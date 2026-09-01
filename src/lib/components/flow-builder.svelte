@@ -63,9 +63,9 @@
 
 <div class="flex flex-col gap-6">
 	<div>
-		<h1 class="text-2xl font-semibold">Flows</h1>
+		<h1 class="text-2xl font-semibold">Actions</h1>
 		<p class="text-muted-foreground">
-			Callable flows become capabilities. Triggered flows become automations.
+			Buttons people tap, and automations that run themselves.
 		</p>
 	</div>
 	<div class="flex flex-col gap-2">
@@ -73,9 +73,7 @@
 			<a class="rounded-lg border px-3 py-2 hover:bg-muted/50" href="/build/flows/{flow.key}">
 				<div class="font-medium">{flow.label}</div>
 				<div class="text-sm text-muted-foreground">
-					{flow.key}
-					{flow.trigger ? ` · ${flow.trigger.when}` : " · callable"}
-					{flow.expose?.length ? ` · ${flow.expose.join(", ")}` : ""}
+					{flow.trigger ? "Runs automatically" : "Button action"}
 				</div>
 			</a>
 		{/each}

@@ -1,40 +1,63 @@
 <script lang="ts">
 	import { page } from "$app/state";
+	import { collectionLabel, featuredViews } from "$lib/app/labels.ts";
 	import { session, runtime } from "$lib/app/session.svelte.ts";
+	import { studioItems } from "$lib/app/studio.ts";
+	import NameDialog from "$lib/components/name-dialog.svelte";
 	import * as DropdownMenu from "$lib/components/ui/dropdown-menu/index.js";
 	import * as Sidebar from "$lib/components/ui/sidebar/index.js";
-	import NameDialog from "$lib/components/name-dialog.svelte";
 	import { sampleApps } from "$lib/runtime/samples.ts";
+	import ArrowLeftIcon from "@lucide/svelte/icons/arrow-left";
 	import BoxIcon from "@lucide/svelte/icons/box";
-	import BoxesIcon from "@lucide/svelte/icons/boxes";
-	import BracesIcon from "@lucide/svelte/icons/braces";
+	import BriefcaseIcon from "@lucide/svelte/icons/briefcase";
 	import Building2Icon from "@lucide/svelte/icons/building-2";
 	import ChevronsUpDownIcon from "@lucide/svelte/icons/chevrons-up-down";
-	import CircuitBoardIcon from "@lucide/svelte/icons/circuit-board";
 	import FileTextIcon from "@lucide/svelte/icons/file-text";
 	import FormInputIcon from "@lucide/svelte/icons/form-input";
-	import HammerIcon from "@lucide/svelte/icons/hammer";
 	import LayersIcon from "@lucide/svelte/icons/layers";
 	import LayoutDashboardIcon from "@lucide/svelte/icons/layout-dashboard";
+	import PencilIcon from "@lucide/svelte/icons/pencil";
 	import PlusIcon from "@lucide/svelte/icons/plus";
+	import ReceiptIcon from "@lucide/svelte/icons/receipt";
+	import SearchIcon from "@lucide/svelte/icons/search";
 	import TableIcon from "@lucide/svelte/icons/table";
 	import UsersIcon from "@lucide/svelte/icons/users";
+	import WalletIcon from "@lucide/svelte/icons/wallet";
 	import WorkflowIcon from "@lucide/svelte/icons/workflow";
-	import type { ComponentProps } from "svelte";
+	import type { Component, ComponentProps } from "svelte";
 
 	let { ref = $bindable(null), ...restProps }: ComponentProps<typeof Sidebar.Root> = $props();
 
 	const snap = $derived(session.snapshot);
 	const spec = $derived(snap?.spec);
 	const path = $derived(page.url.pathname);
+	const studio = $derived(path.startsWith("/build") || path.startsWith("/diagnostics"));
 
-	const views = $derived(spec?.views ?? []);
+	const views = $derived(spec ? featuredViews(spec) : []);
 	const types = $derived(spec?.types ?? []);
 	const pages = $derived((spec?.pages ?? []).filter((item) => !item.implicit));
-	const flows = $derived((spec?.flows ?? []).filter((flow) => flow.expose?.includes("ui")));
 
 	let workspaceOpen = $state(false);
 	let environmentOpen = $state(false);
+
+	const studioIcons: Record<string, Component> = {
+		"/build/types": BoxIcon,
+		"/build/views": TableIcon,
+		"/build/forms": FormInputIcon,
+		"/build/flows": WorkflowIcon,
+		"/build/pages": LayersIcon,
+		"/build/actors": UsersIcon,
+		"/build/spec": FileTextIcon,
+		"/diagnostics": SearchIcon,
+	};
+
+	const typeIcons: Record<string, Component> = {
+		organisation: Building2Icon,
+		contact: UsersIcon,
+		project: BriefcaseIcon,
+		invoice: ReceiptIcon,
+		expense: WalletIcon,
+	};
 
 	async function loadSample(key: string) {
 		await runtime().loadSample(key);
@@ -50,10 +73,10 @@
 						{#snippet child({ props })}
 							<Sidebar.MenuButton {...props} size="lg">
 								<div class="flex aspect-square size-8 items-center justify-center rounded-lg bg-sidebar-primary text-sidebar-primary-foreground">
-									<CircuitBoardIcon />
+									<LayersIcon />
 								</div>
 								<div class="grid flex-1 text-start text-sm leading-tight">
-									<span class="truncate font-medium">builder.run</span>
+									<span class="truncate font-medium">{snap?.workspace.name}</span>
 									<span class="truncate text-xs">{snap?.environment.name}</span>
 								</div>
 								<ChevronsUpDownIcon class="ms-auto" />
@@ -62,36 +85,7 @@
 					</DropdownMenu.Trigger>
 					<DropdownMenu.Content class="min-w-56 rounded-lg" align="start">
 						<DropdownMenu.Group>
-							<DropdownMenu.Label>Environments</DropdownMenu.Label>
-							{#each snap?.environments ?? [] as env (env.id)}
-								<DropdownMenu.Item onSelect={() => runtime().switchEnvironment(env.id)}>
-									<Building2Icon />
-									{env.name}
-								</DropdownMenu.Item>
-							{/each}
-						</DropdownMenu.Group>
-						<DropdownMenu.Separator />
-						<DropdownMenu.Item onSelect={() => (environmentOpen = true)}>
-							<PlusIcon />
-							New environment
-						</DropdownMenu.Item>
-					</DropdownMenu.Content>
-				</DropdownMenu.Root>
-			</Sidebar.MenuItem>
-			<Sidebar.MenuItem>
-				<DropdownMenu.Root>
-					<DropdownMenu.Trigger>
-						{#snippet child({ props })}
-							<Sidebar.MenuButton {...props}>
-								<BoxesIcon />
-								<span>{snap?.workspace.name}</span>
-								<ChevronsUpDownIcon class="ms-auto" />
-							</Sidebar.MenuButton>
-						{/snippet}
-					</DropdownMenu.Trigger>
-					<DropdownMenu.Content class="min-w-56 rounded-lg" align="start">
-						<DropdownMenu.Group>
-							<DropdownMenu.Label>Workspaces</DropdownMenu.Label>
+							<DropdownMenu.Label>Apps</DropdownMenu.Label>
 							{#each snap?.workspaces ?? [] as workspace (workspace.id)}
 								<DropdownMenu.Item onSelect={() => runtime().switchWorkspace(workspace.id)}>
 									{workspace.name}
@@ -99,18 +93,34 @@
 							{/each}
 						</DropdownMenu.Group>
 						<DropdownMenu.Separator />
-						<DropdownMenu.Item onSelect={() => (workspaceOpen = true)}>
-							<PlusIcon />
-							New workspace
-						</DropdownMenu.Item>
+						<DropdownMenu.Group>
+							<DropdownMenu.Item onSelect={() => (workspaceOpen = true)}>
+								<PlusIcon />
+								New app
+							</DropdownMenu.Item>
+						</DropdownMenu.Group>
 						<DropdownMenu.Separator />
 						<DropdownMenu.Group>
-							<DropdownMenu.Label>Gallery</DropdownMenu.Label>
+							<DropdownMenu.Label>Templates</DropdownMenu.Label>
 							{#each sampleApps as sample (sample.key)}
 								<DropdownMenu.Item onSelect={() => loadSample(sample.key)}>
 									{sample.label}
 								</DropdownMenu.Item>
 							{/each}
+						</DropdownMenu.Group>
+						<DropdownMenu.Separator />
+						<DropdownMenu.Group>
+							<DropdownMenu.Label>Places</DropdownMenu.Label>
+							{#each snap?.environments ?? [] as env (env.id)}
+								<DropdownMenu.Item onSelect={() => runtime().switchEnvironment(env.id)}>
+									<Building2Icon />
+									{env.name}
+								</DropdownMenu.Item>
+							{/each}
+							<DropdownMenu.Item onSelect={() => (environmentOpen = true)}>
+								<PlusIcon />
+								New place
+							</DropdownMenu.Item>
 						</DropdownMenu.Group>
 					</DropdownMenu.Content>
 				</DropdownMenu.Root>
@@ -118,131 +128,123 @@
 		</Sidebar.Menu>
 	</Sidebar.Header>
 	<Sidebar.Content>
-		<Sidebar.Group>
-			<Sidebar.GroupLabel>App</Sidebar.GroupLabel>
-			<Sidebar.Menu>
+		{#if studio}
+			<Sidebar.Group>
+				<Sidebar.Menu>
+					<Sidebar.MenuItem>
+						<Sidebar.MenuButton tooltipContent="Back to app">
+							{#snippet child({ props })}
+								<a href="/" {...props}>
+									<ArrowLeftIcon />
+									<span>Back to app</span>
+								</a>
+							{/snippet}
+						</Sidebar.MenuButton>
+					</Sidebar.MenuItem>
+				</Sidebar.Menu>
+			</Sidebar.Group>
+			<Sidebar.Group>
+				<Sidebar.GroupLabel>Edit app</Sidebar.GroupLabel>
+				<Sidebar.Menu>
+					{#each studioItems as item (item.href)}
+						{@const Icon = studioIcons[item.href] ?? BoxIcon}
+						<Sidebar.MenuItem>
+							<Sidebar.MenuButton
+								isActive={path === item.href || path.startsWith(`${item.href}/`)}
+								tooltipContent={item.label}
+							>
+								{#snippet child({ props })}
+									<a href={item.href} {...props}><Icon /><span>{item.label}</span></a>
+								{/snippet}
+							</Sidebar.MenuButton>
+						</Sidebar.MenuItem>
+					{/each}
+				</Sidebar.Menu>
+			</Sidebar.Group>
+		{:else}
+			<Sidebar.Group>
+				<Sidebar.GroupLabel>Menu</Sidebar.GroupLabel>
+				<Sidebar.Menu>
+					<Sidebar.MenuItem>
+						<Sidebar.MenuButton isActive={path === "/"} tooltipContent="Home">
+							{#snippet child({ props })}
+								<a href="/" {...props}>
+									<LayoutDashboardIcon />
+									<span>Home</span>
+								</a>
+							{/snippet}
+						</Sidebar.MenuButton>
+					</Sidebar.MenuItem>
+					{#each views as view (view.id)}
+						<Sidebar.MenuItem>
+							<Sidebar.MenuButton isActive={path === `/v/${view.key}`} tooltipContent={view.label}>
+								{#snippet child({ props })}
+									<a href="/v/{view.key}" {...props}>
+										<TableIcon />
+										<span>{view.label}</span>
+									</a>
+								{/snippet}
+							</Sidebar.MenuButton>
+						</Sidebar.MenuItem>
+					{/each}
+					{#each pages as item (item.id)}
+						<Sidebar.MenuItem>
+							<Sidebar.MenuButton isActive={path === `/p/${item.key}`} tooltipContent={item.label}>
+								{#snippet child({ props })}
+									<a href="/p/{item.key}" {...props}>
+										<FileTextIcon />
+										<span>{item.label}</span>
+									</a>
+								{/snippet}
+							</Sidebar.MenuButton>
+						</Sidebar.MenuItem>
+					{/each}
+				</Sidebar.Menu>
+			</Sidebar.Group>
+			{#if types.length}
+				<Sidebar.Group>
+					<Sidebar.GroupLabel>Records</Sidebar.GroupLabel>
+					<Sidebar.Menu>
+						{#each types as type (type.id)}
+							{@const Icon = typeIcons[type.key] ?? BoxIcon}
+							<Sidebar.MenuItem>
+								<Sidebar.MenuButton isActive={path === `/t/${type.key}` || path.startsWith(`/t/${type.key}/`)} tooltipContent={collectionLabel(type)}>
+									{#snippet child({ props })}
+										<a href="/t/{type.key}" {...props}>
+											<Icon />
+											<span>{collectionLabel(type)}</span>
+										</a>
+									{/snippet}
+								</Sidebar.MenuButton>
+							</Sidebar.MenuItem>
+						{/each}
+					</Sidebar.Menu>
+				</Sidebar.Group>
+			{/if}
+		{/if}
+	</Sidebar.Content>
+	<Sidebar.Footer>
+		<Sidebar.Menu>
+			{#if !studio}
 				<Sidebar.MenuItem>
-					<Sidebar.MenuButton isActive={path === "/"} tooltipContent="Home">
+					<Sidebar.MenuButton isActive={path.startsWith("/build")} tooltipContent="Edit app">
 						{#snippet child({ props })}
-							<a href="/" {...props}>
-								<LayoutDashboardIcon />
-								<span>Home</span>
+							<a href="/build" {...props}>
+								<PencilIcon />
+								<span>Edit app</span>
 							</a>
 						{/snippet}
 					</Sidebar.MenuButton>
 				</Sidebar.MenuItem>
-				{#each views as view (view.id)}
-					<Sidebar.MenuItem>
-						<Sidebar.MenuButton isActive={path === `/v/${view.key}` || path === `/t/${view.source}`} tooltipContent={view.label}>
-							{#snippet child({ props })}
-								<a href="/v/{view.key}" {...props}>
-									<TableIcon />
-									<span>{view.label}</span>
-								</a>
-							{/snippet}
-						</Sidebar.MenuButton>
-					</Sidebar.MenuItem>
-				{/each}
-				{#each pages as item (item.id)}
-					<Sidebar.MenuItem>
-						<Sidebar.MenuButton isActive={path === `/p/${item.key}`} tooltipContent={item.label}>
-							{#snippet child({ props })}
-								<a href="/p/{item.key}" {...props}>
-									<FileTextIcon />
-									<span>{item.label}</span>
-								</a>
-							{/snippet}
-						</Sidebar.MenuButton>
-					</Sidebar.MenuItem>
-				{/each}
-				{#each flows as flow (flow.id)}
-					<Sidebar.MenuItem>
-						<Sidebar.MenuButton tooltipContent={flow.label}>
-							{#snippet child({ props })}
-								<a href="/build/flows/{flow.key}" {...props}>
-									<WorkflowIcon />
-									<span>{flow.label}</span>
-								</a>
-							{/snippet}
-						</Sidebar.MenuButton>
-					</Sidebar.MenuItem>
-				{/each}
-			</Sidebar.Menu>
-		</Sidebar.Group>
-		<Sidebar.Group>
-			<Sidebar.GroupLabel>Build</Sidebar.GroupLabel>
-			<Sidebar.Menu>
-				<Sidebar.MenuItem>
-					<Sidebar.MenuButton isActive={path.startsWith("/build/types")} tooltipContent="Types">
-						{#snippet child({ props })}
-							<a href="/build/types" {...props}><BoxIcon /><span>Types</span></a>
-						{/snippet}
-					</Sidebar.MenuButton>
-				</Sidebar.MenuItem>
-				<Sidebar.MenuItem>
-					<Sidebar.MenuButton isActive={path.startsWith("/build/views")} tooltipContent="Views">
-						{#snippet child({ props })}
-							<a href="/build/views" {...props}><TableIcon /><span>Views</span></a>
-						{/snippet}
-					</Sidebar.MenuButton>
-				</Sidebar.MenuItem>
-				<Sidebar.MenuItem>
-					<Sidebar.MenuButton isActive={path.startsWith("/build/forms")} tooltipContent="Forms">
-						{#snippet child({ props })}
-							<a href="/build/forms" {...props}><FormInputIcon /><span>Forms</span></a>
-						{/snippet}
-					</Sidebar.MenuButton>
-				</Sidebar.MenuItem>
-				<Sidebar.MenuItem>
-					<Sidebar.MenuButton isActive={path.startsWith("/build/flows")} tooltipContent="Flows">
-						{#snippet child({ props })}
-							<a href="/build/flows" {...props}><WorkflowIcon /><span>Flows</span></a>
-						{/snippet}
-					</Sidebar.MenuButton>
-				</Sidebar.MenuItem>
-				<Sidebar.MenuItem>
-					<Sidebar.MenuButton isActive={path.startsWith("/build/pages")} tooltipContent="Pages">
-						{#snippet child({ props })}
-							<a href="/build/pages" {...props}><LayersIcon /><span>Pages</span></a>
-						{/snippet}
-					</Sidebar.MenuButton>
-				</Sidebar.MenuItem>
-				<Sidebar.MenuItem>
-					<Sidebar.MenuButton isActive={path.startsWith("/build/spec")} tooltipContent="Spec">
-						{#snippet child({ props })}
-							<a href="/build/spec" {...props}><BracesIcon /><span>Spec</span></a>
-						{/snippet}
-					</Sidebar.MenuButton>
-				</Sidebar.MenuItem>
-				<Sidebar.MenuItem>
-					<Sidebar.MenuButton isActive={path.startsWith("/build/actors")} tooltipContent="Actors">
-						{#snippet child({ props })}
-							<a href="/build/actors" {...props}><UsersIcon /><span>Actors</span></a>
-						{/snippet}
-					</Sidebar.MenuButton>
-				</Sidebar.MenuItem>
-			</Sidebar.Menu>
-		</Sidebar.Group>
-		<Sidebar.Group class="mt-auto">
-			<Sidebar.GroupLabel>System</Sidebar.GroupLabel>
-			<Sidebar.Menu>
-				<Sidebar.MenuItem>
-					<Sidebar.MenuButton isActive={path.startsWith("/diagnostics")} tooltipContent="Diagnostics">
-						{#snippet child({ props })}
-							<a href="/diagnostics" {...props}><HammerIcon /><span>Diagnostics</span></a>
-						{/snippet}
-					</Sidebar.MenuButton>
-				</Sidebar.MenuItem>
-			</Sidebar.Menu>
-		</Sidebar.Group>
-	</Sidebar.Content>
-	<Sidebar.Footer>
-		<Sidebar.Menu>
+			{/if}
 			<Sidebar.MenuItem>
 				<Sidebar.MenuButton size="lg">
+					<div class="flex size-8 items-center justify-center rounded-lg bg-sidebar-accent text-sidebar-accent-foreground">
+						{snap?.actor.name?.slice(0, 1) ?? "Y"}
+					</div>
 					<div class="grid flex-1 text-start text-sm leading-tight">
 						<span class="truncate font-medium">{snap?.actor.name}</span>
-						<span class="truncate text-xs">{snap?.actor.kind} · {snap?.actor.roles.join(", ")}</span>
+						<span class="truncate text-xs">builder.run</span>
 					</div>
 				</Sidebar.MenuButton>
 			</Sidebar.MenuItem>
@@ -252,16 +254,16 @@
 
 <NameDialog
 	bind:open={workspaceOpen}
-	title="New workspace"
-	description="A workspace has its own spec and SQLite store, and can use shared directory types."
+	title="New app"
+	description="A fresh app in this place. Shared organisations and contacts stay available."
 	onSubmit={async (name) => {
 		await runtime().createWorkspace(name);
 	}}
 />
 <NameDialog
 	bind:open={environmentOpen}
-	title="New environment"
-	description="An environment has its own actors, shared directory, and workspaces."
+	title="New place"
+	description="A separate place for apps, people, and shared contacts."
 	onSubmit={async (name) => {
 		await runtime().createEnvironment(name);
 	}}

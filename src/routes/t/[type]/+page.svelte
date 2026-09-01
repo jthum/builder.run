@@ -1,6 +1,8 @@
 <script lang="ts">
 	import { page } from "$app/state";
+	import { addLabel, collectionLabel } from "$lib/app/labels.ts";
 	import { runtime, session } from "$lib/app/session.svelte.ts";
+	import PageHeader from "$lib/components/page-header.svelte";
 	import RecordTable from "$lib/components/record-table.svelte";
 	import { Button } from "$lib/components/ui/button/index.js";
 	import { implicitViewKey } from "$lib/runtime/defaults.ts";
@@ -13,15 +15,13 @@
 		spec?.views.find((item) => item.key === implicitViewKey(typeKey)) ??
 			spec?.views.find((item) => item.source === typeKey),
 	);
-	let rows = $state<Array<Record<string, unknown>>>([]);
+	let rows = $state<Array<Record<string, unknown>> | null>(null);
 
 	$effect(() => {
 		void session.revision;
 		void typeKey;
-		if (!view) {
-			rows = [];
-			return;
-		}
+		rows = null;
+		if (!view) return;
 		void runtime()
 			.queryView(view.key)
 			.then((result) => {
@@ -31,19 +31,17 @@
 </script>
 
 {#if type && view}
-	<div class="flex flex-col gap-4">
-		<div class="flex items-center justify-between gap-2">
-			<div>
-				<h1 class="text-2xl font-semibold">{type.label}</h1>
-				<p class="text-muted-foreground">{view.label}</p>
-			</div>
-			<Button href="/t/{type.key}/new">
-				<PlusIcon data-icon="inline-start" />
-				New
-			</Button>
-		</div>
+	<div class="flex flex-col gap-6">
+		<PageHeader title={collectionLabel(type)}>
+			{#snippet actions()}
+				<Button href="/t/{type.key}/new">
+					<PlusIcon data-icon="inline-start" />
+					{addLabel(type)}
+				</Button>
+			{/snippet}
+		</PageHeader>
 		<RecordTable {rows} {view} typeKey={type.key} createHref="/t/{type.key}/new" />
 	</div>
 {:else}
-	<p class="text-muted-foreground">Unknown type.</p>
+	<p class="text-muted-foreground">This list isn't in the app.</p>
 {/if}

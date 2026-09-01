@@ -1,62 +1,59 @@
 <script lang="ts">
-	import { session } from "$lib/app/session.svelte.ts";
-	import { buildTools, webmcpSupported } from "$lib/runtime/webmcp.ts";
-	import * as Badge from "$lib/components/ui/badge/index.js";
+	import { runtime, session } from "$lib/app/session.svelte.ts";
+	import PageHeader from "$lib/components/page-header.svelte";
+	import { Badge } from "$lib/components/ui/badge/index.js";
 	import * as Card from "$lib/components/ui/card/index.js";
-	import { runtime } from "$lib/app/session.svelte.ts";
+	import { buildTools, webmcpSupported } from "$lib/runtime/webmcp.ts";
 
 	const tools = $derived(session.host ? buildTools(runtime()) : []);
 </script>
 
 <div class="flex flex-col gap-4">
-	<h1 class="text-2xl font-semibold">Diagnostics</h1>
+	<PageHeader title="Inspect" description="Storage, browser capabilities, and the tools an agent can call. This screen is for debugging, not day-to-day use." />
 	<div class="grid gap-4 md:grid-cols-3">
 		<Card.Root>
 			<Card.Header>
-				<Card.Title>SQLite</Card.Title>
-				<Card.Description>Live records are SQLite tables. VFS is a runtime concern.</Card.Description>
+				<Card.Title>Storage</Card.Title>
+				<Card.Description>Records live in SQLite tables on this device.</Card.Description>
 			</Card.Header>
 			<Card.Content class="flex flex-col gap-2">
-				<Badge.Badge>{session.snapshot?.engine} · {session.snapshot?.backend}</Badge.Badge>
+				<Badge>{session.snapshot?.engine} · {session.snapshot?.backend}</Badge>
 				{#each session.snapshot?.stores ?? [] as store (store.key)}
 					<div class="text-sm">
-						<div class="font-mono">{store.database}</div>
-						<div class="text-muted-foreground">{store.tables.join(", ") || "no tables"}</div>
+						<div class="font-medium">{store.key === "directory" ? "Shared directory" : "This app"}</div>
+						<div class="text-muted-foreground">{store.tables.join(", ") || "no tables yet"}</div>
 					</div>
 				{/each}
 			</Card.Content>
 		</Card.Root>
 		<Card.Root>
 			<Card.Header>
-				<Card.Title>WebMCP</Card.Title>
-				<Card.Description>document.modelContext</Card.Description>
+				<Card.Title>Agent connection</Card.Title>
+				<Card.Description>Whether this browser can register tools for an agent.</Card.Description>
 			</Card.Header>
 			<Card.Content>
-				<Badge.Badge variant={webmcpSupported() ? "default" : "secondary"}>
-					{webmcpSupported() ? "available" : "not in this browser"}
-				</Badge.Badge>
+				<Badge variant={webmcpSupported() ? "default" : "secondary"}>
+					{webmcpSupported() ? "Available in this browser" : "Not in this browser"}
+				</Badge>
 			</Card.Content>
 		</Card.Root>
 		<Card.Root>
 			<Card.Header>
-				<Card.Title>Actor</Card.Title>
+				<Card.Title>Signed in as</Card.Title>
+				<Card.Description>The local person using the app.</Card.Description>
 			</Card.Header>
-			<Card.Content class="text-sm">
-				{session.snapshot?.actor.name} · {session.snapshot?.actor.kind}
-			</Card.Content>
+			<Card.Content class="text-sm">{session.snapshot?.actor.name}</Card.Content>
 		</Card.Root>
 	</div>
 	<Card.Root>
 		<Card.Header>
-			<Card.Title>Registered capability surface</Card.Title>
-			<Card.Description>
-				Builder and app tools derived from the live spec. They register when WebMCP is present.
-			</Card.Description>
+			<Card.Title>Tools</Card.Title>
+			<Card.Description>Builder and app tools taken from the live spec. They register when an agent connection is present.</Card.Description>
 		</Card.Header>
 		<Card.Content class="flex flex-col gap-2">
 			{#each tools as tool (tool.name)}
 				<div class="rounded-lg border px-3 py-2">
-					<div class="font-mono text-sm">{tool.name}</div>
+					<div class="text-sm font-medium">{tool.name}</div>
 					<div class="text-sm text-muted-foreground">{tool.description}</div>
 				</div>
 			{/each}

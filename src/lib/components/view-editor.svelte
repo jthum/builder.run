@@ -54,13 +54,16 @@
 <div class="flex flex-col gap-6">
 	<div>
 		<h1 class="text-2xl font-semibold">Views</h1>
-		<p class="text-muted-foreground">Named queries over the logical application model.</p>
+		<p class="text-muted-foreground">Saved lists with filters, so people see what matters.</p>
 	</div>
 	<div class="flex flex-col gap-2">
 		{#each views as view (view.id)}
 			<a class="rounded-lg border px-3 py-2 hover:bg-muted/50" href="/v/{view.key}">
 				<div class="font-medium">{view.label}</div>
-				<div class="text-sm text-muted-foreground">{view.key} · {view.source}{view.implicit ? " · default" : ""}</div>
+				<div class="text-sm text-muted-foreground">
+					{types.find((type) => type.key === view.source)?.label ?? view.source}
+					{view.implicit ? " · built-in list" : ""}
+				</div>
 			</a>
 		{/each}
 	</div>

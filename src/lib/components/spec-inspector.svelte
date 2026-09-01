@@ -32,8 +32,8 @@
 
 <Card.Root>
 	<Card.Header>
-		<Card.Title>Portable spec</Card.Title>
-		<Card.Description>The spec is the application. Export it, edit it, or let an agent mould it.</Card.Description>
+		<Card.Title>Export</Card.Title>
+		<Card.Description>Download or paste the app definition. This is how an agent moulds the app, and how you take it with you.</Card.Description>
 	</Card.Header>
 	<Card.Content class="flex flex-col gap-4">
 		<ToggleGroup.Root type="single" bind:value={format} spacing={2}>

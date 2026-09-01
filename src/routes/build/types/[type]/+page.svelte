@@ -9,5 +9,5 @@
 {#if type}
 	<TypeEditor {type} />
 {:else}
-	<p class="text-muted-foreground">Unknown type.</p>
+	<p class="text-muted-foreground">This kind of record isn't in the app.</p>
 {/if}

@@ -14,9 +14,16 @@ page.setDefaultTimeout(40000);
 const errors = [];
 page.on("pageerror", (error) => errors.push(String(error)));
 page.on("console", (msg) => {
-  if (msg.type() === "error") errors.push(`console: ${msg.text()}`);
+  if (msg.type() === "error") {
+    if (msg.text().includes("favicon")) return;
+    errors.push(`console: ${msg.text()}`);
+  }
 });
-page.on("requestfailed", (req) => errors.push(`failed ${req.url()} ${req.failure()?.errorText}`));
+page.on("requestfailed", (req) => {
+  const url = req.url();
+  if (url.includes("favicon")) return;
+  errors.push(`failed ${url} ${req.failure()?.errorText}`);
+});
 
 await page.goto(base, { waitUntil: "networkidle0" });
 await page.waitForFunction(
@@ -34,26 +41,35 @@ await page.waitForFunction(
 console.log("text", await page.evaluate(() => document.body?.innerText?.slice(0, 4000)));
 console.log("errors", errors);
 const text = await page.evaluate(() => document.body?.innerText ?? "");
-if (text.includes("Starting") && !text.includes("Home")) {
+if ((text.includes("Starting") || text.includes("Opening")) && !text.includes("Home")) {
   throw new Error(`runtime did not boot\n${errors.join("\n")}\n${text}`);
 }
 
 await page.evaluate(() => {
-  const title = [...document.querySelectorAll("*")].find(
+  const titled = [...document.querySelectorAll("*")].find(
     (el) =>
       el.childNodes.length &&
       [...el.childNodes].some(
         (node) => node.nodeType === 3 && node.textContent?.trim() === "Freelance CRM",
       ),
   );
-  const root = title?.closest("[data-slot='card']") ?? title?.parentElement?.parentElement;
+  const root = titled?.closest("[data-slot='card']") ?? titled?.parentElement?.parentElement;
   const button = [...(root?.querySelectorAll("button") ?? [])].find(
-    (el) => el.textContent?.trim() === "Load",
+    (el) =>
+      el.getAttribute("data-sample") === "freelance_crm" ||
+      el.textContent?.trim() === "Use template" ||
+      el.textContent?.trim() === "Load",
   );
-  if (!button) throw new Error("Freelance CRM Load not found");
+  if (!button) throw new Error("Freelance CRM template button not found");
   button.click();
 });
 await page.waitForFunction(() => document.body.innerText.includes("Invoice"));
+{
+  const loaded = await page.evaluate(() => document.body.innerText);
+  if (loaded.includes("spec is canonical") || loaded.includes("actor.kind")) {
+    throw new Error(`App chrome still dumps internals:\n${loaded.slice(0, 2000)}`);
+  }
+}
 await page.goto(`${base}/t/organisation/new`, { waitUntil: "networkidle0" });
 await page.waitForSelector("input");
 const nameInput = await page.$("input");
@@ -62,7 +78,8 @@ await nameInput.click({ clickCount: 3 });
 await nameInput.type("Acme");
 await page.evaluate(() => {
   const button = [...document.querySelectorAll("button")].find(
-    (el) => el.textContent?.trim() === "Create",
+    (el) =>
+      el.getAttribute("data-testid") === "record-submit" || /\bAdd\b/i.test(el.textContent ?? ""),
   );
   button?.click();
 });
@@ -71,7 +88,11 @@ await page.waitForFunction(
 );
 
 await page.reload({ waitUntil: "networkidle0" });
-await page.waitForFunction(() => document.body.innerText.includes("builder.run"));
+await page.waitForFunction(
+  () =>
+    document.body.innerText.includes("builder.run") ||
+    document.body.innerText.includes("Freelance CRM"),
+);
 await page.goto(`${base}/t/organisation`, { waitUntil: "networkidle0" });
 await page.waitForFunction(() => document.body.innerText.includes("Acme"));
 

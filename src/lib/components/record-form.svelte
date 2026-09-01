@@ -1,14 +1,17 @@
 <script lang="ts">
+	import { addLabel } from "$lib/app/labels.ts";
+	import { runtime, session } from "$lib/app/session.svelte.ts";
+	import ReferencePicker from "$lib/components/reference-picker.svelte";
+	import * as Alert from "$lib/components/ui/alert/index.js";
 	import { Button } from "$lib/components/ui/button/index.js";
 	import { Checkbox } from "$lib/components/ui/checkbox/index.js";
 	import * as Field from "$lib/components/ui/field/index.js";
 	import { Input } from "$lib/components/ui/input/index.js";
 	import * as NativeSelect from "$lib/components/ui/native-select/index.js";
 	import { Spinner } from "$lib/components/ui/spinner/index.js";
-	import { runtime, session } from "$lib/app/session.svelte.ts";
-	import { fieldWidget, findType } from "$lib/runtime/query.ts";
+	import { labelFromKey } from "$lib/runtime/ids.ts";
 	import type { FieldDef, FormDef, RecordValue, TypeDef } from "$lib/runtime/model.ts";
-	import ReferencePicker from "$lib/components/reference-picker.svelte";
+	import { fieldWidget, findType } from "$lib/runtime/query.ts";
 
 	let {
 		type,
@@ -40,7 +43,7 @@
 	});
 
 	async function optionsFor(field: FieldDef) {
-		if (field.type === "enum") return (field.values ?? []).map((value) => ({ id: value, label: value }));
+		if (field.type === "enum") return (field.values ?? []).map((value) => ({ id: value, label: labelFromKey(value) }));
 		if (field.type !== "reference" || !field.target || !session.host) return [];
 		const ctx = runtime().queryContext();
 		const target = findType(ctx, field.target);
@@ -99,11 +102,11 @@
 					<ReferencePicker
 						bind:value={values[field.key] as string}
 						options={refOptions[field.key] ?? []}
-						placeholder={`Select ${field.label}`}
+						placeholder={`Select ${field.label.toLowerCase()}`}
 					/>
 				{:else if widget === "select"}
 					<NativeSelect.Root class="w-full" bind:value={values[field.key] as string}>
-						<NativeSelect.Option value="">Select {field.label}</NativeSelect.Option>
+						<NativeSelect.Option value="">Select {field.label.toLowerCase()}</NativeSelect.Option>
 						{#each refOptions[field.key] ?? [] as option (option.id)}
 							<NativeSelect.Option value={option.id}>{option.label}</NativeSelect.Option>
 						{/each}
@@ -119,12 +122,15 @@
 		{/each}
 	</Field.Group>
 	{#if error}
-		<p class="text-sm text-destructive">{error}</p>
+		<Alert.Root variant="destructive">
+			<Alert.Title>Couldn't save</Alert.Title>
+			<Alert.Description>{error}</Alert.Description>
+		</Alert.Root>
 	{/if}
 	<div class="flex gap-2">
-		<Button type="submit" disabled={pending}>
+		<Button type="submit" disabled={pending} data-testid="record-submit">
 			{#if pending}<Spinner data-icon="inline-start" />{/if}
-			{record ? "Save" : "Create"}
+			{record ? "Save" : addLabel(type)}
 		</Button>
 	</div>
 </form>

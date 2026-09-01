@@ -50,13 +50,13 @@
 <div class="flex flex-col gap-6">
 	<div>
 		<h1 class="text-2xl font-semibold">Pages</h1>
-		<p class="text-muted-foreground">Compose views, forms, actions, and text. Defaults already cover type pages.</p>
+		<p class="text-muted-foreground">Custom screens made of lists, forms, and actions. Record lists are already covered.</p>
 	</div>
 	<div class="flex flex-col gap-2">
 		{#each pages as page (page.id)}
 			<a class="rounded-lg border px-3 py-2 hover:bg-muted/50" href="/p/{page.key}">
 				<div class="font-medium">{page.label}</div>
-				<div class="text-sm text-muted-foreground">{page.key}{page.implicit ? " · default" : ""}</div>
+				<div class="text-sm text-muted-foreground">{page.implicit ? "Built-in record list" : "Custom screen"}</div>
 			</a>
 		{/each}
 	</div>

@@ -51,15 +51,16 @@
 <div class="flex flex-col gap-6">
 	<div>
 		<h1 class="text-2xl font-semibold">Forms</h1>
-		<p class="text-muted-foreground">Reusable input. Types already get default create and edit forms.</p>
+		<p class="text-muted-foreground">Screens for adding and editing. Each kind of record already has a built-in pair.</p>
 	</div>
 	<div class="flex flex-col gap-2">
 		{#each forms as form (form.id)}
 			<a class="rounded-lg border px-3 py-2 hover:bg-muted/50" href="/build/forms/{form.key}">
 				<div class="font-medium">{form.label}</div>
 				<div class="text-sm text-muted-foreground">
-					{form.key} · {form.mode} · {form.type}{form.implicit ? " · default" : ""}
-					{form.submit?.flow ? ` · ${form.submit.flow}` : ""}
+					{form.mode === "create" ? "Add" : "Edit"}
+					{types.find((type) => type.key === form.type)?.label ?? form.type}
+					{form.implicit ? " · built-in" : ""}
 				</div>
 			</a>
 		{/each}

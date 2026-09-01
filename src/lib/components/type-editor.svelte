@@ -42,9 +42,7 @@
 		<Card.Header>
 			<Card.Title>{type.label}</Card.Title>
 			<Card.Description>
-				<code>{type.key}</code>
-				in store
-				<code>{type.store}</code>
+				{type.store === "directory" ? "Shared across apps in this place." : "Stored only in this app."}
 			</Card.Description>
 		</Card.Header>
 		<Card.Content class="flex flex-col gap-3">

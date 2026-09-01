@@ -2,6 +2,7 @@
 	import "./layout.css";
 	import { onMount } from "svelte";
 	import { ModeWatcher } from "mode-watcher";
+	import { breadcrumbFor } from "$lib/app/labels.ts";
 	import { boot, session } from "$lib/app/session.svelte.ts";
 	import AppSidebar from "$lib/components/app-sidebar.svelte";
 	import * as Breadcrumb from "$lib/components/ui/breadcrumb/index.js";
@@ -10,7 +11,6 @@
 	import { Spinner } from "$lib/components/ui/spinner/index.js";
 	import { Toaster } from "$lib/components/ui/sonner/index.js";
 	import { page } from "$app/state";
-	import favicon from "$lib/assets/favicon.svg";
 
 	let { children } = $props();
 
@@ -18,12 +18,21 @@
 		void boot();
 	});
 
-	const crumbs = $derived(page.url.pathname.split("/").filter(Boolean));
+	const crumbs = $derived(
+		page.url.pathname === "/"
+			? [{ label: session.snapshot?.workspace.name ?? "Home" }]
+			: breadcrumbFor(page.url.pathname, session.snapshot?.spec),
+	);
+	const docTitle = $derived(
+		page.url.pathname === "/"
+			? `${session.snapshot?.workspace.name ?? "builder.run"}`
+			: `${crumbs.at(-1)?.label ?? "builder.run"} · ${session.snapshot?.workspace.name ?? "builder.run"}`,
+	);
 </script>
 
 <svelte:head>
-	<title>builder.run</title>
-	<link rel="icon" href={favicon} />
+	<title>{docTitle}</title>
+	<link rel="icon" href="/favicon.svg" />
 </svelte:head>
 
 <ModeWatcher />
@@ -32,7 +41,7 @@
 {#if !session.ready && !session.error}
 	<div class="flex min-h-svh items-center justify-center gap-2 text-muted-foreground">
 		<Spinner />
-		Starting builder.run
+		Opening your workspace
 	</div>
 {:else if session.error}
 	<div class="flex min-h-svh items-center justify-center p-6">
@@ -48,16 +57,15 @@
 					<Separator orientation="vertical" class="me-2 data-[orientation=vertical]:h-4" />
 					<Breadcrumb.Root>
 						<Breadcrumb.List>
-							<Breadcrumb.Item>
-								<Breadcrumb.Link href="/">builder.run</Breadcrumb.Link>
-							</Breadcrumb.Item>
-							{#each crumbs as crumb, index (crumb)}
-								<Breadcrumb.Separator />
+							{#each crumbs as crumb, index (crumb.label + (crumb.href ?? "") + index)}
+								{#if index > 0}
+									<Breadcrumb.Separator />
+								{/if}
 								<Breadcrumb.Item>
-									{#if index === crumbs.length - 1}
-										<Breadcrumb.Page class="capitalize">{crumb}</Breadcrumb.Page>
+									{#if index === crumbs.length - 1 || !crumb.href}
+										<Breadcrumb.Page>{crumb.label}</Breadcrumb.Page>
 									{:else}
-										<Breadcrumb.Link class="capitalize" href="/{crumbs.slice(0, index + 1).join('/')}">{crumb}</Breadcrumb.Link>
+										<Breadcrumb.Link href={crumb.href}>{crumb.label}</Breadcrumb.Link>
 									{/if}
 								</Breadcrumb.Item>
 							{/each}

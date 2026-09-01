@@ -40,7 +40,7 @@ export const sampleApps: SampleApp[] = [
   {
     key: "project_tracker",
     label: "Project tracker",
-    description: "Clients, projects, statuses, and a complete-project flow.",
+    description: "Keep projects moving — from planned to done.",
     spec: normalizeSpec({
       key: "project_tracker",
       label: "Project tracker",
@@ -80,7 +80,7 @@ export const sampleApps: SampleApp[] = [
   {
     key: "expense_approval",
     label: "Expense approval",
-    description: "Guarded status changes and a triggered paid-date stamp.",
+    description: "Submit, approve, and mark expenses paid.",
     spec: normalizeSpec({
       key: "expense_approval",
       label: "Expense approval",
@@ -127,7 +127,7 @@ export const sampleApps: SampleApp[] = [
   {
     key: "freelance_crm",
     label: "Freelance CRM",
-    description: "Clients, projects, invoices, views, and a paid-date automation.",
+    description: "Clients, projects, and invoices — unpaid work in one place.",
     spec: normalizeSpec({
       key: "freelance_crm",
       label: "Freelance CRM",
