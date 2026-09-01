@@ -57,6 +57,43 @@ types:
     expect(spec.types[0]?.fields.map((field) => field.key)).toEqual(["title", "done"]);
   });
 
+  it("walks the freelance CRM mould-and-use loop", async () => {
+    expect.hasAssertions();
+    const host = await Host.open({ persist: false });
+    await host.loadSample("freelance_crm");
+    const org = await host.create("organisation", { name: "Acme" });
+    const project = await host.create("project", {
+      name: "Website redesign",
+      client: org.id,
+      status: "active",
+      budget: 8000,
+    });
+    const invoice = await host.create("invoice", {
+      number: "INV-1",
+      project: project.id,
+      amount: 8000,
+      status: "sent",
+    });
+    await host.invoke("mark_invoice_paid", { invoice: invoice.id });
+    const paid = await host.getRecord("invoice", invoice.id);
+    expect(paid?.status).toBe("paid");
+    expect(paid?.paid_at).toBeTruthy();
+    await host.upsertField("project", {
+      key: "priority",
+      type: "enum",
+      values: ["low", "medium", "high"],
+    });
+    await host.update("project", project.id, { priority: "high" });
+    const moulded = await host.getRecord("project", project.id);
+    expect(moulded?.priority).toBe("high");
+    const info = await host.inspectStore("local");
+    expect(
+      info.tables
+        .find((table) => table.name === "project")
+        ?.columns.some((column) => column.startsWith("priority ")),
+    ).toBe(true);
+  });
+
   it("keeps actors as the permission subject", async () => {
     expect.hasAssertions();
     const host = await Host.open({ persist: false });

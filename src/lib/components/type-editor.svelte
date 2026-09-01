@@ -54,9 +54,16 @@
 						<div class="font-medium">{field.label}</div>
 						<div class="text-muted-foreground">{field.key} · {field.type}{field.target ? ` → ${field.target}` : ""}</div>
 					</div>
-					{#if field.required}
-						<span class="text-xs text-muted-foreground">required</span>
-					{/if}
+					<div class="flex items-center gap-2">
+						{#if field.required}
+							<span class="text-xs text-muted-foreground">required</span>
+						{/if}
+						<Button
+							size="sm"
+							variant="ghost"
+							onclick={() => runtime().deleteField(type.key, field.key)}>Remove</Button
+						>
+					</div>
 				</div>
 			{/each}
 		</Card.Content>

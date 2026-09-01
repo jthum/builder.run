@@ -1,0 +1,62 @@
+<script lang="ts">
+	import { Button } from "$lib/components/ui/button/index.js";
+	import * as Dialog from "$lib/components/ui/dialog/index.js";
+	import * as Field from "$lib/components/ui/field/index.js";
+	import { Input } from "$lib/components/ui/input/index.js";
+
+	let {
+		open = $bindable(false),
+		title,
+		description,
+		label = "Name",
+		confirm = "Create",
+		onSubmit,
+	}: {
+		open?: boolean;
+		title: string;
+		description?: string;
+		label?: string;
+		confirm?: string;
+		onSubmit: (name: string) => Promise<void> | void;
+	} = $props();
+
+	let name = $state("");
+	let pending = $state(false);
+
+	$effect(() => {
+		if (open) name = "";
+	});
+
+	async function submit(event: Event) {
+		event.preventDefault();
+		if (!name.trim()) return;
+		pending = true;
+		try {
+			await onSubmit(name.trim());
+			open = false;
+		} finally {
+			pending = false;
+		}
+	}
+</script>
+
+<Dialog.Root bind:open>
+	<Dialog.Content>
+		<form class="flex flex-col gap-4" onsubmit={submit}>
+			<Dialog.Header>
+				<Dialog.Title>{title}</Dialog.Title>
+				{#if description}
+					<Dialog.Description>{description}</Dialog.Description>
+				{/if}
+			</Dialog.Header>
+			<Field.Field>
+				<Field.Label>{label}</Field.Label>
+				<Input bind:value={name} />
+			</Field.Field>
+			<Dialog.Footer>
+				<Button type="button" variant="outline" onclick={() => (open = false)}>Cancel</Button>
+				<Button type="submit" disabled={pending || !name.trim()}>{confirm}</Button>
+			</Dialog.Footer>
+		</form>
+	</Dialog.Content>
+</Dialog.Root>

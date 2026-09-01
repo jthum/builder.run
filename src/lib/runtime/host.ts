@@ -65,7 +65,6 @@ export class Host {
   private engines = new Map<string, TableEngine>();
   private listeners = new Set<Listener>();
   private persistEnabled = true;
-  private writing = false;
   private storeTables = new Map<string, string[]>();
 
   static async open(options: HostOptions = {}): Promise<Host> {
@@ -93,14 +92,9 @@ export class Host {
     return () => this.listeners.delete(listener);
   }
 
-  private emit(): void {
+  private async persistAndEmit(): Promise<void> {
+    await this.saveCatalog();
     for (const listener of this.listeners) listener();
-    if (!this.writing) {
-      this.writing = true;
-      void this.saveCatalog().finally(() => {
-        this.writing = false;
-      });
-    }
   }
 
   private async saveCatalog(): Promise<void> {
@@ -307,7 +301,7 @@ export class Host {
         queue.push(...run.changes);
       }
     }
-    this.emit();
+    await this.persistAndEmit();
   }
 
   async upsertType(draft: Partial<TypeDef> & { key: string }): Promise<TypeDef> {
@@ -332,7 +326,7 @@ export class Host {
       workspace.spec = applyDefaults(next);
     }
     await this.reconcileAll();
-    this.emit();
+    await this.persistAndEmit();
     return type;
   }
 
@@ -344,7 +338,49 @@ export class Host {
       (type) => type.key !== key,
     );
     await this.reconcileAll();
-    this.emit();
+    await this.persistAndEmit();
+  }
+
+  async renameField(typeKey: string, from: string, to: string): Promise<FieldDef> {
+    const type = this.findWritableType(typeKey);
+    const field = type.fields.find((item) => item.key === from);
+    if (!field) throw new Error(`Unknown field ${from}`);
+    if (field.label === labelFromKey(from)) field.label = labelFromKey(to);
+    field.key = to;
+    await this.reconcileAll();
+    await this.persistAndEmit();
+    return field;
+  }
+
+  async deleteField(typeKey: string, key: string): Promise<void> {
+    const type = this.findWritableType(typeKey);
+    type.fields = type.fields.filter((item) => item.key !== key);
+    await this.reconcileAll();
+    await this.persistAndEmit();
+  }
+
+  async submitForm(
+    formKey: string,
+    values: Record<string, unknown>,
+    recordId?: string,
+  ): Promise<RecordValue | null> {
+    const spec = this.resolvedSpec();
+    const form = spec.forms.find((item) => item.key === formKey);
+    if (!form) throw new Error(`Unknown form ${formKey}`);
+    let record: RecordValue | null = null;
+    if (recordId) {
+      record = await this.update(form.type, recordId, values);
+    } else if (form.mode !== "custom" || !form.submit?.flow) {
+      record = await this.create(form.type, values);
+    }
+    if (form.submit?.flow) {
+      await this.invoke(form.submit.flow, {
+        ...(record ? { [form.type]: record.id } : {}),
+        ...values,
+      });
+      if (record) record = await this.getRecord(form.type, record.id);
+    }
+    return record;
   }
 
   async upsertField(
@@ -368,7 +404,7 @@ export class Host {
         ];
     type.fields = next;
     await this.reconcileAll();
-    this.emit();
+    await this.persistAndEmit();
     return next.find((item) => item.key === field.key) as FieldDef;
   }
 
@@ -382,7 +418,7 @@ export class Host {
       ...draft,
     });
     this.workspace().spec = applyDefaults({ ...spec, views });
-    this.emit();
+    await this.persistAndEmit();
     return views.find((item) => item.key === draft.key) as ViewDef;
   }
 
@@ -397,7 +433,7 @@ export class Host {
       ...draft,
     } as FormDef);
     this.workspace().spec = applyDefaults({ ...spec, forms });
-    this.emit();
+    await this.persistAndEmit();
     return forms.find((item) => item.key === draft.key) as FormDef;
   }
 
@@ -410,7 +446,7 @@ export class Host {
       ...draft,
     });
     this.workspace().spec = { ...spec, flows };
-    this.emit();
+    await this.persistAndEmit();
     return flows.find((item) => item.key === draft.key) as FlowDef;
   }
 
@@ -423,7 +459,7 @@ export class Host {
       ...draft,
     });
     this.workspace().spec = applyDefaults({ ...spec, pages });
-    this.emit();
+    await this.persistAndEmit();
     return pages.find((item) => item.key === draft.key) as PageDef;
   }
 
@@ -431,7 +467,7 @@ export class Host {
     const workspace = this.workspace();
     workspace.spec = applyDefaults(normalizeSpec(input as never, workspace.spec));
     await this.reconcileAll();
-    this.emit();
+    await this.persistAndEmit();
     return this.resolvedSpec();
   }
 
@@ -458,7 +494,7 @@ export class Host {
     env.activeWorkspaceId = workspace.id;
     await this.bootEngines();
     await this.reconcileAll();
-    this.emit();
+    await this.persistAndEmit();
     return workspace;
   }
 
@@ -468,7 +504,7 @@ export class Host {
     env.activeWorkspaceId = id;
     await this.bootEngines();
     await this.reconcileAll();
-    this.emit();
+    await this.persistAndEmit();
   }
 
   async createEnvironment(name: string): Promise<EnvironmentState> {
@@ -477,7 +513,7 @@ export class Host {
     this.platform.activeEnvironmentId = env.id;
     await this.bootEngines();
     await this.reconcileAll();
-    this.emit();
+    await this.persistAndEmit();
     return env;
   }
 
@@ -487,7 +523,7 @@ export class Host {
     this.platform.activeEnvironmentId = id;
     await this.bootEngines();
     await this.reconcileAll();
-    this.emit();
+    await this.persistAndEmit();
   }
 
   async loadSample(key: string): Promise<WorkspaceState> {

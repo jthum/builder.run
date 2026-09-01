@@ -23,11 +23,14 @@ export function webmcpSupported(): boolean {
 export function createWebMcpBridge(host: Host): () => void {
   if (!supported()) return () => undefined;
   let controller = new AbortController();
+  let queue: Promise<void> = Promise.resolve();
 
   const refresh = () => {
-    controller.abort();
-    controller = new AbortController();
-    void registerAll(host, controller.signal);
+    queue = queue.then(async () => {
+      controller.abort();
+      controller = new AbortController();
+      await registerAll(host, controller.signal);
+    });
   };
 
   refresh();
@@ -143,7 +146,8 @@ export function buildTools(host: Host): ToolDefinition[] {
       inputSchema: {
         type: "object",
         properties: {
-          type: { type: "string" },
+          type: { type: "string", description: "Type key" },
+          type_key: { type: "string", description: "Alias for type" },
           key: { type: "string" },
           label: { type: "string" },
           field_type: { type: "string" },
@@ -151,11 +155,11 @@ export function buildTools(host: Host): ToolDefinition[] {
           values: { type: "array", items: { type: "string" } },
           target: { type: "string" },
         },
-        required: ["type", "key"],
+        required: ["key"],
         additionalProperties: false,
       },
       execute: async (input) =>
-        host.upsertField(String(input.type), {
+        host.upsertField(String(input.type_key ?? input.type), {
           key: String(input.key),
           label: input.label as string | undefined,
           type: (input.field_type as never) || "text",
@@ -163,6 +167,41 @@ export function buildTools(host: Host): ToolDefinition[] {
           values: input.values as string[] | undefined,
           target: input.target as string | undefined,
         }),
+    },
+    {
+      name: "rename_field",
+      title: "Rename a field",
+      description: "Rename a field key while keeping its identity and stored values.",
+      inputSchema: {
+        type: "object",
+        properties: {
+          type: { type: "string" },
+          from: { type: "string" },
+          to: { type: "string" },
+        },
+        required: ["type", "from", "to"],
+        additionalProperties: false,
+      },
+      execute: async (input) =>
+        host.renameField(String(input.type), String(input.from), String(input.to)),
+    },
+    {
+      name: "delete_field",
+      title: "Delete a field",
+      description: "Remove a field from a type and drop its SQLite column.",
+      inputSchema: {
+        type: "object",
+        properties: {
+          type: { type: "string" },
+          key: { type: "string" },
+        },
+        required: ["type", "key"],
+        additionalProperties: false,
+      },
+      execute: async (input) => {
+        await host.deleteField(String(input.type), String(input.key));
+        return { ok: true };
+      },
     },
     {
       name: "upsert_view",

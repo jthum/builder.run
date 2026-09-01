@@ -51,7 +51,7 @@
 				<Button variant="destructive" onclick={remove}>Delete</Button>
 			</div>
 		</div>
-		<RecordForm {type} {record} fields={form?.fields} />
+		<RecordForm {type} {record} {form} fields={form?.fields} />
 	</div>
 {:else}
 	<p class="text-muted-foreground">Record not found.</p>

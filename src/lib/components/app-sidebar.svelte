@@ -3,6 +3,7 @@
 	import { session, runtime } from "$lib/app/session.svelte.ts";
 	import * as DropdownMenu from "$lib/components/ui/dropdown-menu/index.js";
 	import * as Sidebar from "$lib/components/ui/sidebar/index.js";
+	import NameDialog from "$lib/components/name-dialog.svelte";
 	import { sampleApps } from "$lib/runtime/samples.ts";
 	import BoxIcon from "@lucide/svelte/icons/box";
 	import BoxesIcon from "@lucide/svelte/icons/boxes";
@@ -32,17 +33,8 @@
 	const pages = $derived((spec?.pages ?? []).filter((item) => !item.implicit));
 	const flows = $derived((spec?.flows ?? []).filter((flow) => flow.expose?.includes("ui")));
 
-	async function addWorkspace() {
-		const name = prompt("Workspace name");
-		if (!name) return;
-		await runtime().createWorkspace(name);
-	}
-
-	async function addEnvironment() {
-		const name = prompt("Environment name");
-		if (!name) return;
-		await runtime().createEnvironment(name);
-	}
+	let workspaceOpen = $state(false);
+	let environmentOpen = $state(false);
 
 	async function loadSample(key: string) {
 		await runtime().loadSample(key);
@@ -79,7 +71,7 @@
 							{/each}
 						</DropdownMenu.Group>
 						<DropdownMenu.Separator />
-						<DropdownMenu.Item onSelect={addEnvironment}>
+						<DropdownMenu.Item onSelect={() => (environmentOpen = true)}>
 							<PlusIcon />
 							New environment
 						</DropdownMenu.Item>
@@ -107,7 +99,7 @@
 							{/each}
 						</DropdownMenu.Group>
 						<DropdownMenu.Separator />
-						<DropdownMenu.Item onSelect={addWorkspace}>
+						<DropdownMenu.Item onSelect={() => (workspaceOpen = true)}>
 							<PlusIcon />
 							New workspace
 						</DropdownMenu.Item>
@@ -257,3 +249,20 @@
 		</Sidebar.Menu>
 	</Sidebar.Footer>
 </Sidebar.Root>
+
+<NameDialog
+	bind:open={workspaceOpen}
+	title="New workspace"
+	description="A workspace has its own spec and SQLite store, and can use shared directory types."
+	onSubmit={async (name) => {
+		await runtime().createWorkspace(name);
+	}}
+/>
+<NameDialog
+	bind:open={environmentOpen}
+	title="New environment"
+	description="An environment has its own actors, shared directory, and workspaces."
+	onSubmit={async (name) => {
+		await runtime().createEnvironment(name);
+	}}
+/>

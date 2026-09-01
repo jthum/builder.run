@@ -8,6 +8,7 @@ import wasmUrl from "wa-sqlite/dist/wa-sqlite-async.wasm?url";
 
 let sqlite3 = null;
 let backend = "memory";
+let selectedVfs = null;
 const dbs = new Map();
 
 async function boot() {
@@ -21,33 +22,42 @@ async function boot() {
 }
 
 async function registerVfs(module, sqlite) {
+  const candidates = [];
   if (globalThis.navigator?.storage?.getDirectory) {
-    try {
-      const vfs = new OriginPrivateFileSystemVFS();
-      sqlite.vfs_register(vfs, true);
-      await probe(sqlite);
-      return "opfs";
-    } catch (error) {
-      console.warn("builder.run OPFS SQLite unavailable", error);
-    }
+    candidates.push({
+      backend: "opfs",
+      create: () => new OriginPrivateFileSystemVFS(),
+    });
   }
   if (typeof indexedDB !== "undefined") {
+    candidates.push({
+      backend: "indexeddb",
+      create: () => new IDBBatchAtomicVFS("builder-run-sqlite"),
+    });
+  }
+  candidates.push({
+    backend: "memory",
+    create: () => new MemoryAsyncVFS(),
+  });
+
+  let lastError;
+  for (const candidate of candidates) {
     try {
-      const vfs = new IDBBatchAtomicVFS("builder-run-sqlite");
-      sqlite.vfs_register(vfs, true);
-      await probe(sqlite);
-      return "indexeddb";
+      const vfs = candidate.create();
+      sqlite.vfs_register(vfs, false);
+      await probe(sqlite, vfs.name);
+      selectedVfs = vfs.name;
+      return candidate.backend;
     } catch (error) {
-      console.warn("builder.run IndexedDB SQLite unavailable", error);
+      lastError = error;
+      console.warn(`builder.run ${candidate.backend} SQLite unavailable`, error);
     }
   }
-  const vfs = new MemoryAsyncVFS();
-  sqlite.vfs_register(vfs, true);
-  return "memory";
+  throw lastError ?? new Error("No SQLite VFS could be registered");
 }
 
-async function probe(sqlite) {
-  const db = await sqlite.open_v2("__builder_run_probe__");
+async function probe(sqlite, vfsName) {
+  const db = await sqlite.open_v2("__builder_run_probe__", undefined, vfsName);
   try {
     await sqlite.exec(
       db,
@@ -62,7 +72,7 @@ async function openDb(name) {
   const sqlite = await boot();
   const existing = dbs.get(name);
   if (existing != null) return existing;
-  const db = await sqlite.open_v2(name);
+  const db = await sqlite.open_v2(name, undefined, selectedVfs);
   dbs.set(name, db);
   return db;
 }

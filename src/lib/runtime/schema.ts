@@ -105,12 +105,15 @@ export async function reconcileStore(engine: TableEngine, types: TypeDef[]): Pro
       identity.table_name &&
       identity.column_name
     ) {
-      try {
-        await engine.dropColumn(identity.table_name, identity.column_name);
-        changes.push(`drop ${identity.table_name}.${identity.column_name}`);
-      } catch {
-        // Some engines may not support DROP COLUMN; leave the physical column.
+      if (
+        ["id", "created_at", "updated_at", "created_by", "updated_by"].includes(
+          identity.column_name,
+        )
+      ) {
+        continue;
       }
+      await engine.dropColumn(identity.table_name, identity.column_name);
+      changes.push(`drop ${identity.table_name}.${identity.column_name}`);
       await engine.delete(META_TABLE, identity.id);
     }
   }

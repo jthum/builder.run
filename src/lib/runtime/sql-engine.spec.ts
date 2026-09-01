@@ -29,6 +29,39 @@ describe("sqlite materialisation", () => {
     expect(directory.tables.some((table) => table.name === "organisation")).toBe(true);
   });
 
+  it("renames and drops columns without losing other values", async () => {
+    expect.hasAssertions();
+    const host = await Host.open({ persist: false });
+    await host.upsertType({
+      key: "project",
+      fields: [
+        { key: "name", type: "text", label: "Name", id: "fld_name" },
+        { key: "note", type: "text", label: "Note", id: "fld_note" },
+      ] as never,
+    });
+    const created = await host.create("project", { name: "Acme", note: "keep me" });
+    await host.renameField("project", "note", "summary");
+    let row = await host.getRecord("project", created.id);
+    expect(row?.summary).toBe("keep me");
+    expect(row?.note).toBeUndefined();
+    await host.upsertField("project", {
+      key: "priority",
+      type: "enum",
+      values: ["low", "medium", "high"],
+    });
+    await host.update("project", created.id, { priority: "high" });
+    row = await host.getRecord("project", created.id);
+    expect(row?.priority).toBe("high");
+    await host.deleteField("project", "summary");
+    const info = await host.inspectStore("local");
+    const project = info.tables.find((table) => table.name === "project");
+    expect(project?.columns.some((column) => column.startsWith("summary "))).toBe(false);
+    expect(project?.columns.some((column) => column.startsWith("priority "))).toBe(true);
+    row = await host.getRecord("project", created.id);
+    expect(row?.name).toBe("Acme");
+    expect(row?.priority).toBe("high");
+  });
+
   it("emits readable CREATE TABLE SQL", () => {
     expect.hasAssertions();
     const sql = createTableSql("project", [

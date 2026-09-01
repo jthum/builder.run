@@ -7,18 +7,21 @@
 	import { Spinner } from "$lib/components/ui/spinner/index.js";
 	import { runtime, session } from "$lib/app/session.svelte.ts";
 	import { fieldWidget, findType } from "$lib/runtime/query.ts";
-	import type { FieldDef, RecordValue, TypeDef } from "$lib/runtime/model.ts";
+	import type { FieldDef, FormDef, RecordValue, TypeDef } from "$lib/runtime/model.ts";
+	import ReferencePicker from "$lib/components/reference-picker.svelte";
 
 	let {
 		type,
 		record = null,
 		fields,
+		form = null,
 		onSaved,
 	}: {
 		type: TypeDef;
 		record?: RecordValue | null;
 		fields?: string[];
-		onSaved?: (record: RecordValue) => void;
+		form?: FormDef | null;
+		onSaved?: (record: RecordValue | null) => void;
 	} = $props();
 
 	const keys = $derived(fields?.length ? fields : type.fields.map((field) => field.key));
@@ -70,9 +73,11 @@
 		error = null;
 		try {
 			const payload = { ...values };
-			const saved = record
-				? await runtime().update(type.key, record.id, payload)
-				: await runtime().create(type.key, payload);
+			const saved = form
+				? await runtime().submitForm(form.key, payload, record?.id)
+				: record
+					? await runtime().update(type.key, record.id, payload)
+					: await runtime().create(type.key, payload);
 			onSaved?.(saved);
 		} catch (err) {
 			error = err instanceof Error ? err.message : String(err);
@@ -90,7 +95,13 @@
 				<Field.Label>{field.label}</Field.Label>
 				{#if widget === "checkbox"}
 					<Checkbox bind:checked={values[field.key] as boolean} />
-				{:else if widget === "select" || widget === "reference"}
+				{:else if widget === "reference"}
+					<ReferencePicker
+						bind:value={values[field.key] as string}
+						options={refOptions[field.key] ?? []}
+						placeholder={`Select ${field.label}`}
+					/>
+				{:else if widget === "select"}
 					<NativeSelect.Root class="w-full" bind:value={values[field.key] as string}>
 						<NativeSelect.Option value="">Select {field.label}</NativeSelect.Option>
 						{#each refOptions[field.key] ?? [] as option (option.id)}

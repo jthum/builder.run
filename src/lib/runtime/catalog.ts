@@ -64,44 +64,108 @@ export async function loadPlatform(conn: SqlConnection): Promise<PlatformState |
 
 export async function savePlatform(conn: SqlConnection, platform: PlatformState): Promise<void> {
   await ensureCatalog(conn);
-  await conn.exec(`DELETE FROM br_actor`);
-  await conn.exec(`DELETE FROM br_store`);
-  await conn.exec(`DELETE FROM br_workspace`);
-  await conn.exec(`DELETE FROM br_shared_types`);
-  await conn.exec(`DELETE FROM br_environment`);
-  const stamp = nowIso();
-  for (const env of platform.environments) {
+  await conn.exec("BEGIN");
+  try {
+    const stamp = nowIso();
+    const envIds = platform.environments.map((env) => env.id);
+    for (const env of platform.environments) {
+      await conn.exec(
+        `INSERT INTO br_environment (id, name, active_workspace_id, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?)
+         ON CONFLICT(id) DO UPDATE SET
+           name = excluded.name,
+           active_workspace_id = excluded.active_workspace_id,
+           updated_at = excluded.updated_at`,
+        [env.id, env.name, env.activeWorkspaceId, stamp, stamp],
+      );
+      for (const actor of env.actors) {
+        await conn.exec(
+          `INSERT INTO br_actor (id, environment_id, name, kind, roles) VALUES (?, ?, ?, ?, ?)
+           ON CONFLICT(id) DO UPDATE SET name = excluded.name, kind = excluded.kind, roles = excluded.roles`,
+          [actor.id, env.id, actor.name, actor.kind, JSON.stringify(actor.roles)],
+        );
+      }
+      for (const store of env.stores) {
+        await conn.exec(
+          `INSERT INTO br_store (id, environment_id, key, label, kind) VALUES (?, ?, ?, ?, ?)
+           ON CONFLICT(id) DO UPDATE SET key = excluded.key, label = excluded.label, kind = excluded.kind`,
+          [store.id, env.id, store.key, store.label, store.kind],
+        );
+      }
+      for (const workspace of env.workspaces) {
+        await conn.exec(
+          `INSERT INTO br_workspace (id, environment_id, name, spec) VALUES (?, ?, ?, ?)
+           ON CONFLICT(id) DO UPDATE SET name = excluded.name, spec = excluded.spec`,
+          [workspace.id, env.id, workspace.name, JSON.stringify(workspace.spec)],
+        );
+      }
+      await conn.exec(
+        `INSERT INTO br_shared_types (environment_id, types) VALUES (?, ?)
+         ON CONFLICT(environment_id) DO UPDATE SET types = excluded.types`,
+        [env.id, JSON.stringify(env.sharedTypes)],
+      );
+      await deleteMissing(
+        conn,
+        "br_actor",
+        "environment_id",
+        env.id,
+        env.actors.map((item) => item.id),
+      );
+      await deleteMissing(
+        conn,
+        "br_store",
+        "environment_id",
+        env.id,
+        env.stores.map((item) => item.id),
+      );
+      await deleteMissing(
+        conn,
+        "br_workspace",
+        "environment_id",
+        env.id,
+        env.workspaces.map((item) => item.id),
+      );
+    }
+    if (envIds.length) {
+      await conn.exec(
+        `DELETE FROM br_environment WHERE id NOT IN (${envIds.map(() => "?").join(",")})`,
+        envIds,
+      );
+      await conn.exec(
+        `DELETE FROM br_shared_types WHERE environment_id NOT IN (${envIds.map(() => "?").join(",")})`,
+        envIds,
+      );
+    }
     await conn.exec(
-      `INSERT INTO br_environment (id, name, active_workspace_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?)`,
-      [env.id, env.name, env.activeWorkspaceId, stamp, stamp],
+      `INSERT INTO br_kv (key, value) VALUES ('active_environment_id', ?)
+       ON CONFLICT(key) DO UPDATE SET value = excluded.value`,
+      [platform.activeEnvironmentId],
     );
-    for (const actor of env.actors) {
-      await conn.exec(
-        `INSERT INTO br_actor (id, environment_id, name, kind, roles) VALUES (?, ?, ?, ?, ?)`,
-        [actor.id, env.id, actor.name, actor.kind, JSON.stringify(actor.roles)],
-      );
+    await conn.exec("COMMIT");
+  } catch (error) {
+    try {
+      await conn.exec("ROLLBACK");
+    } catch {
+      // ignore
     }
-    for (const store of env.stores) {
-      await conn.exec(
-        `INSERT INTO br_store (id, environment_id, key, label, kind) VALUES (?, ?, ?, ?, ?)`,
-        [store.id, env.id, store.key, store.label, store.kind],
-      );
-    }
-    for (const workspace of env.workspaces) {
-      await conn.exec(
-        `INSERT INTO br_workspace (id, environment_id, name, spec) VALUES (?, ?, ?, ?)`,
-        [workspace.id, env.id, workspace.name, JSON.stringify(workspace.spec)],
-      );
-    }
-    await conn.exec(`INSERT INTO br_shared_types (environment_id, types) VALUES (?, ?)`, [
-      env.id,
-      JSON.stringify(env.sharedTypes),
-    ]);
+    throw error;
+  }
+}
+
+async function deleteMissing(
+  conn: SqlConnection,
+  table: string,
+  parentColumn: string,
+  parentId: string,
+  ids: string[],
+): Promise<void> {
+  if (!ids.length) {
+    await conn.exec(`DELETE FROM ${table} WHERE ${parentColumn} = ?`, [parentId]);
+    return;
   }
   await conn.exec(
-    `INSERT INTO br_kv (key, value) VALUES ('active_environment_id', ?)
-     ON CONFLICT(key) DO UPDATE SET value = excluded.value`,
-    [platform.activeEnvironmentId],
+    `DELETE FROM ${table} WHERE ${parentColumn} = ? AND id NOT IN (${ids.map(() => "?").join(",")})`,
+    [parentId, ...ids],
   );
 }
 

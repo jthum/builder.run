@@ -11,7 +11,7 @@
 	<div class="flex flex-col gap-4">
 		<h1 class="text-2xl font-semibold">{form.label}</h1>
 		<p class="text-muted-foreground">{form.mode} form for {type.label}</p>
-		<RecordForm {type} fields={form.fields} />
+		<RecordForm {type} {form} fields={form.fields} />
 	</div>
 {:else}
 	<p class="text-muted-foreground">Unknown form.</p>

@@ -14,6 +14,6 @@
 {#if type}
 	<div class="flex flex-col gap-4">
 		<h1 class="text-2xl font-semibold">{form?.label ?? `New ${type.label}`}</h1>
-		<RecordForm {type} fields={form?.fields} onSaved={(record) => goto(`/t/${type.key}/${record.id}`)} />
+		<RecordForm {type} {form} fields={form?.fields} onSaved={(record) => record && goto(`/t/${type.key}/${record.id}`)} />
 	</div>
 {/if}
