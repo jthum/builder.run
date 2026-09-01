@@ -13,6 +13,13 @@ export default defineConfig({
       $lib: path.resolve(root, "src/lib"),
     },
   },
+  optimizeDeps: {
+    exclude: ["wa-sqlite"],
+  },
+  assetsInclude: ["**/*.wasm"],
+  worker: {
+    format: "es",
+  },
   staged: {
     "*": "vp fmt --write",
   },

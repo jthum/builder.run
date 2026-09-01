@@ -1,0 +1,166 @@
+import { coerceFieldValue, type TableEngine } from "./engine.ts";
+import { createId } from "./ids.ts";
+import {
+  nowIso,
+  type ExecutionContext,
+  type FieldDef,
+  type RecordValue,
+  type TypeDef,
+} from "./model.ts";
+import { findType, type QueryContext } from "./query.ts";
+
+export interface ChangeEvent {
+  kind: "created" | "updated" | "deleted";
+  type: string;
+  id: string;
+  before?: RecordValue | null;
+  after?: RecordValue | null;
+  changed: string[];
+}
+
+export function validateRecord(
+  type: TypeDef,
+  values: Record<string, unknown>,
+  partial = false,
+): string[] {
+  const errors: string[] = [];
+  for (const field of type.fields) {
+    const value = values[field.key];
+    const missing = value == null || value === "";
+    if (!partial && field.required && missing) {
+      errors.push(`${field.label} is required`);
+    }
+    if (
+      !missing &&
+      field.type === "enum" &&
+      field.values &&
+      !field.values.includes(String(value))
+    ) {
+      errors.push(`${field.label} must be one of: ${field.values.join(", ")}`);
+    }
+    if (!missing && field.type === "number" && Number.isNaN(Number(value))) {
+      errors.push(`${field.label} must be a number`);
+    }
+  }
+  return errors;
+}
+
+export function prepareValues(
+  type: TypeDef,
+  values: Record<string, unknown>,
+): Record<string, unknown> {
+  const prepared: Record<string, unknown> = {};
+  for (const field of type.fields) {
+    if (field.key in values) {
+      prepared[field.key] = coerceFieldValue(field.type, values[field.key]);
+    } else if (field.default !== undefined) {
+      prepared[field.key] = coerceFieldValue(field.type, field.default);
+    }
+  }
+  return prepared;
+}
+
+export async function createRecord(
+  ctx: QueryContext,
+  typeKey: string,
+  values: Record<string, unknown>,
+  exec: ExecutionContext,
+): Promise<{ record: RecordValue; change: ChangeEvent }> {
+  const type = requireType(ctx, typeKey);
+  const prepared = prepareValues(type, values);
+  const errors = validateRecord(type, prepared);
+  if (errors.length) throw new Error(errors.join("; "));
+  const engine = ctx.engineFor(type.store);
+  const stamp = nowIso();
+  const record: RecordValue = {
+    id: createId("rec"),
+    created_at: stamp,
+    updated_at: stamp,
+    created_by: exec.actorId,
+    updated_by: exec.actorId,
+    ...prepared,
+  };
+  await engine.insert(type.key, record);
+  return {
+    record,
+    change: {
+      kind: "created",
+      type: type.key,
+      id: record.id,
+      after: record,
+      changed: type.fields.map((field) => field.key),
+    },
+  };
+}
+
+export async function updateRecord(
+  ctx: QueryContext,
+  typeKey: string,
+  id: string,
+  values: Record<string, unknown>,
+  exec: ExecutionContext,
+): Promise<{ record: RecordValue; change: ChangeEvent }> {
+  const type = requireType(ctx, typeKey);
+  const engine = ctx.engineFor(type.store);
+  const before = await engine.get(type.key, id);
+  if (!before) throw new Error(`${type.label} ${id} not found`);
+  const prepared = prepareValues(type, { ...before, ...values });
+  const errors = validateRecord(type, prepared, true);
+  if (errors.length) throw new Error(errors.join("; "));
+  const changed = changedFields(type.fields, before, prepared);
+  await engine.update(type.key, id, {
+    ...prepared,
+    updated_by: exec.actorId,
+    updated_at: nowIso(),
+  });
+  const record = (await engine.get(type.key, id)) as RecordValue;
+  return {
+    record,
+    change: { kind: "updated", type: type.key, id, before, after: record, changed },
+  };
+}
+
+export async function deleteRecord(
+  ctx: QueryContext,
+  typeKey: string,
+  id: string,
+): Promise<{ change: ChangeEvent }> {
+  const type = requireType(ctx, typeKey);
+  const engine = ctx.engineFor(type.store);
+  const before = await engine.get(type.key, id);
+  if (!before) throw new Error(`${type.label} ${id} not found`);
+  await engine.delete(type.key, id);
+  return {
+    change: {
+      kind: "deleted",
+      type: type.key,
+      id,
+      before,
+      changed: type.fields.map((field) => field.key),
+    },
+  };
+}
+
+function changedFields(
+  fields: FieldDef[],
+  before: RecordValue,
+  next: Record<string, unknown>,
+): string[] {
+  return fields
+    .filter((field) => String(before[field.key] ?? "") !== String(next[field.key] ?? ""))
+    .map((field) => field.key);
+}
+
+function requireType(ctx: QueryContext, typeKey: string): TypeDef {
+  const type = findType(ctx, typeKey);
+  if (!type) throw new Error(`Unknown type ${typeKey}`);
+  return type;
+}
+
+export function engineLookup(engines: Map<string, TableEngine>): (storeKey: string) => TableEngine {
+  return (storeKey: string) => {
+    const engine = engines.get(storeKey);
+    if (!engine) throw new Error(`Unknown store ${storeKey}`);
+    return engine;
+  };
+}
