@@ -41,4 +41,4 @@ Environment → Workspaces → Stores, Types, Views, Forms, Flows, Pages.
 
 ## Stack
 
-SvelteKit 3 RC, Svelte 5, Tailwind 4, shadcn-svelte (Bits UI), wa-sqlite (present for the SQLite worker), OPFS/IndexedDB persistence.
+SvelteKit 3 RC, Svelte 5, Tailwind 4, shadcn-svelte (Bits UI). Application data is **SQLite**: `wa-sqlite` in a worker in the browser (OPFS → IndexedDB → in-memory SQLite), `node:sqlite` in tests. Specs live in a control database; types become real tables and readable columns.

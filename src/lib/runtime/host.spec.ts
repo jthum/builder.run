@@ -1,13 +1,11 @@
 import { describe, expect, it } from "vite-plus/test";
 import { Host } from "./host.ts";
-import { resetMemorySlot } from "./persist.ts";
 import { specFromText } from "./serialize.ts";
 
 describe("builder.run host", () => {
   it("materialises a type into records, views, and a triggered flow", async () => {
     expect.hasAssertions();
-    resetMemorySlot();
-    const host = await Host.open({ backend: "memory", persist: false });
+    const host = await Host.open({ persist: false });
     await host.upsertType({
       key: "invoice",
       fields: [
@@ -61,8 +59,7 @@ types:
 
   it("keeps actors as the permission subject", async () => {
     expect.hasAssertions();
-    resetMemorySlot();
-    const host = await Host.open({ backend: "memory", persist: false });
+    const host = await Host.open({ persist: false });
     const actor = host.actor();
     expect(actor.kind).toBe("human");
     expect(actor.roles).toContain("admin");

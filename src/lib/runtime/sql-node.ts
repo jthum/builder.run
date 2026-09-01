@@ -1,0 +1,49 @@
+import { DatabaseSync } from "node:sqlite";
+import type { PersistenceBackend } from "./persist.ts";
+import type { SqlConnection, SqlGateway } from "./sql-gateway.ts";
+import { bindValue } from "./sql.ts";
+
+class NodeConnection implements SqlConnection {
+  constructor(private readonly db: DatabaseSync) {}
+
+  async exec(sql: string, params: unknown[] = []): Promise<void> {
+    if (!params.length) {
+      this.db.exec(sql);
+      return;
+    }
+    this.db.prepare(sql).run(...params.map(bindValue));
+  }
+
+  async query(sql: string, params: unknown[] = []): Promise<Array<Record<string, unknown>>> {
+    const stmt = this.db.prepare(sql);
+    const rows = params.length ? stmt.all(...params.map(bindValue)) : stmt.all();
+    return (rows as Array<Record<string, unknown>>).map(normalizeRow);
+  }
+
+  async close(): Promise<void> {
+    this.db.close();
+  }
+}
+
+export function createNodeGateway(): SqlGateway {
+  const dbs = new Map<string, DatabaseSync>();
+  return {
+    backend: "memory" satisfies PersistenceBackend,
+    async open(name: string) {
+      let db = dbs.get(name);
+      if (!db) {
+        db = new DatabaseSync(":memory:");
+        dbs.set(name, db);
+      }
+      return new NodeConnection(db);
+    },
+  };
+}
+
+function normalizeRow(row: Record<string, unknown>): Record<string, unknown> {
+  const next: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(row)) {
+    next[key] = typeof value === "bigint" ? Number(value) : value;
+  }
+  return next;
+}

@@ -1,3 +1,4 @@
+/** How SQLite pages are stored. Not the application record format. */
 export type PersistenceBackend = "opfs" | "indexeddb" | "memory";
 
 const IDB_NAME = "builder-run";

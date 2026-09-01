@@ -1,3 +1,4 @@
+export * from "./catalog.ts";
 export * from "./defaults.ts";
 export * from "./engine.ts";
 export * from "./flows.ts";
@@ -5,9 +6,12 @@ export * from "./host.ts";
 export * from "./ids.ts";
 export * from "./model.ts";
 export * from "./persist.ts";
+export * from "./platform.ts";
 export * from "./query.ts";
 export * from "./records.ts";
 export * from "./samples.ts";
 export * from "./schema.ts";
 export * from "./serialize.ts";
+export * from "./sql-engine.ts";
+export * from "./sql-gateway.ts";
 export * from "./webmcp.ts";

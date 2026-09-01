@@ -1,73 +1,132 @@
 // @ts-nocheck
-/// <reference types="webmcp-types" />
 import SQLiteESMFactory from "wa-sqlite/dist/wa-sqlite-async.mjs";
-import { Factory } from "wa-sqlite";
+import { Factory, SQLITE_ROW } from "wa-sqlite";
 import { IDBBatchAtomicVFS } from "wa-sqlite/src/examples/IDBBatchAtomicVFS.js";
 import { MemoryAsyncVFS } from "wa-sqlite/src/examples/MemoryAsyncVFS.js";
+import { OriginPrivateFileSystemVFS } from "wa-sqlite/src/examples/OriginPrivateFileSystemVFS.js";
 import wasmUrl from "wa-sqlite/dist/wa-sqlite-async.wasm?url";
 
-type Request = {
-  id: number;
-  method: "open" | "exec" | "query" | "close";
-  db: string;
-  sql?: string;
-  params?: unknown[];
-};
+let sqlite3 = null;
+let backend = "memory";
+const dbs = new Map();
 
-type SqliteApi = ReturnType<typeof Factory>;
-
-let sqlite3: SqliteApi | null = null;
-let vfsName = "memory";
-const dbs = new Map<string, number>();
-
-async function api(): Promise<SqliteApi> {
+async function boot() {
   if (sqlite3) return sqlite3;
   const module = await SQLiteESMFactory({
-    locateFile: (file: string) => (file.endsWith(".wasm") ? wasmUrl : file),
+    locateFile: (file) => (String(file).endsWith(".wasm") ? wasmUrl : file),
   });
   sqlite3 = Factory(module);
-  try {
-    const vfs = await IDBBatchAtomicVFS.create("builder-run-idb", module);
-    sqlite3.vfs_register(vfs, true);
-    vfsName = "indexeddb";
-  } catch {
-    const vfs = await MemoryAsyncVFS.create("builder-run-memory", module);
-    sqlite3.vfs_register(vfs, true);
-    vfsName = "memory";
-  }
+  backend = await registerVfs(module, sqlite3);
   return sqlite3;
 }
 
-async function openDb(name: string): Promise<number> {
+async function registerVfs(module, sqlite) {
+  if (globalThis.navigator?.storage?.getDirectory) {
+    try {
+      const vfs = new OriginPrivateFileSystemVFS();
+      sqlite.vfs_register(vfs, true);
+      await probe(sqlite);
+      return "opfs";
+    } catch (error) {
+      console.warn("builder.run OPFS SQLite unavailable", error);
+    }
+  }
+  if (typeof indexedDB !== "undefined") {
+    try {
+      const vfs = new IDBBatchAtomicVFS("builder-run-sqlite");
+      sqlite.vfs_register(vfs, true);
+      await probe(sqlite);
+      return "indexeddb";
+    } catch (error) {
+      console.warn("builder.run IndexedDB SQLite unavailable", error);
+    }
+  }
+  const vfs = new MemoryAsyncVFS();
+  sqlite.vfs_register(vfs, true);
+  return "memory";
+}
+
+async function probe(sqlite) {
+  const db = await sqlite.open_v2("__builder_run_probe__");
+  try {
+    await sqlite.exec(
+      db,
+      "CREATE TABLE IF NOT EXISTS probe (id TEXT); DROP TABLE IF EXISTS probe;",
+    );
+  } finally {
+    await sqlite.close(db);
+  }
+}
+
+async function openDb(name) {
+  const sqlite = await boot();
   const existing = dbs.get(name);
   if (existing != null) return existing;
-  const sqlite = await api();
   const db = await sqlite.open_v2(name);
   dbs.set(name, db);
   return db;
 }
 
-async function bind(sqlite: SqliteApi, stmt: number, params: unknown[]): Promise<void> {
-  for (let i = 0; i < params.length; i += 1) {
-    const value = params[i];
-    const index = i + 1;
-    if (value == null) sqlite.bind_null(stmt, index);
-    else if (typeof value === "number") sqlite.bind_double(stmt, index, value);
-    else if (typeof value === "boolean") sqlite.bind_int(stmt, index, value ? 1 : 0);
-    else sqlite.bind_text(stmt, index, String(value));
+function bindParams(sqlite, stmt, params) {
+  if (!params?.length) return;
+  if (typeof sqlite.bind_collection === "function") {
+    sqlite.bind_collection(stmt, params);
+    return;
+  }
+  params.forEach((value, index) => {
+    const at = index + 1;
+    if (value == null) sqlite.bind_null(stmt, at);
+    else if (typeof value === "number") sqlite.bind_double(stmt, at, value);
+    else if (typeof value === "boolean") sqlite.bind_int(stmt, at, value ? 1 : 0);
+    else sqlite.bind_text(stmt, at, String(value));
+  });
+}
+
+async function run(dbName, sql, params = []) {
+  const sqlite = await boot();
+  const db = await openDb(dbName);
+  for await (const stmt of sqlite.statements(db, sql)) {
+    bindParams(sqlite, stmt, params);
+    while ((await sqlite.step(stmt)) === SQLITE_ROW) {
+      // drain
+    }
   }
 }
 
-self.onmessage = async (event: MessageEvent<Request>) => {
+async function query(dbName, sql, params = []) {
+  const sqlite = await boot();
+  const db = await openDb(dbName);
+  const rows = [];
+  for await (const stmt of sqlite.statements(db, sql)) {
+    bindParams(sqlite, stmt, params);
+    const columns = sqlite.column_names(stmt);
+    while ((await sqlite.step(stmt)) === SQLITE_ROW) {
+      const values = sqlite.row(stmt);
+      const row = {};
+      columns.forEach((column, index) => {
+        row[column] = values[index];
+      });
+      rows.push(row);
+    }
+  }
+  return rows;
+}
+
+self.onmessage = async (event) => {
   const { id, method, db, sql, params } = event.data;
   try {
+    if (method === "init") {
+      await boot();
+      self.postMessage({ id, result: { backend } });
+      return;
+    }
     if (method === "open") {
       await openDb(db);
-      self.postMessage({ id, result: { vfs: vfsName } });
+      self.postMessage({ id, result: { backend } });
       return;
     }
     if (method === "close") {
-      const sqlite = await api();
+      const sqlite = await boot();
       const handle = dbs.get(db);
       if (handle != null) {
         await sqlite.close(handle);
@@ -76,26 +135,17 @@ self.onmessage = async (event: MessageEvent<Request>) => {
       self.postMessage({ id, result: true });
       return;
     }
-    const sqlite = await api();
-    const handle = await openDb(db);
     if (method === "exec") {
-      await sqlite.exec(handle, sql ?? "");
+      await run(db, sql ?? "", params ?? []);
       self.postMessage({ id, result: true });
       return;
     }
-    const rows: Array<Record<string, unknown>> = [];
-    for await (const stmt of sqlite.statements(handle, sql ?? "")) {
-      await bind(sqlite, stmt, params ?? []);
-      const columns = sqlite.column_names(stmt);
-      while ((await sqlite.step(stmt)) === 100) {
-        const row: Record<string, unknown> = {};
-        columns.forEach((column, index) => {
-          row[column] = sqlite.column(stmt, index);
-        });
-        rows.push(row);
-      }
+    if (method === "query") {
+      const rows = await query(db, sql ?? "", params ?? []);
+      self.postMessage({ id, result: rows });
+      return;
     }
-    self.postMessage({ id, result: rows });
+    throw new Error(`Unknown SQLite worker method ${method}`);
   } catch (error) {
     self.postMessage({ id, error: error instanceof Error ? error.message : String(error) });
   }

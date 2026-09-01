@@ -13,11 +13,17 @@
 	<div class="grid gap-4 md:grid-cols-3">
 		<Card.Root>
 			<Card.Header>
-				<Card.Title>Persistence</Card.Title>
-				<Card.Description>How this browser keeps the environment.</Card.Description>
+				<Card.Title>SQLite</Card.Title>
+				<Card.Description>Live records are SQLite tables. VFS is a runtime concern.</Card.Description>
 			</Card.Header>
-			<Card.Content>
-				<Badge.Badge>{session.snapshot?.backend}</Badge.Badge>
+			<Card.Content class="flex flex-col gap-2">
+				<Badge.Badge>{session.snapshot?.engine} · {session.snapshot?.backend}</Badge.Badge>
+				{#each session.snapshot?.stores ?? [] as store (store.key)}
+					<div class="text-sm">
+						<div class="font-mono">{store.database}</div>
+						<div class="text-muted-foreground">{store.tables.join(", ") || "no tables"}</div>
+					</div>
+				{/each}
 			</Card.Content>
 		</Card.Root>
 		<Card.Root>

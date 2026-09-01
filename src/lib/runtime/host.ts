@@ -1,5 +1,6 @@
+import { ensureCatalog, loadPlatform, savePlatform } from "./catalog.ts";
 import { applyDefaults, effectiveSpec } from "./defaults.ts";
-import { MemoryEngine, type TableEngine } from "./engine.ts";
+import type { TableEngine } from "./engine.ts";
 import { invokeFlow, matchingTriggers, type FlowRun } from "./flows.ts";
 import { createId, labelFromKey, slugify } from "./ids.ts";
 import {
@@ -14,47 +15,30 @@ import {
   type FormDef,
   type PageDef,
   type RecordValue,
-  type StoreDef,
   type TypeDef,
   type ViewDef,
 } from "./model.ts";
-import {
-  detectBackend,
-  readPlatformJson,
-  writePlatformJson,
-  type PersistenceBackend,
-} from "./persist.ts";
+import { readPlatformJson, type PersistenceBackend } from "./persist.ts";
+import type { EnvironmentState, PlatformState, WorkspaceState } from "./platform.ts";
 import { executeView, findType, type QueryContext } from "./query.ts";
-import { createRecord, deleteRecord, updateRecord, type ChangeEvent } from "./records.ts";
+import {
+  createRecord,
+  decodeRecord,
+  deleteRecord,
+  updateRecord,
+  type ChangeEvent,
+} from "./records.ts";
 import { directoryTypes, newWorkspaceSpec, sampleApps } from "./samples.ts";
 import { reconcileStore } from "./schema.ts";
 import { specFromText, specToJson, specToYaml } from "./serialize.ts";
+import { SqliteEngine } from "./sql-engine.ts";
+import { openSqlGateway, type SqlConnection, type SqlGateway } from "./sql-gateway.ts";
 
-export interface WorkspaceState {
-  id: string;
-  name: string;
-  spec: AppSpec;
-}
-
-export interface EnvironmentState {
-  id: string;
-  name: string;
-  actors: Actor[];
-  stores: StoreDef[];
-  sharedTypes: TypeDef[];
-  workspaces: WorkspaceState[];
-  activeWorkspaceId: string;
-}
-
-export interface PlatformState {
-  version: 1;
-  activeEnvironmentId: string;
-  environments: EnvironmentState[];
-  storeData: Record<string, Record<string, RecordValue[]>>;
-}
+export type { EnvironmentState, PlatformState, WorkspaceState } from "./platform.ts";
 
 export interface HostSnapshot {
   backend: PersistenceBackend;
+  engine: "sqlite";
   webmcp: boolean;
   environment: EnvironmentState;
   workspace: WorkspaceState;
@@ -63,10 +47,11 @@ export interface HostSnapshot {
   actor: Actor;
   environments: Array<{ id: string; name: string }>;
   workspaces: Array<{ id: string; name: string }>;
+  stores: Array<{ key: string; database: string; tables: string[] }>;
 }
 
 export interface HostOptions {
-  backend?: PersistenceBackend;
+  gateway?: SqlGateway;
   persist?: boolean;
 }
 
@@ -75,25 +60,31 @@ type Listener = () => void;
 export class Host {
   backend: PersistenceBackend = "memory";
   private platform!: PlatformState;
+  private gateway!: SqlGateway;
+  private catalog!: SqlConnection;
   private engines = new Map<string, TableEngine>();
   private listeners = new Set<Listener>();
   private persistEnabled = true;
   private writing = false;
+  private storeTables = new Map<string, string[]>();
 
   static async open(options: HostOptions = {}): Promise<Host> {
     const host = new Host();
     host.persistEnabled = options.persist !== false;
-    host.backend =
-      options.backend ?? (typeof window === "undefined" ? "memory" : await detectBackend());
-    const raw = host.persistEnabled ? await readPlatformJson(host.backend) : null;
-    if (raw) {
-      host.platform = JSON.parse(raw) as PlatformState;
+    host.gateway = options.gateway ?? (await openSqlGateway());
+    host.backend = host.gateway.backend;
+    host.catalog = await host.gateway.open("builder-run-control");
+    await ensureCatalog(host.catalog);
+    const loaded = await loadPlatform(host.catalog);
+    if (loaded) {
+      host.platform = loaded;
     } else {
-      host.platform = seedPlatform();
+      const migrated = host.persistEnabled ? await migrateLegacyJson() : null;
+      host.platform = migrated ?? seedPlatform();
     }
     await host.bootEngines();
     await host.reconcileAll();
-    if (!raw && host.persistEnabled) await host.save();
+    await host.saveCatalog();
     return host;
   }
 
@@ -104,47 +95,36 @@ export class Host {
 
   private emit(): void {
     for (const listener of this.listeners) listener();
-    if (this.persistEnabled && !this.writing) {
+    if (!this.writing) {
       this.writing = true;
-      void this.save().finally(() => {
+      void this.saveCatalog().finally(() => {
         this.writing = false;
       });
     }
   }
 
-  private async save(): Promise<void> {
-    this.platform.storeData = {};
-    for (const [key, engine] of this.engines) {
-      this.platform.storeData[key] = await engine.dump();
-    }
-    await writePlatformJson(this.backend, JSON.stringify(this.platform));
+  private async saveCatalog(): Promise<void> {
+    await savePlatform(this.catalog, this.platform);
   }
 
-  private async dumpEngines(): Promise<void> {
-    if (this.engines.size === 0) return;
-    this.platform.storeData ??= {};
-    for (const [key, engine] of this.engines) {
-      this.platform.storeData[key] = await engine.dump();
-    }
-  }
-
-  private async bootEngines(): Promise<void> {
-    await this.dumpEngines();
-    this.engines.clear();
+  private dbName(storeKey: string): string {
     const env = this.environment();
-    for (const store of env.stores) {
-      const engineKey = this.engineKey(store.key);
-      const engine = new MemoryEngine(engineKey);
-      const dumped = this.platform.storeData?.[engineKey];
-      if (dumped) await engine.load(dumped);
-      this.engines.set(engineKey, engine);
-    }
+    if (storeKey === "local") return `env-${env.id}-ws-${env.activeWorkspaceId}`;
+    return `env-${env.id}-${storeKey}`;
   }
 
   private engineKey(storeKey: string): string {
+    return this.dbName(storeKey);
+  }
+
+  private async bootEngines(): Promise<void> {
+    this.engines.clear();
     const env = this.environment();
-    if (storeKey === "local") return `${env.id}:${env.activeWorkspaceId}:local`;
-    return `${env.id}:${storeKey}`;
+    for (const store of env.stores) {
+      const name = this.dbName(store.key);
+      const conn = await this.gateway.open(name);
+      this.engines.set(this.engineKey(store.key), new SqliteEngine(conn, name));
+    }
   }
 
   private async reconcileAll(): Promise<void> {
@@ -155,6 +135,7 @@ export class Host {
         sharedEngine,
         env.sharedTypes.filter((type) => type.store === "directory"),
       );
+      this.storeTables.set("directory", await sharedEngine.listTables());
     }
     const local = this.engines.get(this.engineKey("local"));
     if (local) {
@@ -163,6 +144,7 @@ export class Host {
         local,
         spec.types.filter((type) => type.store === "local"),
       );
+      this.storeTables.set("local", await local.listTables());
     }
   }
 
@@ -218,6 +200,7 @@ export class Host {
     const workspace = this.workspace();
     return {
       backend: this.backend,
+      engine: "sqlite",
       webmcp: typeof document !== "undefined" && Boolean(document.modelContext),
       environment: env,
       workspace,
@@ -226,6 +209,11 @@ export class Host {
       actor: this.actor(),
       environments: this.platform.environments.map((item) => ({ id: item.id, name: item.name })),
       workspaces: env.workspaces.map((item) => ({ id: item.id, name: item.name })),
+      stores: env.stores.map((store) => ({
+        key: store.key,
+        database: this.dbName(store.key),
+        tables: this.storeTables.get(store.key) ?? [],
+      })),
     };
   }
 
@@ -246,33 +234,34 @@ export class Host {
     const ctx = this.queryContext();
     const type = findType(ctx, typeKey);
     if (!type) return [];
-    return ctx.engineFor(type.store).select(type.key, { orderBy: { updated_at: "desc" } });
+    const rows = await ctx
+      .engineFor(type.store)
+      .select(type.key, { orderBy: { updated_at: "desc" } });
+    return rows.map((row) => decodeRecord(type, row));
   }
 
   async getRecord(typeKey: string, id: string): Promise<RecordValue | null> {
     const ctx = this.queryContext();
     const type = findType(ctx, typeKey);
     if (!type) return null;
-    return ctx.engineFor(type.store).get(type.key, id);
+    const row = await ctx.engineFor(type.store).get(type.key, id);
+    return row ? decodeRecord(type, row) : null;
   }
 
   async create(typeKey: string, values: Record<string, unknown>): Promise<RecordValue> {
-    const ctx = this.queryContext();
-    const result = await createRecord(ctx, typeKey, values, this.context());
+    const result = await createRecord(this.queryContext(), typeKey, values, this.context());
     await this.afterChanges([result.change]);
     return result.record;
   }
 
   async update(typeKey: string, id: string, values: Record<string, unknown>): Promise<RecordValue> {
-    const ctx = this.queryContext();
-    const result = await updateRecord(ctx, typeKey, id, values, this.context());
+    const result = await updateRecord(this.queryContext(), typeKey, id, values, this.context());
     await this.afterChanges([result.change]);
     return result.record;
   }
 
   async remove(typeKey: string, id: string): Promise<void> {
-    const ctx = this.queryContext();
-    const result = await deleteRecord(ctx, typeKey, id);
+    const result = await deleteRecord(this.queryContext(), typeKey, id);
     await this.afterChanges([result.change]);
   }
 
@@ -351,8 +340,9 @@ export class Host {
     const workspace = this.workspace();
     workspace.spec.types = workspace.spec.types.filter((type) => type.key !== key);
     workspace.spec = applyDefaults(workspace.spec);
-    const env = this.environment();
-    env.sharedTypes = env.sharedTypes.filter((type) => type.key !== key);
+    this.environment().sharedTypes = this.environment().sharedTypes.filter(
+      (type) => type.key !== key,
+    );
     await this.reconcileAll();
     this.emit();
   }
@@ -477,6 +467,7 @@ export class Host {
     if (!env.workspaces.some((item) => item.id === id)) throw new Error("Unknown workspace");
     env.activeWorkspaceId = id;
     await this.bootEngines();
+    await this.reconcileAll();
     this.emit();
   }
 
@@ -495,6 +486,7 @@ export class Host {
       throw new Error("Unknown environment");
     this.platform.activeEnvironmentId = id;
     await this.bootEngines();
+    await this.reconcileAll();
     this.emit();
   }
 
@@ -504,9 +496,22 @@ export class Host {
     return this.createWorkspace(sample.label, sample.spec);
   }
 
+  async inspectStore(
+    storeKey: string,
+  ): Promise<{ database: string; tables: Array<{ name: string; columns: string[] }> }> {
+    const engine = this.engines.get(this.engineKey(storeKey));
+    if (!engine) throw new Error(`Store ${storeKey} is not open`);
+    const names = await engine.listTables();
+    const tables = [];
+    for (const name of names) {
+      const columns = await engine.tableInfo(name);
+      tables.push({ name, columns: columns.map((column) => `${column.name} ${column.sqlType}`) });
+    }
+    return { database: this.dbName(storeKey), tables };
+  }
+
   private findWritableType(typeKey: string): TypeDef {
-    const workspace = this.workspace();
-    const local = workspace.spec.types.find((type) => type.key === typeKey);
+    const local = this.workspace().spec.types.find((type) => type.key === typeKey);
     if (local) return local;
     const shared = this.environment().sharedTypes.find((type) => type.key === typeKey);
     if (shared) return shared;
@@ -536,7 +541,6 @@ function seedPlatform(): PlatformState {
     version: 1,
     activeEnvironmentId: env.id,
     environments: [env],
-    storeData: {},
   };
 }
 
@@ -560,4 +564,23 @@ function seedEnvironment(name: string): EnvironmentState {
     workspaces: [workspace],
     activeWorkspaceId: workspace.id,
   };
+}
+
+async function migrateLegacyJson(): Promise<PlatformState | null> {
+  try {
+    const raw = await readPlatformJson(typeof indexedDB === "undefined" ? "memory" : "indexeddb");
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as {
+      activeEnvironmentId?: string;
+      environments?: EnvironmentState[];
+    };
+    if (!parsed.environments?.length) return null;
+    return {
+      version: 1,
+      activeEnvironmentId: parsed.activeEnvironmentId ?? parsed.environments[0].id,
+      environments: parsed.environments,
+    };
+  } catch {
+    return null;
+  }
 }

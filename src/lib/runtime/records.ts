@@ -81,13 +81,14 @@ export async function createRecord(
     ...prepared,
   };
   await engine.insert(type.key, record);
+  const stored = decodeRecord(type, (await engine.get(type.key, record.id)) ?? record);
   return {
-    record,
+    record: stored,
     change: {
       kind: "created",
       type: type.key,
-      id: record.id,
-      after: record,
+      id: stored.id,
+      after: stored,
       changed: type.fields.map((field) => field.key),
     },
   };
@@ -113,10 +114,17 @@ export async function updateRecord(
     updated_by: exec.actorId,
     updated_at: nowIso(),
   });
-  const record = (await engine.get(type.key, id)) as RecordValue;
+  const record = decodeRecord(type, (await engine.get(type.key, id)) as RecordValue);
   return {
     record,
-    change: { kind: "updated", type: type.key, id, before, after: record, changed },
+    change: {
+      kind: "updated",
+      type: type.key,
+      id,
+      before: decodeRecord(type, before),
+      after: record,
+      changed,
+    },
   };
 }
 
@@ -149,6 +157,16 @@ function changedFields(
   return fields
     .filter((field) => String(before[field.key] ?? "") !== String(next[field.key] ?? ""))
     .map((field) => field.key);
+}
+
+export function decodeRecord(type: TypeDef, row: RecordValue): RecordValue {
+  const decoded: RecordValue = { ...row };
+  for (const field of type.fields) {
+    if (field.key in decoded) {
+      decoded[field.key] = coerceFieldValue(field.type, decoded[field.key]) as never;
+    }
+  }
+  return decoded;
 }
 
 function requireType(ctx: QueryContext, typeKey: string): TypeDef {
