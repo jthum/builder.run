@@ -174,27 +174,29 @@
 					</Sidebar.MenuItem>
 				</Sidebar.Menu>
 			</Sidebar.Group>
-			<Sidebar.Group>
-				<Sidebar.GroupLabel>Edit app</Sidebar.GroupLabel>
-				<Sidebar.Menu>
-					{#each studioSections as section (section.label)}
-						<SidebarNavGroup label={section.label}>
-							{#each section.items as item (item.href)}
-								{@const Icon = studioIcons[item.href] ?? BoxIcon}
-								<Sidebar.MenuSubItem>
-									<Sidebar.MenuSubButton
-										href={item.href}
-										isActive={path === item.href || path.startsWith(`${item.href}/`)}
-									>
-										<Icon />
-										<span>{item.label}</span>
-									</Sidebar.MenuSubButton>
-								</Sidebar.MenuSubItem>
-							{/each}
-						</SidebarNavGroup>
-					{/each}
-				</Sidebar.Menu>
-			</Sidebar.Group>
+			{#each studioSections as section, index (section.label)}
+				<Sidebar.Group class={index > 0 ? "mt-2" : ""}>
+					<Sidebar.GroupLabel>{section.label}</Sidebar.GroupLabel>
+					<Sidebar.Menu>
+						{#each section.items as item (item.href)}
+							{@const Icon = studioIcons[item.href] ?? BoxIcon}
+							<Sidebar.MenuItem>
+								<Sidebar.MenuButton
+									isActive={path === item.href || path.startsWith(`${item.href}/`)}
+									tooltipContent={item.label}
+								>
+									{#snippet child({ props })}
+										<a href={item.href} {...props}>
+											<Icon />
+											<span>{item.label}</span>
+										</a>
+									{/snippet}
+								</Sidebar.MenuButton>
+							</Sidebar.MenuItem>
+						{/each}
+					</Sidebar.Menu>
+				</Sidebar.Group>
+			{/each}
 		{:else}
 			<Sidebar.Group>
 				<Sidebar.Menu>
@@ -229,10 +231,7 @@
 						{/if}
 					{/each}
 					{#if views.length}
-						<Sidebar.MenuItem class="pointer-events-none">
-							<Sidebar.Separator class="mx-2 my-1.5" />
-						</Sidebar.MenuItem>
-						<SidebarNavGroup label="Views" icon={TableIcon}>
+						<SidebarNavGroup class="mt-3" label="Views" icon={TableIcon}>
 							{#each views as view (view.id)}
 								<Sidebar.MenuSubItem>
 									<Sidebar.MenuSubButton href="/v/{view.key}" isActive={path === `/v/${view.key}`}>
@@ -243,10 +242,7 @@
 						</SidebarNavGroup>
 					{/if}
 					{#if localTypes.length || sharedTypes.length}
-						<Sidebar.MenuItem class="pointer-events-none">
-							<Sidebar.Separator class="mx-2 my-1.5" />
-						</Sidebar.MenuItem>
-						<SidebarNavGroup label="Records" icon={BoxIcon}>
+						<SidebarNavGroup class="mt-3" label="Records" icon={BoxIcon}>
 							{#each localTypes as type (type.id)}
 								{@render recordLink(type)}
 							{/each}

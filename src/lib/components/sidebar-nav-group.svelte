@@ -1,6 +1,7 @@
 <script lang="ts">
 	import * as Collapsible from "$lib/components/ui/collapsible/index.js";
 	import * as Sidebar from "$lib/components/ui/sidebar/index.js";
+	import { cn } from "$lib/utils.js";
 	import ChevronRightIcon from "@lucide/svelte/icons/chevron-right";
 	import type { Component, Snippet } from "svelte";
 
@@ -8,16 +9,18 @@
 		label,
 		icon: Icon,
 		open = $bindable(true),
+		class: className,
 		children,
 	}: {
 		label: string;
 		icon?: Component;
 		open?: boolean;
+		class?: string;
 		children: Snippet;
 	} = $props();
 </script>
 
-<Collapsible.Root bind:open class="group/collapsible">
+<Collapsible.Root bind:open class={cn("group/collapsible", className)}>
 	<Sidebar.MenuItem>
 		<Collapsible.Trigger>
 			{#snippet child({ props })}
