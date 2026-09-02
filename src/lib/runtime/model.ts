@@ -3,7 +3,7 @@ import { createId, labelFromKey, slugify } from "./ids.ts";
 export const SPEC_VERSION = 1 as const;
 
 export type FieldKind = "text" | "number" | "date" | "boolean" | "enum" | "reference";
-export type StoreKind = "workspace" | "shared";
+export type StoreKind = "local" | "shared";
 export type ActorKind = "human" | "agent" | "system";
 export type Exposure = "ui" | "agent";
 export type SortDirection = "asc" | "desc";
@@ -30,7 +30,9 @@ export interface TypeDef {
   id: string;
   key: string;
   label: string;
-  store: string;
+  store: StoreKind;
+  /** Available to spaces this space’s users create. Whole type, all fields. */
+  expose?: boolean;
   fields: FieldDef[];
 }
 
@@ -78,12 +80,8 @@ export interface FlowDef {
 }
 
 export type PageBlock =
-  | { kind: "view"; view: string }
-  | { kind: "form"; form: string }
-  | { kind: "record"; type: string }
-  | { kind: "action"; flow: string; label?: string }
-  | { kind: "text"; text: string }
-  | { kind: "group"; blocks: PageBlock[] };
+  | { kind: "widget"; widget: string; values?: Record<string, unknown> }
+  | { kind: "group"; columns?: number; blocks: PageBlock[] };
 
 export interface PageDef {
   id: string;
@@ -109,14 +107,15 @@ export interface AppSpec {
 export interface Actor {
   id: string;
   name: string;
+  email?: string;
   kind: ActorKind;
   roles: string[];
 }
 
 export interface ExecutionContext {
   actorId: string;
-  environmentId: string;
-  workspaceId: string;
+  spaceId: string;
+  appId: string;
 }
 
 export interface RecordValue {
@@ -139,8 +138,8 @@ export function emptySpec(key = "app", label = "App"): AppSpec {
       {
         id: createId("sto"),
         key: "local",
-        label: "Workspace",
-        kind: "workspace",
+        label: "App",
+        kind: "local",
       },
     ],
     types: [],
@@ -151,35 +150,26 @@ export function emptySpec(key = "app", label = "App"): AppSpec {
   };
 }
 
-export function sharedDirectoryStores(): StoreDef[] {
-  return [
-    {
-      id: createId("sto"),
-      key: "directory",
-      label: "Directory",
-      kind: "shared",
-    },
-    {
-      id: createId("sto"),
-      key: "local",
-      label: "Workspace",
-      kind: "workspace",
-    },
-  ];
-}
-
 export function defaultLocalStore(): StoreDef {
   return {
     id: createId("sto"),
     key: "local",
-    label: "Workspace",
-    kind: "workspace",
+    label: "App",
+    kind: "local",
   };
+}
+
+export function isExposed(type: Pick<TypeDef, "expose">): boolean {
+  return Boolean(type.expose);
+}
+
+function isLegacySharedStore(value?: string): boolean {
+  return value === "shared" || value === "directory";
 }
 
 type FieldDraft = FieldKind | (Partial<FieldDef> & { type?: FieldKind | string });
 type TypeDraft = Partial<Omit<TypeDef, "fields">> & {
-  fields?: Record<string, FieldDraft> | FieldDef[] | Record<string, FieldDraft>;
+  fields?: Record<string, FieldDraft> | FieldDef[];
 };
 type SpecDraft = Partial<
   Omit<AppSpec, "types" | "views" | "forms" | "flows" | "pages" | "stores">
@@ -225,12 +215,7 @@ function normalizeField(key: string, draft: FieldDraft, existing?: FieldDef): Fi
   return field;
 }
 
-function normalizeType(
-  key: string,
-  draft: TypeDraft,
-  existing?: TypeDef,
-  fallbackStore = "local",
-): TypeDef {
+function normalizeType(key: string, draft: TypeDraft, existing?: TypeDef): TypeDef {
   const existingByKey = new Map((existing?.fields ?? []).map((field) => [field.key, field]));
   const fields = asEntries(draft.fields).map(([fieldKey, fieldDraft]) => {
     const resolvedKey =
@@ -239,11 +224,16 @@ function normalizeType(
       slugify((fieldDraft as FieldDef).label || "field");
     return normalizeField(resolvedKey, fieldDraft as FieldDraft, existingByKey.get(resolvedKey));
   });
+  const expose =
+    draft.expose ??
+    existing?.expose ??
+    (isLegacySharedStore(draft.store) || isLegacySharedStore(existing?.store));
   return {
     id: draft.id || existing?.id || createId("typ"),
     key,
     label: draft.label || existing?.label || labelFromKey(key),
-    store: draft.store || existing?.store || fallbackStore,
+    store: "local",
+    ...(expose ? { expose: true as const } : {}),
     fields,
   };
 }
@@ -269,14 +259,16 @@ function namedList<T extends { id?: string; key?: string; label?: string }>(
 
 export function normalizeSpec(input: SpecDraft | AppSpec, existing?: AppSpec): AppSpec {
   const key = input.key || existing?.key || "app";
-  const stores = namedList(input.stores, "sto", existing?.stores).map((store) => ({
-    id: store.id || createId("sto"),
-    key: store.key || "local",
-    label: store.label || labelFromKey(store.key || "local"),
-    kind: store.kind === "shared" ? "shared" : "workspace",
-  })) as StoreDef[];
+  const stores = namedList(input.stores, "sto", existing?.stores)
+    .filter((store) => !isLegacySharedStore(store.key) && store.kind !== "shared")
+    .map((store) => ({
+      id: store.id || createId("sto"),
+      key: store.key || "local",
+      label: store.label || "App",
+      kind: "local" as const,
+    })) as StoreDef[];
   if (!stores.some((store) => store.key === "local")) {
-    stores.push(defaultLocalStore());
+    stores.unshift(defaultLocalStore());
   }
   const existingTypes = new Map((existing?.types ?? []).map((type) => [type.key, type]));
   const types = asEntries(input.types).map(([typeKey, draft]) => {
@@ -347,12 +339,6 @@ export function resolveTypeRef(
   shared?: TypeDef[],
 ): TypeDef | undefined {
   const parsed = parseTypeRef(target);
-  if (parsed.store) {
-    return (
-      spec.types.find((type) => type.key === parsed.type && type.store === parsed.store) ||
-      shared?.find((type) => type.key === parsed.type && type.store === parsed.store)
-    );
-  }
   return (
     spec.types.find((type) => type.key === parsed.type) ||
     shared?.find((type) => type.key === parsed.type)

@@ -25,8 +25,15 @@ describe("sqlite materialisation", () => {
     expect(created.name).toBe("Acme site");
     expect(created.budget).toBe(8000);
     expect(created.active).toBe(true);
-    const directory = await host.inspectStore("directory");
-    expect(directory.tables.some((table) => table.name === "organisation")).toBe(true);
+    const shared = await host.inspectStore("shared");
+    expect(shared.database).toBe(`space-${host.space().id}`);
+    expect(shared.database).not.toContain("-shared");
+    expect(info.database).toBe(`space-${host.app().id}`);
+    expect(shared.database).not.toBe(info.database);
+    expect(shared.tables.some((table) => table.name === "_meta")).toBe(true);
+    expect(shared.tables.some((table) => table.name === "organisation")).toBe(false);
+    expect(info.tables.some((table) => table.name === "_meta")).toBe(true);
+    expect(info.tables.some((table) => table.name === "_br_meta")).toBe(false);
   });
 
   it("renames and drops columns without losing other values", async () => {

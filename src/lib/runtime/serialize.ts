@@ -40,6 +40,7 @@ export function authoringSpec(spec: AppSpec): Record<string, unknown> {
           id: type.id,
           label: type.label,
           store: type.store,
+          ...(type.expose ? { expose: true } : {}),
           fields: Object.fromEntries(
             type.fields.map((field) => [
               field.key,

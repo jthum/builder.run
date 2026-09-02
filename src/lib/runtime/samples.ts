@@ -1,21 +1,38 @@
-import { createId } from "./ids.ts";
+import { slugify } from "./ids.ts";
 import { normalizeSpec, type AppSpec, type TypeDef } from "./model.ts";
+
+export interface SampleRecord {
+  type: string;
+  as?: string;
+  values: Record<string, unknown>;
+}
+
+export type TemplateCategory = "crm" | "projects" | "finance";
 
 export interface SampleApp {
   key: string;
   label: string;
   description: string;
+  category: TemplateCategory;
   spec: AppSpec;
+  exposedTypes?: TypeDef[];
+  records?: SampleRecord[];
 }
 
-export function directoryTypes(): TypeDef[] {
+export const templateCategories: Array<{ key: TemplateCategory; label: string }> = [
+  { key: "crm", label: "CRM" },
+  { key: "projects", label: "Projects" },
+  { key: "finance", label: "Finance" },
+];
+
+/** Template content — not kernel types. Installed on the root space with expose. */
+export function peopleSharedTypes(): TypeDef[] {
   return normalizeSpec({
-    key: "directory",
-    label: "Directory",
-    stores: { directory: { kind: "shared", label: "Directory" } },
+    key: "space",
+    label: "Space",
     types: {
       organisation: {
-        store: "directory",
+        expose: true,
         label: "Organisation",
         fields: {
           name: { type: "text", required: true },
@@ -24,12 +41,12 @@ export function directoryTypes(): TypeDef[] {
         },
       },
       contact: {
-        store: "directory",
+        expose: true,
         label: "Contact",
         fields: {
           name: { type: "text", required: true },
           email: "text",
-          organisation: { type: "reference", target: "directory.organisation" },
+          organisation: { type: "reference", target: "organisation" },
         },
       },
     },
@@ -41,6 +58,8 @@ export const sampleApps: SampleApp[] = [
     key: "project_tracker",
     label: "Project tracker",
     description: "Keep projects moving — from planned to done.",
+    category: "projects",
+    exposedTypes: peopleSharedTypes().filter((type) => type.key === "organisation"),
     spec: normalizeSpec({
       key: "project_tracker",
       label: "Project tracker",
@@ -48,7 +67,7 @@ export const sampleApps: SampleApp[] = [
         project: {
           fields: {
             name: { type: "text", required: true },
-            client: { type: "reference", target: "directory.organisation" },
+            client: { type: "reference", target: "organisation" },
             status: {
               type: "enum",
               values: ["planned", "active", "complete"],
@@ -76,11 +95,49 @@ export const sampleApps: SampleApp[] = [
         },
       },
     }),
+    records: [
+      {
+        type: "organisation",
+        as: "northwind",
+        values: { name: "Northwind", email: "hello@northwind.test" },
+      },
+      {
+        type: "project",
+        values: {
+          name: "Website launch",
+          client: "$northwind",
+          status: "active",
+          budget: 12000,
+          due_date: "2026-09-18",
+        },
+      },
+      {
+        type: "project",
+        values: {
+          name: "Brand audit",
+          client: "$northwind",
+          status: "planned",
+          budget: 4000,
+          due_date: "2026-10-02",
+        },
+      },
+      {
+        type: "project",
+        values: {
+          name: "Q2 campaign",
+          client: "$northwind",
+          status: "complete",
+          budget: 6500,
+          due_date: "2026-06-30",
+        },
+      },
+    ],
   },
   {
     key: "expense_approval",
     label: "Expense approval",
     description: "Submit, approve, and mark expenses paid.",
+    category: "finance",
     spec: normalizeSpec({
       key: "expense_approval",
       label: "Expense approval",
@@ -123,11 +180,19 @@ export const sampleApps: SampleApp[] = [
         },
       },
     }),
+    records: [
+      { type: "expense", values: { title: "Train to Manchester", amount: 86, status: "draft" } },
+      { type: "expense", values: { title: "Design software", amount: 320, status: "submitted" } },
+      { type: "expense", values: { title: "Client lunch", amount: 54, status: "approved" } },
+      { type: "expense", values: { title: "Conference ticket", amount: 210, status: "paid" } },
+    ],
   },
   {
     key: "freelance_crm",
     label: "Freelance CRM",
     description: "Clients, projects, and invoices — unpaid work in one place.",
+    category: "crm",
+    exposedTypes: peopleSharedTypes(),
     spec: normalizeSpec({
       key: "freelance_crm",
       label: "Freelance CRM",
@@ -135,7 +200,7 @@ export const sampleApps: SampleApp[] = [
         project: {
           fields: {
             name: { type: "text", required: true },
-            client: { type: "reference", target: "directory.organisation" },
+            client: { type: "reference", target: "organisation" },
             status: {
               type: "enum",
               values: ["planned", "active", "completed"],
@@ -183,16 +248,59 @@ export const sampleApps: SampleApp[] = [
         },
       },
     }),
+    records: [
+      {
+        type: "organisation",
+        as: "acme",
+        values: { name: "Acme Ltd", email: "hello@acme.test", website: "https://acme.test" },
+      },
+      {
+        type: "organisation",
+        as: "bright",
+        values: {
+          name: "Brightline Studio",
+          email: "hi@brightline.test",
+          website: "https://brightline.test",
+        },
+      },
+      {
+        type: "contact",
+        values: { name: "Jane Cole", email: "jane@acme.test", organisation: "$acme" },
+      },
+      {
+        type: "project",
+        as: "web",
+        values: { name: "Website redesign", client: "$acme", status: "active", budget: 8000 },
+      },
+      {
+        type: "project",
+        as: "brand",
+        values: { name: "Brand refresh", client: "$bright", status: "planned", budget: 2500 },
+      },
+      {
+        type: "invoice",
+        values: { number: "INV-104", project: "$web", amount: 8000, status: "sent" },
+      },
+      {
+        type: "invoice",
+        values: { number: "INV-103", project: "$brand", amount: 1200, status: "paid" },
+      },
+    ],
   },
 ];
 
-export function newWorkspaceSpec(key: string, label: string): AppSpec {
+export function rootSpaceSpec(label: string): AppSpec {
+  return normalizeSpec({
+    key: slugify(label) || "space",
+    label,
+    stores: { local: { kind: "local", label: "App" } },
+  });
+}
+
+export function newAppSpec(key: string, label: string): AppSpec {
   return normalizeSpec({
     key,
     label,
-    stores: {
-      directory: { id: createId("sto"), kind: "shared", label: "Directory" },
-      local: { id: createId("sto"), kind: "workspace", label: "Workspace" },
-    },
+    stores: { local: { kind: "local", label: "App" } },
   });
 }

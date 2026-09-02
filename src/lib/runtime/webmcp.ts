@@ -66,21 +66,20 @@ export function buildTools(host: Host): ToolDefinition[] {
   const spec = host.resolvedSpec();
   const tools: ToolDefinition[] = [
     {
-      name: "get_environment",
-      title: "Inspect environment",
-      description:
-        "Inspect the active builder.run environment, workspaces, actors, and persistence backend.",
+      name: "get_space",
+      title: "Inspect space",
+      description: "Inspect the active space: its apps, actors, and persistence backend.",
       inputSchema: { type: "object", properties: {}, additionalProperties: false },
       annotations: { readOnlyHint: true },
       execute: () => {
         const snap = host.snapshot();
         return {
-          environment: snap.environment.name,
-          workspace: snap.workspace.name,
+          space: snap.space.name,
+          app: snap.app.name,
           actor: snap.actor.name,
           backend: snap.backend,
-          workspaces: snap.workspaces,
-          environments: snap.environments,
+          apps: snap.apps,
+          spaces: snap.spaces,
         };
       },
     },
@@ -88,7 +87,7 @@ export function buildTools(host: Host): ToolDefinition[] {
       name: "get_spec",
       title: "Inspect application spec",
       description:
-        "Return the canonical application spec for the active workspace, including shared types.",
+        "Return the canonical application spec for the active app, including types the space exposes.",
       inputSchema: { type: "object", properties: {}, additionalProperties: false },
       annotations: { readOnlyHint: true },
       execute: () => host.resolvedSpec(),
@@ -111,7 +110,7 @@ export function buildTools(host: Host): ToolDefinition[] {
     {
       name: "apply_spec",
       title: "Apply spec",
-      description: "Replace the active workspace spec from a YAML or JSON document.",
+      description: "Replace the active app spec from a YAML or JSON document.",
       inputSchema: {
         type: "object",
         properties: { spec: { type: "string", description: "YAML or JSON spec" } },
@@ -124,13 +123,14 @@ export function buildTools(host: Host): ToolDefinition[] {
       name: "upsert_type",
       title: "Create or update a type",
       description:
-        "Create or update a type in the application spec. Use store 'directory' for shared types.",
+        "Create or update a type in the application spec. Set expose true for types on the account space that apps can use.",
       inputSchema: {
         type: "object",
         properties: {
           key: { type: "string" },
           label: { type: "string" },
           store: { type: "string" },
+          expose: { type: "boolean" },
           fields: { type: "object" },
         },
         required: ["key"],
@@ -264,7 +264,8 @@ export function buildTools(host: Host): ToolDefinition[] {
     {
       name: "upsert_page",
       title: "Create or update a page",
-      description: "Create or update a page composed of views, forms, actions, and text.",
+      description:
+        "Create or update a page of grids and widgets. Widgets take values or attach to a view.",
       inputSchema: {
         type: "object",
         properties: {
@@ -279,9 +280,9 @@ export function buildTools(host: Host): ToolDefinition[] {
       execute: async (input) => host.upsertPage(input as never),
     },
     {
-      name: "create_workspace",
-      title: "Create workspace",
-      description: "Create a workspace in the active environment and switch to it.",
+      name: "create_app",
+      title: "Create app",
+      description: "Create an app in the active space and switch to it.",
       inputSchema: {
         type: "object",
         properties: { name: { type: "string" }, sample: { type: "string" } },
@@ -289,14 +290,26 @@ export function buildTools(host: Host): ToolDefinition[] {
         additionalProperties: false,
       },
       execute: async ({ name, sample }) => {
-        if (sample) return host.loadSample(String(sample));
-        return host.createWorkspace(String(name));
+        if (sample) return host.loadSample(String(sample), String(name));
+        return host.createApp(String(name));
       },
     },
     {
-      name: "switch_workspace",
-      title: "Switch workspace",
-      description: "Switch the active workspace by id.",
+      name: "delete_app",
+      title: "Delete app",
+      description: "Delete an app created from this account space. Shared records stay.",
+      inputSchema: {
+        type: "object",
+        properties: { id: { type: "string" } },
+        required: ["id"],
+        additionalProperties: false,
+      },
+      execute: async ({ id }) => host.deleteApp(String(id)),
+    },
+    {
+      name: "switch_app",
+      title: "Switch app",
+      description: "Switch the active app by id.",
       inputSchema: {
         type: "object",
         properties: { id: { type: "string" } },
@@ -304,26 +317,26 @@ export function buildTools(host: Host): ToolDefinition[] {
         additionalProperties: false,
       },
       execute: async ({ id }) => {
-        await host.switchWorkspace(String(id));
-        return host.snapshot().workspace;
+        await host.switchApp(String(id));
+        return host.snapshot().app;
       },
     },
     {
-      name: "create_environment",
-      title: "Create environment",
-      description: "Create a new environment with its own shared directory and workspaces.",
+      name: "create_space",
+      title: "Create space",
+      description: "Create a new account space with its own apps and optional exposed types.",
       inputSchema: {
         type: "object",
         properties: { name: { type: "string" } },
         required: ["name"],
         additionalProperties: false,
       },
-      execute: async ({ name }) => host.createEnvironment(String(name)),
+      execute: async ({ name }) => host.createSpace(String(name)),
     },
     {
       name: "list_samples",
       title: "List sample apps",
-      description: "List gallery sample applications that can be loaded into a workspace.",
+      description: "List gallery sample applications that can be loaded as an app.",
       inputSchema: { type: "object", properties: {}, additionalProperties: false },
       annotations: { readOnlyHint: true },
       execute: () =>
@@ -331,6 +344,7 @@ export function buildTools(host: Host): ToolDefinition[] {
           key: sample.key,
           label: sample.label,
           description: sample.description,
+          category: sample.category,
         })),
     },
   ];

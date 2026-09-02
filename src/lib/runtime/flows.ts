@@ -60,7 +60,7 @@ async function hydrateInputs(ctx: QueryContext, flow: FlowDef, scope: Scope): Pr
     if (value && typeof value === "object" && "id" in (value as object)) continue;
     const type = findType(ctx, name);
     if (!type || value == null || value === "") continue;
-    const record = await ctx.engineFor(type.store).get(type.key, String(value));
+    const record = await ctx.engineFor(type).get(type.key, String(value));
     if (record) scope[name] = record;
   }
   for (const [name, expr] of entries) {
@@ -71,7 +71,7 @@ async function hydrateInputs(ctx: QueryContext, flow: FlowDef, scope: Scope): Pr
     if (!id || (typeof id === "object" && id && "id" in id)) continue;
     const type = findType(ctx, typeKey);
     if (!type) continue;
-    const record = await ctx.engineFor(type.store).get(type.key, String(id));
+    const record = await ctx.engineFor(type).get(type.key, String(id));
     if (record) scope[name] = record;
   }
 }
@@ -125,7 +125,7 @@ async function runSteps(
       } else if (step.query.type) {
         const type = findType(ctx, step.query.type);
         scope[step.query.as] = type
-          ? await ctx.engineFor(type.store).select(type.key, { where: step.query.where })
+          ? await ctx.engineFor(type).select(type.key, { where: step.query.where })
           : [];
       }
     } else if ("when" in step) {

@@ -1,11 +1,16 @@
-import { ensureCatalog, loadPlatform, savePlatform } from "./catalog.ts";
+import {
+  CATALOG_DATABASE,
+  ensureCatalog,
+  listCatalogTables,
+  loadPlatform,
+  savePlatform,
+} from "./catalog.ts";
 import { applyDefaults, effectiveSpec } from "./defaults.ts";
 import type { TableEngine } from "./engine.ts";
 import { invokeFlow, matchingTriggers, type FlowRun } from "./flows.ts";
 import { createId, labelFromKey, slugify } from "./ids.ts";
 import {
   cloneSpec,
-  emptySpec,
   normalizeSpec,
   type Actor,
   type AppSpec,
@@ -17,9 +22,10 @@ import {
   type RecordValue,
   type TypeDef,
   type ViewDef,
+  isExposed,
 } from "./model.ts";
 import { readPlatformJson, type PersistenceBackend } from "./persist.ts";
-import type { EnvironmentState, PlatformState, WorkspaceState } from "./platform.ts";
+import type { PlatformState, SpaceState } from "./platform.ts";
 import { executeView, findType, type QueryContext } from "./query.ts";
 import {
   createRecord,
@@ -28,26 +34,27 @@ import {
   updateRecord,
   type ChangeEvent,
 } from "./records.ts";
-import { directoryTypes, newWorkspaceSpec, sampleApps } from "./samples.ts";
+import { newAppSpec, rootSpaceSpec, sampleApps } from "./samples.ts";
 import { reconcileStore } from "./schema.ts";
 import { specFromText, specToJson, specToYaml } from "./serialize.ts";
 import { SqliteEngine } from "./sql-engine.ts";
 import { openSqlGateway, type SqlConnection, type SqlGateway } from "./sql-gateway.ts";
 
-export type { EnvironmentState, PlatformState, WorkspaceState } from "./platform.ts";
+export type { PlatformState, SpaceState } from "./platform.ts";
 
 export interface HostSnapshot {
   backend: PersistenceBackend;
   engine: "sqlite";
   webmcp: boolean;
-  environment: EnvironmentState;
-  workspace: WorkspaceState;
+  space: SpaceState;
+  app: SpaceState;
   spec: AppSpec;
   sharedTypes: TypeDef[];
   actor: Actor;
-  environments: Array<{ id: string; name: string }>;
-  workspaces: Array<{ id: string; name: string }>;
-  stores: Array<{ key: string; database: string; tables: string[] }>;
+  spaces: Array<{ id: string; name: string }>;
+  apps: Array<{ id: string; name: string }>;
+  stores: Array<{ key: string; label: string; database: string; tables: string[] }>;
+  catalog: { database: string; tables: string[] };
 }
 
 export interface HostOptions {
@@ -65,14 +72,16 @@ export class Host {
   private engines = new Map<string, TableEngine>();
   private listeners = new Set<Listener>();
   private persistEnabled = true;
+  private silent = false;
   private storeTables = new Map<string, string[]>();
+  private catalogTables: string[] = [];
 
   static async open(options: HostOptions = {}): Promise<Host> {
     const host = new Host();
     host.persistEnabled = options.persist !== false;
     host.gateway = options.gateway ?? (await openSqlGateway());
     host.backend = host.gateway.backend;
-    host.catalog = await host.gateway.open("builder-run-control");
+    host.catalog = await host.gateway.open(CATALOG_DATABASE);
     await ensureCatalog(host.catalog);
     const loaded = await loadPlatform(host.catalog);
     if (loaded) {
@@ -93,121 +102,159 @@ export class Host {
   }
 
   private async persistAndEmit(): Promise<void> {
-    await this.saveCatalog();
+    if (this.silent) return;
+    try {
+      await this.saveCatalog();
+    } catch (error) {
+      console.warn("builder.run persist failed", error);
+    }
     for (const listener of this.listeners) listener();
   }
 
   private async saveCatalog(): Promise<void> {
     await savePlatform(this.catalog, this.platform);
+    this.catalogTables = await listCatalogTables(this.catalog);
   }
 
-  private dbName(storeKey: string): string {
-    const env = this.environment();
-    if (storeKey === "local") return `env-${env.id}-ws-${env.activeWorkspaceId}`;
-    return `env-${env.id}-${storeKey}`;
-  }
-
-  private engineKey(storeKey: string): string {
-    return this.dbName(storeKey);
+  private spaceFile(id: string): string {
+    return `space-${id}`;
   }
 
   private async bootEngines(): Promise<void> {
     this.engines.clear();
-    const env = this.environment();
-    for (const store of env.stores) {
-      const name = this.dbName(store.key);
+    const ids = new Set([this.app().id, this.space().id]);
+    for (const id of ids) {
+      const name = this.spaceFile(id);
       const conn = await this.gateway.open(name);
-      this.engines.set(this.engineKey(store.key), new SqliteEngine(conn, name));
+      this.engines.set(id, new SqliteEngine(conn, name));
     }
   }
 
   private async reconcileAll(): Promise<void> {
-    const env = this.environment();
-    const sharedEngine = this.engines.get(this.engineKey("directory"));
-    if (sharedEngine) {
-      await reconcileStore(
-        sharedEngine,
-        env.sharedTypes.filter((type) => type.store === "directory"),
-      );
-      this.storeTables.set("directory", await sharedEngine.listTables());
+    const space = this.space();
+    const app = this.app();
+    const spaceEngine = this.engines.get(space.id);
+    if (spaceEngine) {
+      await reconcileStore(spaceEngine, space.spec.types);
+      this.storeTables.set(space.id, await spaceEngine.listTables());
     }
-    const local = this.engines.get(this.engineKey("local"));
-    if (local) {
-      const spec = this.resolvedSpec();
-      await reconcileStore(
-        local,
-        spec.types.filter((type) => type.store === "local"),
-      );
-      this.storeTables.set("local", await local.listTables());
+    if (app.id !== space.id) {
+      const appEngine = this.engines.get(app.id);
+      if (appEngine) {
+        await reconcileStore(appEngine, app.spec.types);
+        this.storeTables.set(app.id, await appEngine.listTables());
+      }
     }
   }
 
-  environment(): EnvironmentState {
-    const env = this.platform.environments.find(
-      (item) => item.id === this.platform.activeEnvironmentId,
+  private engineForType(type: TypeDef): TableEngine {
+    const appHas = this.app().spec.types.some((item) => item.key === type.key);
+    const spaceHas = this.space().spec.types.some((item) => item.key === type.key);
+    const id = appHas ? this.app().id : spaceHas ? this.space().id : this.app().id;
+    const engine = this.engines.get(id);
+    if (!engine) throw new Error(`Store for ${type.key} is not open`);
+    return engine;
+  }
+
+  /** Account space: the space that holds the current actor. */
+  space(): SpaceState {
+    const actorId = this.currentActorId();
+    return (
+      this.platform.spaces.find((item) => item.actors.some((actor) => actor.id === actorId)) ??
+      this.app()
     );
-    if (!env) throw new Error("No active environment");
-    return env;
   }
 
-  workspace(): WorkspaceState {
-    const env = this.environment();
-    const workspace = env.workspaces.find((item) => item.id === env.activeWorkspaceId);
-    if (!workspace) throw new Error("No active workspace");
-    return workspace;
+  /** The space you are using. An app when createdBy is set. */
+  app(): SpaceState {
+    const current = this.platform.spaces.find((item) => item.id === this.platform.activeSpaceId);
+    if (!current) throw new Error("No active app");
+    return current;
+  }
+
+  /** Spaces this account created — the app switcher query. */
+  apps(): SpaceState[] {
+    const actorId = this.actor().id;
+    return this.platform.spaces.filter((item) => item.createdBy === actorId);
+  }
+
+  private currentActorId(): string | undefined {
+    const current = this.app();
+    const local = current.actors.find((item) => item.kind === "human") ?? current.actors[0];
+    if (local) return local.id;
+    if (current.createdBy) return current.createdBy;
+    for (const space of this.platform.spaces) {
+      const human = space.actors.find((item) => item.kind === "human") ?? space.actors[0];
+      if (human) return human.id;
+    }
+    return undefined;
   }
 
   actor(): Actor {
-    const env = this.environment();
-    return env.actors.find((item) => item.kind === "human") ?? env.actors[0];
+    const actorId = this.currentActorId();
+    for (const space of this.platform.spaces) {
+      const found = space.actors.find((item) => item.id === actorId);
+      if (found) return found;
+    }
+    throw new Error("No actor");
   }
 
   context(): ExecutionContext {
     return {
       actorId: this.actor().id,
-      environmentId: this.environment().id,
-      workspaceId: this.workspace().id,
+      spaceId: this.space().id,
+      appId: this.app().id,
     };
   }
 
   resolvedSpec(): AppSpec {
-    const workspace = this.workspace();
-    const env = this.environment();
-    const spec = cloneSpec(workspace.spec);
+    const app = this.app();
+    const space = this.space();
+    const spec = cloneSpec(app.spec);
     const localKeys = new Set(spec.types.map((type) => type.key));
-    spec.types = [...env.sharedTypes.filter((type) => !localKeys.has(type.key)), ...spec.types];
-    if (!spec.stores.some((store) => store.key === "directory")) {
-      spec.stores.unshift(
-        env.stores.find((store) => store.key === "directory") ?? {
-          id: createId("sto"),
-          key: "directory",
-          label: "Directory",
-          kind: "shared",
-        },
-      );
-    }
+    const exposed = space.spec.types.filter((type) => isExposed(type) && !localKeys.has(type.key));
+    spec.types = [...exposed, ...spec.types];
     return applyDefaults(spec);
   }
 
   snapshot(): HostSnapshot {
-    const env = this.environment();
-    const workspace = this.workspace();
+    const space = this.space();
+    const app = this.app();
     return {
       backend: this.backend,
       engine: "sqlite",
       webmcp: typeof document !== "undefined" && Boolean(document.modelContext),
-      environment: env,
-      workspace,
+      space,
+      app,
       spec: this.resolvedSpec(),
-      sharedTypes: env.sharedTypes,
+      sharedTypes: space.spec.types.filter(isExposed),
       actor: this.actor(),
-      environments: this.platform.environments.map((item) => ({ id: item.id, name: item.name })),
-      workspaces: env.workspaces.map((item) => ({ id: item.id, name: item.name })),
-      stores: env.stores.map((store) => ({
-        key: store.key,
-        database: this.dbName(store.key),
-        tables: this.storeTables.get(store.key) ?? [],
-      })),
+      spaces: this.platform.spaces
+        .filter((item) => item.actors.length > 0)
+        .map((item) => ({ id: item.id, name: item.name })),
+      apps: this.apps().map((item) => ({ id: item.id, name: item.name })),
+      stores: [
+        ...(space.id === app.id
+          ? []
+          : [
+              {
+                key: "space",
+                label: space.name,
+                database: this.spaceFile(space.id),
+                tables: this.storeTables.get(space.id) ?? [],
+              },
+            ]),
+        {
+          key: "app",
+          label: app.name,
+          database: this.spaceFile(app.id),
+          tables: this.storeTables.get(app.id) ?? [],
+        },
+      ],
+      catalog: {
+        database: CATALOG_DATABASE,
+        tables: this.catalogTables,
+      },
     };
   }
 
@@ -215,12 +262,8 @@ export class Host {
     const spec = this.resolvedSpec();
     return {
       spec,
-      sharedTypes: this.environment().sharedTypes,
-      engineFor: (storeKey) => {
-        const engine = this.engines.get(this.engineKey(storeKey));
-        if (!engine) throw new Error(`Store ${storeKey} is not open`);
-        return engine;
-      },
+      sharedTypes: this.space().spec.types.filter(isExposed),
+      engineFor: (type) => this.engineForType(type),
     };
   }
 
@@ -228,9 +271,7 @@ export class Host {
     const ctx = this.queryContext();
     const type = findType(ctx, typeKey);
     if (!type) return [];
-    const rows = await ctx
-      .engineFor(type.store)
-      .select(type.key, { orderBy: { updated_at: "desc" } });
+    const rows = await ctx.engineFor(type).select(type.key, { orderBy: { updated_at: "desc" } });
     return rows.map((row) => decodeRecord(type, row));
   }
 
@@ -238,7 +279,7 @@ export class Host {
     const ctx = this.queryContext();
     const type = findType(ctx, typeKey);
     if (!type) return null;
-    const row = await ctx.engineFor(type.store).get(type.key, id);
+    const row = await ctx.engineFor(type).get(type.key, id);
     return row ? decodeRecord(type, row) : null;
   }
 
@@ -305,38 +346,33 @@ export class Host {
   }
 
   async upsertType(draft: Partial<TypeDef> & { key: string }): Promise<TypeDef> {
-    const workspace = this.workspace();
-    const env = this.environment();
-    const store = draft.store || "local";
-    const spec = store === "directory" ? typespecFromShared(env) : workspace.spec;
+    const expose = Boolean(draft.expose) || draft.store === "shared";
+    const target = expose ? this.space() : this.app();
+    const spec = target.spec;
     const next = normalizeSpec(
       {
         ...spec,
         types: {
           ...Object.fromEntries(spec.types.map((type) => [type.key, type])),
-          [draft.key]: draft,
+          [draft.key]: { ...draft, ...(expose ? { expose: true } : {}), store: "local" },
         },
       },
       spec,
     );
     const type = next.types.find((item) => item.key === draft.key) as TypeDef;
-    if (store === "directory") {
-      env.sharedTypes = next.types.filter((item) => item.store === "directory");
-    } else {
-      workspace.spec = applyDefaults(next);
-    }
+    target.spec = applyDefaults(next);
     await this.reconcileAll();
     await this.persistAndEmit();
     return type;
   }
 
   async deleteType(key: string): Promise<void> {
-    const workspace = this.workspace();
-    workspace.spec.types = workspace.spec.types.filter((type) => type.key !== key);
-    workspace.spec = applyDefaults(workspace.spec);
-    this.environment().sharedTypes = this.environment().sharedTypes.filter(
-      (type) => type.key !== key,
-    );
+    const app = this.app();
+    app.spec.types = app.spec.types.filter((type) => type.key !== key);
+    app.spec = applyDefaults(app.spec);
+    const space = this.space();
+    space.spec.types = space.spec.types.filter((type) => type.key !== key);
+    space.spec = applyDefaults(space.spec);
     await this.reconcileAll();
     await this.persistAndEmit();
   }
@@ -408,8 +444,22 @@ export class Host {
     return next.find((item) => item.key === field.key) as FieldDef;
   }
 
+  async reorderFields(typeKey: string, keys: string[]): Promise<TypeDef> {
+    const type = this.findWritableType(typeKey);
+    const map = new Map(type.fields.map((field) => [field.key, field]));
+    const next = keys
+      .map((key) => map.get(key))
+      .filter((field): field is FieldDef => Boolean(field));
+    for (const field of type.fields) {
+      if (!keys.includes(field.key)) next.push(field);
+    }
+    type.fields = next;
+    await this.persistAndEmit();
+    return type;
+  }
+
   async upsertView(draft: Partial<ViewDef> & { key: string }): Promise<ViewDef> {
-    const spec = this.workspace().spec;
+    const spec = this.app().spec;
     const views = upsertNamed(spec.views, {
       id: createId("vw"),
       label: labelFromKey(draft.key),
@@ -417,13 +467,13 @@ export class Host {
       fields: [],
       ...draft,
     });
-    this.workspace().spec = applyDefaults({ ...spec, views });
+    this.app().spec = applyDefaults({ ...spec, views });
     await this.persistAndEmit();
     return views.find((item) => item.key === draft.key) as ViewDef;
   }
 
   async upsertForm(draft: Partial<FormDef> & { key: string }): Promise<FormDef> {
-    const spec = this.workspace().spec;
+    const spec = this.app().spec;
     const forms = upsertNamed(spec.forms, {
       id: createId("frm"),
       label: labelFromKey(draft.key),
@@ -432,39 +482,72 @@ export class Host {
       mode: "custom",
       ...draft,
     } as FormDef);
-    this.workspace().spec = applyDefaults({ ...spec, forms });
+    this.app().spec = applyDefaults({ ...spec, forms });
     await this.persistAndEmit();
     return forms.find((item) => item.key === draft.key) as FormDef;
   }
 
   async upsertFlow(draft: Partial<FlowDef> & { key: string }): Promise<FlowDef> {
-    const spec = this.workspace().spec;
+    const spec = this.app().spec;
     const flows = upsertNamed(spec.flows, {
       id: createId("flw"),
       label: labelFromKey(draft.key),
       steps: [],
       ...draft,
     });
-    this.workspace().spec = { ...spec, flows };
+    this.app().spec = { ...spec, flows };
     await this.persistAndEmit();
     return flows.find((item) => item.key === draft.key) as FlowDef;
   }
 
   async upsertPage(draft: Partial<PageDef> & { key: string }): Promise<PageDef> {
-    const spec = this.workspace().spec;
+    const spec = this.app().spec;
     const pages = upsertNamed(spec.pages, {
       id: createId("pg"),
       label: labelFromKey(draft.key),
-      blocks: [],
       ...draft,
+      blocks: JSON.parse(JSON.stringify(draft.blocks ?? [])),
     });
-    this.workspace().spec = applyDefaults({ ...spec, pages });
+    this.app().spec = applyDefaults({ ...spec, pages });
     await this.persistAndEmit();
     return pages.find((item) => item.key === draft.key) as PageDef;
   }
 
+  async deleteView(key: string): Promise<void> {
+    const spec = this.app().spec;
+    this.app().spec = applyDefaults({
+      ...spec,
+      views: spec.views.filter((view) => view.key !== key),
+    });
+    await this.persistAndEmit();
+  }
+
+  async deleteForm(key: string): Promise<void> {
+    const spec = this.app().spec;
+    this.app().spec = applyDefaults({
+      ...spec,
+      forms: spec.forms.filter((form) => form.key !== key),
+    });
+    await this.persistAndEmit();
+  }
+
+  async deleteFlow(key: string): Promise<void> {
+    const spec = this.app().spec;
+    this.app().spec = { ...spec, flows: spec.flows.filter((flow) => flow.key !== key) };
+    await this.persistAndEmit();
+  }
+
+  async deletePage(key: string): Promise<void> {
+    const spec = this.app().spec;
+    this.app().spec = applyDefaults({
+      ...spec,
+      pages: spec.pages.filter((page) => page.key !== key),
+    });
+    await this.persistAndEmit();
+  }
+
   async applySpec(input: unknown): Promise<AppSpec> {
-    const workspace = this.workspace();
+    const workspace = this.app();
     workspace.spec = applyDefaults(normalizeSpec(input as never, workspace.spec));
     await this.reconcileAll();
     await this.persistAndEmit();
@@ -476,80 +559,214 @@ export class Host {
   }
 
   exportJson(): string {
-    return specToJson(effectiveSpec(this.workspace().spec));
+    return specToJson(effectiveSpec(this.app().spec));
   }
 
   exportYaml(): string {
-    return specToYaml(effectiveSpec(this.workspace().spec));
+    return specToYaml(effectiveSpec(this.app().spec));
   }
 
-  async createWorkspace(name: string, spec?: AppSpec): Promise<WorkspaceState> {
-    const env = this.environment();
-    const workspace: WorkspaceState = {
-      id: createId("wsp"),
+  private async insertApp(
+    name: string,
+    spec?: AppSpec,
+    options: { silent?: boolean } = {},
+  ): Promise<SpaceState> {
+    const app: SpaceState = {
+      id: createId("spc"),
       name,
-      spec: spec ? applyDefaults(normalizeSpec(spec)) : newWorkspaceSpec(slugify(name), name),
+      createdBy: this.actor().id,
+      actors: [],
+      spec: spec ? applyDefaults(normalizeSpec(spec)) : newAppSpec(slugify(name), name),
     };
-    env.workspaces.push(workspace);
-    env.activeWorkspaceId = workspace.id;
+    this.platform.spaces.push(app);
+    this.platform.activeSpaceId = app.id;
     await this.bootEngines();
     await this.reconcileAll();
+    if (!options.silent) await this.persistAndEmit();
+    return app;
+  }
+
+  async switchApp(id: string): Promise<void> {
+    const app = this.apps().find((item) => item.id === id);
+    if (!app) throw new Error("Unknown app");
+    this.platform.activeSpaceId = id;
+    await this.bootEngines();
+    await this.reconcileAll();
+    await this.persistAndEmit();
+  }
+
+  async createSpace(name: string): Promise<SpaceState> {
+    const seeded = seedSpace(name);
+    this.platform.spaces.push(...seeded.spaces);
+    this.platform.activeSpaceId = seeded.activeId;
+    await this.bootEngines();
+    await this.reconcileAll();
+    await this.persistAndEmit();
+    return this.space();
+  }
+
+  async switchSpace(id: string): Promise<void> {
+    const account = this.platform.spaces.find((item) => item.id === id && item.actors.length > 0);
+    if (!account) throw new Error("Unknown space");
+    const human = account.actors.find((item) => item.kind === "human") ?? account.actors[0];
+    const firstApp = this.platform.spaces.find((item) => item.createdBy === human?.id);
+    if (firstApp) {
+      this.platform.activeSpaceId = firstApp.id;
+      await this.bootEngines();
+      await this.reconcileAll();
+      await this.persistAndEmit();
+      return;
+    }
+    this.platform.activeSpaceId = account.id;
+    await this.insertApp("Home");
+  }
+
+  async renameSpace(name: string): Promise<void> {
+    const trimmed = name.trim();
+    if (!trimmed) throw new Error("Name required");
+    this.space().name = trimmed;
+    await this.persistAndEmit();
+  }
+
+  async updateActor(patch: { name?: string; email?: string }): Promise<Actor> {
+    const actor = this.actor();
+    if (patch.name != null) {
+      const name = patch.name.trim();
+      if (!name) throw new Error("Name required");
+      actor.name = name;
+    }
+    if (patch.email != null) actor.email = patch.email.trim() || undefined;
+    await this.persistAndEmit();
+    return actor;
+  }
+
+  async deleteApp(id: string): Promise<SpaceState> {
+    const target = this.platform.spaces.find((item) => item.id === id);
+    if (!target?.createdBy) throw new Error("Unknown app");
+    const createdBy = target.createdBy;
+    const others = this.platform.spaces.filter(
+      (item) => item.createdBy === createdBy && item.id !== id,
+    );
+    const deletingActive = this.platform.activeSpaceId === id;
+    if (deletingActive) await this.closeLocalEngine();
+    this.platform.spaces = this.platform.spaces.filter((item) => item.id !== id);
+    if (deletingActive) {
+      if (others.length) this.platform.activeSpaceId = others[0]!.id;
+      else {
+        const blank: SpaceState = {
+          id: createId("spc"),
+          name: "Home",
+          createdBy,
+          actors: [],
+          spec: newAppSpec("home", "Home"),
+        };
+        this.platform.spaces.push(blank);
+        this.platform.activeSpaceId = blank.id;
+      }
+      await this.bootEngines();
+      await this.reconcileAll();
+    }
+    await this.persistAndEmit();
+    return this.app();
+  }
+
+  private async closeLocalEngine(): Promise<void> {
+    const appId = this.app().id;
+    if (appId === this.space().id) return;
+    const engine = this.engines.get(appId);
+    if (engine && "close" in engine && typeof engine.close === "function") {
+      await engine.close();
+    }
+    this.engines.delete(appId);
+  }
+
+  async createApp(name: string, template?: string | null): Promise<SpaceState> {
+    const trimmed = name.trim();
+    if (!trimmed) throw new Error("Name required");
+    if (template) return this.loadSample(template, trimmed);
+    return this.insertApp(trimmed);
+  }
+
+  async loadSample(key: string, name?: string): Promise<SpaceState> {
+    const sample = sampleApps.find((item) => item.key === key);
+    if (!sample) throw new Error(`Unknown sample ${key}`);
+    this.installExposedTypes(sample.exposedTypes ?? []);
+    const workspace = await this.insertApp(name?.trim() || sample.label, sample.spec, {
+      silent: true,
+    });
+    this.silent = true;
+    try {
+      await this.seedRecords(sample.records ?? []);
+    } catch (error) {
+      console.error("builder.run failed to seed template records", error);
+    } finally {
+      this.silent = false;
+    }
     await this.persistAndEmit();
     return workspace;
   }
 
-  async switchWorkspace(id: string): Promise<void> {
-    const env = this.environment();
-    if (!env.workspaces.some((item) => item.id === id)) throw new Error("Unknown workspace");
-    env.activeWorkspaceId = id;
-    await this.bootEngines();
-    await this.reconcileAll();
-    await this.persistAndEmit();
+  private installExposedTypes(types: TypeDef[]): void {
+    if (!types.length) return;
+    const space = this.space();
+    const have = new Set(space.spec.types.map((type) => type.key));
+    const incoming = types
+      .filter((type) => !have.has(type.key))
+      .map((type) => ({ ...type, store: "local" as const, expose: true as const }));
+    if (!incoming.length) return;
+    space.spec = applyDefaults({
+      ...space.spec,
+      types: [...space.spec.types, ...incoming],
+    });
   }
 
-  async createEnvironment(name: string): Promise<EnvironmentState> {
-    const env = seedEnvironment(name);
-    this.platform.environments.push(env);
-    this.platform.activeEnvironmentId = env.id;
-    await this.bootEngines();
-    await this.reconcileAll();
-    await this.persistAndEmit();
-    return env;
-  }
-
-  async switchEnvironment(id: string): Promise<void> {
-    if (!this.platform.environments.some((item) => item.id === id))
-      throw new Error("Unknown environment");
-    this.platform.activeEnvironmentId = id;
-    await this.bootEngines();
-    await this.reconcileAll();
-    await this.persistAndEmit();
-  }
-
-  async loadSample(key: string): Promise<WorkspaceState> {
-    const sample = sampleApps.find((item) => item.key === key);
-    if (!sample) throw new Error(`Unknown sample ${key}`);
-    return this.createWorkspace(sample.label, sample.spec);
+  private async seedRecords(
+    rows: Array<{ type: string; as?: string; values: Record<string, unknown> }>,
+  ): Promise<void> {
+    const aliases: Record<string, string> = {};
+    for (const row of rows) {
+      const values: Record<string, unknown> = {};
+      for (const [key, value] of Object.entries(row.values)) {
+        values[key] =
+          typeof value === "string" && value.startsWith("$")
+            ? (aliases[value.slice(1)] ?? value)
+            : value;
+      }
+      const ctx = this.queryContext();
+      const type = findType(ctx, row.type);
+      if (type && isExposed(type) && typeof values.name === "string") {
+        const existing = (await this.listRecords(row.type)).find(
+          (record) => record.name === values.name,
+        );
+        if (existing) {
+          if (row.as) aliases[row.as] = existing.id;
+          continue;
+        }
+      }
+      const record = await this.create(row.type, values);
+      if (row.as) aliases[row.as] = record.id;
+    }
   }
 
   async inspectStore(
-    storeKey: string,
+    which: string,
   ): Promise<{ database: string; tables: Array<{ name: string; columns: string[] }> }> {
-    const engine = this.engines.get(this.engineKey(storeKey));
-    if (!engine) throw new Error(`Store ${storeKey} is not open`);
+    const id = which === "shared" || which === "space" ? this.space().id : this.app().id;
+    const engine = this.engines.get(id);
+    if (!engine) throw new Error(`Store ${which} is not open`);
     const names = await engine.listTables();
     const tables = [];
     for (const name of names) {
       const columns = await engine.tableInfo(name);
       tables.push({ name, columns: columns.map((column) => `${column.name} ${column.sqlType}`) });
     }
-    return { database: this.dbName(storeKey), tables };
+    return { database: this.spaceFile(id), tables };
   }
 
   private findWritableType(typeKey: string): TypeDef {
-    const local = this.workspace().spec.types.find((type) => type.key === typeKey);
+    const local = this.app().spec.types.find((type) => type.key === typeKey);
     if (local) return local;
-    const shared = this.environment().sharedTypes.find((type) => type.key === typeKey);
+    const shared = this.space().spec.types.find((type) => type.key === typeKey);
     if (shared) return shared;
     throw new Error(`Unknown type ${typeKey}`);
   }
@@ -564,42 +781,34 @@ function upsertNamed<T extends { key: string }>(list: T[], item: T): T[] {
   return [...list, item];
 }
 
-function typespecFromShared(env: EnvironmentState): AppSpec {
-  const spec = emptySpec("directory", "Directory");
-  spec.stores = env.stores;
-  spec.types = env.sharedTypes;
-  return spec;
-}
-
 function seedPlatform(): PlatformState {
-  const env = seedEnvironment("Personal");
+  const seeded = seedSpace("Personal Space");
   return {
     version: 1,
-    activeEnvironmentId: env.id,
-    environments: [env],
+    activeSpaceId: seeded.activeId,
+    spaces: seeded.spaces,
   };
 }
 
-function seedEnvironment(name: string): EnvironmentState {
+function seedSpace(name: string): { spaces: SpaceState[]; activeId: string } {
   const human: Actor = { id: createId("act"), name: "You", kind: "human", roles: ["admin"] };
   const system: Actor = { id: createId("act"), name: "System", kind: "system", roles: ["admin"] };
-  const workspace: WorkspaceState = {
-    id: createId("wsp"),
-    name: "Home",
-    spec: newWorkspaceSpec("home", "Home"),
-  };
-  return {
-    id: createId("env"),
+  const rootId = createId("spc");
+  const appId = createId("spc");
+  const root: SpaceState = {
+    id: rootId,
     name,
     actors: [human, system],
-    stores: [
-      { id: createId("sto"), key: "directory", label: "Directory", kind: "shared" },
-      { id: createId("sto"), key: "local", label: "Workspace", kind: "workspace" },
-    ],
-    sharedTypes: directoryTypes(),
-    workspaces: [workspace],
-    activeWorkspaceId: workspace.id,
+    spec: rootSpaceSpec(name),
   };
+  const home: SpaceState = {
+    id: appId,
+    name: "Home",
+    createdBy: human.id,
+    actors: [],
+    spec: newAppSpec("home", "Home"),
+  };
+  return { spaces: [root, home], activeId: appId };
 }
 
 async function migrateLegacyJson(): Promise<PlatformState | null> {
@@ -607,14 +816,15 @@ async function migrateLegacyJson(): Promise<PlatformState | null> {
     const raw = await readPlatformJson(typeof indexedDB === "undefined" ? "memory" : "indexeddb");
     if (!raw) return null;
     const parsed = JSON.parse(raw) as {
-      activeEnvironmentId?: string;
-      environments?: EnvironmentState[];
+      activeSpaceId?: string;
+      spaces?: SpaceState[];
     };
-    if (!parsed.environments?.length) return null;
+    if (!parsed.spaces?.length) return null;
+    if (parsed.spaces.some((item) => "parentId" in item && !("createdBy" in item))) return null;
     return {
       version: 1,
-      activeEnvironmentId: parsed.activeEnvironmentId ?? parsed.environments[0].id,
-      environments: parsed.environments,
+      activeSpaceId: parsed.activeSpaceId ?? parsed.spaces[0].id,
+      spaces: parsed.spaces,
     };
   } catch {
     return null;

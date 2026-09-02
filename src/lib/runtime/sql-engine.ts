@@ -26,7 +26,7 @@ export class SqliteEngine implements TableEngine {
 
   async listTables(): Promise<string[]> {
     const rows = await this.conn.query(
-      `SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%' AND name NOT LIKE 'br_%' ORDER BY name`,
+      `SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%' ORDER BY name`,
     );
     return rows.map((row) => String(row.name));
   }
@@ -178,6 +178,10 @@ export class SqliteEngine implements TableEngine {
         else await this.insert(table, row);
       }
     }
+  }
+
+  async close(): Promise<void> {
+    await this.enqueue(() => this.conn.close());
   }
 
   private async writableColumns(table: string): Promise<ColumnInfo[]> {

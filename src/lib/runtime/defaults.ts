@@ -1,5 +1,6 @@
 import { createId, labelFromKey } from "./ids.ts";
 import type { AppSpec, FormDef, PageDef, TypeDef, ViewDef } from "./model.ts";
+import { firstViewKey, normalizeBlock } from "./widgets.ts";
 
 export function implicitViewKey(typeKey: string): string {
   return `${typeKey}_list`;
@@ -71,7 +72,13 @@ export function defaultPageFor(type: TypeDef): PageDef {
     key: implicitPageKey(type.key),
     label: type.label,
     path: `/t/${type.key}`,
-    blocks: [{ kind: "view", view: implicitViewKey(type.key) }],
+    blocks: [
+      {
+        kind: "group",
+        columns: 1,
+        blocks: [{ kind: "widget", widget: "table", values: { view: implicitViewKey(type.key) } }],
+      },
+    ],
     implicit: true,
   };
 }
@@ -103,11 +110,14 @@ export function applyDefaults(spec: AppSpec): AppSpec {
   next.forms = next.forms.filter(
     (form) => !form.implicit || next.types.some((type) => type.key === form.type),
   );
+  for (const page of next.pages) {
+    page.blocks = (page.blocks ?? []).map(normalizeBlock);
+  }
   next.pages = next.pages.filter((page) => {
     if (!page.implicit) return true;
-    const block = page.blocks[0];
-    if (block?.kind !== "view") return true;
-    return next.views.some((view) => view.key === block.view);
+    const viewKey = firstViewKey(page.blocks);
+    if (!viewKey) return true;
+    return next.views.some((view) => view.key === viewKey);
   });
   return next;
 }

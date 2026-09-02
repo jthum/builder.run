@@ -12,7 +12,7 @@ import {
 export interface QueryContext {
   spec: AppSpec;
   sharedTypes: TypeDef[];
-  engineFor: (storeKey: string) => TableEngine;
+  engineFor: (type: TypeDef) => TableEngine;
 }
 
 export function allTypes(ctx: QueryContext): TypeDef[] {
@@ -22,11 +22,7 @@ export function allTypes(ctx: QueryContext): TypeDef[] {
 
 export function findType(ctx: QueryContext, key: string): TypeDef | undefined {
   const parsed = parseTypeRef(key);
-  return allTypes(ctx).find((type) => {
-    if (type.key !== parsed.type) return false;
-    if (parsed.store) return type.store === parsed.store;
-    return true;
-  });
+  return allTypes(ctx).find((type) => type.key === parsed.type);
 }
 
 export async function projectRow(
@@ -61,7 +57,7 @@ export async function resolvePath(
     if (field?.type === "reference") {
       const target = findType(ctx, field.target || "");
       if (!target) return record[part] ?? null;
-      const engine = ctx.engineFor(target.store);
+      const engine = ctx.engineFor(target);
       const related = await engine.get(target.key, String(record[part] ?? ""));
       current = related;
       currentType = target;
@@ -79,7 +75,7 @@ export async function executeView(
 ): Promise<Array<Record<string, unknown>>> {
   const type = findType(ctx, view.source);
   if (!type) return [];
-  const engine = ctx.engineFor(type.store);
+  const engine = ctx.engineFor(type);
   const rows = await engine.select(type.key, {
     where: view.where,
     orderBy: view.order_by,

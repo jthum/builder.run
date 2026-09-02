@@ -100,7 +100,78 @@ types:
     const actor = host.actor();
     expect(actor.kind).toBe("human");
     expect(actor.roles).toContain("admin");
-    const record = await host.create("organisation", { name: "Acme" });
+    await host.upsertType({
+      key: "note",
+      fields: [{ id: "fld_n", key: "title", label: "Title", type: "text" }] as never,
+    });
+    const record = await host.create("note", { title: "Hello" });
     expect(record.created_by).toBe(actor.id);
+  });
+
+  it("updates the local person and names a space", async () => {
+    expect.hasAssertions();
+    const host = await Host.open({ persist: false });
+    const actor = await host.updateActor({ name: "Ada", email: "ada@example.com" });
+    expect(actor.name).toBe("Ada");
+    expect(actor.email).toBe("ada@example.com");
+    await host.renameSpace("Studio Space");
+    expect(host.space().name).toBe("Studio Space");
+    const app = await host.createApp("Pipeline", "freelance_crm");
+    expect(app.name).toBe("Pipeline");
+    expect(host.app().spec.types.some((type) => type.key === "invoice")).toBe(true);
+  });
+
+  it("deletes an app and leaves a blank one if it was the last", async () => {
+    expect.hasAssertions();
+    const host = await Host.open({ persist: false });
+    await host.createApp("Pipeline", "freelance_crm");
+    const keep = await host.createApp("Notes");
+    await host.deleteApp(host.apps().find((item) => item.name === "Pipeline")!.id);
+    expect(host.apps().map((item) => item.name)).toEqual(["Home", "Notes"]);
+    expect(host.app().id).toBe(keep.id);
+    await host.deleteApp(keep.id);
+    await host.deleteApp(host.app().id);
+    expect(host.apps()).toHaveLength(1);
+    expect(host.app().name).toBe("Home");
+    expect(host.resolvedSpec().types.some((type) => !type.expose)).toBe(false);
+  });
+
+  it("treats apps as spaces created by the account actor", async () => {
+    expect.hasAssertions();
+    const host = await Host.open({ persist: false });
+    expect(host.space().name).toBe("Personal Space");
+    expect(host.app().name).toBe("Home");
+    expect(host.app().createdBy).toBe(host.actor().id);
+    expect(host.space().spec.types.some((type) => type.key === "organisation")).toBe(false);
+    expect(host.apps().map((item) => item.name)).toEqual(["Home"]);
+    await host.loadSample("freelance_crm");
+    expect(host.space().spec.types.some((type) => type.key === "organisation" && type.expose)).toBe(
+      true,
+    );
+    expect(host.app().spec.types.some((type) => type.key === "organisation")).toBe(false);
+    expect(host.app().spec.types.some((type) => type.key === "invoice")).toBe(true);
+    const shared = await host.inspectStore("shared");
+    const local = await host.inspectStore("local");
+    expect(shared.database).toBe(`space-${host.space().id}`);
+    expect(local.database).toBe(`space-${host.app().id}`);
+    expect(shared.tables.some((table) => table.name === "organisation")).toBe(true);
+    expect(local.tables.some((table) => table.name === "invoice")).toBe(true);
+    expect(host.snapshot().catalog.database).toBe("catalog");
+    expect(
+      host
+        .apps()
+        .map((item) => item.name)
+        .sort(),
+    ).toEqual(["Freelance CRM", "Home"]);
+    const other = await host.createSpace("Client Space");
+    expect(other.name).toBe("Client Space");
+    expect(host.app().name).toBe("Home");
+    expect(host.app().createdBy).toBe(host.actor().id);
+    expect(
+      host
+        .snapshot()
+        .spaces.map((item) => item.name)
+        .sort(),
+    ).toEqual(["Client Space", "Personal Space"]);
   });
 });

@@ -1,10 +1,15 @@
 // @ts-nocheck
-import SQLiteESMFactory from "wa-sqlite/dist/wa-sqlite-async.mjs";
+import SQLiteAsyncFactory from "wa-sqlite/dist/wa-sqlite-async.mjs";
+import SQLiteSyncFactory from "wa-sqlite/dist/wa-sqlite.mjs";
 import { Factory, SQLITE_ROW } from "wa-sqlite";
+import { AccessHandlePoolVFS } from "wa-sqlite/src/examples/AccessHandlePoolVFS.js";
 import { IDBBatchAtomicVFS } from "wa-sqlite/src/examples/IDBBatchAtomicVFS.js";
 import { MemoryAsyncVFS } from "wa-sqlite/src/examples/MemoryAsyncVFS.js";
-import { OriginPrivateFileSystemVFS } from "wa-sqlite/src/examples/OriginPrivateFileSystemVFS.js";
-import wasmUrl from "wa-sqlite/dist/wa-sqlite-async.wasm?url";
+import asyncWasmUrl from "wa-sqlite/dist/wa-sqlite-async.wasm?url";
+import syncWasmUrl from "wa-sqlite/dist/wa-sqlite.wasm?url";
+
+const OPFS_DIR = "/builder-run-sqlite";
+const OPFS_CAPACITY = 24;
 
 let sqlite3 = null;
 let backend = "memory";
@@ -13,22 +18,43 @@ const dbs = new Map();
 
 async function boot() {
   if (sqlite3) return sqlite3;
-  const module = await SQLiteESMFactory({
-    locateFile: (file) => (String(file).endsWith(".wasm") ? wasmUrl : file),
+  const opfs = await tryOpfs();
+  if (opfs) {
+    sqlite3 = opfs.sqlite;
+    backend = "opfs";
+    selectedVfs = opfs.vfsName;
+    return sqlite3;
+  }
+  const module = await SQLiteAsyncFactory({
+    locateFile: (file) => (String(file).endsWith(".wasm") ? asyncWasmUrl : file),
   });
   sqlite3 = Factory(module);
-  backend = await registerVfs(module, sqlite3);
+  backend = await registerAsyncVfs(sqlite3);
   return sqlite3;
 }
 
-async function registerVfs(module, sqlite) {
-  const candidates = [];
-  if (globalThis.navigator?.storage?.getDirectory) {
-    candidates.push({
-      backend: "opfs",
-      create: () => new OriginPrivateFileSystemVFS(),
+async function tryOpfs() {
+  if (!globalThis.navigator?.storage?.getDirectory) return null;
+  try {
+    const module = await SQLiteSyncFactory({
+      locateFile: (file) => (String(file).endsWith(".wasm") ? syncWasmUrl : file),
     });
+    const sqlite = Factory(module);
+    const vfs = new AccessHandlePoolVFS(OPFS_DIR);
+    await vfs.isReady;
+    const extra = OPFS_CAPACITY - vfs.getCapacity();
+    if (extra > 0) await vfs.addCapacity(extra);
+    sqlite.vfs_register(vfs, false);
+    await probe(sqlite, vfs.name);
+    return { sqlite, vfsName: vfs.name };
+  } catch (error) {
+    console.warn("builder.run opfs SQLite unavailable", error);
+    return null;
   }
+}
+
+async function registerAsyncVfs(sqlite) {
+  const candidates = [];
   if (typeof indexedDB !== "undefined") {
     candidates.push({
       backend: "indexeddb",
@@ -44,6 +70,7 @@ async function registerVfs(module, sqlite) {
   for (const candidate of candidates) {
     try {
       const vfs = candidate.create();
+      if (vfs.isReady) await vfs.isReady;
       sqlite.vfs_register(vfs, false);
       await probe(sqlite, vfs.name);
       selectedVfs = vfs.name;
@@ -122,7 +149,12 @@ async function query(dbName, sql, params = []) {
   return rows;
 }
 
-self.onmessage = async (event) => {
+self.addEventListener("unhandledrejection", (event) => {
+  console.warn("builder.run sqlite worker", event.reason);
+  event.preventDefault();
+});
+
+async function handleMessage(event) {
   const { id, method, db, sql, params } = event.data;
   try {
     if (method === "init") {
@@ -159,4 +191,12 @@ self.onmessage = async (event) => {
   } catch (error) {
     self.postMessage({ id, error: error instanceof Error ? error.message : String(error) });
   }
+}
+
+let chain = Promise.resolve();
+self.onmessage = (event) => {
+  chain = chain.then(
+    () => handleMessage(event),
+    () => handleMessage(event),
+  );
 };

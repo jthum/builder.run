@@ -70,7 +70,7 @@ export async function createRecord(
   const prepared = prepareValues(type, values);
   const errors = validateRecord(type, prepared);
   if (errors.length) throw new Error(errors.join("; "));
-  const engine = ctx.engineFor(type.store);
+  const engine = ctx.engineFor(type);
   const stamp = nowIso();
   const record: RecordValue = {
     id: createId("rec"),
@@ -102,7 +102,7 @@ export async function updateRecord(
   exec: ExecutionContext,
 ): Promise<{ record: RecordValue; change: ChangeEvent }> {
   const type = requireType(ctx, typeKey);
-  const engine = ctx.engineFor(type.store);
+  const engine = ctx.engineFor(type);
   const before = await engine.get(type.key, id);
   if (!before) throw new Error(`${type.label} ${id} not found`);
   const prepared = prepareValues(type, { ...before, ...values });
@@ -134,7 +134,7 @@ export async function deleteRecord(
   id: string,
 ): Promise<{ change: ChangeEvent }> {
   const type = requireType(ctx, typeKey);
-  const engine = ctx.engineFor(type.store);
+  const engine = ctx.engineFor(type);
   const before = await engine.get(type.key, id);
   if (!before) throw new Error(`${type.label} ${id} not found`);
   await engine.delete(type.key, id);

@@ -1,7 +1,8 @@
 import type { TableEngine } from "./engine.ts";
 import { sqlTypeFor, type AppSpec, type TypeDef } from "./model.ts";
 
-export const META_TABLE = "_br_meta";
+export const META_TABLE = "_meta";
+const LEGACY_META_TABLE = "_br_meta";
 
 export interface IdentityRow {
   id: string;
@@ -14,7 +15,11 @@ export interface IdentityRow {
 
 export async function ensureMeta(engine: TableEngine): Promise<void> {
   const tables = await engine.listTables();
-  if (!tables.includes(META_TABLE)) {
+  if (tables.includes(LEGACY_META_TABLE) && !tables.includes(META_TABLE)) {
+    await engine.renameTable(LEGACY_META_TABLE, META_TABLE);
+  }
+  const present = await engine.listTables();
+  if (!present.includes(META_TABLE)) {
     await engine.createTable(META_TABLE, [
       { name: "kind", sqlType: "TEXT" },
       { name: "key", sqlType: "TEXT" },

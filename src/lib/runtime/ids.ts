@@ -1,8 +1,7 @@
 import { nanoid } from "nanoid";
 
 export type IdKind =
-  | "env"
-  | "wsp"
+  | "spc"
   | "act"
   | "sto"
   | "typ"
@@ -20,7 +19,7 @@ export function createId(kind: IdKind): string {
 
 export function isId(value: string, kind?: IdKind): boolean {
   if (kind) return value.startsWith(`${kind}_`);
-  return /^(env|wsp|act|sto|typ|fld|vw|frm|flw|pg|rec|run)_/.test(value);
+  return /^(spc|act|sto|typ|fld|vw|frm|flw|pg|rec|run)_/.test(value);
 }
 
 export function labelFromKey(key: string): string {
@@ -38,4 +37,13 @@ export function slugify(value: string): string {
     .replace(/[^a-z0-9]+/g, "_")
     .replace(/^_+|_+$/g, "")
     .replace(/_+/g, "_");
+}
+
+export function uniqueKey(base: string, taken: Iterable<string>, fallback = "item"): string {
+  const slug = slugify(base) || fallback;
+  const used = new Set(taken);
+  if (!used.has(slug)) return slug;
+  let index = 2;
+  while (used.has(`${slug}_${index}`)) index += 1;
+  return `${slug}_${index}`;
 }

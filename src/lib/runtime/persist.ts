@@ -41,13 +41,26 @@ export async function readPlatformJson(backend: PersistenceBackend): Promise<str
   return memorySlot;
 }
 
+function isNotFound(error: unknown): boolean {
+  return error instanceof DOMException && error.name === "NotFoundError";
+}
+
 export async function writePlatformJson(backend: PersistenceBackend, json: string): Promise<void> {
   if (backend === "opfs") {
     const root = await navigator.storage.getDirectory();
-    const handle = await root.getFileHandle(OPFS_FILE, { create: true });
-    const writable = await handle.createWritable();
-    await writable.write(json);
-    await writable.close();
+    for (let attempt = 0; attempt < 2; attempt++) {
+      try {
+        if (attempt > 0) await root.removeEntry(OPFS_FILE).catch(() => undefined);
+        const handle = await root.getFileHandle(OPFS_FILE, { create: true });
+        const writable = await handle.createWritable();
+        await writable.write(json);
+        await writable.close();
+        return;
+      } catch (error) {
+        if (attempt === 0 && isNotFound(error)) continue;
+        throw error;
+      }
+    }
     return;
   }
   if (backend === "indexeddb") {

@@ -1,0 +1,305 @@
+import { homeViews, isBlankApp } from "$lib/app/labels.ts";
+import type { AppSpec, PageBlock, PageDef } from "./model.ts";
+import { labelFromKey } from "./ids.ts";
+
+export const HOME_PAGE_KEY = "home";
+
+export type WidgetCategory = "content" | "data" | "actions";
+
+export type WidgetInputType = "text" | "textarea" | "boolean" | "view" | "form" | "flow";
+
+export interface WidgetInput {
+  key: string;
+  label: string;
+  type: WidgetInputType;
+  required?: boolean;
+  default?: unknown;
+}
+
+export interface WidgetDef {
+  key: string;
+  label: string;
+  description: string;
+  category: WidgetCategory;
+  inputs: WidgetInput[];
+}
+
+export const widgetCategories: Array<{ key: WidgetCategory; label: string }> = [
+  { key: "content", label: "Content" },
+  { key: "data", label: "Data" },
+  { key: "actions", label: "Actions" },
+];
+
+export const widgets: WidgetDef[] = [
+  {
+    key: "heading",
+    label: "Heading",
+    description: "A title and optional supporting text.",
+    category: "content",
+    inputs: [
+      { key: "title", label: "Title", type: "text", required: true, default: "Heading" },
+      { key: "description", label: "Description", type: "textarea" },
+    ],
+  },
+  {
+    key: "text",
+    label: "Text",
+    description: "A paragraph of copy.",
+    category: "content",
+    inputs: [{ key: "text", label: "Text", type: "textarea", required: true }],
+  },
+  {
+    key: "stat",
+    label: "Number card",
+    description: "A count from a view.",
+    category: "data",
+    inputs: [{ key: "view", label: "View", type: "view", required: true }],
+  },
+  {
+    key: "table",
+    label: "Table",
+    description: "Rows from a view, in columns.",
+    category: "data",
+    inputs: [
+      { key: "view", label: "View", type: "view", required: true },
+      { key: "compact", label: "Compact", type: "boolean", default: false },
+    ],
+  },
+  {
+    key: "cards",
+    label: "Cards",
+    description: "A grid of cards from a view.",
+    category: "data",
+    inputs: [{ key: "view", label: "View", type: "view", required: true }],
+  },
+  {
+    key: "list",
+    label: "List",
+    description: "A compact list from a view.",
+    category: "data",
+    inputs: [{ key: "view", label: "View", type: "view", required: true }],
+  },
+  {
+    key: "form",
+    label: "Form",
+    description: "A form for adding or editing a record.",
+    category: "actions",
+    inputs: [{ key: "form", label: "Form", type: "form", required: true }],
+  },
+  {
+    key: "action",
+    label: "Button",
+    description: "Runs a button rule.",
+    category: "actions",
+    inputs: [
+      { key: "flow", label: "Rule", type: "flow", required: true },
+      { key: "label", label: "Label", type: "text", default: "Run" },
+    ],
+  },
+];
+
+export function widgetByKey(key: string): WidgetDef | undefined {
+  return widgets.find((item) => item.key === key);
+}
+
+export function normalizeBlock(block: PageBlock): PageBlock {
+  if (block.kind === "group") {
+    return {
+      kind: "group",
+      columns: clampColumns(block.columns),
+      blocks: normalizeBlockList(block.blocks ?? []),
+    };
+  }
+  return { kind: "widget", widget: block.widget, values: { ...block.values } };
+}
+
+export function normalizePage(page: PageDef): PageDef {
+  return { ...page, blocks: (page.blocks ?? []).map(normalizeBlock) };
+}
+
+export function clampColumns(value: unknown): number {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return 1;
+  return Math.min(4, Math.max(1, Math.round(n)));
+}
+
+export function collectViewKeys(blocks: PageBlock[]): string[] {
+  const keys: string[] = [];
+  for (const block of normalizeBlockList(blocks)) {
+    if (block.kind === "group") keys.push(...collectViewKeys(block.blocks));
+    if (block.kind === "widget") {
+      const view = String(block.values?.view ?? "");
+      if (view) keys.push(view);
+    }
+  }
+  return [...new Set(keys)];
+}
+
+export function normalizeBlockList(blocks: PageBlock[]): PageBlock[] {
+  return blocks
+    .filter((block) => block?.kind === "widget" || block?.kind === "group")
+    .map(normalizeBlock);
+}
+
+export function implicitHomePage(spec: AppSpec): PageDef {
+  const views = isBlankApp(spec) ? [] : homeViews(spec);
+  const columns = Math.min(4, Math.max(1, views.length || 1));
+  const stats: PageBlock[] = views.map((view) => ({
+    kind: "widget",
+    widget: "stat",
+    values: { view: view.key },
+  }));
+  const tables: PageBlock[] = views.map((view) => ({
+    kind: "group",
+    columns: 1,
+    blocks: [
+      {
+        kind: "widget",
+        widget: "table",
+        values: { view: view.key, compact: true },
+      },
+    ],
+  }));
+  return {
+    id: "pg_home",
+    key: HOME_PAGE_KEY,
+    label: "Home",
+    path: "/",
+    implicit: true,
+    blocks: [
+      ...(stats.length ? [{ kind: "group" as const, columns, blocks: stats }] : []),
+      ...tables,
+    ],
+  };
+}
+
+export function resolveHomePage(spec: AppSpec): PageDef {
+  const authored = spec.pages.find((page) => page.key === HOME_PAGE_KEY || page.path === "/");
+  if (authored) return normalizePage(authored);
+  return implicitHomePage(spec);
+}
+
+export function resolvePage(spec: AppSpec, key: string): PageDef | undefined {
+  if (key === HOME_PAGE_KEY) return resolveHomePage(spec);
+  const page = spec.pages.find((item) => item.key === key);
+  return page ? normalizePage(page) : undefined;
+}
+
+export function defaultWidgetValues(widget: WidgetDef, spec: AppSpec): Record<string, unknown> {
+  const values: Record<string, unknown> = {};
+  const firstView = homeViews(spec)[0]?.key ?? spec.views[0]?.key ?? "";
+  const firstForm =
+    spec.forms.find((form) => form.mode === "create")?.key ?? spec.forms[0]?.key ?? "";
+  const firstFlow =
+    spec.flows.find((flow) => flow.expose?.includes("ui") && !flow.trigger)?.key ?? "";
+  for (const input of widget.inputs) {
+    if (input.type === "view") values[input.key] = firstView;
+    else if (input.type === "form") values[input.key] = firstForm;
+    else if (input.type === "flow") values[input.key] = firstFlow;
+    else if (input.type === "boolean") values[input.key] = Boolean(input.default);
+    else values[input.key] = input.default ?? "";
+  }
+  return values;
+}
+
+export function widgetBlock(widget: WidgetDef, spec: AppSpec): PageBlock {
+  return { kind: "widget", widget: widget.key, values: defaultWidgetValues(widget, spec) };
+}
+
+export function emptyGroup(columns = 1): PageBlock {
+  return { kind: "group", columns: clampColumns(columns), blocks: [] };
+}
+
+export function setBlock(blocks: PageBlock[], path: number[], next: PageBlock): PageBlock[] {
+  if (!path.length) return blocks;
+  const [head, ...rest] = path;
+  if (head == null || head < 0 || head >= blocks.length) return blocks;
+  if (!rest.length) {
+    const copy = [...blocks];
+    copy[head] = next;
+    return copy;
+  }
+  const current = blocks[head];
+  if (current?.kind !== "group") return blocks;
+  const copy = [...blocks];
+  copy[head] = { ...current, blocks: setBlock(current.blocks, rest, next) };
+  return copy;
+}
+
+export function removeBlock(blocks: PageBlock[], path: number[]): PageBlock[] {
+  if (!path.length) return blocks;
+  const [head, ...rest] = path;
+  if (head == null || head < 0 || head >= blocks.length) return blocks;
+  if (!rest.length) return blocks.filter((_, index) => index !== head);
+  const current = blocks[head];
+  if (current?.kind !== "group") return blocks;
+  const copy = [...blocks];
+  copy[head] = { ...current, blocks: removeBlock(current.blocks, rest) };
+  return copy;
+}
+
+export function insertBlock(blocks: PageBlock[], path: number[], next: PageBlock): PageBlock[] {
+  if (!path.length) return [...blocks, next];
+  const [head, ...rest] = path;
+  if (head == null) return [...blocks, next];
+  if (!rest.length) {
+    const copy = [...blocks];
+    copy.splice(head, 0, next);
+    return copy;
+  }
+  const current = blocks[head];
+  if (current?.kind !== "group") return blocks;
+  const copy = [...blocks];
+  copy[head] = { ...current, blocks: insertBlock(current.blocks, rest, next) };
+  return copy;
+}
+
+export function appendInGroup(
+  blocks: PageBlock[],
+  groupPath: number[],
+  next: PageBlock,
+): PageBlock[] {
+  if (!groupPath.length) return [...blocks, next];
+  const group = blockAt(blocks, groupPath);
+  if (group?.kind !== "group") return blocks;
+  return setBlock(blocks, groupPath, { ...group, blocks: [...group.blocks, next] });
+}
+
+export function blockAt(blocks: PageBlock[], path: number[]): PageBlock | undefined {
+  let current: PageBlock[] = blocks;
+  let found: PageBlock | undefined;
+  for (const index of path) {
+    found = current[index];
+    if (!found) return undefined;
+    if (found.kind === "group") current = found.blocks;
+    else current = [];
+  }
+  return found;
+}
+
+export function gridClass(columns: number): string {
+  const cols = clampColumns(columns);
+  if (cols <= 1) return "grid grid-cols-1 gap-4";
+  if (cols === 2) return "grid grid-cols-1 gap-4 sm:grid-cols-2";
+  if (cols === 3) return "grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3";
+  return "grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4";
+}
+
+export function firstViewKey(blocks: PageBlock[]): string | undefined {
+  for (const block of normalizeBlockList(blocks)) {
+    if (block.kind === "widget") {
+      const view = String(block.values?.view ?? "");
+      if (view) return view;
+    }
+    if (block.kind === "group") {
+      const nested = firstViewKey(block.blocks);
+      if (nested) return nested;
+    }
+  }
+  return undefined;
+}
+
+export function widgetLabel(block: PageBlock): string {
+  if (block.kind !== "widget") return "Section";
+  return widgetByKey(block.widget)?.label ?? labelFromKey(block.widget);
+}

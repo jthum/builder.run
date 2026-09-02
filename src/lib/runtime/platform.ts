@@ -1,23 +1,17 @@
-import type { Actor, AppSpec, StoreDef, TypeDef } from "./model.ts";
+import type { Actor, AppSpec } from "./model.ts";
 
-export interface WorkspaceState {
+/** One primitive. An app is a space created by an actor from their account space. */
+export interface SpaceState {
   id: string;
   name: string;
-  spec: AppSpec;
-}
-
-export interface EnvironmentState {
-  id: string;
-  name: string;
+  /** Actor who created this space. Set on apps; absent on account spaces. */
+  createdBy?: string;
   actors: Actor[];
-  stores: StoreDef[];
-  sharedTypes: TypeDef[];
-  workspaces: WorkspaceState[];
-  activeWorkspaceId: string;
+  spec: AppSpec;
 }
 
 export interface PlatformState {
   version: 1;
-  activeEnvironmentId: string;
-  environments: EnvironmentState[];
+  activeSpaceId: string;
+  spaces: SpaceState[];
 }
