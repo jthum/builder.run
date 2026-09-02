@@ -247,7 +247,7 @@
 								<Sidebar.MenuSubItem>
 									<div
 										class="px-2 {localTypes.length
-											? 'pt-2.5'
+											? 'pt-1.5'
 											: 'pt-0.5'} pb-0.5 text-[10px] font-medium uppercase tracking-wider text-muted-foreground"
 									>
 										{space}
@@ -267,7 +267,12 @@
 		<Sidebar.Menu>
 			{#if !studio}
 				<Sidebar.MenuItem>
-					<Sidebar.MenuButton isActive={path.startsWith("/build")} tooltipContent="Edit app">
+					<Sidebar.MenuButton
+						variant="outline"
+						isActive={path.startsWith("/build")}
+						tooltipContent="Edit app"
+						class="bg-background font-medium"
+					>
 						{#snippet child({ props })}
 							<a href="/build" {...props}>
 								<PencilIcon />
@@ -276,6 +281,7 @@
 						{/snippet}
 					</Sidebar.MenuButton>
 				</Sidebar.MenuItem>
+				<Sidebar.Separator />
 			{/if}
 			<Sidebar.MenuItem>
 				<DropdownMenu.Root>
