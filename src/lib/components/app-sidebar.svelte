@@ -10,6 +10,7 @@
 	import ProfileDialog from "$lib/components/profile-dialog.svelte";
 	import SpaceSettingsDialog from "$lib/components/space-settings-dialog.svelte";
 	import * as Avatar from "$lib/components/ui/avatar/index.js";
+	import { Button } from "$lib/components/ui/button/index.js";
 	import * as DropdownMenu from "$lib/components/ui/dropdown-menu/index.js";
 	import * as Sidebar from "$lib/components/ui/sidebar/index.js";
 	import ArrowLeftIcon from "@lucide/svelte/icons/arrow-left";
@@ -228,6 +229,9 @@
 						{/if}
 					{/each}
 					{#if views.length}
+						<Sidebar.MenuItem class="pointer-events-none">
+							<Sidebar.Separator class="mx-2 my-1.5" />
+						</Sidebar.MenuItem>
 						<SidebarNavGroup label="Views" icon={TableIcon}>
 							{#each views as view (view.id)}
 								<Sidebar.MenuSubItem>
@@ -239,6 +243,9 @@
 						</SidebarNavGroup>
 					{/if}
 					{#if localTypes.length || sharedTypes.length}
+						<Sidebar.MenuItem class="pointer-events-none">
+							<Sidebar.Separator class="mx-2 my-1.5" />
+						</Sidebar.MenuItem>
 						<SidebarNavGroup label="Records" icon={BoxIcon}>
 							{#each localTypes as type (type.id)}
 								{@render recordLink(type)}
@@ -263,26 +270,14 @@
 			</Sidebar.Group>
 		{/if}
 	</Sidebar.Content>
-	<Sidebar.Footer>
+	<Sidebar.Footer class="gap-3">
+		{#if !studio}
+			<Button href="/build" variant="outline" size="sm" class="w-full justify-start">
+				<PencilIcon data-icon="inline-start" />
+				Edit app
+			</Button>
+		{/if}
 		<Sidebar.Menu>
-			{#if !studio}
-				<Sidebar.MenuItem>
-					<Sidebar.MenuButton
-						variant="outline"
-						isActive={path.startsWith("/build")}
-						tooltipContent="Edit app"
-						class="bg-background font-medium"
-					>
-						{#snippet child({ props })}
-							<a href="/build" {...props}>
-								<PencilIcon />
-								<span>Edit app</span>
-							</a>
-						{/snippet}
-					</Sidebar.MenuButton>
-				</Sidebar.MenuItem>
-				<Sidebar.Separator />
-			{/if}
 			<Sidebar.MenuItem>
 				<DropdownMenu.Root>
 					<DropdownMenu.Trigger>
