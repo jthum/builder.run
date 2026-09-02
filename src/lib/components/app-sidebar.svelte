@@ -174,10 +174,16 @@
 					</Sidebar.MenuItem>
 				</Sidebar.Menu>
 			</Sidebar.Group>
-			{#each studioSections as section, index (section.label)}
-				<Sidebar.Group class={index > 0 ? "mt-2" : ""}>
-					<Sidebar.GroupLabel>{section.label}</Sidebar.GroupLabel>
-					<Sidebar.Menu>
+			<Sidebar.Group>
+				<Sidebar.Menu>
+					{#each studioSections as section, index (section.label)}
+						<Sidebar.MenuItem class={index > 0 ? "mt-3" : ""}>
+							<div
+								class="px-2 pb-0.5 pt-0.5 text-[10px] font-medium uppercase tracking-wider text-muted-foreground"
+							>
+								{section.label}
+							</div>
+						</Sidebar.MenuItem>
 						{#each section.items as item (item.href)}
 							{@const Icon = studioIcons[item.href] ?? BoxIcon}
 							<Sidebar.MenuItem>
@@ -194,9 +200,9 @@
 								</Sidebar.MenuButton>
 							</Sidebar.MenuItem>
 						{/each}
-					</Sidebar.Menu>
-				</Sidebar.Group>
-			{/each}
+					{/each}
+				</Sidebar.Menu>
+			</Sidebar.Group>
 		{:else}
 			<Sidebar.Group>
 				<Sidebar.Menu>
