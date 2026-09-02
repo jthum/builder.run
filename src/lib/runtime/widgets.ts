@@ -299,6 +299,42 @@ export function firstViewKey(blocks: PageBlock[]): string | undefined {
   return undefined;
 }
 
+export function authoredNavPages(spec: AppSpec): PageDef[] {
+  return spec.pages.filter(
+    (page) => !page.implicit && page.key !== HOME_PAGE_KEY && page.path !== "/",
+  );
+}
+
+export function pageHref(page: PageDef): string {
+  if (page.key === HOME_PAGE_KEY || page.path === "/") return "/";
+  return `/p/${page.key}`;
+}
+
+export function groupPagesByFolder(
+  pages: PageDef[],
+): Array<{ folder: string | null; pages: PageDef[] }> {
+  const ungrouped: PageDef[] = [];
+  const folders = new Map<string, PageDef[]>();
+  const order: string[] = [];
+  for (const page of pages) {
+    const folder = page.folder?.trim();
+    if (!folder) {
+      ungrouped.push(page);
+      continue;
+    }
+    const list = folders.get(folder);
+    if (list) list.push(page);
+    else {
+      folders.set(folder, [page]);
+      order.push(folder);
+    }
+  }
+  const groups: Array<{ folder: string | null; pages: PageDef[] }> = [];
+  if (ungrouped.length) groups.push({ folder: null, pages: ungrouped });
+  for (const name of order) groups.push({ folder: name, pages: folders.get(name) ?? [] });
+  return groups;
+}
+
 export function widgetLabel(block: PageBlock): string {
   if (block.kind !== "widget") return "Section";
   return widgetByKey(block.widget)?.label ?? labelFromKey(block.widget);

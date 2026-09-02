@@ -265,13 +265,14 @@ export function buildTools(host: Host): ToolDefinition[] {
       name: "upsert_page",
       title: "Create or update a page",
       description:
-        "Create or update a page of grids and widgets. Widgets take values or attach to a view.",
+        "Create or update a page of grids and widgets. Optional folder groups it under Home.",
       inputSchema: {
         type: "object",
         properties: {
           key: { type: "string" },
           label: { type: "string" },
           path: { type: "string" },
+          folder: { type: "string" },
           blocks: { type: "array" },
         },
         required: ["key"],

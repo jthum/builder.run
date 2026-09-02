@@ -502,11 +502,15 @@ export class Host {
 
   async upsertPage(draft: Partial<PageDef> & { key: string }): Promise<PageDef> {
     const spec = this.app().spec;
+    const existing = spec.pages.find((page) => page.key === draft.key);
+    const folder = draft.folder !== undefined ? draft.folder.trim() || undefined : existing?.folder;
     const pages = upsertNamed(spec.pages, {
-      id: createId("pg"),
+      id: existing?.id || createId("pg"),
       label: labelFromKey(draft.key),
+      ...existing,
       ...draft,
-      blocks: JSON.parse(JSON.stringify(draft.blocks ?? [])),
+      folder,
+      blocks: JSON.parse(JSON.stringify(draft.blocks ?? existing?.blocks ?? [])),
     });
     this.app().spec = applyDefaults({ ...spec, pages });
     await this.persistAndEmit();

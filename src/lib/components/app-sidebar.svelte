@@ -32,7 +32,8 @@
 	import UsersIcon from "@lucide/svelte/icons/users";
 	import WalletIcon from "@lucide/svelte/icons/wallet";
 	import WorkflowIcon from "@lucide/svelte/icons/workflow";
-	import type { TypeDef } from "$lib/runtime/model.ts";
+	import type { PageDef, TypeDef } from "$lib/runtime/model.ts";
+	import { authoredNavPages, groupPagesByFolder, pageHref } from "$lib/runtime/widgets.ts";
 	import type { Component, ComponentProps } from "svelte";
 
 	let { ref = $bindable(null), ...restProps }: ComponentProps<typeof Sidebar.Root> = $props();
@@ -47,11 +48,8 @@
 	const types = $derived(spec?.types ?? []);
 	const localTypes = $derived(types.filter((type) => !type.expose));
 	const sharedTypes = $derived(types.filter((type) => type.expose));
-	const pages = $derived(
-		(spec?.pages ?? []).filter(
-			(item) => !item.implicit && item.key !== "home" && item.path !== "/",
-		),
-	);
+	const navPages = $derived(spec ? authoredNavPages(spec) : []);
+	const pageGroups = $derived(groupPagesByFolder(navPages));
 	const studioSections = $derived(
 		studioGroupOrder.map((label) => ({
 			label,
@@ -99,6 +97,22 @@
 			<span>{collectionLabel(type)}</span>
 		</Sidebar.MenuSubButton>
 	</Sidebar.MenuSubItem>
+{/snippet}
+
+{#snippet pageLink(item: PageDef)}
+	<Sidebar.MenuItem>
+		<Sidebar.MenuButton
+			isActive={path === pageHref(item) || path.startsWith(`${pageHref(item)}/`)}
+			tooltipContent={item.label}
+		>
+			{#snippet child({ props })}
+				<a href={pageHref(item)} {...props}>
+					<LayersIcon />
+					<span>{item.label}</span>
+				</a>
+			{/snippet}
+		</Sidebar.MenuButton>
+	</Sidebar.MenuItem>
 {/snippet}
 
 <Sidebar.Root
@@ -205,23 +219,26 @@
 							{/snippet}
 						</Sidebar.MenuButton>
 					</Sidebar.MenuItem>
+					{#each pageGroups as group (group.folder ?? "__root")}
+						{#if group.folder}
+							<Sidebar.MenuItem>
+								<div
+									class="px-2 pt-2.5 pb-0.5 text-[10px] font-medium uppercase tracking-wider text-muted-foreground"
+								>
+									{group.folder}
+								</div>
+							</Sidebar.MenuItem>
+						{/if}
+						{#each group.pages as item (item.id)}
+							{@render pageLink(item)}
+						{/each}
+					{/each}
 					{#if views.length}
 						<SidebarNavGroup label="Views" icon={TableIcon}>
 							{#each views as view (view.id)}
 								<Sidebar.MenuSubItem>
 									<Sidebar.MenuSubButton href="/v/{view.key}" isActive={path === `/v/${view.key}`}>
 										<span>{view.label}</span>
-									</Sidebar.MenuSubButton>
-								</Sidebar.MenuSubItem>
-							{/each}
-						</SidebarNavGroup>
-					{/if}
-					{#if pages.length}
-						<SidebarNavGroup label="Pages" icon={LayersIcon}>
-							{#each pages as item (item.id)}
-								<Sidebar.MenuSubItem>
-									<Sidebar.MenuSubButton href="/p/{item.key}" isActive={path === `/p/${item.key}`}>
-										<span>{item.label}</span>
 									</Sidebar.MenuSubButton>
 								</Sidebar.MenuSubItem>
 							{/each}

@@ -20,7 +20,8 @@ export const studioItems = [
   {
     href: "/build/pages",
     label: "Pages",
-    description: "Screens of grids and widgets — tables, cards, headings, and more.",
+    description:
+      "The main screens under Home. Group them into folders, or delete ones you don’t need.",
     group: "Build",
   },
   {

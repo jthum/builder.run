@@ -88,6 +88,7 @@ export interface PageDef {
   key: string;
   label: string;
   path?: string;
+  folder?: string;
   blocks: PageBlock[];
   implicit?: boolean;
 }

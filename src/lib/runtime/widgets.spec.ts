@@ -1,14 +1,32 @@
 import { describe, expect, it } from "vite-plus/test";
-import type { AppSpec, PageBlock } from "./model.ts";
+import type { AppSpec, PageBlock, PageDef } from "./model.ts";
 import {
   appendInGroup,
   collectViewKeys,
+  groupPagesByFolder,
   implicitHomePage,
   insertBlock,
   normalizeBlock,
   removeBlock,
   setBlock,
 } from "./widgets.ts";
+
+describe("page folders", () => {
+  it("groups authored pages with ungrouped first, then folders in order", () => {
+    expect.hasAssertions();
+    const pages = [
+      { key: "status", label: "Status", folder: "Ops" },
+      { key: "welcome", label: "Welcome" },
+      { key: "cash", label: "Cash", folder: "Finance" },
+      { key: "invoices", label: "Invoices", folder: "Finance" },
+    ] as PageDef[];
+    expect(groupPagesByFolder(pages)).toEqual([
+      { folder: null, pages: [pages[1]] },
+      { folder: "Ops", pages: [pages[0]] },
+      { folder: "Finance", pages: [pages[2], pages[3]] },
+    ]);
+  });
+});
 
 describe("page widgets", () => {
   it("keeps only widget and group blocks", () => {

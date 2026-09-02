@@ -111,6 +111,7 @@ export function authoringSpec(spec: AppSpec): Record<string, unknown> {
             id: page.id,
             label: page.label,
             ...(page.path ? { path: page.path } : {}),
+            ...(page.folder ? { folder: page.folder } : {}),
             blocks: page.blocks,
           },
         ]),
