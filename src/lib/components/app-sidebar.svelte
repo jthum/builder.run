@@ -206,7 +206,7 @@
 						</Sidebar.MenuButton>
 					</Sidebar.MenuItem>
 					{#if views.length}
-						<SidebarNavGroup label="Lists" icon={TableIcon}>
+						<SidebarNavGroup label="Views" icon={TableIcon}>
 							{#each views as view (view.id)}
 								<Sidebar.MenuSubItem>
 									<Sidebar.MenuSubButton href="/v/{view.key}" isActive={path === `/v/${view.key}`}>
@@ -229,19 +229,20 @@
 					{/if}
 					{#if localTypes.length || sharedTypes.length}
 						<SidebarNavGroup label="Records" icon={BoxIcon}>
-							{#if localTypes.length && sharedTypes.length}
-								<SidebarNavGroup nested label="This app">
-									{#each localTypes as type (type.id)}
-										{@render recordLink(type)}
-									{/each}
-								</SidebarNavGroup>
-								<SidebarNavGroup nested label="From {space}">
-									{#each sharedTypes as type (type.id)}
-										{@render recordLink(type)}
-									{/each}
-								</SidebarNavGroup>
-							{:else}
-								{#each [...localTypes, ...sharedTypes] as type (type.id)}
+							{#each localTypes as type (type.id)}
+								{@render recordLink(type)}
+							{/each}
+							{#if sharedTypes.length}
+								<Sidebar.MenuSubItem>
+									<div
+										class="px-2 {localTypes.length
+											? 'pt-2.5'
+											: 'pt-0.5'} pb-0.5 text-[10px] font-medium uppercase tracking-wider text-muted-foreground"
+									>
+										{space}
+									</div>
+								</Sidebar.MenuSubItem>
+								{#each sharedTypes as type (type.id)}
 									{@render recordLink(type)}
 								{/each}
 							{/if}
