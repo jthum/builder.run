@@ -1,119 +1,467 @@
 <script lang="ts">
+	import { goto } from "$app/navigation";
+	import { fieldKindHint, fieldKindLabel } from "$lib/app/labels.ts";
 	import { runtime, session } from "$lib/app/session.svelte.ts";
+	import AppSelect from "$lib/components/app-select.svelte";
+	import PageHeader from "$lib/components/page-header.svelte";
+	import * as AlertDialog from "$lib/components/ui/alert-dialog/index.js";
+	import { Badge } from "$lib/components/ui/badge/index.js";
 	import { Button } from "$lib/components/ui/button/index.js";
 	import * as Card from "$lib/components/ui/card/index.js";
-	import { Checkbox } from "$lib/components/ui/checkbox/index.js";
+	import * as Collapsible from "$lib/components/ui/collapsible/index.js";
 	import * as Field from "$lib/components/ui/field/index.js";
+	import { Separator } from "$lib/components/ui/separator/index.js";
 	import { Input } from "$lib/components/ui/input/index.js";
-	import * as NativeSelect from "$lib/components/ui/native-select/index.js";
-	import { FIELD_KINDS, type FieldKind, type TypeDef } from "$lib/runtime/model.ts";
+	import * as Sheet from "$lib/components/ui/sheet/index.js";
+	import { Switch } from "$lib/components/ui/switch/index.js";
+	import { slugify } from "$lib/runtime/ids.ts";
+	import { FIELD_KINDS, type FieldDef, type FieldKind, type TypeDef } from "$lib/runtime/model.ts";
+	import CalendarIcon from "@lucide/svelte/icons/calendar";
+	import ChevronDownIcon from "@lucide/svelte/icons/chevron-down";
+	import ChevronUpIcon from "@lucide/svelte/icons/chevron-up";
+	import GripVerticalIcon from "@lucide/svelte/icons/grip-vertical";
+	import HashIcon from "@lucide/svelte/icons/hash";
+	import LinkIcon from "@lucide/svelte/icons/link";
+	import ListIcon from "@lucide/svelte/icons/list";
+	import PlusIcon from "@lucide/svelte/icons/plus";
+	import ToggleLeftIcon from "@lucide/svelte/icons/toggle-left";
+	import TypeIcon from "@lucide/svelte/icons/type";
+	import XIcon from "@lucide/svelte/icons/x";
+	import type { Component } from "svelte";
 	import { toast } from "svelte-sonner";
 
 	let { type }: { type: TypeDef } = $props();
 
+	const kindIcons: Record<FieldKind, Component> = {
+		text: TypeIcon,
+		number: HashIcon,
+		date: CalendarIcon,
+		boolean: ToggleLeftIcon,
+		enum: ListIcon,
+		reference: LinkIcon,
+	};
+
+	const spec = $derived(session.snapshot?.spec);
+	const targets = $derived(spec?.types ?? []);
+	const targetOptions = $derived(
+		targets
+			.filter((item) => item.key !== type.key)
+			.map((item) => ({
+				value: item.key,
+				label: item.expose ? `${item.label} (this space)` : item.label,
+			})),
+	);
+	const inbound = $derived(
+		(spec?.types ?? []).flatMap((item) =>
+			item.fields
+				.filter((field) => field.type === "reference" && field.target?.split(".").at(-1) === type.key)
+				.map((field) => ({ type: item, field })),
+		),
+	);
+
+	let sheetOpen = $state(false);
+	let editing = $state<FieldDef | null>(null);
 	let fieldKey = $state("");
 	let fieldLabel = $state("");
-	let fieldType = $state<FieldKind>("text");
+	let fieldType = $state<string>("text");
 	let fieldRequired = $state(false);
-	let fieldValues = $state("");
+	let fieldChoices = $state<string[]>([]);
+	let choiceDraft = $state("");
 	let fieldTarget = $state("");
+	let advanced = $state(false);
+	let removeKey = $state<string | null>(null);
+	let deleteOpen = $state(false);
+	let dragKey = $state<string | null>(null);
 
-	const targets = $derived(session.snapshot?.spec.types ?? []);
+	const selectedKind = $derived((FIELD_KINDS.includes(fieldType as FieldKind) ? fieldType : "text") as FieldKind);
 
-	async function addField() {
-		if (!fieldKey) return;
-		await runtime().upsertField(type.key, {
-			key: fieldKey,
-			label: fieldLabel || undefined,
-			type: fieldType,
-			required: fieldRequired,
-			values: fieldType === "enum" ? fieldValues.split(",").map((value) => value.trim()).filter(Boolean) : undefined,
-			target: fieldType === "reference" ? fieldTarget : undefined,
-		});
+	function openAdd(kind: FieldKind = "text") {
+		editing = null;
 		fieldKey = "";
 		fieldLabel = "";
-		fieldValues = "";
-		toast.success("Field saved");
+		fieldType = kind;
+		fieldRequired = false;
+		fieldChoices = kind === "enum" ? ["draft", "active"] : [];
+		choiceDraft = "";
+		fieldTarget = targetOptions[0]?.value ?? "";
+		advanced = false;
+		sheetOpen = true;
 	}
+
+	function openEdit(field: FieldDef) {
+		editing = field;
+		fieldKey = field.key;
+		fieldLabel = field.label;
+		fieldType = field.type;
+		fieldRequired = Boolean(field.required);
+		fieldChoices = [...(field.values ?? [])];
+		choiceDraft = "";
+		fieldTarget = field.target ?? "";
+		advanced = false;
+		sheetOpen = true;
+	}
+
+	function addChoice() {
+		const value = slugify(choiceDraft);
+		if (!value || fieldChoices.includes(value)) {
+			choiceDraft = "";
+			return;
+		}
+		fieldChoices = [...fieldChoices, value];
+		choiceDraft = "";
+	}
+
+	function removeChoice(value: string) {
+		fieldChoices = fieldChoices.filter((item) => item !== value);
+	}
+
+	async function saveField() {
+		const key = fieldKey.trim() || slugify(fieldLabel);
+		if (!key) return;
+		if (fieldType === "reference" && !fieldTarget) {
+			toast.error("Pick a record type to link to");
+			return;
+		}
+		if (fieldType === "enum" && fieldChoices.length === 0) {
+			toast.error("Add at least one choice");
+			return;
+		}
+		if (editing && editing.key !== key) {
+			await runtime().renameField(type.key, editing.key, key);
+		}
+		await runtime().upsertField(type.key, {
+			key,
+			label: fieldLabel || undefined,
+			type: fieldType as FieldKind,
+			required: fieldRequired,
+			values: fieldType === "enum" ? fieldChoices : undefined,
+			target: fieldType === "reference" ? fieldTarget : undefined,
+		});
+		sheetOpen = false;
+		toast.success(editing ? "Field saved" : "Field added");
+	}
+
+	async function move(index: number, delta: number) {
+		const next = type.fields.map((field) => field.key);
+		const target = index + delta;
+		if (target < 0 || target >= next.length) return;
+		[next[index], next[target]] = [next[target], next[index]];
+		await runtime().reorderFields(type.key, next);
+	}
+
+	function onDragStart(key: string, event: DragEvent) {
+		dragKey = key;
+		event.dataTransfer?.setData("text/plain", key);
+		if (event.dataTransfer) event.dataTransfer.effectAllowed = "move";
+	}
+
+	async function onDrop(key: string) {
+		if (!dragKey || dragKey === key) {
+			dragKey = null;
+			return;
+		}
+		const keys = type.fields.map((field) => field.key);
+		const from = keys.indexOf(dragKey);
+		const to = keys.indexOf(key);
+		if (from < 0 || to < 0) {
+			dragKey = null;
+			return;
+		}
+		keys.splice(from, 1);
+		keys.splice(to, 0, dragKey);
+		dragKey = null;
+		await runtime().reorderFields(type.key, keys);
+	}
+
+	async function remove() {
+		if (!removeKey) return;
+		await runtime().deleteField(type.key, removeKey);
+		removeKey = null;
+		toast.success("Field removed");
+	}
+
+	async function removeType() {
+		await runtime().deleteType(type.key);
+		toast.success("Type removed");
+		await goto("/build/types");
+	}
+
+	const removing = $derived(type.fields.find((field) => field.key === removeKey));
+	const canSave = $derived(
+		Boolean(fieldLabel.trim()) &&
+			(fieldType !== "reference" || Boolean(fieldTarget)) &&
+			(fieldType !== "enum" || fieldChoices.length > 0),
+	);
 </script>
 
-<div class="flex flex-col gap-6">
-	<Card.Root>
-		<Card.Header>
-			<Card.Title>{type.label}</Card.Title>
-			<Card.Description>
-				{type.store === "directory" ? "Shared across apps in this place." : "Stored only in this app."}
-			</Card.Description>
-		</Card.Header>
-		<Card.Content class="flex flex-col gap-3">
-			{#each type.fields as field (field.id)}
-				<div class="flex items-center justify-between rounded-lg border px-3 py-2 text-sm">
-					<div>
-						<div class="font-medium">{field.label}</div>
-						<div class="text-muted-foreground">{field.key} · {field.type}{field.target ? ` → ${field.target}` : ""}</div>
-					</div>
-					<div class="flex items-center gap-2">
-						{#if field.required}
-							<span class="text-xs text-muted-foreground">required</span>
-						{/if}
-						<Button
-							size="sm"
-							variant="ghost"
-							onclick={() => runtime().deleteField(type.key, field.key)}>Remove</Button
+<div class="flex flex-col gap-8">
+	<PageHeader
+		title={type.label}
+		description={type.expose
+			? "Exposed to apps in this space. Fields here show up in every app you create."
+			: "The shape of this record. Lists, forms, and home update as you add fields."}
+	>
+		{#snippet actions()}
+			<Button onclick={() => openAdd()}>
+				<PlusIcon data-icon="inline-start" />
+				Add field
+			</Button>
+			{#if !type.expose}
+				<Button variant="ghost" onclick={() => (deleteOpen = true)}>Delete</Button>
+			{/if}
+		{/snippet}
+	</PageHeader>
+
+	{#if inbound.length}
+		<p class="text-sm text-muted-foreground">
+			Linked from
+			{inbound.map((item) => `${item.type.label} (${item.field.label})`).join(", ")}.
+		</p>
+	{/if}
+
+	{#if type.fields.length === 0}
+		<Card.Root>
+			<Card.Content class="flex flex-col gap-4 p-5">
+				<div class="flex flex-col gap-1">
+					<p class="font-medium">What does a {type.label.toLowerCase()} remember?</p>
+					<p class="text-sm text-muted-foreground">
+						Pick a field kind to start. You can reorder and edit anything after.
+					</p>
+				</div>
+				<div class="grid gap-2 sm:grid-cols-2">
+					{#each FIELD_KINDS as kind (kind)}
+						{@const Icon = kindIcons[kind]}
+						<button
+							type="button"
+							class="flex items-start gap-3 rounded-xl border bg-background p-3 text-start transition-colors hover:bg-muted/40"
+							onclick={() => openAdd(kind)}
 						>
+							<span class="flex size-9 shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground">
+								<Icon class="size-4" />
+							</span>
+							<span class="min-w-0">
+								<span class="block text-sm font-medium">{fieldKindLabel[kind]}</span>
+								<span class="block text-xs text-muted-foreground">{fieldKindHint[kind]}</span>
+							</span>
+						</button>
+					{/each}
+				</div>
+			</Card.Content>
+		</Card.Root>
+	{:else}
+		<div class="flex flex-col gap-2" role="list">
+			{#each type.fields as field, index (field.id)}
+				{@const Icon = kindIcons[field.type] ?? TypeIcon}
+				<div
+					role="listitem"
+					class="flex items-center gap-3 rounded-2xl bg-card px-3 py-3 ring-1 ring-foreground/10 {dragKey ===
+					field.key
+						? 'opacity-60'
+						: ''}"
+					ondragover={(event) => event.preventDefault()}
+					ondrop={() => onDrop(field.key)}
+				>
+					<button
+						type="button"
+						class="cursor-grab text-muted-foreground hover:text-foreground active:cursor-grabbing"
+						draggable="true"
+						aria-label="Drag to reorder"
+						ondragstart={(event) => onDragStart(field.key, event)}
+						ondragend={() => (dragKey = null)}
+					>
+						<GripVerticalIcon class="size-4" />
+					</button>
+					<button type="button" class="flex min-w-0 flex-1 items-center gap-3 text-start" onclick={() => openEdit(field)}>
+						<div class="flex size-9 shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground">
+							<Icon class="size-4" />
+						</div>
+						<div class="min-w-0 flex-1">
+							<div class="font-medium">{field.label}</div>
+							<div class="text-sm text-muted-foreground">
+								{fieldKindLabel[field.type]}
+								{#if field.target}
+									{@const target = targets.find((item) => item.key === field.target?.split(".").at(-1))}
+									→ {target?.label ?? field.target}
+								{/if}
+								{#if field.type === "enum" && field.values?.length}
+									· {field.values.map((value) => value.replaceAll("_", " ")).join(", ")}
+								{/if}
+							</div>
+						</div>
+					</button>
+					<div class="flex shrink-0 items-center gap-1">
+						{#if field.required}
+							<Badge variant="secondary">Required</Badge>
+						{/if}
+						<Button size="icon-sm" variant="ghost" disabled={index === 0} onclick={() => move(index, -1)}>
+							<ChevronUpIcon />
+							<span class="sr-only">Move up</span>
+						</Button>
+						<Button
+							size="icon-sm"
+							variant="ghost"
+							disabled={index === type.fields.length - 1}
+							onclick={() => move(index, 1)}
+						>
+							<ChevronDownIcon />
+							<span class="sr-only">Move down</span>
+						</Button>
 					</div>
 				</div>
 			{/each}
-		</Card.Content>
-	</Card.Root>
+			<Button variant="outline" onclick={() => openAdd()}>
+				<PlusIcon data-icon="inline-start" />
+				Add field
+			</Button>
+		</div>
+	{/if}
+</div>
 
-	<Card.Root>
-		<Card.Header>
-			<Card.Title>Add field</Card.Title>
-		</Card.Header>
-		<Card.Content>
+<Sheet.Root bind:open={sheetOpen}>
+	<Sheet.Content class="sm:max-w-md" side="right">
+		<Sheet.Header>
+			<Sheet.Title>{editing ? "Edit field" : "Add field"}</Sheet.Title>
+			<Sheet.Description>
+				{editing ? "Change how this field is stored and shown." : "People see the name. The kind decides the control."}
+			</Sheet.Description>
+		</Sheet.Header>
+		<div class="flex flex-col gap-4 overflow-y-auto px-6">
 			<Field.Group>
 				<Field.Field>
-					<Field.Label>Key</Field.Label>
-					<Input bind:value={fieldKey} placeholder="due_date" />
+					<Field.Label>Name</Field.Label>
+					<Input bind:value={fieldLabel} placeholder="Name" />
 				</Field.Field>
 				<Field.Field>
-					<Field.Label>Label</Field.Label>
-					<Input bind:value={fieldLabel} placeholder="Due date" />
-				</Field.Field>
-				<Field.Field>
-					<Field.Label>Type</Field.Label>
-					<NativeSelect.Root class="w-full" bind:value={fieldType}>
+					<Field.Label>Kind</Field.Label>
+					<div class="grid grid-cols-2 gap-2">
 						{#each FIELD_KINDS as kind (kind)}
-							<NativeSelect.Option value={kind}>{kind}</NativeSelect.Option>
+							{@const Icon = kindIcons[kind]}
+							<button
+								type="button"
+								class="flex items-start gap-2 rounded-xl border p-2.5 text-start transition-colors hover:bg-muted/40 {selectedKind ===
+								kind
+									? 'border-primary bg-primary/5 ring-2 ring-primary/20'
+									: 'border-border'}"
+								onclick={() => (fieldType = kind)}
+							>
+								<Icon class="mt-0.5 size-4 shrink-0 text-muted-foreground" />
+								<span class="min-w-0">
+									<span class="block text-sm font-medium">{fieldKindLabel[kind]}</span>
+									<span class="block text-xs text-muted-foreground">{fieldKindHint[kind]}</span>
+								</span>
+							</button>
 						{/each}
-					</NativeSelect.Root>
+					</div>
 				</Field.Field>
 				{#if fieldType === "enum"}
 					<Field.Field>
-						<Field.Label>Values</Field.Label>
-						<Input bind:value={fieldValues} placeholder="draft, sent, paid" />
+						<Field.Label>Choices</Field.Label>
+						<div class="flex flex-wrap gap-1.5">
+							{#each fieldChoices as value (value)}
+								<button
+									type="button"
+									class="inline-flex items-center gap-1 rounded-full border bg-background px-2.5 py-1 text-xs font-medium"
+									onclick={() => removeChoice(value)}
+								>
+									{value.replaceAll("_", " ")}
+									<XIcon class="size-3 text-muted-foreground" />
+								</button>
+							{/each}
+						</div>
+						<div class="flex flex-nowrap gap-2">
+							<Input
+								bind:value={choiceDraft}
+								placeholder="Add a choice"
+								onkeydown={(event) => {
+									if (event.key === "Enter") {
+										event.preventDefault();
+										addChoice();
+									}
+								}}
+							/>
+							<Button type="button" variant="outline" class="shrink-0" onclick={addChoice}>Add</Button>
+						</div>
+						<Field.Description>People pick one. Click a choice to remove it.</Field.Description>
 					</Field.Field>
 				{/if}
 				{#if fieldType === "reference"}
 					<Field.Field>
-						<Field.Label>Target</Field.Label>
-						<NativeSelect.Root class="w-full" bind:value={fieldTarget}>
-							<NativeSelect.Option value="">Select type</NativeSelect.Option>
-							{#each targets as target (target.id)}
-								<NativeSelect.Option value={target.store === "directory" ? `${target.store}.${target.key}` : target.key}>
-									{target.label}
-								</NativeSelect.Option>
-							{/each}
-						</NativeSelect.Root>
+						<Field.Label>Links to</Field.Label>
+						<AppSelect bind:value={fieldTarget} options={targetOptions} placeholder="Select a record type" />
+						<Field.Description>
+							{#if targetOptions.length}
+								The other record type this field points at.
+							{:else}
+								Add another record type first, then you can link to it.
+							{/if}
+						</Field.Description>
 					</Field.Field>
 				{/if}
 				<Field.Field orientation="horizontal">
-					<Checkbox bind:checked={fieldRequired} id="required" />
+					<Switch bind:checked={fieldRequired} id="required" />
 					<Field.Label for="required">Required</Field.Label>
 				</Field.Field>
-				<Button onclick={addField}>Add field</Button>
 			</Field.Group>
-		</Card.Content>
-	</Card.Root>
-</div>
+			<Separator />
+			<Collapsible.Root bind:open={advanced}>
+				<Collapsible.Trigger
+					class="flex w-full items-center justify-between text-sm font-medium text-muted-foreground hover:text-foreground"
+				>
+					Advanced
+					<ChevronDownIcon class="size-4 transition-transform {advanced ? 'rotate-180' : ''}" />
+				</Collapsible.Trigger>
+				<Collapsible.Content class="pt-3">
+					<Field.Field>
+						<Field.Label>Key</Field.Label>
+						<Input bind:value={fieldKey} placeholder={slugify(fieldLabel) || "due_date"} />
+						<Field.Description>Used in the spec. Leave blank to generate from the name.</Field.Description>
+					</Field.Field>
+				</Collapsible.Content>
+			</Collapsible.Root>
+		</div>
+		<Sheet.Footer class="flex-row justify-end">
+			{#if editing}
+				<Button
+					variant="ghost"
+					onclick={() => {
+						removeKey = editing?.key ?? null;
+						sheetOpen = false;
+					}}
+				>
+					Remove
+				</Button>
+			{/if}
+			<Button onclick={saveField} disabled={!canSave}>{editing ? "Save field" : "Add field"}</Button>
+		</Sheet.Footer>
+	</Sheet.Content>
+</Sheet.Root>
+
+<AlertDialog.Root open={Boolean(removeKey)} onOpenChange={(open) => !open && (removeKey = null)}>
+	<AlertDialog.Content>
+		<AlertDialog.Header>
+			<AlertDialog.Title>Remove {removing?.label ?? "this field"}?</AlertDialog.Title>
+			<AlertDialog.Description>
+				Stored values in this column will be dropped. This cannot be undone.
+			</AlertDialog.Description>
+		</AlertDialog.Header>
+		<AlertDialog.Footer>
+			<AlertDialog.Cancel>Cancel</AlertDialog.Cancel>
+			<AlertDialog.Action variant="destructive" onclick={remove}>Remove</AlertDialog.Action>
+		</AlertDialog.Footer>
+	</AlertDialog.Content>
+</AlertDialog.Root>
+
+<AlertDialog.Root bind:open={deleteOpen}>
+	<AlertDialog.Content>
+		<AlertDialog.Header>
+			<AlertDialog.Title>Delete {type.label}?</AlertDialog.Title>
+			<AlertDialog.Description>
+				The type, its lists, and its forms go. Records stored as {type.label.toLowerCase()} are dropped.
+			</AlertDialog.Description>
+		</AlertDialog.Header>
+		<AlertDialog.Footer>
+			<AlertDialog.Cancel>Cancel</AlertDialog.Cancel>
+			<AlertDialog.Action variant="destructive" onclick={removeType}>Delete</AlertDialog.Action>
+		</AlertDialog.Footer>
+	</AlertDialog.Content>
+</AlertDialog.Root>

@@ -1,16 +1,22 @@
 <script lang="ts">
 	import { page } from "$app/state";
-	import { collectionLabel, featuredViews } from "$lib/app/labels.ts";
-	import { session, runtime } from "$lib/app/session.svelte.ts";
-	import { studioItems } from "$lib/app/studio.ts";
+	import { initialsFromName, toneFromName } from "$lib/app/color.ts";
+	import { collectionLabel, featuredViews, spaceLabel } from "$lib/app/labels.ts";
+	import { chrome, openNewApp, session, runtime } from "$lib/app/session.svelte.ts";
+	import { studioGroupOrder, studioItems } from "$lib/app/studio.ts";
+	import SidebarNavGroup from "$lib/components/sidebar-nav-group.svelte";
 	import NameDialog from "$lib/components/name-dialog.svelte";
+	import NewAppDialog from "$lib/components/new-app-dialog.svelte";
+	import ProfileDialog from "$lib/components/profile-dialog.svelte";
+	import SpaceSettingsDialog from "$lib/components/space-settings-dialog.svelte";
+	import * as Avatar from "$lib/components/ui/avatar/index.js";
 	import * as DropdownMenu from "$lib/components/ui/dropdown-menu/index.js";
 	import * as Sidebar from "$lib/components/ui/sidebar/index.js";
-	import { sampleApps } from "$lib/runtime/samples.ts";
 	import ArrowLeftIcon from "@lucide/svelte/icons/arrow-left";
 	import BoxIcon from "@lucide/svelte/icons/box";
 	import BriefcaseIcon from "@lucide/svelte/icons/briefcase";
 	import Building2Icon from "@lucide/svelte/icons/building-2";
+	import CheckIcon from "@lucide/svelte/icons/check";
 	import ChevronsUpDownIcon from "@lucide/svelte/icons/chevrons-up-down";
 	import FileTextIcon from "@lucide/svelte/icons/file-text";
 	import FormInputIcon from "@lucide/svelte/icons/form-input";
@@ -20,10 +26,13 @@
 	import PlusIcon from "@lucide/svelte/icons/plus";
 	import ReceiptIcon from "@lucide/svelte/icons/receipt";
 	import SearchIcon from "@lucide/svelte/icons/search";
+	import SettingsIcon from "@lucide/svelte/icons/settings";
 	import TableIcon from "@lucide/svelte/icons/table";
+	import UserIcon from "@lucide/svelte/icons/user";
 	import UsersIcon from "@lucide/svelte/icons/users";
 	import WalletIcon from "@lucide/svelte/icons/wallet";
 	import WorkflowIcon from "@lucide/svelte/icons/workflow";
+	import type { TypeDef } from "$lib/runtime/model.ts";
 	import type { Component, ComponentProps } from "svelte";
 
 	let { ref = $bindable(null), ...restProps }: ComponentProps<typeof Sidebar.Root> = $props();
@@ -32,13 +41,28 @@
 	const spec = $derived(snap?.spec);
 	const path = $derived(page.url.pathname);
 	const studio = $derived(path.startsWith("/build") || path.startsWith("/diagnostics"));
+	const space = $derived(spaceLabel(snap?.space.name));
 
 	const views = $derived(spec ? featuredViews(spec) : []);
 	const types = $derived(spec?.types ?? []);
-	const pages = $derived((spec?.pages ?? []).filter((item) => !item.implicit));
+	const localTypes = $derived(types.filter((type) => !type.expose));
+	const sharedTypes = $derived(types.filter((type) => type.expose));
+	const pages = $derived(
+		(spec?.pages ?? []).filter(
+			(item) => !item.implicit && item.key !== "home" && item.path !== "/",
+		),
+	);
+	const studioSections = $derived(
+		studioGroupOrder.map((label) => ({
+			label,
+			items: studioItems.filter((item) => item.group === label),
+		})),
+	);
 
-	let workspaceOpen = $state(false);
-	let environmentOpen = $state(false);
+	let spaceOpen = $state(false);
+	let profileOpen = $state(false);
+	let settingsOpen = $state(false);
+
 
 	const studioIcons: Record<string, Component> = {
 		"/build/types": BoxIcon,
@@ -59,25 +83,51 @@
 		expense: WalletIcon,
 	};
 
-	async function loadSample(key: string) {
-		await runtime().loadSample(key);
-	}
+	const appTone = $derived(toneFromName(snap?.app.name ?? "App"));
+	const actorTone = $derived(toneFromName(snap?.actor.name ?? "You"));
+	const initial = $derived(initialsFromName(snap?.actor.name ?? "You"));
 </script>
 
-<Sidebar.Root bind:ref variant="inset" {...restProps}>
+{#snippet recordLink(type: TypeDef)}
+	{@const Icon = typeIcons[type.key] ?? BoxIcon}
+	<Sidebar.MenuSubItem>
+		<Sidebar.MenuSubButton
+			href="/t/{type.key}"
+			isActive={path === `/t/${type.key}` || path.startsWith(`/t/${type.key}/`)}
+		>
+			<Icon />
+			<span>{collectionLabel(type)}</span>
+		</Sidebar.MenuSubButton>
+	</Sidebar.MenuSubItem>
+{/snippet}
+
+<Sidebar.Root
+	bind:ref
+	variant="inset"
+	style="--app-gradient: {appTone.gradient}; --app-hue: {appTone.hue}; --app-accent: {appTone.accent}"
+	{...restProps}
+>
 	<Sidebar.Header>
 		<Sidebar.Menu>
 			<Sidebar.MenuItem>
 				<DropdownMenu.Root>
 					<DropdownMenu.Trigger>
 						{#snippet child({ props })}
-							<Sidebar.MenuButton {...props} size="lg">
-								<div class="flex aspect-square size-8 items-center justify-center rounded-lg bg-sidebar-primary text-sidebar-primary-foreground">
+							<Sidebar.MenuButton
+								{...props}
+								size="lg"
+								variant="outline"
+								class="bg-background"
+							>
+								<div
+									class="flex aspect-square size-8 items-center justify-center rounded-lg text-white"
+									style="background-image: {appTone.gradient}"
+								>
 									<LayersIcon />
 								</div>
 								<div class="grid flex-1 text-start text-sm leading-tight">
-									<span class="truncate font-medium">{snap?.workspace.name}</span>
-									<span class="truncate text-xs">{snap?.environment.name}</span>
+									<span class="truncate font-medium">{snap?.app.name}</span>
+									<span class="truncate text-xs text-muted-foreground group-hover/menu-button:text-muted-foreground">{space}</span>
 								</div>
 								<ChevronsUpDownIcon class="ms-auto" />
 							</Sidebar.MenuButton>
@@ -86,42 +136,20 @@
 					<DropdownMenu.Content class="min-w-56 rounded-lg" align="start">
 						<DropdownMenu.Group>
 							<DropdownMenu.Label>Apps</DropdownMenu.Label>
-							{#each snap?.workspaces ?? [] as workspace (workspace.id)}
-								<DropdownMenu.Item onSelect={() => runtime().switchWorkspace(workspace.id)}>
-									{workspace.name}
+							{#each snap?.apps ?? [] as app (app.id)}
+								<DropdownMenu.Item onSelect={() => runtime().switchApp(app.id)}>
+									<span class="truncate">{app.name}</span>
+									{#if app.id === snap?.app.id}
+										<CheckIcon class="ms-auto" />
+									{/if}
 								</DropdownMenu.Item>
 							{/each}
 						</DropdownMenu.Group>
 						<DropdownMenu.Separator />
-						<DropdownMenu.Group>
-							<DropdownMenu.Item onSelect={() => (workspaceOpen = true)}>
-								<PlusIcon />
-								New app
-							</DropdownMenu.Item>
-						</DropdownMenu.Group>
-						<DropdownMenu.Separator />
-						<DropdownMenu.Group>
-							<DropdownMenu.Label>Templates</DropdownMenu.Label>
-							{#each sampleApps as sample (sample.key)}
-								<DropdownMenu.Item onSelect={() => loadSample(sample.key)}>
-									{sample.label}
-								</DropdownMenu.Item>
-							{/each}
-						</DropdownMenu.Group>
-						<DropdownMenu.Separator />
-						<DropdownMenu.Group>
-							<DropdownMenu.Label>Places</DropdownMenu.Label>
-							{#each snap?.environments ?? [] as env (env.id)}
-								<DropdownMenu.Item onSelect={() => runtime().switchEnvironment(env.id)}>
-									<Building2Icon />
-									{env.name}
-								</DropdownMenu.Item>
-							{/each}
-							<DropdownMenu.Item onSelect={() => (environmentOpen = true)}>
-								<PlusIcon />
-								New place
-							</DropdownMenu.Item>
-						</DropdownMenu.Group>
+						<DropdownMenu.Item onSelect={() => openNewApp()}>
+							<PlusIcon />
+							New app
+						</DropdownMenu.Item>
 					</DropdownMenu.Content>
 				</DropdownMenu.Root>
 			</Sidebar.MenuItem>
@@ -146,24 +174,26 @@
 			<Sidebar.Group>
 				<Sidebar.GroupLabel>Edit app</Sidebar.GroupLabel>
 				<Sidebar.Menu>
-					{#each studioItems as item (item.href)}
-						{@const Icon = studioIcons[item.href] ?? BoxIcon}
-						<Sidebar.MenuItem>
-							<Sidebar.MenuButton
-								isActive={path === item.href || path.startsWith(`${item.href}/`)}
-								tooltipContent={item.label}
-							>
-								{#snippet child({ props })}
-									<a href={item.href} {...props}><Icon /><span>{item.label}</span></a>
-								{/snippet}
-							</Sidebar.MenuButton>
-						</Sidebar.MenuItem>
+					{#each studioSections as section (section.label)}
+						<SidebarNavGroup label={section.label}>
+							{#each section.items as item (item.href)}
+								{@const Icon = studioIcons[item.href] ?? BoxIcon}
+								<Sidebar.MenuSubItem>
+									<Sidebar.MenuSubButton
+										href={item.href}
+										isActive={path === item.href || path.startsWith(`${item.href}/`)}
+									>
+										<Icon />
+										<span>{item.label}</span>
+									</Sidebar.MenuSubButton>
+								</Sidebar.MenuSubItem>
+							{/each}
+						</SidebarNavGroup>
 					{/each}
 				</Sidebar.Menu>
 			</Sidebar.Group>
 		{:else}
 			<Sidebar.Group>
-				<Sidebar.GroupLabel>Menu</Sidebar.GroupLabel>
 				<Sidebar.Menu>
 					<Sidebar.MenuItem>
 						<Sidebar.MenuButton isActive={path === "/"} tooltipContent="Home">
@@ -175,52 +205,50 @@
 							{/snippet}
 						</Sidebar.MenuButton>
 					</Sidebar.MenuItem>
-					{#each views as view (view.id)}
-						<Sidebar.MenuItem>
-							<Sidebar.MenuButton isActive={path === `/v/${view.key}`} tooltipContent={view.label}>
-								{#snippet child({ props })}
-									<a href="/v/{view.key}" {...props}>
-										<TableIcon />
+					{#if views.length}
+						<SidebarNavGroup label="Lists" icon={TableIcon}>
+							{#each views as view (view.id)}
+								<Sidebar.MenuSubItem>
+									<Sidebar.MenuSubButton href="/v/{view.key}" isActive={path === `/v/${view.key}`}>
 										<span>{view.label}</span>
-									</a>
-								{/snippet}
-							</Sidebar.MenuButton>
-						</Sidebar.MenuItem>
-					{/each}
-					{#each pages as item (item.id)}
-						<Sidebar.MenuItem>
-							<Sidebar.MenuButton isActive={path === `/p/${item.key}`} tooltipContent={item.label}>
-								{#snippet child({ props })}
-									<a href="/p/{item.key}" {...props}>
-										<FileTextIcon />
+									</Sidebar.MenuSubButton>
+								</Sidebar.MenuSubItem>
+							{/each}
+						</SidebarNavGroup>
+					{/if}
+					{#if pages.length}
+						<SidebarNavGroup label="Pages" icon={LayersIcon}>
+							{#each pages as item (item.id)}
+								<Sidebar.MenuSubItem>
+									<Sidebar.MenuSubButton href="/p/{item.key}" isActive={path === `/p/${item.key}`}>
 										<span>{item.label}</span>
-									</a>
-								{/snippet}
-							</Sidebar.MenuButton>
-						</Sidebar.MenuItem>
-					{/each}
+									</Sidebar.MenuSubButton>
+								</Sidebar.MenuSubItem>
+							{/each}
+						</SidebarNavGroup>
+					{/if}
+					{#if localTypes.length || sharedTypes.length}
+						<SidebarNavGroup label="Records" icon={BoxIcon}>
+							{#if localTypes.length && sharedTypes.length}
+								<SidebarNavGroup nested label="This app">
+									{#each localTypes as type (type.id)}
+										{@render recordLink(type)}
+									{/each}
+								</SidebarNavGroup>
+								<SidebarNavGroup nested label="From {space}">
+									{#each sharedTypes as type (type.id)}
+										{@render recordLink(type)}
+									{/each}
+								</SidebarNavGroup>
+							{:else}
+								{#each [...localTypes, ...sharedTypes] as type (type.id)}
+									{@render recordLink(type)}
+								{/each}
+							{/if}
+						</SidebarNavGroup>
+					{/if}
 				</Sidebar.Menu>
 			</Sidebar.Group>
-			{#if types.length}
-				<Sidebar.Group>
-					<Sidebar.GroupLabel>Records</Sidebar.GroupLabel>
-					<Sidebar.Menu>
-						{#each types as type (type.id)}
-							{@const Icon = typeIcons[type.key] ?? BoxIcon}
-							<Sidebar.MenuItem>
-								<Sidebar.MenuButton isActive={path === `/t/${type.key}` || path.startsWith(`/t/${type.key}/`)} tooltipContent={collectionLabel(type)}>
-									{#snippet child({ props })}
-										<a href="/t/{type.key}" {...props}>
-											<Icon />
-											<span>{collectionLabel(type)}</span>
-										</a>
-									{/snippet}
-								</Sidebar.MenuButton>
-							</Sidebar.MenuItem>
-						{/each}
-					</Sidebar.Menu>
-				</Sidebar.Group>
-			{/if}
 		{/if}
 	</Sidebar.Content>
 	<Sidebar.Footer>
@@ -238,33 +266,89 @@
 				</Sidebar.MenuItem>
 			{/if}
 			<Sidebar.MenuItem>
-				<Sidebar.MenuButton size="lg">
-					<div class="flex size-8 items-center justify-center rounded-lg bg-sidebar-accent text-sidebar-accent-foreground">
-						{snap?.actor.name?.slice(0, 1) ?? "Y"}
-					</div>
-					<div class="grid flex-1 text-start text-sm leading-tight">
-						<span class="truncate font-medium">{snap?.actor.name}</span>
-						<span class="truncate text-xs">builder.run</span>
-					</div>
-				</Sidebar.MenuButton>
+				<DropdownMenu.Root>
+					<DropdownMenu.Trigger>
+						{#snippet child({ props })}
+							<Sidebar.MenuButton
+								{...props}
+								size="lg"
+								variant="outline"
+								class="bg-background"
+							>
+								<Avatar.Root class="size-8 rounded-lg">
+									<Avatar.Fallback
+										class="rounded-lg font-medium"
+										style="background-color: {actorTone.background}; color: {actorTone.foreground}"
+									>
+										{initial}
+									</Avatar.Fallback>
+								</Avatar.Root>
+								<div class="grid flex-1 text-start text-sm leading-tight">
+									<span class="truncate font-medium">{snap?.actor.name}</span>
+									<span class="truncate text-xs text-muted-foreground group-hover/menu-button:text-muted-foreground">{snap?.actor.email || space}</span>
+								</div>
+								<ChevronsUpDownIcon class="ms-auto" />
+							</Sidebar.MenuButton>
+						{/snippet}
+					</DropdownMenu.Trigger>
+					<DropdownMenu.Content class="min-w-56 rounded-lg" align="end" side="top">
+						<DropdownMenu.Group>
+							<DropdownMenu.Label class="font-normal">
+								<div class="flex flex-col">
+									<span class="font-medium">{snap?.actor.name}</span>
+									<span class="text-xs text-muted-foreground">{snap?.actor.email || "No email yet"}</span>
+								</div>
+							</DropdownMenu.Label>
+						</DropdownMenu.Group>
+						<DropdownMenu.Separator />
+						<DropdownMenu.Item onSelect={() => (profileOpen = true)}>
+							<UserIcon />
+							Profile
+						</DropdownMenu.Item>
+						<DropdownMenu.Item onSelect={() => (settingsOpen = true)}>
+							<SettingsIcon />
+							Space settings
+						</DropdownMenu.Item>
+						<DropdownMenu.Separator />
+						<DropdownMenu.Sub>
+							<DropdownMenu.SubTrigger>
+								<Building2Icon />
+								Spaces
+							</DropdownMenu.SubTrigger>
+							<DropdownMenu.SubContent class="min-w-48">
+								{#each snap?.spaces ?? [] as item (item.id)}
+									<DropdownMenu.Item onSelect={() => runtime().switchSpace(item.id)}>
+										<span class="truncate">{spaceLabel(item.name)}</span>
+										{#if item.id === snap?.space.id}
+											<CheckIcon class="ms-auto" />
+										{/if}
+									</DropdownMenu.Item>
+								{/each}
+								<DropdownMenu.Separator />
+								<DropdownMenu.Item onSelect={() => (spaceOpen = true)}>
+									<PlusIcon />
+									New space
+								</DropdownMenu.Item>
+							</DropdownMenu.SubContent>
+						</DropdownMenu.Sub>
+						<DropdownMenu.Separator />
+						<DropdownMenu.Label class="text-xs font-normal text-muted-foreground">builder.run</DropdownMenu.Label>
+					</DropdownMenu.Content>
+				</DropdownMenu.Root>
 			</Sidebar.MenuItem>
 		</Sidebar.Menu>
 	</Sidebar.Footer>
 </Sidebar.Root>
 
+<NewAppDialog bind:open={chrome.newAppOpen} preset={chrome.newAppPreset} />
+<ProfileDialog bind:open={profileOpen} />
+<SpaceSettingsDialog bind:open={settingsOpen} />
 <NameDialog
-	bind:open={workspaceOpen}
-	title="New app"
-	description="A fresh app in this place. Shared organisations and contacts stay available."
+	bind:open={spaceOpen}
+	title="New space"
+	description="A separate space for apps, people, and types you expose to those apps."
+	confirm="Create space"
 	onSubmit={async (name) => {
-		await runtime().createWorkspace(name);
-	}}
-/>
-<NameDialog
-	bind:open={environmentOpen}
-	title="New place"
-	description="A separate place for apps, people, and shared contacts."
-	onSubmit={async (name) => {
-		await runtime().createEnvironment(name);
+		await runtime().createSpace(name);
 	}}
 />
