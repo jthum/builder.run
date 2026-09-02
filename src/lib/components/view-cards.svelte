@@ -1,0 +1,64 @@
+<script lang="ts">
+	import { columnLabel, isStatusPath } from "$lib/app/labels.ts";
+	import FormattedValue from "$lib/components/formatted-value.svelte";
+	import * as Card from "$lib/components/ui/card/index.js";
+	import * as Empty from "$lib/components/ui/empty/index.js";
+	import { Skeleton } from "$lib/components/ui/skeleton/index.js";
+	import type { TypeDef, ViewDef } from "$lib/runtime/model.ts";
+	import InboxIcon from "@lucide/svelte/icons/inbox";
+
+	let {
+		rows,
+		view,
+		type,
+	}: {
+		rows: Array<Record<string, unknown>> | null;
+		view: ViewDef;
+		type?: TypeDef;
+	} = $props();
+
+	const fields = $derived(view.fields.length ? view.fields : ["id"]);
+	const titleField = $derived(fields[0] ?? "id");
+	const rest = $derived(fields.slice(1, 4));
+</script>
+
+{#if rows === null}
+	<div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+		<Skeleton class="h-32 w-full" />
+		<Skeleton class="h-32 w-full" />
+		<Skeleton class="h-32 w-full" />
+	</div>
+{:else if !rows.length}
+	<Empty.Root class="border-0 py-8">
+		<Empty.Header>
+			<Empty.Media variant="icon"><InboxIcon /></Empty.Media>
+			<Empty.Title>Nothing here yet</Empty.Title>
+		</Empty.Header>
+	</Empty.Root>
+{:else}
+	<div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+		{#each rows as row (String(row.id ?? JSON.stringify(row)))}
+			<a href="/t/{view.source}/{row.id}" class="block rounded-2xl outline-none focus-visible:ring-2 focus-visible:ring-ring">
+				<Card.Root class="h-full transition-all hover:ring-foreground/20">
+					<Card.Content class="flex flex-col gap-3 p-5">
+						<p class="font-medium">
+							<FormattedValue path={titleField} value={row[titleField]} {type} />
+						</p>
+						{#if rest.length}
+							<dl class="flex flex-col gap-1.5">
+								{#each rest as path (path)}
+									<div class="flex items-center justify-between gap-3 text-sm">
+										<dt class="text-muted-foreground">{columnLabel(path, type)}</dt>
+										<dd>
+											<FormattedValue {path} value={row[path]} {type} badge={isStatusPath(path)} />
+										</dd>
+									</div>
+								{/each}
+							</dl>
+						{/if}
+					</Card.Content>
+				</Card.Root>
+			</a>
+		{/each}
+	</div>
+{/if}

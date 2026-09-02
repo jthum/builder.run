@@ -63,6 +63,15 @@ await page.evaluate(() => {
   if (!button) throw new Error("Freelance CRM template button not found");
   button.click();
 });
+await page.waitForFunction(
+  () =>
+    Boolean(document.querySelector("[data-testid='create-app']")) ||
+    document.body.innerText.includes("Invoice"),
+);
+await page.evaluate(() => {
+  const create = document.querySelector("[data-testid='create-app']");
+  if (create instanceof HTMLElement) create.click();
+});
 await page.waitForFunction(() => document.body.innerText.includes("Invoice"));
 {
   const loaded = await page.evaluate(() => document.body.innerText);

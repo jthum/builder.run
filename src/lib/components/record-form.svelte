@@ -1,14 +1,14 @@
 <script lang="ts">
-	import { addLabel } from "$lib/app/labels.ts";
+	import { addLabel, recordTitle } from "$lib/app/labels.ts";
 	import { runtime, session } from "$lib/app/session.svelte.ts";
+	import AppSelect from "$lib/components/app-select.svelte";
 	import ReferencePicker from "$lib/components/reference-picker.svelte";
 	import * as Alert from "$lib/components/ui/alert/index.js";
 	import { Button } from "$lib/components/ui/button/index.js";
-	import { Checkbox } from "$lib/components/ui/checkbox/index.js";
 	import * as Field from "$lib/components/ui/field/index.js";
 	import { Input } from "$lib/components/ui/input/index.js";
-	import * as NativeSelect from "$lib/components/ui/native-select/index.js";
 	import { Spinner } from "$lib/components/ui/spinner/index.js";
+	import { Switch } from "$lib/components/ui/switch/index.js";
 	import { labelFromKey } from "$lib/runtime/ids.ts";
 	import type { FieldDef, FormDef, RecordValue, TypeDef } from "$lib/runtime/model.ts";
 	import { fieldWidget, findType } from "$lib/runtime/query.ts";
@@ -18,32 +18,68 @@
 		record = null,
 		fields,
 		form = null,
+		defaults = {},
+		omit = [],
 		onSaved,
+		onCancel,
+		submitLabel,
 	}: {
 		type: TypeDef;
 		record?: RecordValue | null;
 		fields?: string[];
 		form?: FormDef | null;
+		defaults?: Record<string, unknown>;
+		omit?: string[];
 		onSaved?: (record: RecordValue | null) => void;
+		onCancel?: () => void;
+		submitLabel?: string;
 	} = $props();
 
-	const keys = $derived(fields?.length ? fields : type.fields.map((field) => field.key));
-	const visible = $derived(keys.map((key) => type.fields.find((field) => field.key === key)).filter(Boolean) as FieldDef[]);
+	const keys = $derived(
+		(fields?.length ? fields : type.fields.map((field) => field.key)).filter(
+			(key) => !omit.includes(key),
+		),
+	);
+	const visible = $derived(
+		keys.map((key) => type.fields.find((field) => field.key === key)).filter(Boolean) as FieldDef[],
+	);
+	const optionKeys = $derived(
+		visible
+			.filter((field) => field.type === "reference" || field.type === "enum")
+			.map((field) => field.key)
+			.join(","),
+	);
+
+	function formValues(
+		current: TypeDef,
+		row: RecordValue | null | undefined,
+		initial: Record<string, unknown>,
+	): Record<string, unknown> {
+		const next: Record<string, unknown> = {};
+		for (const field of current.fields) {
+			const raw = row?.[field.key] ?? initial[field.key] ?? field.default;
+			if (field.type === "boolean") next[field.key] = Boolean(raw);
+			else next[field.key] = raw ?? "";
+		}
+		return next;
+	}
 
 	let values = $state<Record<string, unknown>>({});
 	let error = $state<string | null>(null);
 	let pending = $state(false);
+	const defaultsKey = $derived(JSON.stringify(defaults));
+	const recordId = $derived(record?.id ?? "");
 
-	$effect(() => {
-		const next: Record<string, unknown> = {};
-		for (const field of type.fields) {
-			next[field.key] = record?.[field.key] ?? field.default ?? (field.type === "boolean" ? false : "");
-		}
-		values = next;
+	$effect.pre(() => {
+		void recordId;
+		const initial = JSON.parse(defaultsKey) as Record<string, unknown>;
+		values = formValues(type, record, initial);
 	});
 
 	async function optionsFor(field: FieldDef) {
-		if (field.type === "enum") return (field.values ?? []).map((value) => ({ id: value, label: labelFromKey(value) }));
+		if (field.type === "enum") {
+			return (field.values ?? []).map((value) => ({ id: value, label: labelFromKey(value) }));
+		}
 		if (field.type !== "reference" || !field.target || !session.host) return [];
 		const ctx = runtime().queryContext();
 		const target = findType(ctx, field.target);
@@ -51,7 +87,7 @@
 		const rows = await runtime().listRecords(target.key);
 		return rows.map((row) => ({
 			id: row.id,
-			label: String(row.name ?? row.title ?? row.email ?? row.id),
+			label: recordTitle(row, target),
 		}));
 	}
 
@@ -59,11 +95,17 @@
 
 	$effect(() => {
 		void session.revision;
+		void optionKeys;
+		const current = visible;
 		void (async () => {
 			const next: Record<string, Array<{ id: string; label: string }>> = {};
-			for (const field of visible) {
-				if (field.type === "reference" || field.type === "enum") {
+			for (const field of current) {
+				if (field.type !== "reference" && field.type !== "enum") continue;
+				try {
 					next[field.key] = await optionsFor(field);
+				} catch (err) {
+					console.warn(`Couldn't load ${field.key} options`, err);
+					next[field.key] = [];
 				}
 			}
 			refOptions = next;
@@ -97,7 +139,10 @@
 			<Field.Field>
 				<Field.Label>{field.label}</Field.Label>
 				{#if widget === "checkbox"}
-					<Checkbox bind:checked={values[field.key] as boolean} />
+					<Field.Field orientation="horizontal">
+						<Switch bind:checked={values[field.key] as boolean} />
+						<Field.Description>{values[field.key] ? "Yes" : "No"}</Field.Description>
+					</Field.Field>
 				{:else if widget === "reference"}
 					<ReferencePicker
 						bind:value={values[field.key] as string}
@@ -105,16 +150,19 @@
 						placeholder={`Select ${field.label.toLowerCase()}`}
 					/>
 				{:else if widget === "select"}
-					<NativeSelect.Root class="w-full" bind:value={values[field.key] as string}>
-						<NativeSelect.Option value="">Select {field.label.toLowerCase()}</NativeSelect.Option>
-						{#each refOptions[field.key] ?? [] as option (option.id)}
-							<NativeSelect.Option value={option.id}>{option.label}</NativeSelect.Option>
-						{/each}
-					</NativeSelect.Root>
+					<AppSelect
+						bind:value={values[field.key] as string}
+						options={(refOptions[field.key] ?? []).map((option) => ({
+							value: option.id,
+							label: option.label,
+						}))}
+						placeholder={`Select ${field.label.toLowerCase()}`}
+					/>
 				{:else}
 					<Input
 						class="w-full"
 						type={widget === "number" ? "number" : widget === "date" ? "date" : "text"}
+						required={field.required}
 						bind:value={values[field.key] as string}
 					/>
 				{/if}
@@ -130,7 +178,10 @@
 	<div class="flex gap-2">
 		<Button type="submit" disabled={pending} data-testid="record-submit">
 			{#if pending}<Spinner data-icon="inline-start" />{/if}
-			{record ? "Save" : addLabel(type)}
+			{submitLabel ?? (record ? "Save" : addLabel(type))}
 		</Button>
+		{#if onCancel}
+			<Button type="button" variant="outline" onclick={onCancel}>Cancel</Button>
+		{/if}
 	</div>
 </form>

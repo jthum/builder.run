@@ -18,10 +18,20 @@
 			</Card.Header>
 			<Card.Content class="flex flex-col gap-2">
 				<Badge>{session.snapshot?.engine} · {session.snapshot?.backend}</Badge>
+				{#if session.snapshot?.catalog}
+					<div class="text-sm">
+						<div class="font-medium">Control</div>
+						<div class="text-muted-foreground">
+							{session.snapshot.catalog.database}: {session.snapshot.catalog.tables.join(", ") || "no tables yet"}
+						</div>
+					</div>
+				{/if}
 				{#each session.snapshot?.stores ?? [] as store (store.key)}
 					<div class="text-sm">
-						<div class="font-medium">{store.key === "directory" ? "Shared directory" : "This app"}</div>
-						<div class="text-muted-foreground">{store.tables.join(", ") || "no tables yet"}</div>
+						<div class="font-medium">{store.key === "space" ? store.label : "This app"}</div>
+						<div class="text-muted-foreground">
+							{store.database}: {store.tables.join(", ") || "no tables yet"}
+						</div>
 					</div>
 				{/each}
 			</Card.Content>

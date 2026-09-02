@@ -1,5 +1,28 @@
-import { labelFromKey } from "$lib/runtime/ids.ts";
-import type { AppSpec, TypeDef, ViewDef } from "$lib/runtime/model.ts";
+import { isId, labelFromKey } from "$lib/runtime/ids.ts";
+import type { AppSpec, FieldKind, TypeDef, ViewDef } from "$lib/runtime/model.ts";
+
+export const fieldKindLabel: Record<FieldKind, string> = {
+  text: "Text",
+  number: "Number",
+  date: "Date",
+  boolean: "Yes / no",
+  enum: "Choice",
+  reference: "Link",
+};
+
+export const fieldKindHint: Record<FieldKind, string> = {
+  text: "Names, emails, notes",
+  number: "Amounts, counts, scores",
+  date: "Days and deadlines",
+  boolean: "Yes or no",
+  enum: "A fixed list of choices",
+  reference: "A link to another record",
+};
+
+export function spaceLabel(name: string | undefined): string {
+  if (!name || name === "Personal") return "Personal Space";
+  return name;
+}
 
 export function collectionLabel(type: TypeDef): string {
   if (type.label.endsWith("s")) return type.label;
@@ -40,8 +63,29 @@ export function featuredViews(spec: AppSpec): ViewDef[] {
   return spec.views.filter((view) => !view.implicit);
 }
 
+export function homeViews(spec: AppSpec): ViewDef[] {
+  const featured = featuredViews(spec);
+  if (featured.length) return featured;
+  return spec.types
+    .filter((type) => !type.expose)
+    .map((type) => spec.views.find((view) => view.source === type.key))
+    .filter((view): view is ViewDef => Boolean(view));
+}
+
+export function greeting(name?: string, at = new Date()): string {
+  const hour = at.getHours();
+  const part = hour < 12 ? "Good morning" : hour < 18 ? "Good afternoon" : "Good evening";
+  const first = name?.trim().split(/\s+/)[0];
+  if (!first || first.toLowerCase() === "you") return part;
+  return `${part}, ${first}`;
+}
+
+export function listHref(view: ViewDef): string {
+  return view.implicit ? `/t/${view.source}` : `/v/${view.key}`;
+}
+
 export function isBlankApp(spec: AppSpec): boolean {
-  return !spec.types.some((type) => type.store === "local") && featuredViews(spec).length === 0;
+  return !spec.types.some((type) => !type.expose) && featuredViews(spec).length === 0;
 }
 
 export function isStatusPath(path: string): boolean {
@@ -55,11 +99,47 @@ export function isAmountPath(path: string): boolean {
 }
 
 export function statusVariant(value: string): "default" | "secondary" | "destructive" | "outline" {
-  const normalized = value.toLowerCase();
-  if (["overdue", "rejected", "failed"].includes(normalized)) return "destructive";
-  if (["paid", "complete", "completed", "active", "approved"].includes(normalized))
-    return "default";
+  const tone = statusTone(value);
+  if (tone === "danger") return "destructive";
+  if (tone === "success") return "default";
   return "secondary";
+}
+
+export type StatusTone = "success" | "danger" | "warning" | "info" | "neutral";
+
+export function statusTone(value: string): StatusTone {
+  const normalized = value.toLowerCase();
+  if (["overdue", "rejected", "failed", "suspended"].includes(normalized)) return "danger";
+  if (["paid", "complete", "completed", "active", "approved"].includes(normalized))
+    return "success";
+  if (["pending", "submitted", "sent"].includes(normalized)) return "warning";
+  if (["draft", "planned"].includes(normalized)) return "info";
+  return "neutral";
+}
+
+export function statusDotClass(value: string): string {
+  switch (statusTone(value)) {
+    case "success":
+      return "bg-emerald-500";
+    case "danger":
+      return "bg-red-500";
+    case "warning":
+      return "bg-amber-500";
+    case "info":
+      return "bg-sky-500";
+    default:
+      return "bg-muted-foreground/45";
+  }
+}
+
+export function formatMoney(value: unknown): string {
+  const numeric = typeof value === "number" ? value : Number(value);
+  if (Number.isNaN(numeric)) return "—";
+  return new Intl.NumberFormat(undefined, {
+    style: "currency",
+    currency: "GBP",
+    maximumFractionDigits: numeric % 1 === 0 ? 0 : 2,
+  }).format(numeric);
 }
 
 export function formatCell(path: string, value: unknown): string {
@@ -67,7 +147,9 @@ export function formatCell(path: string, value: unknown): string {
   if (typeof value === "boolean") return value ? "Yes" : "No";
   if (typeof value === "number" || isAmountPath(path)) {
     const numeric = typeof value === "number" ? value : Number(value);
-    if (!Number.isNaN(numeric)) return numeric.toLocaleString();
+    if (!Number.isNaN(numeric)) {
+      return isAmountPath(path) ? formatMoney(numeric) : numeric.toLocaleString();
+    }
   }
   if (typeof value === "string" && /^\d{4}-\d{2}-\d{2}/.test(value)) {
     const date = new Date(value);
@@ -79,6 +161,7 @@ export function formatCell(path: string, value: unknown): string {
       });
     }
   }
+  if (typeof value === "string" && isId(value)) return "—";
   if (typeof value === "string" && /^[a-z0-9]+(?:_[a-z0-9]+)*$/i.test(value)) {
     return labelFromKey(value);
   }
@@ -110,7 +193,7 @@ export function breadcrumbFor(path: string, spec?: AppSpec): Crumb[] {
       types: "Data",
       views: "Views",
       forms: "Forms",
-      flows: "Actions",
+      flows: "Rules",
       pages: "Pages",
       spec: "Export",
       actors: "People",

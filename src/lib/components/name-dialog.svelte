@@ -42,17 +42,19 @@
 
 <Dialog.Root bind:open>
 	<Dialog.Content>
-		<form class="flex flex-col gap-4" onsubmit={submit}>
+		<form onsubmit={submit}>
 			<Dialog.Header>
 				<Dialog.Title>{title}</Dialog.Title>
 				{#if description}
 					<Dialog.Description>{description}</Dialog.Description>
 				{/if}
 			</Dialog.Header>
-			<Field.Field>
-				<Field.Label>{label}</Field.Label>
-				<Input bind:value={name} />
-			</Field.Field>
+			<Dialog.Body>
+				<Field.Field>
+					<Field.Label>{label}</Field.Label>
+					<Input bind:value={name} />
+				</Field.Field>
+			</Dialog.Body>
 			<Dialog.Footer>
 				<Button type="button" variant="outline" onclick={() => (open = false)}>Cancel</Button>
 				<Button type="submit" disabled={pending || !name.trim()}>{confirm}</Button>

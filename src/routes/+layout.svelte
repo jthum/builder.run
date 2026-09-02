@@ -2,6 +2,7 @@
 	import "./layout.css";
 	import { onMount } from "svelte";
 	import { ModeWatcher } from "mode-watcher";
+	import { toneFromName } from "$lib/app/color.ts";
 	import { breadcrumbFor } from "$lib/app/labels.ts";
 	import { boot, session } from "$lib/app/session.svelte.ts";
 	import AppSidebar from "$lib/components/app-sidebar.svelte";
@@ -20,14 +21,15 @@
 
 	const crumbs = $derived(
 		page.url.pathname === "/"
-			? [{ label: session.snapshot?.workspace.name ?? "Home" }]
+			? [{ label: session.snapshot?.app.name ?? "Home" }]
 			: breadcrumbFor(page.url.pathname, session.snapshot?.spec),
 	);
 	const docTitle = $derived(
 		page.url.pathname === "/"
-			? `${session.snapshot?.workspace.name ?? "builder.run"}`
-			: `${crumbs.at(-1)?.label ?? "builder.run"} · ${session.snapshot?.workspace.name ?? "builder.run"}`,
+			? `${session.snapshot?.app.name ?? "builder.run"}`
+			: `${crumbs.at(-1)?.label ?? "builder.run"} · ${session.snapshot?.app.name ?? "builder.run"}`,
 	);
+	const appTone = $derived(toneFromName(session.snapshot?.app.name ?? "builder.run"));
 </script>
 
 <svelte:head>
@@ -41,18 +43,20 @@
 {#if !session.ready && !session.error}
 	<div class="flex min-h-svh items-center justify-center gap-2 text-muted-foreground">
 		<Spinner />
-		Opening your workspace
+		Opening your space
 	</div>
 {:else if session.error}
 	<div class="flex min-h-svh items-center justify-center p-6">
 		<p class="text-destructive">{session.error}</p>
 	</div>
 {:else}
-	<Sidebar.Provider>
+	<Sidebar.Provider
+		style="--app-gradient: {appTone.gradient}; --app-hue: {appTone.hue}; --app-accent: {appTone.accent}"
+	>
 		<AppSidebar />
 		<Sidebar.Inset>
 			<header class="flex h-16 shrink-0 items-center gap-2">
-				<div class="flex items-center gap-2 px-4">
+				<div class="flex items-center gap-2 px-6 md:px-8">
 					<Sidebar.Trigger class="-ms-1" />
 					<Separator orientation="vertical" class="me-2 data-[orientation=vertical]:h-4" />
 					<Breadcrumb.Root>
@@ -73,7 +77,7 @@
 					</Breadcrumb.Root>
 				</div>
 			</header>
-			<div class="flex flex-1 flex-col gap-4 p-4 pt-0">
+			<div class="flex flex-1 flex-col gap-4 px-6 py-4 pt-0 md:px-8">
 				{@render children()}
 			</div>
 		</Sidebar.Inset>

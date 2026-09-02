@@ -1,0 +1,83 @@
+<script lang="ts">
+	import { listHref } from "$lib/app/labels.ts";
+	import { runtime, session } from "$lib/app/session.svelte.ts";
+	import RecordForm from "$lib/components/record-form.svelte";
+	import RecordTable from "$lib/components/record-table.svelte";
+	import StatCard from "$lib/components/stat-card.svelte";
+	import { Button } from "$lib/components/ui/button/index.js";
+	import ViewCards from "$lib/components/view-cards.svelte";
+	import ViewList from "$lib/components/view-list.svelte";
+	import type { PageBlock } from "$lib/runtime/model.ts";
+	import { toast } from "svelte-sonner";
+
+	let {
+		block,
+		rows,
+		ready = true,
+	}: {
+		block: PageBlock;
+		rows: Record<string, Array<Record<string, unknown>>>;
+		ready?: boolean;
+	} = $props();
+
+	const spec = $derived(session.snapshot?.spec);
+	const values = $derived(block.kind === "widget" ? (block.values ?? {}) : {});
+	const widget = $derived(block.kind === "widget" ? block.widget : "");
+	const viewKey = $derived(String(values.view ?? ""));
+	const view = $derived(spec?.views.find((item) => item.key === viewKey));
+	const type = $derived(spec?.types.find((item) => item.key === view?.source));
+	const form = $derived(spec?.forms.find((item) => item.key === String(values.form ?? "")));
+	const formType = $derived(spec?.types.find((item) => item.key === form?.type));
+	const viewRows = $derived(viewKey ? (rows[viewKey] ?? []) : []);
+
+	async function runFlow() {
+		const flow = String(values.flow ?? "");
+		if (!flow) return;
+		await runtime().invoke(flow, {});
+		toast.success(String(values.label || "Done"));
+	}
+</script>
+
+{#if widget === "heading"}
+	<div class="flex flex-col gap-1">
+		<h2 class="text-lg font-medium">{String(values.title ?? "Heading")}</h2>
+		{#if values.description}
+			<p class="max-w-2xl text-muted-foreground">{String(values.description)}</p>
+		{/if}
+	</div>
+{:else if widget === "text"}
+	<p class="max-w-2xl text-muted-foreground whitespace-pre-wrap">{String(values.text ?? "")}</p>
+{:else if widget === "stat" && view}
+	<StatCard
+		label={view.label}
+		count={viewRows.length}
+		href={listHref(view)}
+		source={view.source}
+		{ready}
+	/>
+{:else if widget === "table" && view}
+	<RecordTable
+		rows={ready ? viewRows : null}
+		{view}
+		typeKey={view.source}
+		title={view.label}
+		compact={Boolean(values.compact)}
+		actionHref={listHref(view)}
+		actionLabel="View all"
+		createHref={values.compact ? undefined : `/t/${view.source}/new`}
+	/>
+{:else if widget === "cards" && view}
+	<ViewCards rows={ready ? viewRows : null} {view} {type} />
+{:else if widget === "list" && view}
+	<ViewList rows={ready ? viewRows : null} {view} {type} />
+{:else if widget === "form" && form && formType}
+	<RecordForm type={formType} {form} fields={form.fields} />
+{:else if widget === "action"}
+	<Button onclick={runFlow}>{String(values.label || "Run")}</Button>
+{:else if widget === "stat" || widget === "table" || widget === "cards" || widget === "list"}
+	<p class="text-sm text-muted-foreground">Pick a view for this widget.</p>
+{:else if widget === "form"}
+	<p class="text-sm text-muted-foreground">Pick a form for this widget.</p>
+{:else if widget}
+	<p class="text-sm text-muted-foreground">This widget isn't available yet.</p>
+{/if}

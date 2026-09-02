@@ -43,3 +43,16 @@ export function runtime(): Host {
   if (!session.host) throw new Error("builder.run runtime is not ready");
   return session.host;
 }
+
+export const chrome: {
+  newAppOpen: boolean;
+  newAppPreset: string;
+} = $state({
+  newAppOpen: false,
+  newAppPreset: "",
+});
+
+export function openNewApp(preset = "") {
+  chrome.newAppPreset = preset;
+  chrome.newAppOpen = true;
+}

@@ -1,99 +1,111 @@
 <script lang="ts">
+	import { goto } from "$app/navigation";
 	import { runtime, session } from "$lib/app/session.svelte.ts";
+	import AppSelect from "$lib/components/app-select.svelte";
+	import PageHeader from "$lib/components/page-header.svelte";
+	import RecordForm from "$lib/components/record-form.svelte";
+	import * as AlertDialog from "$lib/components/ui/alert-dialog/index.js";
 	import { Button } from "$lib/components/ui/button/index.js";
 	import { Checkbox } from "$lib/components/ui/checkbox/index.js";
 	import * as Field from "$lib/components/ui/field/index.js";
 	import { Input } from "$lib/components/ui/input/index.js";
-	import * as NativeSelect from "$lib/components/ui/native-select/index.js";
-	import { slugify } from "$lib/runtime/ids.ts";
 	import type { FormDef } from "$lib/runtime/model.ts";
 	import { toast } from "svelte-sonner";
 
+	let { form }: { form: FormDef } = $props();
+
 	const spec = $derived(session.snapshot?.spec);
 	const types = $derived(spec?.types ?? []);
-	const forms = $derived(spec?.forms ?? []);
 	const flows = $derived(spec?.flows ?? []);
 
-	let key = $state("");
 	let label = $state("");
 	let typeKey = $state("");
-	let mode = $state<FormDef["mode"]>("create");
+	let mode = $state("create");
 	let selected = $state<string[]>([]);
 	let submitFlow = $state("");
-
-	const sourceType = $derived(types.find((type) => type.key === typeKey));
+	let deleteOpen = $state(false);
 
 	$effect(() => {
-		if (!typeKey && types[0]) typeKey = types[0].key;
+		label = form.label;
+		typeKey = form.type;
+		mode = form.mode;
+		selected = [...form.fields];
+		submitFlow = form.submit?.flow ?? "";
 	});
 
+	const sourceType = $derived(
+		types.find((item) => item.key === typeKey) ?? types.find((item) => item.key === form.type),
+	);
+
 	function toggle(field: string, on: boolean) {
-		selected = on ? [...selected.filter((item) => item !== field), field] : selected.filter((item) => item !== field);
+		selected = on
+			? selected.includes(field)
+				? selected
+				: [...selected, field]
+			: selected.filter((item) => item !== field);
 	}
 
-	async function create() {
+	async function save() {
 		await runtime().upsertForm({
-			key: key || slugify(label),
+			key: form.key,
+			id: form.id,
 			label,
 			type: typeKey,
-			mode,
+			mode: mode as FormDef["mode"],
 			fields: selected.length ? selected : (sourceType?.fields.map((field) => field.key) ?? []),
 			submit: submitFlow ? { flow: submitFlow } : undefined,
+			implicit: form.implicit,
 		});
-		key = "";
-		label = "";
-		selected = [];
-		submitFlow = "";
 		toast.success("Form saved");
+	}
+
+	async function remove() {
+		await runtime().deleteForm(form.key);
+		toast.success("Form deleted");
+		await goto("/build/forms");
 	}
 </script>
 
-<div class="flex flex-col gap-6">
-	<div>
-		<h1 class="text-2xl font-semibold">Forms</h1>
-		<p class="text-muted-foreground">Screens for adding and editing. Each kind of record already has a built-in pair.</p>
-	</div>
-	<div class="flex flex-col gap-2">
-		{#each forms as form (form.id)}
-			<a class="rounded-lg border px-3 py-2 hover:bg-muted/50" href="/build/forms/{form.key}">
-				<div class="font-medium">{form.label}</div>
-				<div class="text-sm text-muted-foreground">
-					{form.mode === "create" ? "Add" : "Edit"}
-					{types.find((type) => type.key === form.type)?.label ?? form.type}
-					{form.implicit ? " · built-in" : ""}
-				</div>
-			</a>
-		{/each}
-	</div>
-	<div class="max-w-xl">
+<div class="flex flex-col gap-8">
+	<PageHeader
+		title={label || form.label}
+		description={mode === "create" ? "Shown when someone adds a record." : "Shown when someone edits a record."}
+	>
+		{#snippet actions()}
+			<Button onclick={save}>Save</Button>
+			{#if !form.implicit}
+				<Button variant="ghost" onclick={() => (deleteOpen = true)}>Delete</Button>
+			{/if}
+		{/snippet}
+	</PageHeader>
+
+	<div class="grid gap-8 lg:grid-cols-[minmax(0,24rem)_1fr]">
 		<Field.Group>
 			<Field.Field>
-				<Field.Label>Label</Field.Label>
-				<Input bind:value={label} placeholder="New project" />
+				<Field.Label>Name</Field.Label>
+				<Input bind:value={label} />
 			</Field.Field>
 			<Field.Field>
-				<Field.Label>Key</Field.Label>
-				<Input bind:value={key} placeholder="new_project" />
+				<Field.Label>Record type</Field.Label>
+				<AppSelect
+					bind:value={typeKey}
+					options={types.map((type) => ({ value: type.key, label: type.label }))}
+				/>
 			</Field.Field>
 			<Field.Field>
-				<Field.Label>Type</Field.Label>
-				<NativeSelect.Root class="w-full" bind:value={typeKey}>
-					{#each types as type (type.id)}
-						<NativeSelect.Option value={type.key}>{type.label}</NativeSelect.Option>
-					{/each}
-				</NativeSelect.Root>
-			</Field.Field>
-			<Field.Field>
-				<Field.Label>Mode</Field.Label>
-				<NativeSelect.Root class="w-full" bind:value={mode}>
-					<NativeSelect.Option value="create">Create</NativeSelect.Option>
-					<NativeSelect.Option value="edit">Edit</NativeSelect.Option>
-					<NativeSelect.Option value="custom">Custom</NativeSelect.Option>
-				</NativeSelect.Root>
+				<Field.Label>Used for</Field.Label>
+				<AppSelect
+					bind:value={mode}
+					options={[
+						{ value: "create", label: "Adding" },
+						{ value: "edit", label: "Editing" },
+						{ value: "custom", label: "Custom" },
+					]}
+				/>
 			</Field.Field>
 			<Field.Field>
 				<Field.Label>Fields</Field.Label>
-				<div class="flex flex-col gap-2">
+				<div class="flex flex-col gap-2 rounded-xl border p-3">
 					{#each sourceType?.fields ?? [] as field (field.id)}
 						<Field.Field orientation="horizontal">
 							<Checkbox
@@ -106,15 +118,38 @@
 				</div>
 			</Field.Field>
 			<Field.Field>
-				<Field.Label>Submit flow</Field.Label>
-				<NativeSelect.Root class="w-full" bind:value={submitFlow}>
-					<NativeSelect.Option value="">Record save only</NativeSelect.Option>
-					{#each flows as flow (flow.id)}
-						<NativeSelect.Option value={flow.key}>{flow.label}</NativeSelect.Option>
-					{/each}
-				</NativeSelect.Root>
+				<Field.Label>After save</Field.Label>
+				<AppSelect
+					bind:value={submitFlow}
+					options={[
+						{ value: "", label: "Just save the record" },
+						...flows.map((item) => ({ value: item.key, label: item.label })),
+					]}
+				/>
 			</Field.Field>
-			<Button onclick={create}>Create form</Button>
 		</Field.Group>
+		<div class="flex min-w-0 flex-col gap-3">
+			<h2 class="text-sm font-medium text-muted-foreground">Preview</h2>
+			{#if sourceType}
+				<RecordForm
+					type={sourceType}
+					form={{ ...form, label, type: typeKey, mode: mode as FormDef["mode"], fields: selected }}
+					fields={selected}
+				/>
+			{/if}
+		</div>
 	</div>
 </div>
+
+<AlertDialog.Root bind:open={deleteOpen}>
+	<AlertDialog.Content>
+		<AlertDialog.Header>
+			<AlertDialog.Title>Delete {form.label}?</AlertDialog.Title>
+			<AlertDialog.Description>The custom form is removed. The built-in add/edit screens remain.</AlertDialog.Description>
+		</AlertDialog.Header>
+		<AlertDialog.Footer>
+			<AlertDialog.Cancel>Cancel</AlertDialog.Cancel>
+			<AlertDialog.Action variant="destructive" onclick={remove}>Delete</AlertDialog.Action>
+		</AlertDialog.Footer>
+	</AlertDialog.Content>
+</AlertDialog.Root>

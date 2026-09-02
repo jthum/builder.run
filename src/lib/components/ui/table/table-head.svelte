@@ -10,6 +10,14 @@
 	}: WithElementRef<HTMLThAttributes> = $props();
 </script>
 
-<th bind:this={ref} data-slot="table-head" class={cn("h-12 px-3 text-left align-middle font-medium whitespace-nowrap text-foreground [&:has([role=checkbox])]:pr-0", className)} {...restProps}>
+<th
+	bind:this={ref}
+	data-slot="table-head"
+	class={cn(
+		"h-11 bg-muted px-3.5 text-left align-middle text-xs font-medium tracking-wide whitespace-nowrap text-muted-foreground [&:has([role=checkbox])]:pr-0",
+		className
+	)}
+	{...restProps}
+>
 	{@render children?.()}
 </th>
