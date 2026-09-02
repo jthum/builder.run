@@ -310,6 +310,38 @@ export function pageHref(page: PageDef): string {
   return `/p/${page.key}`;
 }
 
+export function moveAuthoredPage(
+  pages: PageDef[],
+  fromKey: string,
+  target: { folder: string | null; beforeKey?: string },
+): PageDef[] {
+  const source = pages.find((page) => page.key === fromKey);
+  if (!source) return pages;
+  const next = pages.filter((page) => page.key !== fromKey).map((page) => ({ ...page }));
+  const moving: PageDef = { ...source, folder: target.folder || undefined };
+  if (!moving.folder) delete moving.folder;
+  if (target.beforeKey) {
+    const to = next.findIndex((page) => page.key === target.beforeKey);
+    if (to >= 0) next.splice(to, 0, moving);
+    else next.push(moving);
+    return next;
+  }
+  let insertAt = next.length;
+  if (target.folder) {
+    for (let i = next.length - 1; i >= 0; i--) {
+      if ((next[i]?.folder?.trim() || null) === target.folder) {
+        insertAt = i + 1;
+        break;
+      }
+    }
+  } else {
+    const firstFolder = next.findIndex((page) => Boolean(page.folder?.trim()));
+    insertAt = firstFolder < 0 ? next.length : firstFolder;
+  }
+  next.splice(insertAt, 0, moving);
+  return next;
+}
+
 export function groupPagesByFolder(
   pages: PageDef[],
 ): Array<{ folder: string | null; pages: PageDef[] }> {

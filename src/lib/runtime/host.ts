@@ -541,6 +541,22 @@ export class Host {
     await this.persistAndEmit();
   }
 
+  async replaceAuthoredPages(pages: PageDef[]): Promise<void> {
+    const spec = this.app().spec;
+    const keep = spec.pages.filter(
+      (page) => page.implicit || page.key === "home" || page.path === "/",
+    );
+    const authored = pages
+      .filter((page) => !page.implicit && page.key !== "home" && page.path !== "/")
+      .map((page) => ({
+        ...page,
+        folder: page.folder?.trim() || undefined,
+        blocks: JSON.parse(JSON.stringify(page.blocks ?? [])),
+      }));
+    this.app().spec = applyDefaults({ ...spec, pages: [...keep, ...authored] });
+    await this.persistAndEmit();
+  }
+
   async deletePage(key: string): Promise<void> {
     const spec = this.app().spec;
     this.app().spec = applyDefaults({

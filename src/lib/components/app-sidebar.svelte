@@ -14,23 +14,21 @@
 	import * as Sidebar from "$lib/components/ui/sidebar/index.js";
 	import ArrowLeftIcon from "@lucide/svelte/icons/arrow-left";
 	import BoxIcon from "@lucide/svelte/icons/box";
-	import BriefcaseIcon from "@lucide/svelte/icons/briefcase";
 	import Building2Icon from "@lucide/svelte/icons/building-2";
 	import CheckIcon from "@lucide/svelte/icons/check";
 	import ChevronsUpDownIcon from "@lucide/svelte/icons/chevrons-up-down";
 	import FileTextIcon from "@lucide/svelte/icons/file-text";
+	import FolderIcon from "@lucide/svelte/icons/folder";
 	import FormInputIcon from "@lucide/svelte/icons/form-input";
 	import LayersIcon from "@lucide/svelte/icons/layers";
 	import LayoutDashboardIcon from "@lucide/svelte/icons/layout-dashboard";
 	import PencilIcon from "@lucide/svelte/icons/pencil";
 	import PlusIcon from "@lucide/svelte/icons/plus";
-	import ReceiptIcon from "@lucide/svelte/icons/receipt";
 	import SearchIcon from "@lucide/svelte/icons/search";
 	import SettingsIcon from "@lucide/svelte/icons/settings";
 	import TableIcon from "@lucide/svelte/icons/table";
 	import UserIcon from "@lucide/svelte/icons/user";
 	import UsersIcon from "@lucide/svelte/icons/users";
-	import WalletIcon from "@lucide/svelte/icons/wallet";
 	import WorkflowIcon from "@lucide/svelte/icons/workflow";
 	import type { PageDef, TypeDef } from "$lib/runtime/model.ts";
 	import { authoredNavPages, groupPagesByFolder, pageHref } from "$lib/runtime/widgets.ts";
@@ -73,27 +71,17 @@
 		"/diagnostics": SearchIcon,
 	};
 
-	const typeIcons: Record<string, Component> = {
-		organisation: Building2Icon,
-		contact: UsersIcon,
-		project: BriefcaseIcon,
-		invoice: ReceiptIcon,
-		expense: WalletIcon,
-	};
-
 	const appTone = $derived(toneFromName(snap?.app.name ?? "App"));
 	const actorTone = $derived(toneFromName(snap?.actor.name ?? "You"));
 	const initial = $derived(initialsFromName(snap?.actor.name ?? "You"));
 </script>
 
 {#snippet recordLink(type: TypeDef)}
-	{@const Icon = typeIcons[type.key] ?? BoxIcon}
 	<Sidebar.MenuSubItem>
 		<Sidebar.MenuSubButton
 			href="/t/{type.key}"
 			isActive={path === `/t/${type.key}` || path.startsWith(`/t/${type.key}/`)}
 		>
-			<Icon />
 			<span>{collectionLabel(type)}</span>
 		</Sidebar.MenuSubButton>
 	</Sidebar.MenuSubItem>
@@ -221,17 +209,23 @@
 					</Sidebar.MenuItem>
 					{#each pageGroups as group (group.folder ?? "__root")}
 						{#if group.folder}
-							<Sidebar.MenuItem>
-								<div
-									class="px-2 pt-2.5 pb-0.5 text-[10px] font-medium uppercase tracking-wider text-muted-foreground"
-								>
-									{group.folder}
-								</div>
-							</Sidebar.MenuItem>
+							<SidebarNavGroup label={group.folder} icon={FolderIcon}>
+								{#each group.pages as item (item.id)}
+									<Sidebar.MenuSubItem>
+										<Sidebar.MenuSubButton
+											href={pageHref(item)}
+											isActive={path === pageHref(item) || path.startsWith(`${pageHref(item)}/`)}
+										>
+											<span>{item.label}</span>
+										</Sidebar.MenuSubButton>
+									</Sidebar.MenuSubItem>
+								{/each}
+							</SidebarNavGroup>
+						{:else}
+							{#each group.pages as item (item.id)}
+								{@render pageLink(item)}
+							{/each}
 						{/if}
-						{#each group.pages as item (item.id)}
-							{@render pageLink(item)}
-						{/each}
 					{/each}
 					{#if views.length}
 						<SidebarNavGroup label="Views" icon={TableIcon}>

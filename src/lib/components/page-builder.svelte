@@ -5,7 +5,6 @@
 	import PageHeader from "$lib/components/page-header.svelte";
 	import * as AlertDialog from "$lib/components/ui/alert-dialog/index.js";
 	import { Button } from "$lib/components/ui/button/index.js";
-	import * as Card from "$lib/components/ui/card/index.js";
 	import * as Dialog from "$lib/components/ui/dialog/index.js";
 	import * as DropdownMenu from "$lib/components/ui/dropdown-menu/index.js";
 	import * as Empty from "$lib/components/ui/empty/index.js";
@@ -13,9 +12,10 @@
 	import { Input } from "$lib/components/ui/input/index.js";
 	import { uniqueKey } from "$lib/runtime/ids.ts";
 	import type { PageDef } from "$lib/runtime/model.ts";
-	import { authoredNavPages, groupPagesByFolder, pageHref } from "$lib/runtime/widgets.ts";
+	import { authoredNavPages, groupPagesByFolder, moveAuthoredPage, pageHref } from "$lib/runtime/widgets.ts";
 	import EllipsisIcon from "@lucide/svelte/icons/ellipsis";
 	import FolderIcon from "@lucide/svelte/icons/folder";
+	import GripVerticalIcon from "@lucide/svelte/icons/grip-vertical";
 	import LayersIcon from "@lucide/svelte/icons/layers";
 	import PlusIcon from "@lucide/svelte/icons/plus";
 	import { toast } from "svelte-sonner";
@@ -34,6 +34,8 @@
 	let folderOpen = $state(false);
 	let removePage = $state<PageDef | null>(null);
 	let pending = $state(false);
+	let dragKey = $state<string | null>(null);
+	let over = $state<string | null>(null);
 
 	function openCreate(folder = "") {
 		createName = "";
@@ -104,12 +106,36 @@
 		toast.success("Page deleted");
 		removePage = null;
 	}
+
+	function onDragStart(key: string, event: DragEvent) {
+		dragKey = key;
+		event.dataTransfer?.setData("text/plain", key);
+		if (event.dataTransfer) event.dataTransfer.effectAllowed = "move";
+	}
+
+	function onDragOver(id: string, event: DragEvent) {
+		event.preventDefault();
+		over = id;
+	}
+
+	async function dropOn(target: { folder: string | null; beforeKey?: string }) {
+		if (!dragKey) return;
+		const next = moveAuthoredPage(pages, dragKey, target);
+		dragKey = null;
+		over = null;
+		await runtime().replaceAuthoredPages(next);
+	}
+
+	function endDrag() {
+		dragKey = null;
+		over = null;
+	}
 </script>
 
 <div class="flex flex-col gap-6">
 	<PageHeader
 		title="Pages"
-		description="The main screens in this app. Group them into folders for the menu under Home."
+		description="Drag to reorder. Drop onto a folder to group. These screens show under Home."
 	>
 		{#snippet actions()}
 			<Button onclick={() => openCreate()}>
@@ -134,12 +160,32 @@
 			</Empty.Content>
 		</Empty.Root>
 	{:else}
-		<div class="flex flex-col gap-6">
+		<div class="flex flex-col gap-4">
+			{#if folders.length}
+				<div
+					role="listitem"
+					class="rounded-xl border border-dashed px-3 py-2 text-sm text-muted-foreground {over === 'root'
+						? 'border-primary bg-primary/5 text-foreground'
+						: ''}"
+					ondragover={(event) => onDragOver("root", event)}
+					ondrop={() => dropOn({ folder: null })}
+				>
+					Drop here to keep a page under Home, outside a folder.
+				</div>
+			{/if}
 			{#each groups as group (group.folder ?? "__root")}
 				<div class="flex flex-col gap-2">
 					{#if group.folder}
-						<div class="flex items-center justify-between gap-2">
-							<h2 class="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+						<div
+							class="flex items-center justify-between gap-2 rounded-xl px-1 py-1 {over ===
+							`folder:${group.folder}`
+								? 'bg-primary/5 ring-1 ring-primary/40'
+								: ''}"
+							ondragover={(event) => onDragOver(`folder:${group.folder}`, event)}
+							ondrop={() => dropOn({ folder: group.folder })}
+						>
+							<h2 class="flex items-center gap-2 text-sm font-medium">
+								<FolderIcon class="size-4 text-muted-foreground" />
 								{group.folder}
 							</h2>
 							<Button variant="ghost" size="xs" onclick={() => openCreate(group.folder ?? "")}>
@@ -148,54 +194,70 @@
 							</Button>
 						</div>
 					{/if}
-					<div class="flex flex-col gap-2">
+					<div class="flex flex-col gap-2" role="list">
 						{#each group.pages as item (item.id)}
-							<Card.Root size="sm" class="transition-colors hover:bg-foreground/[0.04]">
-								<Card.Header class="flex-row items-start justify-between gap-3">
-									<a href={pageHref(item)} class="min-w-0 flex-1 rounded-md outline-none focus-visible:ring-2 focus-visible:ring-ring">
-										<Card.Title>{item.label}</Card.Title>
-										<Card.Description>
-											{item.folder ? item.folder : "In the menu under Home"}
-										</Card.Description>
-									</a>
-									<DropdownMenu.Root>
-										<DropdownMenu.Trigger>
-											{#snippet child({ props })}
-												<Button variant="ghost" size="icon-sm" {...props} aria-label="Page actions">
-													<EllipsisIcon />
-												</Button>
-											{/snippet}
-										</DropdownMenu.Trigger>
-										<DropdownMenu.Content align="end">
-											<DropdownMenu.Item onSelect={() => goto(pageHref(item))}>Open</DropdownMenu.Item>
-											<DropdownMenu.Sub>
-												<DropdownMenu.SubTrigger>
-													<FolderIcon />
-													Folder
-												</DropdownMenu.SubTrigger>
-												<DropdownMenu.SubContent>
-													<DropdownMenu.Item onSelect={() => setFolder(item, "")}>
-														No folder
+							<div
+								role="listitem"
+								class="flex items-center gap-2 rounded-2xl bg-card px-2 py-2 ring-1 ring-foreground/10 {dragKey ===
+								item.key
+									? 'opacity-50'
+									: ''} {over === `page:${item.key}` ? 'ring-primary/50' : ''}"
+								ondragover={(event) => onDragOver(`page:${item.key}`, event)}
+								ondrop={() => dropOn({ folder: item.folder ?? null, beforeKey: item.key })}
+								ondragend={endDrag}
+							>
+								<button
+									type="button"
+									class="cursor-grab px-1 text-muted-foreground hover:text-foreground active:cursor-grabbing"
+									draggable="true"
+									aria-label="Drag to reorder"
+									ondragstart={(event) => onDragStart(item.key, event)}
+								>
+									<GripVerticalIcon class="size-4" />
+								</button>
+								<a href={pageHref(item)} class="min-w-0 flex-1 rounded-md outline-none focus-visible:ring-2 focus-visible:ring-ring">
+									<div class="font-medium">{item.label}</div>
+									<div class="text-sm text-muted-foreground">
+										{item.folder ? item.folder : "Under Home"}
+									</div>
+								</a>
+								<DropdownMenu.Root>
+									<DropdownMenu.Trigger>
+										{#snippet child({ props })}
+											<Button variant="ghost" size="icon-sm" {...props} aria-label="Page actions">
+												<EllipsisIcon />
+											</Button>
+										{/snippet}
+									</DropdownMenu.Trigger>
+									<DropdownMenu.Content align="end">
+										<DropdownMenu.Item onSelect={() => goto(pageHref(item))}>Open</DropdownMenu.Item>
+										<DropdownMenu.Sub>
+											<DropdownMenu.SubTrigger>
+												<FolderIcon />
+												Folder
+											</DropdownMenu.SubTrigger>
+											<DropdownMenu.SubContent>
+												<DropdownMenu.Item onSelect={() => setFolder(item, "")}>
+													No folder
+												</DropdownMenu.Item>
+												{#each folders as name (name)}
+													<DropdownMenu.Item onSelect={() => setFolder(item, name)}>
+														{name}
 													</DropdownMenu.Item>
-													{#each folders as name (name)}
-														<DropdownMenu.Item onSelect={() => setFolder(item, name)}>
-															{name}
-														</DropdownMenu.Item>
-													{/each}
-													<DropdownMenu.Separator />
-													<DropdownMenu.Item onSelect={() => openNewFolder(item)}>
-														New folder…
-													</DropdownMenu.Item>
-												</DropdownMenu.SubContent>
-											</DropdownMenu.Sub>
-											<DropdownMenu.Separator />
-											<DropdownMenu.Item variant="destructive" onSelect={() => (removePage = item)}>
-												Delete
-											</DropdownMenu.Item>
-										</DropdownMenu.Content>
-									</DropdownMenu.Root>
-								</Card.Header>
-							</Card.Root>
+												{/each}
+												<DropdownMenu.Separator />
+												<DropdownMenu.Item onSelect={() => openNewFolder(item)}>
+													New folder…
+												</DropdownMenu.Item>
+											</DropdownMenu.SubContent>
+										</DropdownMenu.Sub>
+										<DropdownMenu.Separator />
+										<DropdownMenu.Item variant="destructive" onSelect={() => (removePage = item)}>
+											Delete
+										</DropdownMenu.Item>
+									</DropdownMenu.Content>
+								</DropdownMenu.Root>
+							</div>
 						{/each}
 					</div>
 				</div>

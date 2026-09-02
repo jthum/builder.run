@@ -4,6 +4,7 @@ import {
   appendInGroup,
   collectViewKeys,
   groupPagesByFolder,
+  moveAuthoredPage,
   implicitHomePage,
   insertBlock,
   normalizeBlock,
@@ -12,6 +13,24 @@ import {
 } from "./widgets.ts";
 
 describe("page folders", () => {
+  it("moves a page before another and into a folder", () => {
+    expect.hasAssertions();
+    const pages = [
+      { key: "a", label: "A" },
+      { key: "b", label: "B" },
+      { key: "c", label: "C", folder: "Ops" },
+    ] as PageDef[];
+    const intoOps = moveAuthoredPage(pages, "a", { folder: "Ops", beforeKey: "c" });
+    expect(intoOps.map((page) => [page.key, page.folder ?? null])).toEqual([
+      ["b", null],
+      ["a", "Ops"],
+      ["c", "Ops"],
+    ]);
+    const toTop = moveAuthoredPage(intoOps, "c", { folder: null });
+    expect(toTop.map((page) => page.key)).toEqual(["b", "c", "a"]);
+    expect(toTop.find((page) => page.key === "c")?.folder).toBeUndefined();
+  });
+
   it("groups authored pages with ungrouped first, then folders in order", () => {
     expect.hasAssertions();
     const pages = [
