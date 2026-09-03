@@ -10,6 +10,7 @@ import type { TableEngine } from "./engine.ts";
 import { invokeFlow, matchingTriggers, type FlowRun } from "./flows.ts";
 import { createId, labelFromKey, slugify } from "./ids.ts";
 import {
+  cloneData,
   cloneSpec,
   normalizeSpec,
   type Actor,
@@ -21,12 +22,13 @@ import {
   type PageDef,
   type RecordValue,
   type TypeDef,
+  type TypeDraft,
   type ViewDef,
   isExposed,
 } from "./model.ts";
 import { readPlatformJson, type PersistenceBackend } from "./persist.ts";
 import type { PlatformState, SpaceState } from "./platform.ts";
-import { executeView, findType, type QueryContext } from "./query.ts";
+import { executeView, findType, type QueryContext, type ViewRunContext } from "./query.ts";
 import {
   createRecord,
   decodeRecord,
@@ -37,6 +39,7 @@ import {
 import { newAppSpec, rootSpaceSpec, sampleApps } from "./samples.ts";
 import { reconcileStore } from "./schema.ts";
 import { specFromText, specToJson, specToYaml } from "./serialize.ts";
+import { normalizeBlockList } from "./widgets.ts";
 import { SqliteEngine } from "./sql-engine.ts";
 import { openSqlGateway, type SqlConnection, type SqlGateway } from "./sql-gateway.ts";
 
@@ -224,11 +227,11 @@ export class Host {
       backend: this.backend,
       engine: "sqlite",
       webmcp: typeof document !== "undefined" && Boolean(document.modelContext),
-      space,
-      app,
+      space: cloneData(space),
+      app: cloneData(app),
       spec: this.resolvedSpec(),
-      sharedTypes: space.spec.types.filter(isExposed),
-      actor: this.actor(),
+      sharedTypes: cloneData(space.spec.types.filter(isExposed)),
+      actor: cloneData(this.actor()),
       spaces: this.platform.spaces
         .filter((item) => item.actors.length > 0)
         .map((item) => ({ id: item.id, name: item.name })),
@@ -284,13 +287,24 @@ export class Host {
   }
 
   async create(typeKey: string, values: Record<string, unknown>): Promise<RecordValue> {
-    const result = await createRecord(this.queryContext(), typeKey, values, this.context());
+    const result = await createRecord(
+      this.queryContext(),
+      typeKey,
+      cloneData(values),
+      this.context(),
+    );
     await this.afterChanges([result.change]);
     return result.record;
   }
 
   async update(typeKey: string, id: string, values: Record<string, unknown>): Promise<RecordValue> {
-    const result = await updateRecord(this.queryContext(), typeKey, id, values, this.context());
+    const result = await updateRecord(
+      this.queryContext(),
+      typeKey,
+      id,
+      cloneData(values),
+      this.context(),
+    );
     await this.afterChanges([result.change]);
     return result.record;
   }
@@ -301,13 +315,19 @@ export class Host {
   }
 
   async queryView(
-    viewKey: string,
+    view: string | ViewDef,
     expose?: Record<string, unknown>,
+    context?: ViewRunContext,
   ): Promise<Array<Record<string, unknown>>> {
-    const spec = this.resolvedSpec();
-    const view = spec.views.find((item) => item.key === viewKey);
-    if (!view) return [];
-    return executeView(this.queryContext(), view, expose);
+    const resolved =
+      typeof view === "string" ? this.resolvedSpec().views.find((item) => item.key === view) : view;
+    if (!resolved) return [];
+    return executeView(
+      this.queryContext(),
+      typeof view === "string" ? resolved : cloneData(resolved),
+      expose ? cloneData(expose) : expose,
+      context ? cloneData(context) : context,
+    );
   }
 
   async invoke(flowKey: string, input: Record<string, unknown> = {}): Promise<FlowRun> {
@@ -315,7 +335,7 @@ export class Host {
     const flow = spec.flows.find((item) => item.key === flowKey);
     if (!flow) throw new Error(`Unknown flow ${flowKey}`);
     const ctx = this.queryContext();
-    const run = await invokeFlow(ctx, flow, input, this.context(), {
+    const run = await invokeFlow(ctx, flow, cloneData(input), this.context(), {
       getFlow: (key) => spec.flows.find((item) => item.key === key),
       guard: new Set(),
     });
@@ -348,7 +368,8 @@ export class Host {
     await this.persistAndEmit();
   }
 
-  async upsertType(draft: Partial<TypeDef> & { key: string }): Promise<TypeDef> {
+  async upsertType(draft: TypeDraft & { key: string }): Promise<TypeDef> {
+    draft = cloneData(draft);
     const expose = Boolean(draft.expose) || draft.store === "shared";
     const target = expose ? this.space() : this.app();
     const spec = target.spec;
@@ -426,6 +447,7 @@ export class Host {
     typeKey: string,
     field: Partial<FieldDef> & { key: string },
   ): Promise<FieldDef> {
+    field = cloneData(field);
     const type = this.findWritableType(typeKey);
     const existing = type.fields.find((item) => item.key === field.key);
     const next = existing
@@ -448,6 +470,7 @@ export class Host {
   }
 
   async reorderFields(typeKey: string, keys: string[]): Promise<TypeDef> {
+    keys = cloneData(keys);
     const type = this.findWritableType(typeKey);
     const map = new Map(type.fields.map((field) => [field.key, field]));
     const next = keys
@@ -462,13 +485,17 @@ export class Host {
   }
 
   async upsertView(draft: Partial<ViewDef> & { key: string }): Promise<ViewDef> {
+    draft = cloneData(draft);
     const spec = this.app().spec;
+    const existing = spec.views.find((view) => view.key === draft.key);
     const views = upsertNamed(spec.views, {
-      id: createId("vw"),
+      id: existing?.id || createId("vw"),
       label: labelFromKey(draft.key),
       source: "",
       fields: [],
+      ...existing,
       ...draft,
+      implicit: false,
     });
     this.app().spec = applyDefaults({ ...spec, views });
     await this.persistAndEmit();
@@ -476,14 +503,18 @@ export class Host {
   }
 
   async upsertForm(draft: Partial<FormDef> & { key: string }): Promise<FormDef> {
+    draft = cloneData(draft);
     const spec = this.app().spec;
+    const existing = spec.forms.find((form) => form.key === draft.key);
     const forms = upsertNamed(spec.forms, {
-      id: createId("frm"),
+      id: existing?.id || createId("frm"),
       label: labelFromKey(draft.key),
       type: "",
       fields: [],
       mode: "custom",
+      ...existing,
       ...draft,
+      implicit: false,
     } as FormDef);
     this.app().spec = applyDefaults({ ...spec, forms });
     await this.persistAndEmit();
@@ -491,6 +522,7 @@ export class Host {
   }
 
   async upsertFlow(draft: Partial<FlowDef> & { key: string }): Promise<FlowDef> {
+    draft = cloneData(draft);
     const spec = this.app().spec;
     const flows = upsertNamed(spec.flows, {
       id: createId("flw"),
@@ -504,16 +536,20 @@ export class Host {
   }
 
   async upsertPage(draft: Partial<PageDef> & { key: string }): Promise<PageDef> {
+    draft = cloneData(draft);
     const spec = this.app().spec;
     const existing = spec.pages.find((page) => page.key === draft.key);
-    const folder = draft.folder !== undefined ? draft.folder.trim() || undefined : existing?.folder;
+    const folder = draft.folder !== undefined ? folderName(draft.folder) : existing?.folder;
     const pages = upsertNamed(spec.pages, {
       id: existing?.id || createId("pg"),
       label: labelFromKey(draft.key),
       ...existing,
       ...draft,
       folder,
-      blocks: JSON.parse(JSON.stringify(draft.blocks ?? existing?.blocks ?? [])),
+      implicit: false,
+      blocks: normalizeBlockList(
+        draft.blocks !== undefined ? draft.blocks : (existing?.blocks ?? []),
+      ),
     });
     this.app().spec = applyDefaults({ ...spec, pages });
     await this.persistAndEmit();
@@ -545,6 +581,7 @@ export class Host {
   }
 
   async replaceAuthoredPages(pages: PageDef[]): Promise<void> {
+    pages = cloneData(pages);
     const spec = this.app().spec;
     const keep = spec.pages.filter(
       (page) => page.implicit || page.key === "home" || page.path === "/",
@@ -554,7 +591,7 @@ export class Host {
       .map((page) => ({
         ...page,
         folder: page.folder?.trim() || undefined,
-        blocks: JSON.parse(JSON.stringify(page.blocks ?? [])),
+        blocks: cloneData(page.blocks ?? []),
       }));
     this.app().spec = applyDefaults({ ...spec, pages: [...keep, ...authored] });
     await this.persistAndEmit();
@@ -571,7 +608,7 @@ export class Host {
 
   async applySpec(input: unknown): Promise<AppSpec> {
     const workspace = this.app();
-    workspace.spec = applyDefaults(normalizeSpec(input as never, workspace.spec));
+    workspace.spec = applyDefaults(normalizeSpec(cloneData(input) as never, workspace.spec));
     await this.reconcileAll();
     await this.persistAndEmit();
     return this.resolvedSpec();
@@ -652,6 +689,7 @@ export class Host {
   }
 
   async updateActor(patch: { name?: string; email?: string }): Promise<Actor> {
+    patch = cloneData(patch);
     const actor = this.actor();
     if (patch.name != null) {
       const name = patch.name.trim();
@@ -786,6 +824,26 @@ export class Host {
     return { database: this.spaceFile(id), tables };
   }
 
+  /** Close stores and delete catalog, space files, and leftover IndexedDB on this device. */
+  async resetLocalData(): Promise<void> {
+    for (const engine of this.engines.values()) {
+      try {
+        if ("close" in engine && typeof engine.close === "function") {
+          await engine.close();
+        }
+      } catch (error) {
+        console.warn("builder.run close store failed", error);
+      }
+    }
+    this.engines.clear();
+    try {
+      await this.catalog.close();
+    } catch (error) {
+      console.warn("builder.run close catalog failed", error);
+    }
+    await this.gateway.wipe();
+  }
+
   private findWritableType(typeKey: string): TypeDef {
     const local = this.app().spec.types.find((type) => type.key === typeKey);
     if (local) return local;
@@ -793,6 +851,12 @@ export class Host {
     if (shared) return shared;
     throw new Error(`Unknown type ${typeKey}`);
   }
+}
+
+function folderName(value: unknown): string | undefined {
+  if (value == null || value === false) return undefined;
+  const text = String(value).trim();
+  return text || undefined;
 }
 
 function upsertNamed<T extends { key: string }>(list: T[], item: T): T[] {

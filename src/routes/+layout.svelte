@@ -9,8 +9,11 @@
 	import * as Breadcrumb from "$lib/components/ui/breadcrumb/index.js";
 	import * as Sidebar from "$lib/components/ui/sidebar/index.js";
 	import { Separator } from "$lib/components/ui/separator/index.js";
+	import { Button } from "$lib/components/ui/button/index.js";
+	import * as Empty from "$lib/components/ui/empty/index.js";
 	import { Spinner } from "$lib/components/ui/spinner/index.js";
 	import { Toaster } from "$lib/components/ui/sonner/index.js";
+	import RefreshCwIcon from "@lucide/svelte/icons/refresh-cw";
 	import { page } from "$app/state";
 
 	let { children } = $props();
@@ -47,7 +50,18 @@
 	</div>
 {:else if session.error}
 	<div class="flex min-h-svh items-center justify-center p-6">
-		<p class="text-destructive">{session.error}</p>
+		<Empty.Root class="max-w-md border-none">
+			<Empty.Header>
+				<Empty.Title>Couldn't open your space</Empty.Title>
+				<Empty.Description>{session.error}</Empty.Description>
+			</Empty.Header>
+			<Empty.Content>
+				<Button onclick={() => location.reload()}>
+					<RefreshCwIcon data-icon="inline-start" />
+					Reload
+				</Button>
+			</Empty.Content>
+		</Empty.Root>
 	</div>
 {:else}
 	<Sidebar.Provider

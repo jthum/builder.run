@@ -4,6 +4,8 @@ export type PersistenceBackend = "opfs" | "indexeddb" | "memory";
 const IDB_NAME = "builder-run";
 const IDB_STORE = "kv";
 const OPFS_FILE = "builder-run-platform.json";
+const SQLITE_OPFS_DIR = "builder-run-sqlite";
+const SQLITE_IDB_NAME = "builder-run-sqlite";
 
 export async function detectBackend(): Promise<PersistenceBackend> {
   if (typeof navigator !== "undefined" && navigator.storage?.getDirectory) {
@@ -91,4 +93,40 @@ function openIdb(): Promise<IDBDatabase> {
 
 export function resetMemorySlot(): void {
   memorySlot = null;
+}
+
+export async function wipeLocalData(): Promise<void> {
+  resetMemorySlot();
+  if (typeof navigator !== "undefined" && navigator.storage?.getDirectory) {
+    try {
+      const root = await navigator.storage.getDirectory();
+      await Promise.all([
+        root.removeEntry(OPFS_FILE).catch(() => undefined),
+        root.removeEntry(SQLITE_OPFS_DIR, { recursive: true }).catch(() => undefined),
+      ]);
+    } catch {
+      // OPFS unavailable
+    }
+  }
+  if (typeof indexedDB === "undefined") return;
+  const names = new Set([IDB_NAME, SQLITE_IDB_NAME]);
+  if (typeof indexedDB.databases === "function") {
+    try {
+      for (const info of await indexedDB.databases()) {
+        if (info.name?.startsWith("builder-run")) names.add(info.name);
+      }
+    } catch {
+      // Safari may not support databases()
+    }
+  }
+  await Promise.all([...names].map(deleteIndexedDb));
+}
+
+function deleteIndexedDb(name: string): Promise<void> {
+  return new Promise((resolve) => {
+    const request = indexedDB.deleteDatabase(name);
+    request.onsuccess = () => resolve();
+    request.onerror = () => resolve();
+    request.onblocked = () => resolve();
+  });
 }

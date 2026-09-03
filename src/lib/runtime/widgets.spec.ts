@@ -8,6 +8,7 @@ import {
   implicitHomePage,
   insertBlock,
   normalizeBlock,
+  normalizeBlockList,
   removeBlock,
   setBlock,
 } from "./widgets.ts";
@@ -62,6 +63,22 @@ describe("page widgets", () => {
       columns: 4,
       blocks: [],
     });
+  });
+
+  it("wraps a single nested block object so group.blocks.filter never throws", () => {
+    expect.hasAssertions();
+    const widget = { kind: "widget" as const, widget: "table", values: { view: "recent_time" } };
+    expect(normalizeBlockList([{ kind: "group", columns: 1, blocks: widget as never }])).toEqual([
+      {
+        kind: "group",
+        columns: 1,
+        blocks: [widget],
+      },
+    ]);
+    expect(normalizeBlockList(widget)).toEqual([widget]);
+    expect(normalizeBlockList(JSON.stringify([widget]))).toEqual([widget]);
+    expect(normalizeBlockList({ 0: widget })).toEqual([widget]);
+    expect(normalizeBlockList(undefined)).toEqual([]);
   });
 
   it("builds a home page of number cards and compact tables from featured views", () => {

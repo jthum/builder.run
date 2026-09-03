@@ -1,6 +1,13 @@
 import { createId, labelFromKey } from "./ids.ts";
-import type { AppSpec, FormDef, PageDef, TypeDef, ViewDef } from "./model.ts";
-import { firstViewKey, normalizeBlock } from "./widgets.ts";
+import {
+  cloneData,
+  type AppSpec,
+  type FormDef,
+  type PageDef,
+  type TypeDef,
+  type ViewDef,
+} from "./model.ts";
+import { firstViewKey, normalizeBlockList } from "./widgets.ts";
 
 export function implicitViewKey(typeKey: string): string {
   return `${typeKey}_list`;
@@ -84,7 +91,7 @@ export function defaultPageFor(type: TypeDef): PageDef {
 }
 
 export function applyDefaults(spec: AppSpec): AppSpec {
-  const next: AppSpec = structuredClone(spec);
+  const next: AppSpec = cloneData(spec);
   for (const type of next.types) {
     if (
       !next.views.some(
@@ -111,7 +118,7 @@ export function applyDefaults(spec: AppSpec): AppSpec {
     (form) => !form.implicit || next.types.some((type) => type.key === form.type),
   );
   for (const page of next.pages) {
-    page.blocks = (page.blocks ?? []).map(normalizeBlock);
+    page.blocks = normalizeBlockList(page.blocks);
   }
   next.pages = next.pages.filter((page) => {
     if (!page.implicit) return true;

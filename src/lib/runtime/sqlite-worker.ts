@@ -7,6 +7,7 @@ import { IDBBatchAtomicVFS } from "wa-sqlite/src/examples/IDBBatchAtomicVFS.js";
 import { MemoryAsyncVFS } from "wa-sqlite/src/examples/MemoryAsyncVFS.js";
 import asyncWasmUrl from "wa-sqlite/dist/wa-sqlite-async.wasm?url";
 import syncWasmUrl from "wa-sqlite/dist/wa-sqlite.wasm?url";
+import { STORAGE_LOCKED } from "./storage-lock.ts";
 
 const OPFS_DIR = "/builder-run-sqlite";
 const OPFS_CAPACITY = 24;
@@ -14,6 +15,7 @@ const OPFS_CAPACITY = 24;
 let sqlite3 = null;
 let backend = "memory";
 let selectedVfs = null;
+let vfsInstance = null;
 const dbs = new Map();
 
 async function boot() {
@@ -23,6 +25,7 @@ async function boot() {
     sqlite3 = opfs.sqlite;
     backend = "opfs";
     selectedVfs = opfs.vfsName;
+    vfsInstance = opfs.vfs;
     return sqlite3;
   }
   const module = await SQLiteAsyncFactory({
@@ -33,24 +36,46 @@ async function boot() {
   return sqlite3;
 }
 
+function isOpfsLockError(error) {
+  if (!error) return false;
+  const name = error.name ?? "";
+  const message = String(error.message ?? error);
+  return (
+    name === "NoModificationAllowedError" ||
+    name === "InvalidStateError" ||
+    name === "InvalidAccessError" ||
+    /access handle|already (?:open|opened)|exclusiv|locked|busy/i.test(message)
+  );
+}
+
 async function tryOpfs() {
   if (!globalThis.navigator?.storage?.getDirectory) return null;
-  try {
-    const module = await SQLiteSyncFactory({
-      locateFile: (file) => (String(file).endsWith(".wasm") ? syncWasmUrl : file),
-    });
-    const sqlite = Factory(module);
-    const vfs = new AccessHandlePoolVFS(OPFS_DIR);
-    await vfs.isReady;
-    const extra = OPFS_CAPACITY - vfs.getCapacity();
-    if (extra > 0) await vfs.addCapacity(extra);
-    sqlite.vfs_register(vfs, false);
-    await probe(sqlite, vfs.name);
-    return { sqlite, vfsName: vfs.name };
-  } catch (error) {
-    console.warn("builder.run opfs SQLite unavailable", error);
-    return null;
+  let lastError;
+  for (let attempt = 0; attempt < 8; attempt++) {
+    try {
+      const module = await SQLiteSyncFactory({
+        locateFile: (file) => (String(file).endsWith(".wasm") ? syncWasmUrl : file),
+      });
+      const sqlite = Factory(module);
+      const vfs = new AccessHandlePoolVFS(OPFS_DIR);
+      await vfs.isReady;
+      const extra = OPFS_CAPACITY - vfs.getCapacity();
+      if (extra > 0) await vfs.addCapacity(extra);
+      sqlite.vfs_register(vfs, false);
+      await probe(sqlite, vfs.name);
+      return { sqlite, vfsName: vfs.name, vfs };
+    } catch (error) {
+      lastError = error;
+      if (!isOpfsLockError(error) || attempt === 7) break;
+      await new Promise((resolve) => setTimeout(resolve, 50 * (attempt + 1)));
+    }
   }
+  if (isOpfsLockError(lastError)) {
+    console.warn("builder.run opfs SQLite locked; not falling back to IndexedDB", lastError);
+    throw new Error(STORAGE_LOCKED);
+  }
+  console.warn("builder.run opfs SQLite unavailable", lastError);
+  return null;
 }
 
 async function registerAsyncVfs(sqlite) {
@@ -74,6 +99,7 @@ async function registerAsyncVfs(sqlite) {
       sqlite.vfs_register(vfs, false);
       await probe(sqlite, vfs.name);
       selectedVfs = vfs.name;
+      vfsInstance = vfs;
       return candidate.backend;
     } catch (error) {
       lastError = error;
@@ -128,6 +154,49 @@ async function run(dbName, sql, params = []) {
       // drain
     }
   }
+}
+
+async function closeAll() {
+  if (sqlite3) {
+    for (const handle of dbs.values()) {
+      try {
+        await sqlite3.close(handle);
+      } catch (error) {
+        console.warn("builder.run sqlite close", error);
+      }
+    }
+    dbs.clear();
+  }
+  if (vfsInstance && typeof vfsInstance.close === "function") {
+    try {
+      await vfsInstance.close();
+    } catch (error) {
+      console.warn("builder.run vfs close", error);
+    }
+  }
+  vfsInstance = null;
+  selectedVfs = null;
+  sqlite3 = null;
+  backend = "memory";
+}
+
+async function removeOpfsTree(path) {
+  if (!globalThis.navigator?.storage?.getDirectory) return;
+  const root = await navigator.storage.getDirectory();
+  const top = String(path).split("/").filter(Boolean)[0];
+  if (!top) return;
+  try {
+    await root.removeEntry(top, { recursive: true });
+  } catch (error) {
+    if (error?.name !== "NotFoundError") {
+      console.warn("builder.run opfs wipe", error);
+    }
+  }
+}
+
+async function wipe() {
+  await closeAll();
+  await removeOpfsTree(OPFS_DIR);
 }
 
 async function query(dbName, sql, params = []) {
@@ -185,6 +254,11 @@ async function handleMessage(event) {
     if (method === "query") {
       const rows = await query(db, sql ?? "", params ?? []);
       self.postMessage({ id, result: rows });
+      return;
+    }
+    if (method === "wipe") {
+      await wipe();
+      self.postMessage({ id, result: true });
       return;
     }
     throw new Error(`Unknown SQLite worker method ${method}`);

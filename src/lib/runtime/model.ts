@@ -187,8 +187,8 @@ function isLegacySharedStore(value?: string): boolean {
   return value === "shared" || value === "directory";
 }
 
-type FieldDraft = FieldKind | (Partial<FieldDef> & { type?: FieldKind | string });
-type TypeDraft = Partial<Omit<TypeDef, "fields">> & {
+export type FieldDraft = FieldKind | (Partial<FieldDef> & { field_type?: string });
+export type TypeDraft = Partial<Omit<TypeDef, "fields">> & {
   fields?: Record<string, FieldDraft> | FieldDef[];
 };
 type SpecDraft = Partial<
@@ -208,12 +208,31 @@ function asEntries<T>(value: Record<string, T> | T[] | undefined): Array<[string
   return Object.entries(value);
 }
 
+function fieldKindFrom(
+  draft: Partial<FieldDef> & { field_type?: string },
+  existing?: FieldDef,
+): FieldKind {
+  const raw = draft.type || draft.field_type || existing?.type || "text";
+  return raw as FieldKind;
+}
+
+function fieldKeyFrom(mapKey: string | undefined, draft: FieldDraft): string {
+  const fromDraft =
+    typeof draft === "object" && draft && "key" in draft && draft.key ? String(draft.key) : "";
+  if (mapKey && !/^\d+$/.test(mapKey)) return mapKey;
+  if (fromDraft) return fromDraft;
+  if (mapKey) return mapKey;
+  const label =
+    typeof draft === "object" && draft && "label" in draft ? String(draft.label || "") : "";
+  return slugify(label || "field");
+}
+
 function normalizeField(key: string, draft: FieldDraft, existing?: FieldDef): FieldDef {
-  const objectDraft: Partial<FieldDef> =
+  const objectDraft: Partial<FieldDef> & { field_type?: string } =
     typeof draft === "string" ? { type: draft as FieldKind } : { ...draft };
-  const type = (objectDraft.type as FieldKind) || existing?.type || "text";
+  const type = fieldKindFrom(objectDraft, existing);
   if (!FIELD_KINDS.includes(type)) {
-    throw new Error(`Unknown field type "${String(objectDraft.type)}" on ${key}`);
+    throw new Error(`Unknown field type "${String(type)}" on ${key}`);
   }
   const field: FieldDef = {
     id: objectDraft.id || existing?.id || createId("fld"),
@@ -237,11 +256,9 @@ function normalizeField(key: string, draft: FieldDraft, existing?: FieldDef): Fi
 
 function normalizeType(key: string, draft: TypeDraft, existing?: TypeDef): TypeDef {
   const existingByKey = new Map((existing?.fields ?? []).map((field) => [field.key, field]));
-  const fields = asEntries(draft.fields).map(([fieldKey, fieldDraft]) => {
-    const resolvedKey =
-      fieldKey ||
-      (fieldDraft as FieldDef).key ||
-      slugify((fieldDraft as FieldDef).label || "field");
+  const fieldSource = draft.fields !== undefined ? draft.fields : existing?.fields;
+  const fields = asEntries(fieldSource as TypeDraft["fields"]).map(([fieldKey, fieldDraft]) => {
+    const resolvedKey = fieldKeyFrom(fieldKey, fieldDraft as FieldDraft);
     return normalizeField(resolvedKey, fieldDraft as FieldDraft, existingByKey.get(resolvedKey));
   });
   const expose =
@@ -325,8 +342,48 @@ export function normalizeSpec(input: SpecDraft | AppSpec, existing?: AppSpec): A
   return spec;
 }
 
+/**
+ * Deep-clone own data into plain objects/arrays.
+ * Walks through proxies (including Svelte `$state`) by reading properties,
+ * so the result is always structured-cloneable.
+ */
+export function cloneData<T>(value: T): T {
+  return walkClone(value, new Map()) as T;
+}
+
+function walkClone(value: unknown, seen: Map<unknown, unknown>): unknown {
+  if (value === null || typeof value !== "object") return value;
+  const cached = seen.get(value);
+  if (cached) return cached;
+  if (value instanceof Date) return new Date(value.getTime());
+  if (Array.isArray(value)) {
+    const copy: unknown[] = [];
+    seen.set(value, copy);
+    for (let index = 0; index < value.length; index++) {
+      if (index in value) copy[index] = walkClone(value[index], seen);
+    }
+    return copy;
+  }
+  const proto = Object.getPrototypeOf(value);
+  if (proto === Object.prototype || proto === null) {
+    const copy: Record<string, unknown> = {};
+    seen.set(value, copy);
+    for (const key of Object.keys(value)) {
+      copy[key] = walkClone((value as Record<string, unknown>)[key], seen);
+    }
+    return copy;
+  }
+  try {
+    const copy = structuredClone(value);
+    seen.set(value, copy);
+    return copy;
+  } catch {
+    return value;
+  }
+}
+
 export function cloneSpec(spec: AppSpec): AppSpec {
-  return structuredClone(spec);
+  return cloneData(spec);
 }
 
 export function typeByKey(spec: AppSpec, key: string): TypeDef | undefined {

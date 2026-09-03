@@ -9,6 +9,7 @@ export interface SqlConnection {
 export interface SqlGateway {
   readonly backend: PersistenceBackend;
   open(name: string): Promise<SqlConnection>;
+  wipe(): Promise<void>;
 }
 
 export async function openSqlGateway(): Promise<SqlGateway> {

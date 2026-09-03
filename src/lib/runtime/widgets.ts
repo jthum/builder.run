@@ -107,14 +107,14 @@ export function normalizeBlock(block: PageBlock): PageBlock {
     return {
       kind: "group",
       columns: clampColumns(block.columns),
-      blocks: normalizeBlockList(block.blocks ?? []),
+      blocks: normalizeBlockList(block.blocks),
     };
   }
   return { kind: "widget", widget: block.widget, values: { ...block.values } };
 }
 
 export function normalizePage(page: PageDef): PageDef {
-  return { ...page, blocks: (page.blocks ?? []).map(normalizeBlock) };
+  return { ...page, blocks: normalizeBlockList(page.blocks) };
 }
 
 export function clampColumns(value: unknown): number {
@@ -135,8 +135,38 @@ export function collectViewKeys(blocks: PageBlock[]): string[] {
   return [...new Set(keys)];
 }
 
-export function normalizeBlockList(blocks: PageBlock[]): PageBlock[] {
-  return blocks
+function isPageBlock(value: unknown): value is PageBlock {
+  if (!value || typeof value !== "object") return false;
+  const kind = (value as { kind?: unknown }).kind;
+  return kind === "widget" || kind === "group";
+}
+
+/** Coerce WebMCP/JSON payloads: a one-child group often arrives as an object, not `[object]`. */
+export function asBlockList(value: unknown): PageBlock[] {
+  if (value == null || value === false) return [];
+  if (typeof value === "string") {
+    const text = value.trim();
+    if (!text) return [];
+    try {
+      return asBlockList(JSON.parse(text) as unknown);
+    } catch {
+      return [];
+    }
+  }
+  if (Array.isArray(value)) return value as PageBlock[];
+  if (isPageBlock(value)) return [value];
+  if (typeof value === "object") {
+    const record = value as Record<string, unknown>;
+    const keys = Object.keys(record);
+    if (keys.length && keys.every((key) => /^\d+$/.test(key))) {
+      return keys.sort((a, b) => Number(a) - Number(b)).map((key) => record[key]) as PageBlock[];
+    }
+  }
+  return [];
+}
+
+export function normalizeBlockList(blocks: unknown): PageBlock[] {
+  return asBlockList(blocks)
     .filter((block) => block?.kind === "widget" || block?.kind === "group")
     .map(normalizeBlock);
 }

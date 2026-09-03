@@ -97,9 +97,12 @@ export async function reconcileStore(engine: TableEngine, types: TypeDef[]): Pro
   const desiredTypeIds = new Set(types.map((type) => type.id));
   for (const identity of identities) {
     if (identity.kind === "type" && !desiredTypeIds.has(identity.id) && identity.table_name) {
-      await engine.dropTable(identity.table_name);
+      if (present.has(identity.table_name)) {
+        await engine.dropTable(identity.table_name);
+        present.delete(identity.table_name);
+        changes.push(`drop table ${identity.table_name}`);
+      }
       await engine.delete(META_TABLE, identity.id);
-      changes.push(`drop table ${identity.table_name}`);
     }
   }
   const desiredFieldIds = new Set(types.flatMap((type) => type.fields.map((field) => field.id)));
@@ -117,8 +120,10 @@ export async function reconcileStore(engine: TableEngine, types: TypeDef[]): Pro
       ) {
         continue;
       }
-      await engine.dropColumn(identity.table_name, identity.column_name);
-      changes.push(`drop ${identity.table_name}.${identity.column_name}`);
+      if (present.has(identity.table_name)) {
+        await engine.dropColumn(identity.table_name, identity.column_name);
+        changes.push(`drop ${identity.table_name}.${identity.column_name}`);
+      }
       await engine.delete(META_TABLE, identity.id);
     }
   }

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vite-plus/test";
 import { Host } from "./host.ts";
 import { specFromText } from "./serialize.ts";
+import { createNodeGateway } from "./sql-node.ts";
 
 describe("builder.run host", () => {
   it("materialises a type into records, views, and a triggered flow", async () => {
@@ -180,5 +181,236 @@ types:
         .spaces.map((item) => item.name)
         .sort(),
     ).toEqual(["Client Space", "Personal Space"]);
+  });
+
+  it("orders a view by more than one field", async () => {
+    expect.hasAssertions();
+    const host = await Host.open({ persist: false });
+    await host.loadSample("freelance_crm");
+    await host.create("invoice", { number: "INV-105", amount: 500, status: "sent" });
+    await host.create("invoice", { number: "INV-106", amount: 9000, status: "paid" });
+    await host.upsertView({
+      key: "by_status_amount",
+      label: "By status then amount",
+      source: "invoice",
+      fields: ["number", "status", "amount"],
+      order_by: { status: "asc", amount: "desc" },
+      implicit: false,
+    });
+    const rows = await host.queryView("by_status_amount");
+    expect(rows.map((row) => `${row.status}:${row.amount}`)).toEqual([
+      "paid:9000",
+      "paid:1200",
+      "sent:8000",
+      "sent:500",
+    ]);
+  });
+
+  it("accepts nested group blocks and a null folder on upsert_page", async () => {
+    expect.hasAssertions();
+    const host = await Host.open({ persist: false });
+    await host.upsertType({
+      key: "client",
+      fields: [{ key: "name", type: "text", label: "Name" }] as never,
+    });
+    const page = await host.upsertPage({
+      key: "clients",
+      label: "Clients",
+      folder: null as never,
+      blocks: [
+        {
+          kind: "group",
+          columns: 1,
+          blocks: [{ kind: "widget", widget: "table", values: { view: "client_list" } }],
+        },
+      ],
+    });
+    expect(page.folder).toBeUndefined();
+    expect(page.blocks).toEqual([
+      {
+        kind: "group",
+        columns: 1,
+        blocks: [{ kind: "widget", widget: "table", values: { view: "client_list" } }],
+      },
+    ]);
+  });
+
+  it("accepts upsert_page when a group's inner blocks is a single object", async () => {
+    expect.hasAssertions();
+    const host = await Host.open({ persist: false });
+    const page = await host.upsertPage({
+      key: "diag_nested",
+      label: "Diagnostic Nested",
+      path: "/diag-nested",
+      blocks: [
+        {
+          kind: "group",
+          columns: 1,
+          blocks: { kind: "widget", widget: "table", values: { view: "recent_time" } } as never,
+        },
+      ],
+    });
+    expect(page.blocks).toEqual([
+      {
+        kind: "group",
+        columns: 1,
+        blocks: [{ kind: "widget", widget: "table", values: { view: "recent_time" } }],
+      },
+    ]);
+  });
+
+  it("creates a type from inline fields as an array or a map, and keeps them on later upserts", async () => {
+    expect.hasAssertions();
+    const host = await Host.open({ persist: false });
+    await host.upsertType({
+      key: "client",
+      fields: {
+        name: { type: "text", label: "Name", required: true },
+        industry: "text",
+      },
+    });
+    expect(
+      host
+        .resolvedSpec()
+        .types.find((type) => type.key === "client")
+        ?.fields.map((field) => field.key),
+    ).toEqual(["name", "industry"]);
+    await host.upsertType({ key: "client", label: "Clients" });
+    const kept = host.resolvedSpec().types.find((type) => type.key === "client");
+    expect(kept?.label).toBe("Clients");
+    expect(kept?.fields.map((field) => field.key)).toEqual(["name", "industry"]);
+    await host.upsertType({
+      key: "project",
+      fields: [
+        { key: "name", type: "text" },
+        { key: "client", type: "reference", target: "client" },
+      ],
+    });
+    expect(
+      host
+        .resolvedSpec()
+        .types.find((type) => type.key === "project")
+        ?.fields.map((field) => [field.key, field.type, field.target]),
+    ).toEqual([
+      ["name", "text", undefined],
+      ["client", "reference", "client"],
+    ]);
+  });
+
+  it("exports authored forms and omits generated default forms", async () => {
+    expect.hasAssertions();
+    const host = await Host.open({ persist: false });
+    await host.upsertType({
+      key: "client",
+      fields: { name: { type: "text" } },
+    });
+    expect(host.resolvedSpec().forms.some((form) => form.key === "client_create")).toBe(true);
+    expect(host.exportYaml()).not.toMatch(/client_create:/);
+    await host.upsertForm({
+      key: "intake",
+      type: "client",
+      fields: ["name"],
+      mode: "create",
+    });
+    expect(host.exportYaml()).toMatch(/intake:/);
+    await host.upsertForm({
+      key: "client_create",
+      type: "client",
+      fields: ["name"],
+      mode: "create",
+    });
+    expect(host.exportYaml()).toMatch(/client_create:/);
+  });
+
+  it("drops old type tables when replaceSpecText replaces the spec", async () => {
+    expect.hasAssertions();
+    const host = await Host.open({ persist: false });
+    await host.upsertType({ key: "note", fields: { title: "text" } });
+    await host.replaceSpecText("types:\n  gone:\n    fields:\n      x: text\n");
+    expect(host.resolvedSpec().types.map((type) => type.key)).toContain("gone");
+    expect(host.resolvedSpec().types.some((type) => type.key === "note")).toBe(false);
+    const info = await host.inspectStore("local");
+    expect(info.tables.some((table) => table.name === "note")).toBe(false);
+    expect(info.tables.some((table) => table.name === "gone")).toBe(true);
+  });
+
+  it("gives the UI a copy of space and app, not the live host objects", async () => {
+    expect.hasAssertions();
+    const host = await Host.open({ persist: false });
+    const snap = host.snapshot();
+    expect(snap.app).not.toBe(host.app());
+    expect(snap.space).not.toBe(host.space());
+    const original = host.app().name;
+    snap.app.name = "Mutated in the UI copy";
+    expect(host.app().name).toBe(original);
+  });
+
+  it("saves exposed view filters from a reactive array", async () => {
+    expect.hasAssertions();
+    const host = await Host.open({ persist: false });
+    await host.loadSample("freelance_crm");
+    const expose = new Proxy(["status"], {});
+    const saved = await host.upsertView({
+      key: "unpaid_invoices",
+      expose,
+      implicit: false,
+    });
+    expect([...(saved.expose ?? [])]).toEqual(["status"]);
+  });
+
+  it("filters a view by the current record", async () => {
+    expect.hasAssertions();
+    const host = await Host.open({ persist: false });
+    await host.loadSample("freelance_crm");
+    const project = (await host.listRecords("project")).find(
+      (row) => row.name === "Website redesign",
+    );
+    expect(project).toBeTruthy();
+    await host.upsertView({
+      key: "project_invoices",
+      label: "Project invoices",
+      source: "invoice",
+      fields: ["number", "amount", "status"],
+      where: [{ field: "project", op: "eq", value: "$record.id" }],
+      implicit: false,
+    });
+    const rows = await host.queryView("project_invoices", undefined, {
+      recordId: String(project!.id),
+    });
+    expect(rows.length).toBeGreaterThan(0);
+    expect(rows.every((row) => row.number === "INV-104")).toBe(true);
+    const empty = await host.queryView("project_invoices");
+    expect(empty).toEqual([]);
+  });
+
+  it("previews a draft view without saving it", async () => {
+    expect.hasAssertions();
+    const host = await Host.open({ persist: false });
+    await host.loadSample("freelance_crm");
+    const saved = host.resolvedSpec().views.find((item) => item.key === "unpaid_invoices");
+    expect(saved).toBeTruthy();
+    const draft = { ...saved!, where: { status: "paid" } };
+    const rows = await host.queryView(draft);
+    expect(rows.length).toBeGreaterThan(0);
+    expect(rows.every((row) => row.status === "paid")).toBe(true);
+    const still = await host.queryView("unpaid_invoices");
+    expect(still.every((row) => row.status === "sent")).toBe(true);
+  });
+
+  it("wipes local data so a new host reseeds without leftover space ids", async () => {
+    expect.hasAssertions();
+    const gateway = createNodeGateway();
+    const host = await Host.open({ gateway, persist: false });
+    await host.loadSample("freelance_crm");
+    const oldSpace = host.space().id;
+    const oldApp = host.app().id;
+    await host.resetLocalData();
+    const next = await Host.open({ gateway, persist: false });
+    expect(next.space().id).not.toBe(oldSpace);
+    expect(next.app().id).not.toBe(oldApp);
+    expect(next.space().id.startsWith("spc_")).toBe(false);
+    expect(next.app().id.startsWith("spc_")).toBe(false);
+    expect(next.snapshot().catalog.tables).toEqual(["actor", "kv", "space"]);
+    expect(next.snapshot().stores.every((store) => !store.database.includes("spc_"))).toBe(true);
   });
 });

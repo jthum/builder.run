@@ -1,4 +1,4 @@
-import type { PersistenceBackend } from "./persist.ts";
+import { wipeLocalData, type PersistenceBackend } from "./persist.ts";
 import type { SqlConnection, SqlGateway } from "./sql-gateway.ts";
 
 type RpcResult = {
@@ -7,8 +7,17 @@ type RpcResult = {
   error?: string;
 };
 
+let connecting: Promise<SqlGateway> | null = null;
+let workerRef: Worker | null = null;
+
 export async function connectWorkerGateway(): Promise<SqlGateway> {
+  connecting ??= openWorkerGateway();
+  return connecting;
+}
+
+async function openWorkerGateway(): Promise<SqlGateway> {
   const worker = new Worker(new URL("./sqlite-worker.ts", import.meta.url), { type: "module" });
+  workerRef = worker;
   const pending = new Map<
     number,
     { resolve: (value: unknown) => void; reject: (error: Error) => void }
@@ -56,5 +65,28 @@ export async function connectWorkerGateway(): Promise<SqlGateway> {
         },
       } satisfies SqlConnection;
     },
+    async wipe() {
+      try {
+        await rpc({ method: "wipe" });
+      } catch {
+        // Worker may already be gone; still drop files from this thread.
+      }
+      worker.terminate();
+      pending.clear();
+      connecting = null;
+      workerRef = null;
+      await wipeLocalData();
+    },
   };
+}
+
+if (import.meta.hot) {
+  import.meta.hot.dispose(() => {
+    workerRef?.terminate();
+    workerRef = null;
+    connecting = null;
+  });
+  import.meta.hot.accept(() => {
+    import.meta.hot?.invalidate();
+  });
 }

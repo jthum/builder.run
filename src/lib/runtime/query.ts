@@ -80,15 +80,33 @@ export async function resolvePath(
   return current ?? null;
 }
 
+export const RECORD_ID_TOKEN = "$record.id";
+
+export interface ViewRunContext {
+  recordId?: string;
+}
+
+export function viewUsesRecord(view: ViewDef): boolean {
+  return normalizeFilters(view.where).some((clause) => clause.value === RECORD_ID_TOKEN);
+}
+
+function resolveClause(clause: FilterClause, context?: ViewRunContext): FilterClause {
+  if (clause.value !== RECORD_ID_TOKEN) return clause;
+  return { ...clause, value: context?.recordId ?? clause.value };
+}
+
 export async function executeView(
   ctx: QueryContext,
   view: ViewDef,
   expose?: Record<string, unknown>,
+  context?: ViewRunContext,
 ): Promise<Array<Record<string, unknown>>> {
   const type = findType(ctx, view.source);
   if (!type) return [];
   const engine = ctx.engineFor(type);
-  const clauses = mergeExpose(normalizeFilters(view.where), exposeFilters(view.expose, expose));
+  const clauses = mergeExpose(normalizeFilters(view.where), exposeFilters(view.expose, expose)).map(
+    (clause) => resolveClause(clause, context),
+  );
   const sqlClauses = clauses.filter((clause) => !clause.field.includes("."));
   const memClauses = clauses.filter((clause) => clause.field.includes("."));
   const rows = await engine.select(type.key, {

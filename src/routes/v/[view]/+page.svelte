@@ -2,12 +2,10 @@
 	import { page } from "$app/state";
 	import { addLabel, typeByKey } from "$lib/app/labels.ts";
 	import { runtime, session } from "$lib/app/session.svelte.ts";
-	import AppSelect from "$lib/components/app-select.svelte";
 	import PageHeader from "$lib/components/page-header.svelte";
 	import RecordTable from "$lib/components/record-table.svelte";
+	import ViewExposeBar from "$lib/components/view-expose-bar.svelte";
 	import { Button } from "$lib/components/ui/button/index.js";
-	import { Input } from "$lib/components/ui/input/index.js";
-	import { labelFromKey } from "$lib/runtime/ids.ts";
 	import PlusIcon from "@lucide/svelte/icons/plus";
 
 	const viewKey = $derived(page.params.view);
@@ -53,33 +51,7 @@
 				</Button>
 			{/snippet}
 		</PageHeader>
-		{#if exposeFields.length}
-			<div class="flex flex-wrap items-end gap-3">
-				{#each exposeFields as field (field.key)}
-					<div class="flex min-w-40 flex-col gap-1.5">
-						<label class="text-sm font-medium" for="expose-{field.key}">{field.label}</label>
-						{#if field.type === "enum"}
-							<AppSelect
-								bind:value={expose[field.key]}
-								options={[
-									{ value: "", label: "Any" },
-									...(field.values ?? []).map((value) => ({
-										value,
-										label: labelFromKey(value),
-									})),
-								]}
-							/>
-						{:else}
-							<Input
-								id="expose-{field.key}"
-								bind:value={expose[field.key]}
-								placeholder="Any"
-							/>
-						{/if}
-					</div>
-				{/each}
-			</div>
-		{/if}
+		<ViewExposeBar fields={exposeFields} bind:values={expose} />
 		<RecordTable
 			{rows}
 			{view}

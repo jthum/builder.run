@@ -18,8 +18,9 @@
 		implicitEditFormKey,
 		implicitViewKey,
 	} from "$lib/runtime/defaults.ts";
+	import { normalizeFilters } from "$lib/runtime/filters.ts";
 	import { parseTypeRef } from "$lib/runtime/model.ts";
-	import { projectRow } from "$lib/runtime/query.ts";
+	import { projectRow, RECORD_ID_TOKEN } from "$lib/runtime/query.ts";
 	import type { FieldDef, FormDef, RecordValue, TypeDef, ViewDef } from "$lib/runtime/model.ts";
 	import EllipsisIcon from "@lucide/svelte/icons/ellipsis";
 	import PencilIcon from "@lucide/svelte/icons/pencil";
@@ -96,9 +97,11 @@
 			try {
 				const next: Record<string, Array<Record<string, unknown>>> = {};
 				for (const rel of reverseRelations(spec, typeKey)) {
-					const view =
-						spec.views.find((item) => item.key === implicitViewKey(rel.type.key)) ??
-						spec.views.find((item) => item.source === rel.type.key);
+					const view = relatedViewFor(rel.type.key, rel.field.key);
+					if (view && relatedViewIsContextual(view, rel.field.key)) {
+						next[rel.type.key] = await runtime().queryView(view, undefined, { recordId: id });
+						continue;
+					}
 					const rows = await runtime().listRecords(rel.type.key);
 					const matched = rows.filter((row) => String(row[rel.field.key] ?? "") === id);
 					if (view) {
@@ -141,10 +144,24 @@
 		await goto(`/t/${typeKey}`);
 	}
 
-	function relatedView(typeKeyRel: string): ViewDef | undefined {
-		return (
-			spec?.views.find((item) => item.key === implicitViewKey(typeKeyRel)) ??
-			spec?.views.find((item) => item.source === typeKeyRel)
+	function relatedViewFor(typeKeyRel: string, fieldKey?: string): ViewDef | undefined {
+		const views = spec?.views.filter((item) => item.source === typeKeyRel) ?? [];
+		if (fieldKey) {
+			const contextual = views
+				.filter((item) =>
+					normalizeFilters(item.where).some(
+						(clause) => clause.field === fieldKey && clause.value === RECORD_ID_TOKEN,
+					),
+				)
+				.sort((left, right) => Number(Boolean(left.implicit)) - Number(Boolean(right.implicit)));
+			if (contextual[0]) return contextual[0];
+		}
+		return views.find((item) => item.key === implicitViewKey(typeKeyRel)) ?? views[0];
+	}
+
+	function relatedViewIsContextual(view: ViewDef, fieldKey: string): boolean {
+		return normalizeFilters(view.where).some(
+			(clause) => clause.field === fieldKey && clause.value === RECORD_ID_TOKEN,
 		);
 	}
 
@@ -233,10 +250,12 @@
 		{/if}
 
 		{#each related as rel (rel.type.id + rel.field.id)}
-			{@const view = relatedView(rel.type.key)}
+			{@const view = relatedViewFor(rel.type.key, rel.field.key)}
 			{#if view}
 				<div class="flex flex-col gap-3">
-					<h2 class="text-lg font-medium">{collectionLabel(rel.type)}</h2>
+					<h2 class="text-lg font-medium">
+						{relatedViewIsContextual(view, rel.field.key) ? view.label : collectionLabel(rel.type)}
+					</h2>
 					<RecordTable
 						rows={relatedRows[rel.type.key] ?? []}
 						{view}
