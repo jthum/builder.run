@@ -5,7 +5,6 @@
 	import AppSelect from "$lib/components/app-select.svelte";
 	import PageHeader from "$lib/components/page-header.svelte";
 	import RecordTable from "$lib/components/record-table.svelte";
-	import ViewExposeBar from "$lib/components/view-expose-bar.svelte";
 	import * as AlertDialog from "$lib/components/ui/alert-dialog/index.js";
 	import { Badge } from "$lib/components/ui/badge/index.js";
 	import { Button } from "$lib/components/ui/button/index.js";
@@ -865,8 +864,14 @@
 							without that.
 						</p>
 					{/if}
-					<ViewExposeBar fields={previewExposeFields} bind:values={previewExpose} idPrefix="preview-expose" />
-					<RecordTable rows={preview} view={previewView} typeKey={source} compact />
+					<RecordTable
+						rows={preview}
+						view={previewView}
+						typeKey={source}
+						exposedFields={previewExposeFields}
+						bind:exposedValues={previewExpose}
+						compact
+					/>
 				</Card.Content>
 			</Collapsible.Content>
 		</Collapsible.Root>

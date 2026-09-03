@@ -4,7 +4,6 @@
 	import { runtime, session } from "$lib/app/session.svelte.ts";
 	import PageHeader from "$lib/components/page-header.svelte";
 	import RecordTable from "$lib/components/record-table.svelte";
-	import ViewExposeBar from "$lib/components/view-expose-bar.svelte";
 	import { Button } from "$lib/components/ui/button/index.js";
 	import PlusIcon from "@lucide/svelte/icons/plus";
 
@@ -51,11 +50,12 @@
 				</Button>
 			{/snippet}
 		</PageHeader>
-		<ViewExposeBar fields={exposeFields} bind:values={expose} />
 		<RecordTable
 			{rows}
 			{view}
 			typeKey={view.source}
+			exposedFields={exposeFields}
+			bind:exposedValues={expose}
 			createHref="/t/{view.source}/new"
 			emptyTitle={`No ${view.label.toLowerCase()} yet`}
 			emptyDescription="Nothing matches this list right now."

@@ -39,6 +39,9 @@
 		onOpen,
 		onCreate,
 		onDelete,
+		externalFilterIds = [],
+		externallyFiltered = false,
+		filterControls,
 		footer,
 		cell,
 	}: {
@@ -56,6 +59,9 @@
 		onOpen?: (row: Record<string, unknown>) => void;
 		onCreate?: () => void;
 		onDelete?: (rows: Array<Record<string, unknown>>) => void;
+		externalFilterIds?: string[];
+		externallyFiltered?: boolean;
+		filterControls?: Snippet;
 		footer?: Snippet<[{ rows: Array<Record<string, unknown>>; columns: DataTableColumn[] }]>;
 		cell?: Snippet<
 			[{ row: Record<string, unknown>; column: DataTableColumn; value: unknown; index: number }]
@@ -73,7 +79,12 @@
 	const pageSize = $derived(compact ? 5 : Number(pageSizeKey) || 10);
 
 	const visible = $derived(columns.filter((column) => !hidden[column.id]));
-	const filterColumns = $derived(columns.filter((column) => (column.filterValues?.length ?? 0) > 0));
+	const filterColumns = $derived(
+		columns.filter(
+			(column) =>
+				(column.filterValues?.length ?? 0) > 0 && !externalFilterIds.includes(column.id),
+		),
+	);
 	const activeFilters = $derived(
 		filterColumns.filter((column) => Boolean(filters[column.id])).map((column) => ({
 			id: column.id,
@@ -81,7 +92,8 @@
 			value: filters[column.id],
 		})),
 	);
-	const hasQuery = $derived(Boolean(query.trim() || activeFilters.length));
+	const hasLocalQuery = $derived(Boolean(query.trim() || activeFilters.length));
+	const hasQuery = $derived(hasLocalQuery || externallyFiltered);
 
 	const filtered = $derived.by(() => {
 		if (!rows) return null;
@@ -119,8 +131,9 @@
 	const totalCount = $derived(rows?.length ?? 0);
 	const canCreate = $derived(Boolean(onCreate || createHref));
 	const showToolbar = $derived(
-		!compact || Boolean(title || actionHref || selectedCount || (canCreate && sorted.length > 0)),
+		Boolean(title || actionHref || selectedCount || (compact && canCreate && sorted.length > 0)),
 	);
+	const showFilterBar = $derived(!compact || externalFilterIds.length > 0);
 
 	$effect(() => {
 		void query;
@@ -189,11 +202,6 @@
 		return `Any ${column.label.toLowerCase()}`;
 	}
 
-	function filterControlClass(active: boolean): string {
-		return active
-			? "h-8 bg-primary/5 text-foreground hover:bg-primary/10"
-			: "h-8 bg-background";
-	}
 </script>
 
 {#snippet createButton(size?: "sm" | "default")}
@@ -220,7 +228,7 @@
 							<p class="text-sm font-medium tracking-tight">{title}</p>
 							{#if rows}
 								<Badge variant="secondary">
-									{hasQuery ? `${sorted.length}/${totalCount}` : totalCount}
+									{hasLocalQuery ? `${sorted.length}/${totalCount}` : totalCount}
 								</Badge>
 							{/if}
 						{/if}
@@ -237,70 +245,6 @@
 					</div>
 				{/if}
 				<div class="flex min-w-0 flex-wrap items-center gap-2 sm:justify-end">
-					{#if !compact}
-						{#each filterColumns as column (column.id)}
-							{@const active = Boolean(filters[column.id])}
-							<DropdownMenu.Root>
-								<DropdownMenu.Trigger>
-									{#snippet child({ props })}
-										<Button variant="outline" size="sm" class={filterControlClass(active)} {...props}>
-											{#if isStatusPath(column.id) && active}
-												<span class="size-1.5 rounded-full {statusDotClass(filters[column.id])}"></span>
-											{/if}
-											{filterLabel(column)}
-											<ChevronDownIcon data-icon="inline-end" class="text-muted-foreground" />
-										</Button>
-									{/snippet}
-								</DropdownMenu.Trigger>
-								<DropdownMenu.Content align="end" class="w-auto min-w-52">
-									<DropdownMenu.Label>{column.label}</DropdownMenu.Label>
-									<DropdownMenu.Separator />
-									<DropdownMenu.RadioGroup
-										value={filters[column.id] || anyFilter}
-										onValueChange={(value) => setFilter(column.id, value === anyFilter ? "" : value)}
-									>
-										<DropdownMenu.RadioItem value={anyFilter}>Any {column.label.toLowerCase()}</DropdownMenu.RadioItem>
-										{#each column.filterValues ?? [] as value (value)}
-											<DropdownMenu.RadioItem value={value}>
-												{#if isStatusPath(column.id)}
-													<span class="size-1.5 rounded-full {statusDotClass(value)}"></span>
-												{/if}
-												{labelFromKey(value)}
-											</DropdownMenu.RadioItem>
-										{/each}
-									</DropdownMenu.RadioGroup>
-								</DropdownMenu.Content>
-							</DropdownMenu.Root>
-						{/each}
-						<DropdownMenu.Root>
-							<DropdownMenu.Trigger>
-								{#snippet child({ props })}
-									<Button variant="outline" size="sm" class="h-8 bg-background" {...props}>
-										<Columns3Icon data-icon="inline-start" />
-										Columns
-									</Button>
-								{/snippet}
-							</DropdownMenu.Trigger>
-							<DropdownMenu.Content align="end" class="w-auto min-w-52">
-								<DropdownMenu.Label>Visible columns</DropdownMenu.Label>
-								<DropdownMenu.Separator />
-								{#each columns as column (column.id)}
-									<DropdownMenu.CheckboxItem
-										checked={!hidden[column.id]}
-										onCheckedChange={(value) => toggleHidden(column.id, !value)}
-									>
-										{column.label}
-									</DropdownMenu.CheckboxItem>
-								{/each}
-							</DropdownMenu.Content>
-						</DropdownMenu.Root>
-						<InputGroup.Root class="h-8 min-w-44 flex-1 bg-background sm:max-w-56 sm:flex-none">
-							<InputGroup.Addon>
-								<SearchIcon />
-							</InputGroup.Addon>
-							<InputGroup.Input bind:value={query} placeholder={searchPlaceholder} />
-						</InputGroup.Root>
-					{/if}
 					{#if actionHref}
 						<Button href={actionHref} size="sm" variant={compact ? "outline" : "ghost"}>
 							{actionLabel}
@@ -312,29 +256,87 @@
 					{/if}
 				</div>
 			</div>
-			{#if !compact && activeFilters.length}
-				<div class="flex flex-wrap items-center gap-1.5">
-					{#each activeFilters as item (item.id)}
-						<button
-							type="button"
-							class="inline-flex h-7 items-center gap-1.5 rounded-full border bg-background px-2.5 text-xs font-medium hover:bg-muted/60"
-							onclick={() => setFilter(item.id, "")}
-						>
-							{#if isStatusPath(item.id)}
-								<span class="size-1.5 rounded-full {statusDotClass(item.value)}"></span>
-							{/if}
-							<span class="text-muted-foreground">{item.label}:</span>
-							{labelFromKey(item.value)}
-							<XIcon class="size-3 text-muted-foreground" />
-						</button>
-					{/each}
-					<Button size="xs" variant="ghost" onclick={clearFilters}>Clear all</Button>
-				</div>
-			{/if}
 		</div>
 	{/if}
 
 	<div class="overflow-hidden rounded-xl border bg-background">
+		{#if showFilterBar}
+			<div class="flex flex-wrap items-center gap-2 border-b bg-muted/30 px-3 py-2">
+				{@render filterControls?.()}
+				{#if !compact}
+					{#each filterColumns as column (column.id)}
+						{@const active = Boolean(filters[column.id])}
+						<DropdownMenu.Root>
+							<DropdownMenu.Trigger>
+								{#snippet child({ props })}
+									<Button variant={active ? "secondary" : "outline"} size="sm" class="h-8" {...props}>
+										{#if isStatusPath(column.id) && active}
+											<span class="size-1.5 rounded-full {statusDotClass(filters[column.id])}"></span>
+										{/if}
+										{filterLabel(column)}
+										<ChevronDownIcon data-icon="inline-end" class="text-muted-foreground" />
+									</Button>
+								{/snippet}
+							</DropdownMenu.Trigger>
+							<DropdownMenu.Content align="start" class="w-auto min-w-52">
+								<DropdownMenu.Label>Filter by {column.label.toLowerCase()}</DropdownMenu.Label>
+								<DropdownMenu.Separator />
+								<DropdownMenu.RadioGroup
+									value={filters[column.id] || anyFilter}
+									onValueChange={(value) => setFilter(column.id, value === anyFilter ? "" : value)}
+								>
+									<DropdownMenu.RadioItem value={anyFilter}>Any {column.label.toLowerCase()}</DropdownMenu.RadioItem>
+									{#each column.filterValues ?? [] as value (value)}
+										<DropdownMenu.RadioItem value={value}>
+											{#if isStatusPath(column.id)}
+												<span class="size-1.5 rounded-full {statusDotClass(value)}"></span>
+											{/if}
+											{labelFromKey(value)}
+										</DropdownMenu.RadioItem>
+									{/each}
+								</DropdownMenu.RadioGroup>
+							</DropdownMenu.Content>
+						</DropdownMenu.Root>
+					{/each}
+					<DropdownMenu.Root>
+						<DropdownMenu.Trigger>
+							{#snippet child({ props })}
+								<Button variant="outline" size="sm" class="h-8 bg-background" {...props}>
+									<Columns3Icon data-icon="inline-start" />
+									Columns
+								</Button>
+							{/snippet}
+						</DropdownMenu.Trigger>
+						<DropdownMenu.Content align="end" class="w-auto min-w-52">
+							<DropdownMenu.Label>Visible columns</DropdownMenu.Label>
+							<DropdownMenu.Separator />
+							<DropdownMenu.Group>
+								{#each columns as column (column.id)}
+									<DropdownMenu.CheckboxItem
+										checked={!hidden[column.id]}
+										onCheckedChange={(value) => toggleHidden(column.id, !value)}
+									>
+										{column.label}
+									</DropdownMenu.CheckboxItem>
+								{/each}
+							</DropdownMenu.Group>
+						</DropdownMenu.Content>
+					</DropdownMenu.Root>
+					<InputGroup.Root class="ms-auto h-8 min-w-44 flex-1 bg-background sm:max-w-56 sm:flex-none">
+						<InputGroup.Addon>
+							<SearchIcon />
+						</InputGroup.Addon>
+						<InputGroup.Input bind:value={query} placeholder={searchPlaceholder} />
+					</InputGroup.Root>
+					{#if query || activeFilters.length}
+						<Button size="xs" variant="ghost" onclick={clearFilters}>
+							<XIcon data-icon="inline-start" />
+							Clear
+						</Button>
+					{/if}
+				{/if}
+			</div>
+		{/if}
 		{#if rows === null}
 			<div class="flex flex-col gap-2 p-4">
 				<Skeleton class="h-10 w-full" />

@@ -16,9 +16,10 @@
 	import type { DataTableColumn } from "$lib/components/data-table.ts";
 	import DataTable from "$lib/components/data-table.svelte";
 	import FormattedValue from "$lib/components/formatted-value.svelte";
+	import ViewExposeBar from "$lib/components/view-expose-bar.svelte";
 	import * as AlertDialog from "$lib/components/ui/alert-dialog/index.js";
 	import * as Table from "$lib/components/ui/table/index.js";
-	import type { TypeDef, ViewDef } from "$lib/runtime/model.ts";
+	import type { FieldDef, TypeDef, ViewDef } from "$lib/runtime/model.ts";
 	import { toast } from "svelte-sonner";
 
 	let {
@@ -34,6 +35,8 @@
 		actionHref,
 		actionLabel,
 		onCreate,
+		exposedFields = [],
+		exposedValues = $bindable({}),
 	}: {
 		rows: Array<Record<string, unknown>> | null;
 		view: ViewDef;
@@ -47,6 +50,8 @@
 		actionHref?: string;
 		actionLabel?: string;
 		onCreate?: () => void;
+		exposedFields?: FieldDef[];
+		exposedValues?: Record<string, string>;
 	} = $props();
 
 	const type = $derived(typeByKey(session.snapshot?.spec, typeKey) as TypeDef | undefined);
@@ -67,6 +72,10 @@
 		});
 	});
 	const amountColumns = $derived(columns.filter((column) => isAmountPath(column.id)));
+	const externalFilterIds = $derived(exposedFields.map((field) => field.key));
+	const externallyFiltered = $derived(
+		exposedFields.some((field) => Boolean(exposedValues[field.key])),
+	);
 
 	let pending = $state<Array<Record<string, unknown>>>([]);
 
@@ -110,9 +119,14 @@
 	{actionHref}
 	{actionLabel}
 	searchPlaceholder={`Search ${type ? collectionLabel(type).toLowerCase() : "records"}`}
+	{externalFilterIds}
+	{externallyFiltered}
 	onOpen={openRow}
 	onDelete={(items) => (pending = items)}
 >
+	{#snippet filterControls()}
+		<ViewExposeBar fields={exposedFields} bind:values={exposedValues} />
+	{/snippet}
 	{#snippet cell({ row, column, value, index })}
 		<FormattedValue
 			path={column.id}
