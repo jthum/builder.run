@@ -341,11 +341,13 @@
 					{#each block.blocks as child, childIndex (`${index}-${childIndex}`)}
 						<div
 							class="flex h-full flex-col {rowHeightClass(block.min_height)} {editing
-								? 'group/cell relative rounded-xl ring-1 ring-transparent hover:ring-border'
+								? 'group/cell relative rounded-xl p-2 ring-1 ring-transparent hover:ring-border'
 								: ''}"
 						>
 							{#if editing}
-								<div class="absolute top-2 right-2 z-10 hidden gap-1 group-hover/cell:flex">
+								<div
+									class="absolute top-2 right-2 z-10 hidden gap-0.5 rounded-lg border bg-background p-0.5 shadow-sm group-hover/cell:flex"
+								>
 									<Button
 										size="icon-xs"
 										variant="outline"
@@ -396,9 +398,15 @@
 				</div>
 			</div>
 		{:else}
-			<div class={editing ? "group/cell relative h-full min-h-0 rounded-xl" : "h-full min-h-0"}>
+			<div
+				class={editing
+					? "group/cell relative h-full min-h-0 rounded-xl p-2 ring-1 ring-transparent hover:ring-border"
+					: "h-full min-h-0"}
+			>
 				{#if editing}
-					<div class="absolute top-2 right-2 z-10 hidden gap-1 group-hover/cell:flex">
+					<div
+						class="absolute top-2 right-2 z-10 hidden gap-0.5 rounded-lg border bg-background p-0.5 shadow-sm group-hover/cell:flex"
+					>
 						<Button size="xs" variant="outline" onclick={() => openSheet([index])}>Edit</Button>
 						<Button size="icon-xs" variant="outline" onclick={() => remove([index])}>
 							<Trash2Icon />
