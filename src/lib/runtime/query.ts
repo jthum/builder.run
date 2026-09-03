@@ -1,5 +1,16 @@
 import type { TableEngine } from "./engine.ts";
 import { matchesWhere } from "./engine.ts";
+import { exposeFilters, matchFilters, normalizeFilters, type FilterClause } from "./filters.ts";
+
+function mergeExpose(base: FilterClause[], extra: FilterClause[]): FilterClause[] {
+  const next = [...base];
+  for (const clause of extra) {
+    const index = next.findIndex((item) => item.field === clause.field);
+    if (index >= 0) next[index] = clause;
+    else next.push(clause);
+  }
+  return next;
+}
 import {
   parseTypeRef,
   type AppSpec,
@@ -72,17 +83,24 @@ export async function resolvePath(
 export async function executeView(
   ctx: QueryContext,
   view: ViewDef,
+  expose?: Record<string, unknown>,
 ): Promise<Array<Record<string, unknown>>> {
   const type = findType(ctx, view.source);
   if (!type) return [];
   const engine = ctx.engineFor(type);
+  const clauses = mergeExpose(normalizeFilters(view.where), exposeFilters(view.expose, expose));
+  const sqlClauses = clauses.filter((clause) => !clause.field.includes("."));
+  const memClauses = clauses.filter((clause) => clause.field.includes("."));
   const rows = await engine.select(type.key, {
-    where: view.where,
+    where: sqlClauses,
     orderBy: view.order_by,
+    limit: view.limit,
   });
   const projected = [];
   for (const row of rows) {
-    projected.push(await projectRow(ctx, type, row, view.fields));
+    const next = await projectRow(ctx, type, row, view.fields);
+    if (memClauses.length && !matchFilters(next, memClauses)) continue;
+    projected.push(next);
   }
   return projected;
 }

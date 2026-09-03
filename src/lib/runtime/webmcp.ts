@@ -215,6 +215,8 @@ export function buildTools(host: Host): ToolDefinition[] {
           source: { type: "string" },
           fields: { type: "array", items: { type: "string" } },
           where: { type: "object" },
+          expose: { type: "array", items: { type: "string" } },
+          limit: { type: "number" },
           order_by: { type: "object" },
         },
         required: ["key", "source"],

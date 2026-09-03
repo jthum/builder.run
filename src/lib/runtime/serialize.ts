@@ -1,4 +1,5 @@
 import { parse, stringify } from "yaml";
+import { compactWhere, normalizeFilters } from "./filters.ts";
 import { cloneSpec, normalizeSpec, type AppSpec } from "./model.ts";
 
 export function specToJson(spec: AppSpec): string {
@@ -68,7 +69,11 @@ export function authoringSpec(spec: AppSpec): Record<string, unknown> {
             label: view.label,
             source: view.source,
             fields: view.fields,
-            ...(view.where ? { where: view.where } : {}),
+            ...(view.where
+              ? { where: compactWhere(normalizeFilters(view.where)) ?? view.where }
+              : {}),
+            ...(view.expose?.length ? { expose: view.expose } : {}),
+            ...(view.limit ? { limit: view.limit } : {}),
             ...(view.order_by ? { order_by: view.order_by } : {}),
           },
         ]),

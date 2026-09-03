@@ -157,6 +157,13 @@ types:
     expect(shared.tables.some((table) => table.name === "organisation")).toBe(true);
     expect(local.tables.some((table) => table.name === "invoice")).toBe(true);
     expect(host.snapshot().catalog.database).toBe("catalog");
+    expect(host.space().id.startsWith("spc_")).toBe(false);
+    expect(shared.database.includes("spc_")).toBe(false);
+    const unpaid = await host.queryView("unpaid_invoices");
+    expect(unpaid.every((row) => row.status === "sent")).toBe(true);
+    const paid = await host.queryView("unpaid_invoices", { status: "paid" });
+    expect(paid.length).toBeGreaterThan(0);
+    expect(paid.every((row) => row.status === "paid")).toBe(true);
     expect(
       host
         .apps()

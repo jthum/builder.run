@@ -1,4 +1,5 @@
-import type { RecordValue } from "./model.ts";
+import type { FilterClause, RecordValue } from "./model.ts";
+import { matchFilters, normalizeFilters } from "./filters.ts";
 
 export interface ColumnInfo {
   name: string;
@@ -6,7 +7,7 @@ export interface ColumnInfo {
 }
 
 export interface SelectOptions {
-  where?: Record<string, unknown>;
+  where?: FilterClause[] | Record<string, unknown>;
   orderBy?: Record<string, "asc" | "desc">;
   limit?: number;
 }
@@ -45,12 +46,9 @@ export function systemColumns(): ColumnInfo[] {
 
 export function matchesWhere(
   row: Record<string, unknown>,
-  where: Record<string, unknown>,
+  where: FilterClause[] | Record<string, unknown>,
 ): boolean {
-  for (const [key, expected] of Object.entries(where)) {
-    if (!valuesEqual(row[key], expected)) return false;
-  }
-  return true;
+  return matchFilters(row, normalizeFilters(where));
 }
 
 export function valuesEqual(left: unknown, right: unknown): boolean {

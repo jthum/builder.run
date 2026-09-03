@@ -1,4 +1,9 @@
-import { nanoid } from "nanoid";
+import { customAlphabet } from "nanoid";
+
+const idAlphabet = customAlphabet(
+  "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz",
+  12,
+);
 
 export type IdKind =
   | "spc"
@@ -14,7 +19,9 @@ export type IdKind =
   | "run";
 
 export function createId(kind: IdKind): string {
-  return `${kind}_${nanoid(12)}`;
+  const id = idAlphabet();
+  if (kind === "spc") return id;
+  return `${kind}_${id}`;
 }
 
 export function isId(value: string, kind?: IdKind): boolean {

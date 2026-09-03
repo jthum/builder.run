@@ -2,6 +2,7 @@ import { createId } from "./ids.ts";
 import { nowIso, type RecordValue } from "./model.ts";
 import { type ColumnInfo, type SelectOptions, type TableEngine, systemColumns } from "./engine.ts";
 import type { SqlConnection } from "./sql-gateway.ts";
+import { inValues, normalizeFilters, type FilterClause } from "./filters.ts";
 import { bindValue, createTableSql, placeholders, quoteList, sqlIdent } from "./sql.ts";
 
 export class SqliteEngine implements TableEngine {
@@ -119,12 +120,16 @@ export class SqliteEngine implements TableEngine {
   async select(table: string, options: SelectOptions = {}): Promise<RecordValue[]> {
     let sql = `SELECT * FROM ${sqlIdent(table)}`;
     const params: unknown[] = [];
-    if (options.where && Object.keys(options.where).length) {
-      const parts = Object.entries(options.where).map(([key, value]) => {
-        params.push(bindValue(value));
-        return `${sqlIdent(key)} = ?`;
-      });
-      sql += ` WHERE ${parts.join(" AND ")}`;
+    const clauses = normalizeFilters(options.where).filter((clause) => !clause.field.includes("."));
+    if (clauses.length) {
+      const parts: string[] = [];
+      for (const clause of clauses) {
+        const compiled = sqlFilter(clause);
+        if (!compiled) continue;
+        parts.push(compiled.sql);
+        params.push(...compiled.params);
+      }
+      if (parts.length) sql += ` WHERE ${parts.join(" AND ")}`;
     }
     if (options.orderBy && Object.keys(options.orderBy).length) {
       const order = Object.entries(options.orderBy)
@@ -188,6 +193,39 @@ export class SqliteEngine implements TableEngine {
     const columns = await this.tableInfo(table);
     if (columns.length) return columns;
     return systemColumns();
+  }
+}
+
+function sqlFilter(clause: FilterClause): { sql: string; params: unknown[] } | null {
+  const column = sqlIdent(clause.field);
+  const op = clause.op ?? "eq";
+  switch (op) {
+    case "neq":
+      return { sql: `${column} != ?`, params: [bindValue(clause.value)] };
+    case "contains":
+      return { sql: `${column} LIKE ?`, params: [`%${String(clause.value ?? "")}%`] };
+    case "empty":
+      return { sql: `(${column} IS NULL OR ${column} = '')`, params: [] };
+    case "not_empty":
+      return { sql: `(${column} IS NOT NULL AND ${column} != '')`, params: [] };
+    case "in": {
+      const values = inValues(clause.value);
+      if (!values.length) return null;
+      return {
+        sql: `${column} IN (${values.map(() => "?").join(", ")})`,
+        params: values.map(bindValue),
+      };
+    }
+    case "gt":
+      return { sql: `${column} > ?`, params: [bindValue(clause.value)] };
+    case "gte":
+      return { sql: `${column} >= ?`, params: [bindValue(clause.value)] };
+    case "lt":
+      return { sql: `${column} < ?`, params: [bindValue(clause.value)] };
+    case "lte":
+      return { sql: `${column} <= ?`, params: [bindValue(clause.value)] };
+    default:
+      return { sql: `${column} = ?`, params: [bindValue(clause.value)] };
   }
 }
 

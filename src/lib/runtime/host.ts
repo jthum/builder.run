@@ -300,11 +300,14 @@ export class Host {
     await this.afterChanges([result.change]);
   }
 
-  async queryView(viewKey: string): Promise<Array<Record<string, unknown>>> {
+  async queryView(
+    viewKey: string,
+    expose?: Record<string, unknown>,
+  ): Promise<Array<Record<string, unknown>>> {
     const spec = this.resolvedSpec();
     const view = spec.views.find((item) => item.key === viewKey);
     if (!view) return [];
-    return executeView(this.queryContext(), view);
+    return executeView(this.queryContext(), view, expose);
   }
 
   async invoke(flowKey: string, input: Record<string, unknown> = {}): Promise<FlowRun> {

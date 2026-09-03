@@ -10,8 +10,11 @@
 	import * as Field from "$lib/components/ui/field/index.js";
 	import { Input } from "$lib/components/ui/input/index.js";
 	import { Switch } from "$lib/components/ui/switch/index.js";
+	import { compactWhere, FILTER_OPS, normalizeFilters, type FilterOp } from "$lib/runtime/filters.ts";
 	import { labelFromKey } from "$lib/runtime/ids.ts";
 	import type { SortDirection, ViewDef } from "$lib/runtime/model.ts";
+	import PlusIcon from "@lucide/svelte/icons/plus";
+	import XIcon from "@lucide/svelte/icons/x";
 	import { toast } from "svelte-sonner";
 	import { goto } from "$app/navigation";
 
@@ -22,8 +25,9 @@
 	let label = $state("");
 	let source = $state("");
 	let selected = $state<string[]>([]);
-	let whereField = $state("");
-	let whereValue = $state("");
+	let filters = $state<Array<{ field: string; op: string; value: string }>>([]);
+	let expose = $state<string[]>([]);
+	let limit = $state("");
 	let orderField = $state("");
 	let orderDir = $state("asc");
 	let featured = $state(true);
@@ -37,20 +41,64 @@
 			field.type === "reference" ? `${field.key}.name` : field.key,
 		),
 	);
-	const whereFieldDef = $derived(sourceType?.fields.find((field) => field.key === whereField));
-
 	$effect(() => {
 		label = view.label;
 		source = view.source;
 		selected = [...view.fields];
-		const where = view.where ? Object.entries(view.where)[0] : undefined;
-		whereField = where?.[0] ?? "";
-		whereValue = where ? String(where[1] ?? "") : "";
+		filters = normalizeFilters(view.where).map((clause) => ({
+			field: clause.field,
+			op: clause.op ?? "eq",
+			value: Array.isArray(clause.value) ? clause.value.join(", ") : String(clause.value ?? ""),
+		}));
+		expose = [...(view.expose ?? [])];
+		limit = view.limit ? String(view.limit) : "";
 		const order = view.order_by ? Object.entries(view.order_by)[0] : undefined;
 		orderField = order?.[0] ?? "";
 		orderDir = (order?.[1] as SortDirection) ?? "asc";
 		featured = !view.implicit;
 	});
+
+	function fieldDef(key: string) {
+		return sourceType?.fields.find((item) => item.key === key);
+	}
+
+	function needsValue(op: string) {
+		return op !== "empty" && op !== "not_empty";
+	}
+
+	function addFilter() {
+		filters = [...filters, { field: sourceType?.fields[0]?.key ?? "", op: "eq", value: "" }];
+	}
+
+	function removeFilter(index: number) {
+		filters = filters.filter((_, item) => item !== index);
+	}
+
+	function toggleExpose(field: string, on: boolean) {
+		expose = on
+			? expose.includes(field)
+				? expose
+				: [...expose, field]
+			: expose.filter((item) => item !== field);
+	}
+
+	function builtWhere() {
+		return compactWhere(
+			filters
+				.filter((clause) => clause.field && (!needsValue(clause.op) || clause.value !== ""))
+				.map((clause) => ({
+					field: clause.field,
+					op: clause.op as FilterOp,
+					value:
+						clause.op === "in"
+							? clause.value
+									.split(",")
+									.map((item) => item.trim())
+									.filter(Boolean)
+							: clause.value,
+				})),
+		);
+	}
 
 	function toggle(field: string, on: boolean) {
 		selected = on
@@ -67,7 +115,9 @@
 			label,
 			source,
 			fields: selected,
-			where: whereField && whereValue !== "" ? { [whereField]: whereValue } : undefined,
+			where: builtWhere(),
+			expose: expose.length ? expose : undefined,
+			limit: Number(limit) || undefined,
 			order_by: orderField ? { [orderField]: orderDir as SortDirection } : undefined,
 			implicit: featured ? false : view.implicit,
 		});
@@ -86,7 +136,9 @@
 		label,
 		source,
 		fields: selected,
-		where: whereField && whereValue !== "" ? { [whereField]: whereValue } : undefined,
+		where: builtWhere(),
+		expose,
+		limit: Number(limit) || undefined,
 		order_by: orderField ? { [orderField]: orderDir } : undefined,
 	} as ViewDef);
 
@@ -140,32 +192,77 @@
 						{/each}
 					</div>
 				</Field.Field>
-				<Field.Field>
-					<Field.Label>Only show where</Field.Label>
-					<AppSelect
-						bind:value={whereField}
-						options={[
-							{ value: "", label: "Everything" },
-							...(sourceType?.fields ?? []).map((field) => ({ value: field.key, label: field.label })),
-						]}
-					/>
-				</Field.Field>
-				{#if whereField}
+				<div class="flex flex-col gap-2">
+					<div class="flex items-center justify-between gap-2">
+						<Field.Label>Filters</Field.Label>
+						<Button variant="ghost" size="xs" onclick={addFilter}>
+							<PlusIcon data-icon="inline-start" />
+							Add
+						</Button>
+					</div>
+					{#if !filters.length}
+						<p class="text-sm text-muted-foreground">All records of this type.</p>
+					{/if}
+					{#each filters as clause, index (index)}
+						{@const def = fieldDef(clause.field)}
+						<div class="flex flex-col gap-2 rounded-xl border p-3">
+							<div class="flex items-start gap-2">
+								<div class="grid min-w-0 flex-1 gap-2">
+									<AppSelect
+										bind:value={clause.field}
+										options={(sourceType?.fields ?? []).map((field) => ({
+											value: field.key,
+											label: field.label,
+										}))}
+									/>
+									<AppSelect
+										bind:value={clause.op}
+										options={FILTER_OPS.map((item) => ({ value: item.value, label: item.label }))}
+									/>
+									{#if needsValue(clause.op)}
+										{#if def?.type === "enum" && clause.op !== "contains"}
+											<AppSelect
+												bind:value={clause.value}
+												options={(def.values ?? []).map((value) => ({
+													value,
+													label: labelFromKey(value),
+												}))}
+											/>
+										{:else}
+											<Input
+												bind:value={clause.value}
+												placeholder={clause.op === "in" ? "sent, overdue" : "value"}
+											/>
+										{/if}
+									{/if}
+								</div>
+								<Button variant="ghost" size="icon-xs" onclick={() => removeFilter(index)} aria-label="Remove filter">
+									<XIcon />
+								</Button>
+							</div>
+						</div>
+					{/each}
+				</div>
+				{#if sourceType?.fields.length}
 					<Field.Field>
-						<Field.Label>Equals</Field.Label>
-						{#if whereFieldDef?.type === "enum"}
-							<AppSelect
-								bind:value={whereValue}
-								options={(whereFieldDef.values ?? []).map((value) => ({
-									value,
-									label: labelFromKey(value),
-								}))}
-							/>
-						{:else}
-							<Input bind:value={whereValue} placeholder="active" />
-						{/if}
+						<Field.Label>People can filter by</Field.Label>
+						<div class="flex flex-col gap-2 rounded-xl border p-3">
+							{#each sourceType.fields as field (field.key)}
+								<Field.Field orientation="horizontal">
+									<Checkbox
+										checked={expose.includes(field.key)}
+										onCheckedChange={(value) => toggleExpose(field.key, Boolean(value))}
+									/>
+									<Field.Label class="font-normal">{field.label}</Field.Label>
+								</Field.Field>
+							{/each}
+						</div>
 					</Field.Field>
 				{/if}
+				<Field.Field>
+					<Field.Label>Limit</Field.Label>
+					<Input bind:value={limit} inputmode="numeric" placeholder="No limit" />
+				</Field.Field>
 				<Field.Field>
 					<Field.Label>Sort by</Field.Label>
 					<AppSelect

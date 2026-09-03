@@ -28,6 +28,8 @@ describe("sqlite materialisation", () => {
     const shared = await host.inspectStore("shared");
     expect(shared.database).toBe(`space-${host.space().id}`);
     expect(shared.database).not.toContain("-shared");
+    expect(shared.database).not.toContain("spc_");
+    expect(host.space().id.startsWith("spc_")).toBe(false);
     expect(info.database).toBe(`space-${host.app().id}`);
     expect(shared.database).not.toBe(info.database);
     expect(shared.tables.some((table) => table.name === "_meta")).toBe(true);

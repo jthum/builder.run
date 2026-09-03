@@ -233,6 +233,7 @@ export const sampleApps: SampleApp[] = [
           source: "invoice",
           fields: ["number", "project.name", "amount", "status"],
           where: { status: "sent" },
+          expose: ["status"],
         },
       },
       flows: {

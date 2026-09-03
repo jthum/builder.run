@@ -7,6 +7,23 @@ export type StoreKind = "local" | "shared";
 export type ActorKind = "human" | "agent" | "system";
 export type Exposure = "ui" | "agent";
 export type SortDirection = "asc" | "desc";
+export type FilterOp =
+  | "eq"
+  | "neq"
+  | "contains"
+  | "empty"
+  | "not_empty"
+  | "in"
+  | "gt"
+  | "gte"
+  | "lt"
+  | "lte";
+
+export interface FilterClause {
+  field: string;
+  op?: FilterOp;
+  value?: unknown;
+}
 
 export interface StoreDef {
   id: string;
@@ -42,7 +59,9 @@ export interface ViewDef {
   label: string;
   source: string;
   fields: string[];
-  where?: Record<string, unknown>;
+  where?: FilterClause[] | Record<string, unknown>;
+  expose?: string[];
+  limit?: number;
   order_by?: Record<string, SortDirection>;
   implicit?: boolean;
 }
