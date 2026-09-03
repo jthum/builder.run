@@ -260,6 +260,31 @@ types:
     ]);
   });
 
+  it("updates page metadata without replacing its blocks", async () => {
+    expect.hasAssertions();
+    const host = await Host.open({ persist: false });
+    const blocks = [
+      {
+        kind: "group" as const,
+        columns: 1,
+        blocks: [{ kind: "widget" as const, widget: "heading", values: { title: "Overview" } }],
+      },
+    ];
+    await host.upsertPage({ key: "overview", label: "Overview", blocks });
+
+    const page = await host.upsertPage({
+      key: "overview",
+      label: "Project overview",
+      icon: "dashboard",
+      folder: "Projects",
+    });
+
+    expect(page.label).toBe("Project overview");
+    expect(page.icon).toBe("dashboard");
+    expect(page.folder).toBe("Projects");
+    expect(page.blocks).toEqual(blocks);
+  });
+
   it("creates a type from inline fields as an array or a map, and keeps them on later upserts", async () => {
     expect.hasAssertions();
     const host = await Host.open({ persist: false });

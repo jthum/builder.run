@@ -32,6 +32,7 @@
 	let createName = $state("");
 	let createFolder = $state("");
 	let createIcon = $state<PageIconKey>("page");
+	let editingPage = $state<PageDef | null>(null);
 	let folderFor = $state<PageDef | null>(null);
 	let folderOpen = $state(false);
 	let removePage = $state<PageDef | null>(null);
@@ -40,18 +41,39 @@
 	let over = $state<string | null>(null);
 
 	function openCreate(folder = "") {
+		editingPage = null;
 		createName = "";
 		createFolder = folder;
 		createIcon = "page";
 		createOpen = true;
 	}
 
-	async function create(event: Event) {
+	function openEdit(page: PageDef) {
+		editingPage = page;
+		createName = page.label;
+		createFolder = page.folder ?? "";
+		createIcon = pageIconEntry(page.icon).key;
+		createOpen = true;
+	}
+
+	async function savePage(event: Event) {
 		event.preventDefault();
 		const name = createName.trim();
 		if (!name || !spec) return;
 		pending = true;
 		try {
+			if (editingPage) {
+				await runtime().upsertPage({
+					key: editingPage.key,
+					label: name,
+					icon: createIcon,
+					folder: createFolder.trim(),
+				});
+				createOpen = false;
+				editingPage = null;
+				toast.success("Page updated");
+				return;
+			}
 			const key = uniqueKey(
 				name,
 				spec.pages.map((page) => page.key),
@@ -242,13 +264,15 @@
 										{/snippet}
 									</DropdownMenu.Trigger>
 									<DropdownMenu.Content align="start" class="max-h-72 overflow-y-auto">
-										{#each pageIconList as choice (choice.key)}
-											{@const Icon = choice.icon}
-											<DropdownMenu.Item onSelect={() => setIcon(item, choice.key)}>
-												<Icon />
-												{choice.label}
-											</DropdownMenu.Item>
-										{/each}
+										<DropdownMenu.Group>
+											{#each pageIconList as choice (choice.key)}
+												{@const Icon = choice.icon}
+												<DropdownMenu.Item onSelect={() => setIcon(item, choice.key)}>
+													<Icon />
+													{choice.label}
+												</DropdownMenu.Item>
+											{/each}
+										</DropdownMenu.Group>
 									</DropdownMenu.Content>
 								</DropdownMenu.Root>
 								<a href={pageHref(item)} class="min-w-0 flex-1 rounded-md outline-none focus-visible:ring-2 focus-visible:ring-ring">
@@ -266,31 +290,38 @@
 										{/snippet}
 									</DropdownMenu.Trigger>
 									<DropdownMenu.Content align="end">
-										<DropdownMenu.Item onSelect={() => goto(pageHref(item))}>Open</DropdownMenu.Item>
-										<DropdownMenu.Sub>
-											<DropdownMenu.SubTrigger>
-												<FolderIcon />
-												Folder
-											</DropdownMenu.SubTrigger>
-											<DropdownMenu.SubContent>
-												<DropdownMenu.Item onSelect={() => setFolder(item, "")}>
-													No folder
-												</DropdownMenu.Item>
-												{#each folders as name (name)}
-													<DropdownMenu.Item onSelect={() => setFolder(item, name)}>
-														{name}
-													</DropdownMenu.Item>
-												{/each}
-												<DropdownMenu.Separator />
-												<DropdownMenu.Item onSelect={() => openNewFolder(item)}>
-													New folder…
-												</DropdownMenu.Item>
-											</DropdownMenu.SubContent>
-										</DropdownMenu.Sub>
+										<DropdownMenu.Group>
+											<DropdownMenu.Item onSelect={() => goto(pageHref(item))}>Open</DropdownMenu.Item>
+											<DropdownMenu.Item onSelect={() => openEdit(item)}>Edit</DropdownMenu.Item>
+											<DropdownMenu.Sub>
+												<DropdownMenu.SubTrigger>
+													<FolderIcon />
+													Folder
+												</DropdownMenu.SubTrigger>
+												<DropdownMenu.SubContent>
+													<DropdownMenu.Group>
+														<DropdownMenu.Item onSelect={() => setFolder(item, "")}>
+															No folder
+														</DropdownMenu.Item>
+														{#each folders as name (name)}
+															<DropdownMenu.Item onSelect={() => setFolder(item, name)}>
+																{name}
+															</DropdownMenu.Item>
+														{/each}
+														<DropdownMenu.Separator />
+														<DropdownMenu.Item onSelect={() => openNewFolder(item)}>
+															New folder…
+														</DropdownMenu.Item>
+													</DropdownMenu.Group>
+												</DropdownMenu.SubContent>
+											</DropdownMenu.Sub>
+										</DropdownMenu.Group>
 										<DropdownMenu.Separator />
-										<DropdownMenu.Item variant="destructive" onSelect={() => (removePage = item)}>
-											Delete
-										</DropdownMenu.Item>
+										<DropdownMenu.Group>
+											<DropdownMenu.Item variant="destructive" onSelect={() => (removePage = item)}>
+												Delete
+											</DropdownMenu.Item>
+										</DropdownMenu.Group>
 									</DropdownMenu.Content>
 								</DropdownMenu.Root>
 							</div>
@@ -304,46 +335,55 @@
 
 <Dialog.Root bind:open={createOpen}>
 	<Dialog.Content class="sm:max-w-md">
-		<form onsubmit={create}>
+		<form onsubmit={savePage}>
 			<Dialog.Header>
-				<Dialog.Title>New page</Dialog.Title>
-				<Dialog.Description>Shows under Home. Put it in a folder if you like.</Dialog.Description>
+				<Dialog.Title>{editingPage ? "Edit page" : "New page"}</Dialog.Title>
+				<Dialog.Description>
+					{editingPage
+						? "Change how this page appears in the app."
+						: "Shows under Home. Put it in a folder if you like."}
+				</Dialog.Description>
 			</Dialog.Header>
-			<Dialog.Body class="flex flex-col gap-4">
-				<Field.Field>
-					<Field.Label>Name</Field.Label>
-					<Input bind:value={createName} placeholder="Weekly review" autofocus />
-				</Field.Field>
-				<Field.Field>
-					<Field.Label>Icon</Field.Label>
-					<div class="flex flex-wrap gap-1">
-						{#each pageIconList as choice (choice.key)}
-							{@const Icon = choice.icon}
-							<Button
-								type="button"
-								variant={createIcon === choice.key ? "secondary" : "ghost"}
-								size="icon-sm"
-								onclick={() => (createIcon = choice.key)}
-								aria-label={choice.label}
-							>
-								<Icon />
-							</Button>
-						{/each}
-					</div>
-				</Field.Field>
-				<Field.Field>
-					<Field.Label>Folder</Field.Label>
-					<Input bind:value={createFolder} placeholder="Optional — e.g. Finance" list="page-folders" />
-					<datalist id="page-folders">
-						{#each folders as name (name)}
-							<option value={name}></option>
-						{/each}
-					</datalist>
-				</Field.Field>
+			<Dialog.Body>
+				<Field.FieldGroup>
+					<Field.Field>
+						<Field.Label>Name</Field.Label>
+						<Input bind:value={createName} placeholder="Weekly review" autofocus />
+					</Field.Field>
+					<Field.Field>
+						<Field.Label>Icon</Field.Label>
+						<div class="flex flex-wrap gap-1">
+							{#each pageIconList as choice (choice.key)}
+								{@const Icon = choice.icon}
+								<Button
+									type="button"
+									variant={createIcon === choice.key ? "secondary" : "ghost"}
+									size="icon-sm"
+									onclick={() => (createIcon = choice.key)}
+									aria-label={choice.label}
+									aria-pressed={createIcon === choice.key}
+								>
+									<Icon />
+								</Button>
+							{/each}
+						</div>
+					</Field.Field>
+					<Field.Field>
+						<Field.Label>Folder</Field.Label>
+						<Input bind:value={createFolder} placeholder="Optional — e.g. Finance" list="page-folders" />
+						<datalist id="page-folders">
+							{#each folders as name (name)}
+								<option value={name}></option>
+							{/each}
+						</datalist>
+					</Field.Field>
+				</Field.FieldGroup>
 			</Dialog.Body>
 			<Dialog.Footer>
 				<Button type="button" variant="outline" onclick={() => (createOpen = false)}>Cancel</Button>
-				<Button type="submit" disabled={pending || !createName.trim()}>Create page</Button>
+				<Button type="submit" disabled={pending || !createName.trim()}>
+					{editingPage ? "Save changes" : "Create page"}
+				</Button>
 			</Dialog.Footer>
 		</form>
 	</Dialog.Content>
