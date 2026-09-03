@@ -18,6 +18,7 @@ import {
   type RecordValue,
   type TypeDef,
   type ViewDef,
+  type ViewMeasure,
 } from "./model.ts";
 
 export interface QueryContext {
@@ -109,6 +110,24 @@ export async function executeView(
   );
   const sqlClauses = clauses.filter((clause) => !clause.field.includes("."));
   const memClauses = clauses.filter((clause) => clause.field.includes("."));
+  if (view.group_by) {
+    const sourceRows = await engine.select(type.key, { where: sqlClauses });
+    const filtered = [];
+    for (const row of sourceRows) {
+      if (memClauses.length) {
+        const projected = await projectRow(
+          ctx,
+          type,
+          row,
+          memClauses.map((clause) => clause.field),
+        );
+        if (!matchFilters(projected, memClauses)) continue;
+      }
+      filtered.push(row);
+    }
+    const grouped = await aggregateRows(ctx, type, filtered, view);
+    return grouped.slice(0, view.limit ?? grouped.length);
+  }
   const rows = await engine.select(type.key, {
     where: sqlClauses,
     orderBy: view.order_by,
@@ -121,6 +140,112 @@ export async function executeView(
     projected.push(next);
   }
   return projected;
+}
+
+async function aggregateRows(
+  ctx: QueryContext,
+  type: TypeDef,
+  rows: RecordValue[],
+  view: ViewDef,
+): Promise<Array<Record<string, unknown>>> {
+  const groupBy = view.group_by as string;
+  const groups = new Map<string, { value: unknown; rows: RecordValue[] }>();
+  for (const row of rows) {
+    const value = row[groupBy];
+    const token = `${typeof value}:${JSON.stringify(value)}`;
+    const group = groups.get(token);
+    if (group) group.rows.push(row);
+    else groups.set(token, { value, rows: [row] });
+  }
+  const result = await Promise.all(
+    [...groups.values()].map(async (group) => {
+      const output: Record<string, unknown> = {
+        id: scalarString(group.value),
+        [groupBy]: await groupLabel(ctx, type, groupBy, group.value),
+      };
+      for (const [alias, measure] of Object.entries(view.measures ?? {})) {
+        output[alias] = aggregateMeasure(group.rows, measure);
+      }
+      return output;
+    }),
+  );
+  const order = Object.entries(view.order_by ?? {});
+  if (order.length) {
+    result.sort((left, right) => {
+      for (const [field, direction] of order) {
+        const compared = compareValues(left[field], right[field]);
+        if (compared) return direction === "desc" ? -compared : compared;
+      }
+      return 0;
+    });
+  }
+  return result;
+}
+
+function aggregateMeasure(rows: RecordValue[], measure: ViewMeasure): number | null {
+  if (measure.op === "count") return rows.length;
+  const values = rows
+    .map((row) => measureValue(row, measure))
+    .filter((value): value is number => value != null);
+  if (!values.length) return null;
+  if (measure.op === "sum") return values.reduce((sum, value) => sum + value, 0);
+  if (measure.op === "min") return Math.min(...values);
+  if (measure.op === "max") return Math.max(...values);
+  return values.reduce((sum, value) => sum + value, 0) / values.length;
+}
+
+function measureValue(row: RecordValue, measure: ViewMeasure): number | null {
+  if (measure.op === "avg" && measure.fields?.length) {
+    const values = measure.fields.map((field) => finiteNumber(row[field]));
+    if (values.some((value) => value == null)) return null;
+    return (values as number[]).reduce((sum, value) => sum + value, 0) / values.length;
+  }
+  return finiteNumber(measure.field ? row[measure.field] : null);
+}
+
+function finiteNumber(value: unknown): number | null {
+  if (value == null || value === "") return null;
+  const number = typeof value === "number" ? value : Number(value);
+  return Number.isFinite(number) ? number : null;
+}
+
+function compareValues(left: unknown, right: unknown): number {
+  if (left == null || left === "") return right == null || right === "" ? 0 : 1;
+  if (right == null || right === "") return -1;
+  const leftNumber = finiteNumber(left);
+  const rightNumber = finiteNumber(right);
+  if (leftNumber != null && rightNumber != null) return leftNumber - rightNumber;
+  return scalarString(left).localeCompare(scalarString(right), undefined, {
+    numeric: true,
+    sensitivity: "base",
+  });
+}
+
+async function groupLabel(
+  ctx: QueryContext,
+  type: TypeDef,
+  fieldKey: string,
+  value: unknown,
+): Promise<unknown> {
+  const field = type.fields.find((item) => item.key === fieldKey);
+  if (field?.type !== "reference" || !field.target || value == null || value === "") return value;
+  const target = findType(ctx, field.target);
+  if (!target) return value;
+  const related = await ctx.engineFor(target).get(target.key, scalarString(value));
+  if (!related) return value;
+  const title = ["name", "title", "number", "email"].find((key) =>
+    target.fields.some((item) => item.key === key),
+  );
+  return title ? (related[title] ?? value) : value;
+}
+
+function scalarString(value: unknown): string {
+  if (value == null) return "";
+  if (typeof value === "string") return value;
+  if (typeof value === "number" || typeof value === "boolean" || typeof value === "bigint") {
+    return String(value);
+  }
+  return JSON.stringify(value) ?? "";
 }
 
 export function displayValue(value: unknown): string {

@@ -44,10 +44,12 @@
 	<div class="flex flex-col gap-6">
 		<PageHeader title={view.label}>
 			{#snippet actions()}
-				<Button href="/t/{view.source}/new">
-					<PlusIcon data-icon="inline-start" />
-					{type ? addLabel(type) : "Add"}
-				</Button>
+				{#if !view.group_by}
+					<Button href="/t/{view.source}/new">
+						<PlusIcon data-icon="inline-start" />
+						{type ? addLabel(type) : "Add"}
+					</Button>
+				{/if}
 			{/snippet}
 		</PageHeader>
 		<RecordTable

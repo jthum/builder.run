@@ -240,7 +240,14 @@ export function normalizeBlock(block: PageBlock): PageBlock {
 }
 
 export function normalizePage(page: PageDef): PageDef {
-  return { ...page, blocks: normalizeBlockList(page.blocks) };
+  return { ...page, blocks: normalizePageRows(page.blocks) };
+}
+
+/** Page roots are rows; tolerate legacy/agent-authored root widgets by wrapping each in a grid. */
+export function normalizePageRows(blocks: unknown): PageBlock[] {
+  return normalizeBlockList(blocks).map((block) =>
+    block.kind === "group" ? block : { kind: "group", columns: 1, blocks: [block] },
+  );
 }
 
 export function clampColumns(value: unknown): number {
@@ -369,6 +376,25 @@ export function typeForView(spec: AppSpec, viewKey: string): TypeDef | undefined
   return spec.types.find((item) => item.key === view.source);
 }
 
+export function fieldsForView(spec: AppSpec, viewKey: string): FieldDef[] {
+  const view = spec.views.find((item) => item.key === viewKey);
+  const type = typeForView(spec, viewKey);
+  if (!view?.group_by) return type?.fields ?? [];
+  const groupField = type?.fields.find((field) => field.key === view.group_by) ?? {
+    id: `group_${view.group_by}`,
+    key: view.group_by,
+    label: labelFromKey(view.group_by),
+    type: "text" as const,
+  };
+  const measures = Object.keys(view.measures ?? {}).map((key) => ({
+    id: `measure_${key}`,
+    key,
+    label: labelFromKey(key),
+    type: "number" as const,
+  }));
+  return [groupField, ...measures];
+}
+
 export function defaultWidgetValues(widget: WidgetDef, spec: AppSpec): Record<string, unknown> {
   const values: Record<string, unknown> = {};
   const firstView = homeViews(spec)[0]?.key ?? spec.views[0]?.key ?? "";
@@ -376,8 +402,7 @@ export function defaultWidgetValues(widget: WidgetDef, spec: AppSpec): Record<st
     spec.forms.find((form) => form.mode === "create")?.key ?? spec.forms[0]?.key ?? "";
   const firstFlow =
     spec.flows.find((flow) => flow.expose?.includes("ui") && !flow.trigger)?.key ?? "";
-  const type = typeForView(spec, firstView);
-  const fields = type?.fields ?? [];
+  const fields = fieldsForView(spec, firstView);
   for (const input of widget.inputs) {
     if (input.type === "view") values[input.key] = firstView;
     else if (input.type === "form") values[input.key] = firstForm;

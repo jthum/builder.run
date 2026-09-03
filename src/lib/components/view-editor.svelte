@@ -18,9 +18,9 @@
 	import * as Tabs from "$lib/components/ui/tabs/index.js";
 	import * as ToggleGroup from "$lib/components/ui/toggle-group/index.js";
 	import { compactWhere, FILTER_OPS, normalizeFilters, type FilterOp } from "$lib/runtime/filters.ts";
-	import { labelFromKey, uniqueKey } from "$lib/runtime/ids.ts";
+	import { labelFromKey, slugify, uniqueKey } from "$lib/runtime/ids.ts";
 	import { RECORD_ID_TOKEN } from "$lib/runtime/query.ts";
-	import type { FieldKind, SortDirection, TypeDef, ViewDef } from "$lib/runtime/model.ts";
+	import type { FieldKind, SortDirection, TypeDef, ViewDef, ViewMeasure } from "$lib/runtime/model.ts";
 	import { cn } from "$lib/utils.js";
 	import ArrowUpDownIcon from "@lucide/svelte/icons/arrow-up-down";
 	import CalendarIcon from "@lucide/svelte/icons/calendar";
@@ -35,6 +35,7 @@
 	import ListFilterIcon from "@lucide/svelte/icons/list-filter";
 	import ListIcon from "@lucide/svelte/icons/list";
 	import PlusIcon from "@lucide/svelte/icons/plus";
+	import SigmaIcon from "@lucide/svelte/icons/sigma";
 	import ToggleLeftIcon from "@lucide/svelte/icons/toggle-left";
 	import TypeIcon from "@lucide/svelte/icons/type";
 	import XIcon from "@lucide/svelte/icons/x";
@@ -55,6 +56,7 @@
 
 	type ColumnRow = { field: string; on: boolean };
 	type SortRow = { field: string; dir: SortDirection };
+	type MeasureRow = ViewMeasure & { key: string };
 
 	const types = $derived(session.snapshot?.spec.types ?? []);
 
@@ -67,6 +69,9 @@
 	let limit = $state("");
 	let limitOn = $state(false);
 	let sorts = $state<SortRow[]>([]);
+	let summarize = $state(false);
+	let groupBy = $state("");
+	let measureRows = $state<MeasureRow[]>([]);
 	let featured = $state(true);
 	let deleteOpen = $state(false);
 	let section = $state("filters");
@@ -82,7 +87,17 @@
 	const sourceType = $derived(
 		types.find((item) => item.key === source) ?? types.find((item) => item.key === view.source),
 	);
-	const fieldChoices = $derived(choicesFor(sourceType));
+	const numericFields = $derived((sourceType?.fields ?? []).filter((field) => field.type === "number"));
+	const measures = $derived(
+		Object.fromEntries(
+			measureRows
+				.filter((measure) => measure.key)
+				.map(({ key, ...measure }) => [key, measure]),
+		),
+	);
+	const fieldChoices = $derived(
+		summarize && groupBy ? [groupBy, ...Object.keys(measures)] : choicesFor(sourceType),
+	);
 	const selected = $derived(columns.filter((column) => column.on).map((column) => column.field));
 	const previewExposeFields = $derived(
 		exposeOn ? (sourceType?.fields ?? []).filter((field) => expose.includes(field.key)) : [],
@@ -97,7 +112,6 @@
 			label = view.label;
 			source = view.source;
 			const type = types.find((item) => item.key === view.source);
-			columns = mergeColumns([], choicesFor(type), view.fields);
 			filters = normalizeFilters(view.where).map((clause) => ({
 				field: clause.field,
 				op: clause.op ?? "eq",
@@ -108,6 +122,17 @@
 			exposeOn = nextExpose.length > 0;
 			limit = view.limit ? String(view.limit) : "";
 			limitOn = Boolean(view.limit);
+			summarize = Boolean(view.group_by);
+			groupBy = view.group_by ?? "";
+			measureRows = Object.entries(view.measures ?? {}).map(([key, measure]) => ({
+				key,
+				...structuredClone(measure),
+			}));
+			columns = mergeColumns(
+				[],
+				groupBy ? [groupBy, ...measureRows.map((measure) => measure.key)] : choicesFor(type),
+				view.fields,
+			);
 			sorts = Object.entries(view.order_by ?? {}).map(([field, dir]) => ({
 				field,
 				dir: dir === "desc" ? "desc" : "asc",
@@ -168,6 +193,7 @@
 	}
 
 	function columnKind(field: string): FieldKind {
+		if (measures[field]) return "number";
 		return fieldDef(field)?.type ?? "text";
 	}
 
@@ -281,9 +307,15 @@
 	function sortFieldOptions(current: string) {
 		const used = new Set(sorts.map((row) => row.field).filter((field) => field && field !== current));
 		return [
-			...(sourceType?.fields ?? []).map((field) => ({ value: field.key, label: field.label })),
-			{ value: "updated_at", label: "Last updated" },
-			{ value: "created_at", label: "Created" },
+			...(summarize && groupBy
+				? fieldChoices.map((field) => ({ value: field, label: columnLabel(field, sourceType) }))
+				: (sourceType?.fields ?? []).map((field) => ({ value: field.key, label: field.label }))),
+			...(summarize && groupBy
+				? []
+				: [
+						{ value: "updated_at", label: "Last updated" },
+						{ value: "created_at", label: "Created" },
+					]),
 		].filter((option) => !used.has(option.value));
 	}
 
@@ -295,6 +327,109 @@
 
 	function removeSort(index: number) {
 		sorts = sorts.filter((_, item) => item !== index);
+	}
+
+	function setSummarize(on: boolean) {
+		summarize = on;
+		if (!on) {
+			const aliases = new Set(measureRows.map((measure) => measure.key));
+			sorts = sorts.filter((sort) => !aliases.has(sort.field));
+			columns = choicesFor(sourceType).map((field) => ({ field, on: true }));
+			return;
+		}
+		groupBy ||= sourceType?.fields[0]?.key ?? "";
+		if (!measureRows.length) addMeasure();
+		columns = [groupBy, ...measureRows.map((measure) => measure.key)].map((field) => ({
+			field,
+			on: true,
+		}));
+	}
+
+	function setGroupBy(field: string) {
+		const previous = groupBy;
+		groupBy = field;
+		if (!field) return;
+		const existing = columns.find((column) => column.field === previous);
+		columns = [
+			{ field, on: existing?.on ?? true },
+			...columns.filter((column) => column.field !== previous && column.field !== field),
+		];
+		sorts = sorts.map((sort) => (sort.field === previous ? { ...sort, field } : sort));
+	}
+
+	function addMeasure() {
+		const key = uniqueKey(
+			`${source || "record"}_count`,
+			measureRows.map((measure) => measure.key),
+			"measure",
+		);
+		measureRows = [...measureRows, { key, op: "count" }];
+		columns = [...columns, { field: key, on: true }];
+	}
+
+	function removeMeasure(index: number) {
+		const removed = measureRows[index]?.key;
+		measureRows = measureRows.filter((_, item) => item !== index);
+		if (removed) {
+			columns = columns.filter((column) => column.field !== removed);
+			sorts = sorts.filter((sort) => sort.field !== removed);
+		}
+	}
+
+	function updateMeasure(index: number, patch: Partial<MeasureRow>) {
+		measureRows = measureRows.map((measure, item) =>
+			item === index ? { ...measure, ...patch } : measure,
+		);
+	}
+
+	function renameMeasure(index: number, value: string) {
+		const current = measureRows[index];
+		if (!current) return;
+		const key = uniqueKey(
+			slugify(value),
+			measureRows.filter((_, item) => item !== index).map((measure) => measure.key),
+			"measure",
+		);
+		if (key === current.key) return;
+		updateMeasure(index, { key });
+		columns = columns.map((column) =>
+			column.field === current.key ? { ...column, field: key } : column,
+		);
+		sorts = sorts.map((sort) => (sort.field === current.key ? { ...sort, field: key } : sort));
+	}
+
+	function setMeasureOp(index: number, op: ViewMeasure["op"]) {
+		const current = measureRows[index];
+		if (!current) return;
+		if (op === "count") {
+			updateMeasure(index, { op, field: undefined, fields: undefined });
+			return;
+		}
+		const selected = measureFields(current);
+		const field = selected[0] ?? numericFields[0]?.key ?? "";
+		updateMeasure(
+			index,
+			op === "avg"
+				? { op, field: undefined, fields: field ? [field] : [] }
+				: { op, field, fields: undefined },
+		);
+	}
+
+	function measureFields(measure: ViewMeasure): string[] {
+		return measure.fields?.length ? measure.fields : measure.field ? [measure.field] : [];
+	}
+
+	function toggleAverageField(index: number, field: string, on: boolean) {
+		const current = measureRows[index];
+		if (!current) return;
+		const selected = measureFields(current);
+		const fields = on
+			? selected.includes(field)
+				? selected
+				: [...selected, field]
+			: selected.filter((item) => item !== field);
+		if (!fields.length) return;
+		updateMeasure(index, { field: undefined, fields });
 	}
 
 	function builtOrder(): Record<string, SortDirection> | undefined {
@@ -329,7 +464,7 @@
 		if (field === "created_at" || field === "updated_at" || fieldDef(field)?.type === "date") {
 			return { asc: "Oldest first", desc: "Newest first" };
 		}
-		if (fieldDef(field)?.type === "number") {
+		if (columnKind(field) === "number") {
 			return { asc: "Low to high", desc: "High to low" };
 		}
 		return { asc: "A to Z", desc: "Z to A" };
@@ -346,6 +481,8 @@
 			expose: exposeOn && expose.length ? [...expose] : undefined,
 			limit: limitOn ? Number(limit) || undefined : undefined,
 			order_by: builtOrder(),
+			group_by: summarize ? groupBy || undefined : undefined,
+			measures: summarize && groupBy ? structuredClone(measures) : undefined,
 			implicit: featured ? false : view.implicit,
 		});
 		toast.success("View saved");
@@ -363,6 +500,8 @@
 			expose: exposeOn && expose.length ? [...expose] : undefined,
 			limit: limitOn ? Number(limit) || undefined : undefined,
 			order_by: builtOrder(),
+			group_by: summarize ? groupBy || undefined : undefined,
+			measures: summarize && groupBy ? structuredClone(measures) : undefined,
 			implicit: false,
 		});
 		toast.success("View duplicated");
@@ -386,6 +525,8 @@
 			expose: exposeOn ? expose : undefined,
 			limit: limitOn ? Number(limit) || undefined : undefined,
 			order_by: builtOrder(),
+			group_by: summarize ? groupBy || undefined : undefined,
+			measures: summarize && groupBy ? measures : undefined,
 		}) as ViewDef,
 	);
 
@@ -486,6 +627,13 @@
 					<Tabs.Trigger value="columns" class="h-8 flex-none gap-2 px-3">
 						<Columns3Icon data-icon="inline-start" class="hidden sm:block" />
 						Columns
+					</Tabs.Trigger>
+					<Tabs.Trigger value="summaries" class="h-8 flex-none gap-2 px-3">
+						<SigmaIcon data-icon="inline-start" class="hidden sm:block" />
+						Summaries
+						{#if summarize && measureRows.length}
+							<span class="text-xs text-muted-foreground tabular-nums">{measureRows.length}</span>
+						{/if}
 					</Tabs.Trigger>
 					<Tabs.Trigger value="sort" class="h-8 flex-none gap-2 px-3">
 						<ArrowUpDownIcon data-icon="inline-start" class="hidden sm:block" />
@@ -725,6 +873,148 @@
 								</div>
 							{/each}
 						</div>
+					{/if}
+				</Tabs.Content>
+
+				<Tabs.Content value="summaries" class="flex flex-col gap-5">
+					<div class="flex flex-col gap-4 rounded-2xl bg-muted/60 p-4 ring-1 ring-foreground/5">
+						<Field.Field orientation="horizontal">
+							<Switch
+								checked={summarize}
+								onCheckedChange={(value) => setSummarize(Boolean(value))}
+								id="summarize"
+							/>
+							<Field.Content>
+								<Field.Label for="summarize">Group and summarize records</Field.Label>
+								<Field.Description>
+									Return one row per group with live totals, averages, minimums, or maximums.
+								</Field.Description>
+							</Field.Content>
+						</Field.Field>
+						{#if summarize}
+							<Field.Field>
+								<Field.Label>Group by</Field.Label>
+								<AppSelect
+									value={groupBy}
+									onValueChange={setGroupBy}
+									options={(sourceType?.fields ?? []).map((field) => ({
+										value: field.key,
+										label: field.label,
+									}))}
+									placeholder="Choose a field"
+								/>
+								<Field.Description>
+									Reference fields use the referenced record as the group and show its label.
+								</Field.Description>
+							</Field.Field>
+						{/if}
+					</div>
+
+					{#if summarize}
+						<div class="flex items-center justify-between gap-3">
+							<div>
+								<h3 class="font-medium">Summary columns</h3>
+								<p class="text-sm text-muted-foreground">Each calculation becomes a column in the grouped list.</p>
+							</div>
+							<Button variant="outline" size="sm" onclick={addMeasure}>
+								<PlusIcon data-icon="inline-start" />
+								Add summary
+							</Button>
+						</div>
+
+						{#if !measureRows.length}
+							<Empty.Root class="border border-dashed py-8">
+								<Empty.Header>
+									<Empty.Media variant="icon"><SigmaIcon /></Empty.Media>
+									<Empty.Title>No summary columns</Empty.Title>
+									<Empty.Description>Add a count, total, average, minimum, or maximum.</Empty.Description>
+								</Empty.Header>
+								<Empty.Content>
+									<Button variant="outline" onclick={addMeasure}>
+										<PlusIcon data-icon="inline-start" />
+										Add summary
+									</Button>
+								</Empty.Content>
+							</Empty.Root>
+						{:else}
+							<div class="flex flex-col gap-3">
+								{#each measureRows as measure, index (index)}
+									<div class="flex flex-col gap-4 rounded-2xl bg-card p-4 ring-1 ring-foreground/10">
+										<div class="grid items-end gap-3 md:grid-cols-[minmax(0,1fr)_12rem_auto]">
+											<Field.Field>
+												<Field.Label for="measure-{index}">Column name</Field.Label>
+												<Input
+													id="measure-{index}"
+													value={measure.key}
+													onchange={(event) => renameMeasure(index, event.currentTarget.value)}
+													placeholder="overall_score"
+												/>
+											</Field.Field>
+											<Field.Field>
+												<Field.Label>Calculation</Field.Label>
+												<AppSelect
+													value={measure.op}
+													onValueChange={(value) => setMeasureOp(index, value as ViewMeasure["op"])}
+													options={[
+														{ value: "count", label: "Count" },
+														...(numericFields.length
+															? [
+																{ value: "sum", label: "Sum" },
+																{ value: "avg", label: "Average" },
+																{ value: "min", label: "Minimum" },
+																{ value: "max", label: "Maximum" },
+															]
+															: []),
+													]}
+												/>
+											</Field.Field>
+											<Button
+												variant="ghost"
+												size="icon-sm"
+												onclick={() => removeMeasure(index)}
+												aria-label="Remove {labelFromKey(measure.key)} summary"
+											>
+												<XIcon />
+											</Button>
+										</div>
+
+										{#if measure.op === "avg"}
+											<Field.FieldSet>
+												<Field.FieldLegend variant="label">Fields to average</Field.FieldLegend>
+												<Field.Description>
+													With several fields, each record is averaged first, then the group is averaged.
+												</Field.Description>
+												<div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+													{#each numericFields as field (field.key)}
+														<Field.Field orientation="horizontal">
+															<Checkbox
+																checked={measureFields(measure).includes(field.key)}
+																disabled={measureFields(measure).length === 1 && measureFields(measure).includes(field.key)}
+																onCheckedChange={(value) =>
+																	toggleAverageField(index, field.key, Boolean(value))}
+															/>
+															<Field.Label class="font-normal">{field.label}</Field.Label>
+														</Field.Field>
+													{/each}
+												</div>
+											</Field.FieldSet>
+										{:else if measure.op !== "count"}
+											<Field.Field>
+												<Field.Label>Number field</Field.Label>
+												<AppSelect
+													value={measure.field ?? ""}
+													onValueChange={(value) => updateMeasure(index, { field: value })}
+													options={numericFields.map((field) => ({ value: field.key, label: field.label }))}
+													placeholder="Choose a number field"
+												/>
+											</Field.Field>
+										{:else}
+											<p class="text-sm text-muted-foreground">Counts every record in the group.</p>
+										{/if}
+									</div>
+								{/each}
+							</div>
+						{/if}
 					{/if}
 				</Tabs.Content>
 

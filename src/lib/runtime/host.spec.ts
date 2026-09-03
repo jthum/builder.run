@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vite-plus/test";
 import { Host } from "./host.ts";
+import { groupChart } from "./chart-data.ts";
 import { specFromText } from "./serialize.ts";
 import { createNodeGateway } from "./sql-node.ts";
 
@@ -101,6 +102,100 @@ types:
     expect(host.resolvedSpec().types[0]?.fields[0]).not.toHaveProperty("presentation");
     expect(host.resolvedSpec().types[0]?.fields[0]).not.toHaveProperty("variant");
     expect(host.resolvedSpec().types[0]?.fields[0]).not.toHaveProperty("max");
+  });
+
+  it("derives and reorders a grouped review leaderboard without mutating submissions", async () => {
+    expect.hasAssertions();
+    const host = await Host.open({ persist: false });
+    await host.upsertType({
+      key: "submission",
+      fields: [{ key: "name", label: "Name", type: "text", required: true }] as never,
+    });
+    await host.upsertType({
+      key: "review",
+      fields: [
+        { key: "submission", label: "Submission", type: "reference", target: "submission" },
+        { key: "webmcp_leverage", label: "WebMCP leverage", type: "number", required: true },
+        { key: "execution", label: "Execution", type: "number", required: true },
+        { key: "impact", label: "Impact", type: "number", required: true },
+        { key: "creativity", label: "Creativity", type: "number", required: true },
+      ] as never,
+    });
+    const submissionA = await host.create("submission", { name: "Submission A" });
+    const submissionB = await host.create("submission", { name: "Submission B" });
+    await host.create("review", {
+      submission: submissionA.id,
+      webmcp_leverage: 5,
+      execution: 5,
+      impact: 4,
+      creativity: 4,
+    });
+    await host.create("review", {
+      submission: submissionA.id,
+      webmcp_leverage: 4,
+      execution: 5,
+      impact: 5,
+      creativity: 4,
+    });
+    const reviewB = await host.create("review", {
+      submission: submissionB.id,
+      webmcp_leverage: 3,
+      execution: 4,
+      impact: 3,
+      creativity: 4,
+    });
+    const beforeA = await host.getRecord("submission", submissionA.id);
+    const beforeB = await host.getRecord("submission", submissionB.id);
+    const view = await host.upsertView({
+      key: "leaderboard",
+      source: "review",
+      group_by: "submission",
+      measures: {
+        review_count: { op: "count" },
+        webmcp_score: { op: "avg", field: "webmcp_leverage" },
+        execution_score: { op: "avg", field: "execution" },
+        impact_score: { op: "avg", field: "impact" },
+        creativity_score: { op: "avg", field: "creativity" },
+        overall_score: {
+          op: "avg",
+          fields: ["webmcp_leverage", "execution", "impact", "creativity"],
+        },
+      },
+      order_by: { overall_score: "desc" },
+    });
+
+    expect(view.fields).toEqual([
+      "submission",
+      "review_count",
+      "webmcp_score",
+      "execution_score",
+      "impact_score",
+      "creativity_score",
+      "overall_score",
+    ]);
+    const initial = await host.queryView("leaderboard");
+    expect(initial.map((row) => row.submission)).toEqual(["Submission A", "Submission B"]);
+    expect(initial[0]).toMatchObject({
+      review_count: 2,
+      webmcp_score: 4.5,
+      execution_score: 5,
+      impact_score: 4.5,
+      creativity_score: 4,
+      overall_score: 4.5,
+    });
+    expect(initial[1]?.overall_score).toBe(3.5);
+
+    await host.update("review", reviewB.id, { webmcp_leverage: 5 });
+    const updated = await host.queryView("leaderboard");
+    expect(updated.map((row) => row.submission)).toEqual(["Submission A", "Submission B"]);
+    expect(updated[1]).toMatchObject({ webmcp_score: 5, overall_score: 4 });
+    expect(groupChart(updated, { category: "submission", value: "overall_score" })).toMatchObject({
+      categories: [{ label: "Submission A" }, { label: "Submission B" }],
+      series: [{ values: [4.5, 4] }],
+    });
+    expect(await host.getRecord("submission", submissionA.id)).toEqual(beforeA);
+    expect(await host.getRecord("submission", submissionB.id)).toEqual(beforeB);
+    expect(host.resolvedSpec().flows).toEqual([]);
   });
 
   it("walks the freelance CRM mould-and-use loop", async () => {

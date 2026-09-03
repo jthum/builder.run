@@ -10,12 +10,14 @@
 		placeholder = "Select",
 		class: className,
 		disabled = false,
+		onValueChange,
 	}: {
 		value?: string;
 		options: Array<{ value: string; label: string }>;
 		placeholder?: string;
 		class?: string;
 		disabled?: boolean;
+		onValueChange?: (value: string) => void;
 	} = $props();
 
 	const items = $derived(
@@ -32,6 +34,7 @@
 	value={value ? value : empty}
 	onValueChange={(next) => {
 		value = next === empty ? "" : next;
+		onValueChange?.(value);
 	}}
 	{disabled}
 	allowDeselect={false}

@@ -9,8 +9,8 @@
 	import { Textarea } from "$lib/components/ui/textarea/index.js";
 	import type { PageBlock } from "$lib/runtime/model.ts";
 	import {
+		fieldsForView,
 		fieldsMatching,
-		typeForView,
 		widgetByKey,
 		type WidgetFieldKind,
 	} from "$lib/runtime/widgets.ts";
@@ -53,8 +53,8 @@
 
 	function fieldOptions(of?: WidgetFieldKind) {
 		const viewKey = String(values.view ?? "");
-		const type = spec ? typeForView(spec, viewKey) : undefined;
-		return fieldsMatching(type?.fields ?? [], of).map((field) => ({
+		const fields = spec ? fieldsForView(spec, viewKey) : [];
+		return fieldsMatching(fields, of).map((field) => ({
 			value: field.key,
 			label: field.label,
 		}));

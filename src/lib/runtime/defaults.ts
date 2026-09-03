@@ -7,7 +7,7 @@ import {
   type TypeDef,
   type ViewDef,
 } from "./model.ts";
-import { firstViewKey, normalizeBlockList } from "./widgets.ts";
+import { firstViewKey, normalizePageRows } from "./widgets.ts";
 
 export function implicitViewKey(typeKey: string): string {
   return `${typeKey}_list`;
@@ -118,7 +118,7 @@ export function applyDefaults(spec: AppSpec): AppSpec {
     (form) => !form.implicit || next.types.some((type) => type.key === form.type),
   );
   for (const page of next.pages) {
-    page.blocks = normalizeBlockList(page.blocks);
+    page.blocks = normalizePageRows(page.blocks);
   }
   next.pages = next.pages.filter((page) => {
     if (!page.implicit) return true;

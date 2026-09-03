@@ -9,6 +9,7 @@ export type StoreKind = "local" | "shared";
 export type ActorKind = "human" | "agent" | "system";
 export type Exposure = "ui" | "agent";
 export type SortDirection = "asc" | "desc";
+export type AggregateOp = "count" | "sum" | "avg" | "min" | "max";
 export type FilterOp =
   | "eq"
   | "neq"
@@ -68,7 +69,15 @@ export interface ViewDef {
   expose?: string[];
   limit?: number;
   order_by?: Record<string, SortDirection>;
+  group_by?: string;
+  measures?: Record<string, ViewMeasure>;
   implicit?: boolean;
+}
+
+export interface ViewMeasure {
+  op: AggregateOp;
+  field?: string;
+  fields?: string[];
 }
 
 export interface FormDef {
@@ -199,11 +208,15 @@ export type FieldDraft = FieldKind | (Partial<FieldDef> & { field_type?: string 
 export type TypeDraft = Partial<Omit<TypeDef, "fields">> & {
   fields?: Record<string, FieldDraft> | FieldDraft[];
 };
+type ViewDraft = Partial<ViewDef> & {
+  groupBy?: string;
+  sort?: Array<{ field: string; direction?: SortDirection }>;
+};
 type SpecDraft = Partial<
   Omit<AppSpec, "types" | "views" | "forms" | "flows" | "pages" | "stores">
 > & {
   types?: Record<string, TypeDraft> | TypeDef[];
-  views?: Record<string, Partial<ViewDef>> | ViewDef[];
+  views?: Record<string, ViewDraft> | ViewDraft[];
   forms?: Record<string, Partial<FormDef>> | FormDef[];
   flows?: Record<string, Partial<FlowDef>> | FlowDef[];
   pages?: Record<string, Partial<PageDef>> | PageDef[];
@@ -313,6 +326,52 @@ function namedList<T extends { id?: string; key?: string; label?: string }>(
   });
 }
 
+const AGGREGATE_OPS = new Set<AggregateOp>(["count", "sum", "avg", "min", "max"]);
+
+export function normalizeView(view: ViewDraft & Pick<ViewDef, "id" | "key" | "label">): ViewDef {
+  const { groupBy, sort, ...base } = view;
+  const groupByField = String(base.group_by ?? groupBy ?? "").trim();
+  const measures = Object.fromEntries(
+    Object.entries(base.measures ?? {}).map(([alias, draft]) => {
+      const op = String(draft.op) as AggregateOp;
+      if (!AGGREGATE_OPS.has(op)) throw new Error(`Unknown aggregate op "${op}" on ${alias}`);
+      const field = String(draft.field ?? "").trim();
+      const fields = (draft.fields ?? []).map((item) => String(item).trim()).filter(Boolean);
+      if (op !== "count" && !field && !(op === "avg" && fields.length)) {
+        throw new Error(`Aggregate measure "${alias}" needs a field`);
+      }
+      return [
+        alias,
+        {
+          op,
+          ...(field ? { field } : {}),
+          ...(op === "avg" && fields.length ? { fields } : {}),
+        } satisfies ViewMeasure,
+      ];
+    }),
+  );
+  const orderBy =
+    base.order_by ??
+    (sort?.length
+      ? Object.fromEntries(
+          sort.filter((item) => item.field).map((item) => [item.field, item.direction ?? "asc"]),
+        )
+      : undefined);
+  const fields = base.fields?.length
+    ? base.fields
+    : groupByField
+      ? [groupByField, ...Object.keys(measures)]
+      : [];
+  return {
+    ...base,
+    source: base.source ?? "",
+    fields,
+    ...(orderBy && Object.keys(orderBy).length ? { order_by: orderBy } : {}),
+    ...(groupByField ? { group_by: groupByField } : {}),
+    ...(Object.keys(measures).length ? { measures } : {}),
+  };
+}
+
 export function normalizeSpec(input: SpecDraft | AppSpec, existing?: AppSpec): AppSpec {
   const key = input.key || existing?.key || "app";
   const stores = namedList(input.stores, "sto", existing?.stores)
@@ -338,7 +397,9 @@ export function normalizeSpec(input: SpecDraft | AppSpec, existing?: AppSpec): A
     label: input.label || existing?.label || labelFromKey(key),
     stores,
     types,
-    views: namedList(input.views as never, "vw", existing?.views as never) as ViewDef[],
+    views: (namedList(input.views as never, "vw", existing?.views as never) as ViewDef[]).map(
+      normalizeView,
+    ),
     forms: namedList(input.forms as never, "frm", existing?.forms as never) as FormDef[],
     flows: namedList(input.flows as never, "flw", existing?.flows as never) as FlowDef[],
     pages: namedList(input.pages as never, "pg", existing?.pages as never) as PageDef[],

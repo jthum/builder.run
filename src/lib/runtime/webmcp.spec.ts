@@ -151,6 +151,61 @@ describe("webmcp bridge", () => {
     bridge.stop();
   });
 
+  it("returns grouped view measures through the shared query_view tool", async () => {
+    expect.hasAssertions();
+    const host = await Host.open({ persist: false });
+    await host.upsertType({
+      key: "review",
+      fields: [
+        { key: "submission", type: "text" },
+        { key: "score", type: "number" },
+      ] as never,
+    });
+    await host.create("review", { submission: "A", score: 5 });
+    await host.create("review", { submission: "A", score: 3 });
+    await host.create("review", { submission: "B", score: 2 });
+    const registry = mockRegistry();
+    const bridge = createWebMcpBridge(host, registry);
+    await bridge.flush();
+    await registry.tools.get("upsert_view")!.execute({
+      key: "scores",
+      source: "review",
+      group_by: "submission",
+      measures: {
+        review_count: { op: "count" },
+        average_score: { op: "avg", field: "score" },
+        total_score: { op: "sum", field: "score" },
+        lowest_score: { op: "min", field: "score" },
+        highest_score: { op: "max", field: "score" },
+      },
+      order_by: { average_score: "desc" },
+    });
+    const result = JSON.parse(
+      String(await registry.tools.get("query_view")!.execute({ view: "scores" })),
+    );
+    expect(result).toEqual([
+      {
+        id: "A",
+        submission: "A",
+        review_count: 2,
+        average_score: 4,
+        total_score: 8,
+        lowest_score: 3,
+        highest_score: 5,
+      },
+      {
+        id: "B",
+        submission: "B",
+        review_count: 1,
+        average_score: 2,
+        total_score: 2,
+        lowest_score: 2,
+        highest_score: 2,
+      },
+    ]);
+    bridge.stop();
+  });
+
   it("lists space-exposed types on get_space and shares them across apps", async () => {
     expect.hasAssertions();
     const host = await Host.open({ persist: false });

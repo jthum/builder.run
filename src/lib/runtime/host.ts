@@ -13,6 +13,7 @@ import {
   cloneData,
   cloneSpec,
   normalizeSpec,
+  normalizeView,
   type Actor,
   type AppSpec,
   type ExecutionContext,
@@ -40,7 +41,7 @@ import { newAppSpec, rootSpaceSpec, sampleApps } from "./samples.ts";
 import { reconcileStore } from "./schema.ts";
 import { specFromText, specToJson, specToYaml } from "./serialize.ts";
 import { guessPageIcon, normalizePageIcon } from "./page-icons.ts";
-import { normalizeBlockList } from "./widgets.ts";
+import { normalizePageRows } from "./widgets.ts";
 import { SqliteEngine } from "./sql-engine.ts";
 import { openSqlGateway, type SqlConnection, type SqlGateway } from "./sql-gateway.ts";
 
@@ -494,15 +495,19 @@ export class Host {
     draft = cloneData(draft);
     const spec = this.app().spec;
     const existing = spec.views.find((view) => view.key === draft.key);
-    const views = upsertNamed(spec.views, {
-      id: existing?.id || createId("vw"),
-      label: labelFromKey(draft.key),
-      source: "",
-      fields: [],
-      ...existing,
-      ...draft,
-      implicit: false,
-    });
+    const views = upsertNamed(
+      spec.views,
+      normalizeView({
+        id: existing?.id || createId("vw"),
+        label: labelFromKey(draft.key),
+        source: "",
+        fields: [],
+        ...existing,
+        ...draft,
+        key: draft.key,
+        implicit: false,
+      }),
+    );
     this.app().spec = applyDefaults({ ...spec, views });
     await this.persistAndEmit();
     return views.find((item) => item.key === draft.key) as ViewDef;
@@ -546,7 +551,7 @@ export class Host {
     const spec = this.app().spec;
     const existing = spec.pages.find((page) => page.key === draft.key);
     const folder = draft.folder !== undefined ? folderName(draft.folder) : existing?.folder;
-    const blocks = normalizeBlockList(
+    const blocks = normalizePageRows(
       draft.blocks !== undefined ? draft.blocks : (existing?.blocks ?? []),
     );
     const icon =

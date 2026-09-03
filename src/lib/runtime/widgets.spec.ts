@@ -6,12 +6,14 @@ import {
   groupPagesByFolder,
   moveAuthoredPage,
   defaultWidgetValues,
+  fieldsForView,
   implicitHomePage,
   insertBlock,
   moveInGroup,
   moveSibling,
   normalizeBlock,
   normalizeBlockList,
+  normalizePage,
   removeBlock,
   rowHeightClass,
   setBlock,
@@ -97,6 +99,36 @@ describe("page widgets", () => {
     });
   });
 
+  it("offers grouped dimensions and measures to chart widgets", () => {
+    expect.hasAssertions();
+    const spec = {
+      views: [
+        {
+          key: "leaderboard",
+          source: "review",
+          fields: ["submission", "overall_score"],
+          group_by: "submission",
+          measures: { overall_score: { op: "avg", field: "score" } },
+        },
+      ],
+      types: [
+        {
+          key: "review",
+          fields: [
+            { key: "submission", type: "reference", label: "Submission" },
+            { key: "score", type: "number", label: "Score" },
+          ],
+        },
+      ],
+      forms: [],
+      flows: [],
+    } as never;
+    expect(fieldsForView(spec, "leaderboard").map((field) => [field.key, field.type])).toEqual([
+      ["submission", "reference"],
+      ["overall_score", "number"],
+    ]);
+  });
+
   it("wraps a single nested block object so group.blocks.filter never throws", () => {
     expect.hasAssertions();
     const widget = { kind: "widget" as const, widget: "table", values: { view: "recent_time" } };
@@ -111,6 +143,24 @@ describe("page widgets", () => {
     expect(normalizeBlockList(JSON.stringify([widget]))).toEqual([widget]);
     expect(normalizeBlockList({ 0: widget })).toEqual([widget]);
     expect(normalizeBlockList(undefined)).toEqual([]);
+  });
+
+  it("wraps legacy root widgets in editable grid rows", () => {
+    expect.hasAssertions();
+    const heading = {
+      kind: "widget" as const,
+      widget: "heading",
+      values: { title: "Overview", description: "At a glance" },
+    };
+    expect(
+      normalizePage({ id: "pg_1", key: "overview", label: "Overview", blocks: [heading] }).blocks,
+    ).toEqual([
+      {
+        kind: "group",
+        columns: 1,
+        blocks: [heading],
+      },
+    ]);
   });
 
   it("builds a home page of number cards and compact tables from featured views", () => {

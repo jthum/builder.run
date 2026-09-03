@@ -263,6 +263,21 @@ const fieldDraftSchema = {
   },
 };
 
+const viewMeasuresSchema = {
+  type: "object",
+  description: "Named live aggregates for a grouped view",
+  additionalProperties: {
+    type: "object",
+    properties: {
+      op: { type: "string", enum: ["count", "sum", "avg", "min", "max"] },
+      field: { type: "string" },
+      fields: { type: "array", items: { type: "string" } },
+    },
+    required: ["op"],
+    additionalProperties: false,
+  },
+};
+
 export function buildTools(host: Host): ToolDefinition[] {
   const spec = host.resolvedSpec();
   const tools: ToolDefinition[] = [
@@ -323,7 +338,7 @@ export function buildTools(host: Host): ToolDefinition[] {
       name: "query_view",
       title: "Run a view",
       description:
-        'Run a named view and return its rows. Views are how records are filtered, sorted, and limited — list_* returns every record. Discover view keys via get_spec. Example: query_view({ view: "active_projects" }).',
+        'Run a named view and return its rows. Views can filter, sort, limit, and derive live grouped measures — list_* returns every source record. Discover view keys via get_spec. Example: query_view({ view: "active_projects" }).',
       inputSchema: {
         type: "object",
         properties: {
@@ -537,7 +552,7 @@ export function buildTools(host: Host): ToolDefinition[] {
       name: "upsert_view",
       title: "Create or update a view",
       description:
-        'Create or update a named view (a stored query: filter, sort, limit, columns). Run it with query_view. Example: upsert_view({ key: "active_projects", source: "project", where: { status: "active" } }).',
+        'Create or update a named view (a stored query: filter, sort, limit, columns, or live grouped measures). group_by accepts one source field. measures supports count, sum, avg, min, and max; avg accepts field or fields. Sort aggregate aliases with order_by. Run it with query_view. Example: upsert_view({ key: "scores", source: "review", group_by: "submission", measures: { review_count: { op: "count" }, overall_score: { op: "avg", fields: ["quality", "impact"] } }, order_by: { overall_score: "desc" } }).',
       inputSchema: {
         type: "object",
         properties: {
@@ -549,6 +564,8 @@ export function buildTools(host: Host): ToolDefinition[] {
           expose: { type: "array", items: { type: "string" } },
           limit: { type: "number" },
           order_by: { type: "object" },
+          group_by: { type: "string" },
+          measures: viewMeasuresSchema,
         },
         required: ["key", "source"],
         additionalProperties: false,

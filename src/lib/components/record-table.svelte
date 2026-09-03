@@ -55,6 +55,7 @@
 	} = $props();
 
 	const type = $derived(typeByKey(session.snapshot?.spec, typeKey) as TypeDef | undefined);
+	const aggregated = $derived(Boolean(view.group_by));
 	const add = $derived(createLabel ?? (type ? addLabel(type) : "Add"));
 	const columns = $derived.by((): DataTableColumn[] => {
 		const keys = view.fields.length ? view.fields : ["id"];
@@ -65,9 +66,9 @@
 				id: key,
 				label: columnLabel(key, type),
 				sortable: true,
-				numeric: isAmountPath(key) || field?.type === "number",
+				numeric: isAmountPath(key) || field?.type === "number" || Boolean(view.measures?.[key]),
 				filterValues: field?.type === "enum" ? field.values : undefined,
-				href: (row) => (key === keys[0] ? `/t/${typeKey}/${row.id}` : undefined),
+				href: (row) => (!aggregated && key === keys[0] ? `/t/${typeKey}/${row.id}` : undefined),
 			};
 		});
 	});
@@ -109,9 +110,9 @@
 	{rows}
 	{columns}
 	{compact}
-	createHref={createHref}
+	createHref={aggregated ? undefined : createHref}
 	createLabel={add}
-	{onCreate}
+	onCreate={aggregated ? undefined : onCreate}
 	emptyTitle={emptyTitle ?? (type ? emptyCollectionTitle(type) : "Nothing here yet")}
 	emptyDescription={emptyDescription ??
 		(type ? emptyCollectionDescription(type) : "Add a record to get started.")}
@@ -121,8 +122,8 @@
 	searchPlaceholder={`Search ${type ? collectionLabel(type).toLowerCase() : "records"}`}
 	{externalFilterIds}
 	{externallyFiltered}
-	onOpen={openRow}
-	onDelete={(items) => (pending = items)}
+	onOpen={aggregated ? undefined : openRow}
+	onDelete={aggregated ? undefined : (items) => (pending = items)}
 >
 	{#snippet filterControls()}
 		<ViewExposeBar fields={exposedFields} bind:values={exposedValues} />
@@ -133,7 +134,7 @@
 			{value}
 			{type}
 			badge={isStatusPath(column.id)}
-			href={index === 0 ? `/t/${typeKey}/${row.id}` : column.href?.(row)}
+			href={aggregated ? undefined : index === 0 ? `/t/${typeKey}/${row.id}` : column.href?.(row)}
 		/>
 	{/snippet}
 	{#snippet footer({ rows: visibleRows, columns: visibleCols })}

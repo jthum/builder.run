@@ -75,6 +75,8 @@ export function authoringSpec(spec: AppSpec): Record<string, unknown> {
             ...(view.expose?.length ? { expose: view.expose } : {}),
             ...(view.limit ? { limit: view.limit } : {}),
             ...(view.order_by ? { order_by: view.order_by } : {}),
+            ...(view.group_by ? { group_by: view.group_by } : {}),
+            ...(view.measures ? { measures: view.measures } : {}),
           },
         ]),
     ),
