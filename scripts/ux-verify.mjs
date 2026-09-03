@@ -15,7 +15,7 @@ const browser = await puppeteer.launch({
   args: ["--no-sandbox", "--disable-gpu", "--disable-dev-shm-usage"],
 });
 const page = await browser.newPage();
-page.setViewport({ width: 1400, height: 900 });
+await page.setViewport({ width: 1400, height: 900 });
 page.setDefaultTimeout(40000);
 const errors = [];
 page.on("pageerror", (error) => {

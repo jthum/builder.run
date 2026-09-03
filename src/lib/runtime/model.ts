@@ -1,4 +1,4 @@
-import { createId, labelFromKey, slugify } from "./ids.ts";
+import { createId, labelFromKey, slugify, uniqueKey } from "./ids.ts";
 
 export const SPEC_VERSION = 1 as const;
 
@@ -165,6 +165,13 @@ export interface RecordValue {
 }
 
 export const FIELD_KINDS: FieldKind[] = ["text", "number", "date", "boolean", "enum", "reference"];
+export const RESERVED_FIELD_KEYS = new Set([
+  "id",
+  "created_at",
+  "updated_at",
+  "created_by",
+  "updated_by",
+]);
 
 export function emptySpec(key = "app", label = "App"): AppSpec {
   return {
@@ -237,15 +244,25 @@ function fieldKindFrom(
   return raw as FieldKind;
 }
 
+export function normalizeFieldKey(value: unknown): string {
+  const raw = typeof value === "string" ? value.trim() : "";
+  if (!raw) throw new Error("Field needs a non-empty key or label");
+  let key = slugify(raw);
+  if (!key) throw new Error("Field needs a non-empty key or label");
+  if (/^\d/.test(key)) key = `field_${key}`;
+  if (RESERVED_FIELD_KEYS.has(key)) {
+    throw new Error(`Field key "${key}" is reserved for system data`);
+  }
+  return key;
+}
+
 function fieldKeyFrom(mapKey: string | undefined, draft: FieldDraft): string {
   const fromDraft =
-    typeof draft === "object" && draft && "key" in draft && draft.key ? String(draft.key) : "";
-  if (mapKey && !/^\d+$/.test(mapKey)) return mapKey;
-  if (fromDraft) return fromDraft;
-  if (mapKey) return mapKey;
+    typeof draft === "object" && draft && "key" in draft ? String(draft.key ?? "").trim() : "";
   const label =
-    typeof draft === "object" && draft && "label" in draft ? String(draft.label || "") : "";
-  return slugify(label || "field");
+    typeof draft === "object" && draft && "label" in draft ? String(draft.label ?? "").trim() : "";
+  const namedMapKey = mapKey && !/^\d+$/.test(mapKey) ? mapKey.trim() : "";
+  return normalizeFieldKey(namedMapKey || fromDraft || label || mapKey);
 }
 
 function normalizeField(key: string, draft: FieldDraft, existing?: FieldDef): FieldDef {
@@ -258,7 +275,10 @@ function normalizeField(key: string, draft: FieldDraft, existing?: FieldDef): Fi
   const field: FieldDef = {
     id: objectDraft.id || existing?.id || createId("fld"),
     key,
-    label: objectDraft.label || existing?.label || labelFromKey(key),
+    label:
+      String(objectDraft.label ?? "").trim() ||
+      String(existing?.label ?? "").trim() ||
+      labelFromKey(key),
     type,
   };
   if (objectDraft.required ?? existing?.required) field.required = true;
@@ -289,8 +309,11 @@ function normalizeField(key: string, draft: FieldDraft, existing?: FieldDef): Fi
 function normalizeType(key: string, draft: TypeDraft, existing?: TypeDef): TypeDef {
   const existingByKey = new Map((existing?.fields ?? []).map((field) => [field.key, field]));
   const fieldSource = draft.fields !== undefined ? draft.fields : existing?.fields;
+  const seen = new Set<string>();
   const fields = asEntries(fieldSource as TypeDraft["fields"]).map(([fieldKey, fieldDraft]) => {
     const resolvedKey = fieldKeyFrom(fieldKey, fieldDraft as FieldDraft);
+    if (seen.has(resolvedKey)) throw new Error(`Duplicate field key "${resolvedKey}" on ${key}`);
+    seen.add(resolvedKey);
     return normalizeField(resolvedKey, fieldDraft as FieldDraft, existingByKey.get(resolvedKey));
   });
   const expose =
@@ -418,6 +441,82 @@ export function normalizeSpec(input: SpecDraft | AppSpec, existing?: AppSpec): A
   }
   for (const page of spec.pages) {
     page.blocks = page.blocks || [];
+  }
+  return spec;
+}
+
+function repairedFieldPath(path: string, replacements: Map<string, string>): string {
+  const [head, ...tail] = path.split(".");
+  const repaired = replacements.get(head) ?? head;
+  return tail.length ? [repaired, ...tail].join(".") : repaired;
+}
+
+/** Repairs field definitions written before field keys and labels were validated. */
+export function repairLegacyFields(input: AppSpec): AppSpec {
+  const spec = cloneData(input);
+  const replacements = new Map<string, Map<string, string>>();
+  for (const type of spec.types ?? []) {
+    const used = new Set(RESERVED_FIELD_KEYS);
+    const byOldKey = new Map<string, string>();
+    for (const field of type.fields ?? []) {
+      const oldKey = String(field.key ?? "");
+      const oldLabel = String(field.label ?? "").trim();
+      let base = slugify(oldKey) || slugify(oldLabel) || "field";
+      if (/^\d/.test(base)) base = `field_${base}`;
+      if (RESERVED_FIELD_KEYS.has(base)) base = `${base}_field`;
+      const key = uniqueKey(base, used, "field");
+      used.add(key);
+      if (!byOldKey.has(oldKey)) byOldKey.set(oldKey, key);
+      field.key = key;
+      field.label = oldLabel || labelFromKey(key);
+    }
+    replacements.set(type.key, byOldKey);
+  }
+  for (const form of spec.forms ?? []) {
+    const byOldKey = replacements.get(form.type);
+    if (byOldKey) form.fields = form.fields.map((field) => repairedFieldPath(field, byOldKey));
+  }
+  for (const view of spec.views ?? []) {
+    const byOldKey = replacements.get(view.source);
+    if (!byOldKey) continue;
+    view.fields = view.fields.map((field) => repairedFieldPath(field, byOldKey));
+    if (view.expose) view.expose = view.expose.map((field) => repairedFieldPath(field, byOldKey));
+    if (view.group_by) view.group_by = repairedFieldPath(view.group_by, byOldKey);
+    if (view.order_by) {
+      view.order_by = Object.fromEntries(
+        Object.entries(view.order_by).map(([field, direction]) => [
+          repairedFieldPath(field, byOldKey),
+          direction,
+        ]),
+      );
+    }
+    if (view.measures) {
+      view.measures = Object.fromEntries(
+        Object.entries(view.measures).map(([alias, measure]) => [
+          alias,
+          {
+            ...measure,
+            ...(measure.field ? { field: repairedFieldPath(measure.field, byOldKey) } : {}),
+            ...(measure.fields
+              ? { fields: measure.fields.map((field) => repairedFieldPath(field, byOldKey)) }
+              : {}),
+          },
+        ]),
+      );
+    }
+    if (Array.isArray(view.where)) {
+      view.where = view.where.map((clause) => ({
+        ...clause,
+        field: repairedFieldPath(clause.field, byOldKey),
+      }));
+    } else if (view.where) {
+      view.where = Object.fromEntries(
+        Object.entries(view.where).map(([field, value]) => [
+          repairedFieldPath(field, byOldKey),
+          value,
+        ]),
+      );
+    }
   }
   return spec;
 }

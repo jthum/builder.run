@@ -104,6 +104,28 @@ types:
     expect(host.resolvedSpec().types[0]?.fields[0]).not.toHaveProperty("max");
   });
 
+  it("enforces field identity rules on direct field changes", async () => {
+    expect.hasAssertions();
+    const host = await Host.open({ persist: false });
+    await host.upsertType({ key: "review", fields: [] });
+    const score = await host.upsertField("review", {
+      key: " Review Score ",
+      label: "   ",
+      type: "number",
+    });
+    expect(score).toMatchObject({ key: "review_score", label: "Review Score" });
+    await expect(host.upsertField("review", { key: " ", type: "text" })).rejects.toThrow(
+      "Field needs a non-empty key or label",
+    );
+    await expect(host.upsertField("review", { key: "created_at", type: "date" })).rejects.toThrow(
+      'Field key "created_at" is reserved',
+    );
+    await host.upsertField("review", { key: "notes", type: "text" });
+    await expect(host.renameField("review", "notes", "Review score")).rejects.toThrow(
+      'Field key "review_score" already exists',
+    );
+  });
+
   it("derives and reorders a grouped review leaderboard without mutating submissions", async () => {
     expect.hasAssertions();
     const host = await Host.open({ persist: false });
@@ -338,11 +360,11 @@ types:
       implicit: false,
     });
     const rows = await host.queryView("by_status_amount");
-    expect(rows.map((row) => `${row.status}:${row.amount}`)).toEqual([
-      "paid:9000",
-      "paid:1200",
-      "sent:8000",
-      "sent:500",
+    expect(rows.map((row) => [row.status, row.amount])).toEqual([
+      ["paid", 9000],
+      ["paid", 1200],
+      ["sent", 8000],
+      ["sent", 500],
     ]);
   });
 
@@ -387,7 +409,7 @@ types:
         {
           kind: "group",
           columns: 1,
-          blocks: { kind: "widget", widget: "table", values: { view: "recent_time" } } as never,
+          blocks: { kind: "widget", widget: "heading", values: { title: "Diagnostics" } } as never,
         },
       ],
     });
@@ -395,9 +417,40 @@ types:
       {
         kind: "group",
         columns: 1,
-        blocks: [{ kind: "widget", widget: "table", values: { view: "recent_time" } }],
+        blocks: [{ kind: "widget", widget: "heading", values: { title: "Diagnostics" } }],
       },
     ]);
+  });
+
+  it("validates widget contracts before replacing a full spec", async () => {
+    expect.hasAssertions();
+    const host = await Host.open({ persist: false });
+    await host.upsertType({ key: "note", fields: { title: "text" } });
+    await expect(
+      host.applySpec({
+        types: {
+          task: {
+            fields: {
+              status: { type: "enum", values: ["todo", "done"] },
+              points: "number",
+            },
+          },
+        },
+        pages: {
+          board: {
+            blocks: [
+              {
+                kind: "widget",
+                widget: "kanban",
+                values: { view: "task_list", field: "points" },
+              },
+            ],
+          },
+        },
+      }),
+    ).rejects.toThrow('Widget "kanban" values.field cannot be "points". Valid options: status.');
+    expect(host.resolvedSpec().types.some((type) => type.key === "note")).toBe(true);
+    expect(host.resolvedSpec().types.some((type) => type.key === "task")).toBe(false);
   });
 
   it("updates page metadata without replacing its blocks", async () => {

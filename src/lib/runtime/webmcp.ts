@@ -3,6 +3,7 @@ import { cloneData, FIELD_KINDS, type FieldDef } from "./model.ts";
 import { sampleApps } from "./samples.ts";
 import { PAGE_ICON_KEYS } from "./page-icons.ts";
 import { specFromText } from "./serialize.ts";
+import { describeWidget, widgets } from "./widgets.ts";
 
 export type ToolSurface = "builder" | "app";
 
@@ -13,7 +14,7 @@ export interface ToolDefinition {
   surface?: ToolSurface;
   inputSchema: Record<string, unknown>;
   annotations?: { readOnlyHint?: boolean };
-  execute: (input: Record<string, unknown>) => Promise<unknown> | unknown;
+  execute: (input: Record<string, unknown>) => unknown;
 }
 
 export function toolSurface(tool: Pick<ToolDefinition, "surface">): ToolSurface {
@@ -249,7 +250,7 @@ export function createWebMcpBridge(host: Host, registry?: WebMcpToolRegistry | n
 const fieldDraftSchema = {
   type: "object",
   properties: {
-    key: { type: "string" },
+    key: { type: "string", minLength: 1, pattern: "\\S" },
     label: { type: "string" },
     type: { type: "string", enum: [...FIELD_KINDS] },
     field_type: { type: "string", description: "Alias for type" },
@@ -317,6 +318,64 @@ export function buildTools(host: Host): ToolDefinition[] {
       inputSchema: { type: "object", properties: {}, additionalProperties: false },
       annotations: { readOnlyHint: true },
       execute: () => host.resolvedSpec(),
+    },
+    {
+      name: "get_widgets",
+      title: "Inspect page widgets",
+      description:
+        "Discover page widgets and their configuration contract. Call without widget to list or search widgets. Pass a widget key for its inputs. Also pass view for exact compatible field options before calling upsert_page.",
+      inputSchema: {
+        type: "object",
+        properties: {
+          widget: { type: "string", description: "Widget key to inspect" },
+          view: {
+            type: "string",
+            description: "Optional View key used to resolve compatible field inputs",
+          },
+          query: { type: "string", description: "Optional text search when listing widgets" },
+          category: {
+            type: "string",
+            enum: ["content", "data", "actions"],
+            description: "Optional category filter when listing widgets",
+          },
+        },
+        additionalProperties: false,
+      },
+      annotations: { readOnlyHint: true },
+      execute: ({ widget, view, query, category }) => {
+        const key = asText(widget);
+        if (!key) {
+          const needle = asText(query).trim().toLowerCase();
+          const categoryKey = asText(category);
+          const matching = widgets.filter((item) => {
+            if (categoryKey && item.category !== categoryKey) return false;
+            if (!needle) return true;
+            return `${item.key} ${item.label} ${item.description}`.toLowerCase().includes(needle);
+          });
+          return {
+            total: matching.length,
+            widgets: matching.slice(0, 25).map((item) => ({
+              key: item.key,
+              label: item.label,
+              description: item.description,
+              category: item.category,
+            })),
+            next:
+              matching.length > 25
+                ? "Refine query or category, then call get_widgets with a widget key and optional view key."
+                : "Call get_widgets with a widget key and, for data widgets, a view key.",
+          };
+        }
+        const spec = host.resolvedSpec();
+        const viewKey = asText(view);
+        if (viewKey && !spec.views.some((item) => item.key === viewKey)) {
+          return {
+            error: `Unknown view "${viewKey}"`,
+            views: spec.views.map((item) => item.key),
+          };
+        }
+        return describeWidget(spec, key, viewKey ? { view: viewKey } : {});
+      },
     },
     {
       name: "export_spec",
@@ -439,7 +498,7 @@ export function buildTools(host: Host): ToolDefinition[] {
       inputSchema: {
         type: "object",
         properties: {
-          key: { type: "string" },
+          key: { type: "string", minLength: 1, pattern: "\\S" },
           label: { type: "string" },
           store: { type: "string" },
           expose: {
@@ -479,7 +538,7 @@ export function buildTools(host: Host): ToolDefinition[] {
         properties: {
           type: { type: "string", description: "Type key (not the field kind)" },
           type_key: { type: "string", description: "Alias for type" },
-          key: { type: "string" },
+          key: { type: "string", minLength: 1, pattern: "\\S" },
           label: { type: "string" },
           field_type: {
             type: "string",
@@ -522,7 +581,7 @@ export function buildTools(host: Host): ToolDefinition[] {
         properties: {
           type: { type: "string" },
           from: { type: "string" },
-          to: { type: "string" },
+          to: { type: "string", minLength: 1, pattern: "\\S" },
         },
         required: ["type", "from", "to"],
         additionalProperties: false,
@@ -616,7 +675,7 @@ export function buildTools(host: Host): ToolDefinition[] {
       name: "upsert_page",
       title: "Create or update a page",
       description:
-        'Create or update a page of grids and widgets. Optional folder groups it in the app menu. Optional icon is one of: page, dashboard, table, chart, line, donut, board, calendar, list, inbox, people, money, time. A group nests children in a blocks array even when there is only one widget. columns is how many widgets sit side by side; unused columns stay empty. Widgets include table, cards, list, stat, metric, bar, line, donut, stacked_bar, kanban, calendar, form, action, heading, text, and callout. Example: upsert_page({ key: "board", icon: "board", path: "/board", blocks: [{ kind: "group", columns: 1, blocks: [{ kind: "widget", widget: "table", values: { view: "active_projects" } }] }] }).',
+        'Create or update a page of grids and widgets. Call get_widgets first to discover widget keys, required values, and compatible fields. Widget values are validated against that contract. Optional folder groups it in the app menu. Optional icon is one of: page, dashboard, table, chart, line, donut, board, calendar, list, inbox, people, money, time. A group nests children in a blocks array even when there is only one widget. columns is how many widgets sit side by side; unused columns stay empty. Example: upsert_page({ key: "board", icon: "board", path: "/board", blocks: [{ kind: "group", columns: 1, blocks: [{ kind: "widget", widget: "table", values: { view: "active_projects" } }] }] }).',
       inputSchema: {
         type: "object",
         properties: {
@@ -665,8 +724,8 @@ export function buildTools(host: Host): ToolDefinition[] {
         additionalProperties: false,
       },
       execute: async ({ name, sample }) => {
-        if (sample) return host.loadSample(String(sample), String(name));
-        return host.createApp(String(name));
+        if (sample) return host.loadSample(asText(sample), asText(name));
+        return host.createApp(asText(name));
       },
     },
     {
@@ -883,7 +942,7 @@ function fieldInputDescription(field: FieldDef): string {
 }
 
 function flowInputProperty(expr: unknown): Record<string, unknown> {
-  const text = String(expr ?? "");
+  const text = asText(expr);
   const match = /^ref\(([^)]+)\)$/.exec(text.trim());
   if (match) {
     return { type: "string", description: `id of a ${match[1]} record` };
@@ -898,7 +957,7 @@ function invokeFlowDescription(
 ): string {
   const args = inputs
     .map(([name, expr]) => {
-      const match = /^ref\(([^)]+)\)$/.exec(String(expr ?? "").trim());
+      const match = /^ref\(([^)]+)\)$/.exec(asText(expr).trim());
       return match ? `${name}: <${match[1]} id>` : `${name}: <value>`;
     })
     .join(", ");

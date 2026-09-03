@@ -1,6 +1,7 @@
 import type { TableEngine } from "./engine.ts";
 import { matchesWhere } from "./engine.ts";
 import { exposeFilters, matchFilters, normalizeFilters, type FilterClause } from "./filters.ts";
+import { scalarString } from "./values.ts";
 
 function mergeExpose(base: FilterClause[], extra: FilterClause[]): FilterClause[] {
   const next = [...base];
@@ -70,7 +71,7 @@ export async function resolvePath(
       const target = findType(ctx, field.target || "");
       if (!target) return record[part] ?? null;
       const engine = ctx.engineFor(target);
-      const related = await engine.get(target.key, String(record[part] ?? ""));
+      const related = await engine.get(target.key, scalarString(record[part]));
       current = related;
       currentType = target;
     } else {
@@ -239,19 +240,10 @@ async function groupLabel(
   return title ? (related[title] ?? value) : value;
 }
 
-function scalarString(value: unknown): string {
-  if (value == null) return "";
-  if (typeof value === "string") return value;
-  if (typeof value === "number" || typeof value === "boolean" || typeof value === "bigint") {
-    return String(value);
-  }
-  return JSON.stringify(value) ?? "";
-}
-
 export function displayValue(value: unknown): string {
   if (value == null) return "";
   if (typeof value === "boolean") return value ? "Yes" : "No";
-  return String(value);
+  return scalarString(value);
 }
 
 export function filterRows(

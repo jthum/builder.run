@@ -4,6 +4,7 @@ import { findType, type QueryContext } from "./query.ts";
 import { executeView } from "./query.ts";
 import { createRecord, deleteRecord, updateRecord, type ChangeEvent } from "./records.ts";
 import { nowIso } from "./model.ts";
+import { scalarEqual, scalarString } from "./values.ts";
 
 export interface FlowRun {
   id: string;
@@ -60,7 +61,7 @@ async function hydrateInputs(ctx: QueryContext, flow: FlowDef, scope: Scope): Pr
     if (value && typeof value === "object" && "id" in (value as object)) continue;
     const type = findType(ctx, name);
     if (!type || value == null || value === "") continue;
-    const record = await ctx.engineFor(type).get(type.key, String(value));
+    const record = await ctx.engineFor(type).get(type.key, scalarString(value));
     if (record) scope[name] = record;
   }
   for (const [name, expr] of entries) {
@@ -71,7 +72,7 @@ async function hydrateInputs(ctx: QueryContext, flow: FlowDef, scope: Scope): Pr
     if (!id || (typeof id === "object" && id && "id" in id)) continue;
     const type = findType(ctx, typeKey);
     if (!type) continue;
-    const record = await ctx.engineFor(type).get(type.key, String(id));
+    const record = await ctx.engineFor(type).get(type.key, scalarString(id));
     if (record) scope[name] = record;
   }
 }
@@ -161,7 +162,7 @@ export function evaluateCondition(
 ): boolean {
   if (typeof condition !== "string") {
     for (const [path, expected] of Object.entries(condition)) {
-      if (String(lookupPath(scope, path) ?? "") !== String(resolveValue(expected, scope) ?? "")) {
+      if (!scalarEqual(lookupPath(scope, path), resolveValue(expected, scope))) {
         return false;
       }
     }
@@ -171,7 +172,7 @@ export function evaluateCondition(
   if (!match) return Boolean(lookupPath(scope, condition));
   const left = lookupPath(scope, match[1].trim());
   const right = resolveValue(match[3].trim(), scope);
-  const equal = String(left ?? "") === String(right ?? "");
+  const equal = scalarEqual(left, right);
   return match[2] === "==" ? equal : !equal;
 }
 

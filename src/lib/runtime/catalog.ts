@@ -1,9 +1,10 @@
 import { applyDefaults } from "./defaults.ts";
 import type { Actor, AppSpec } from "./model.ts";
-import { nowIso, normalizeSpec } from "./model.ts";
+import { nowIso, normalizeSpec, repairLegacyFields } from "./model.ts";
 import type { PlatformState, SpaceState } from "./platform.ts";
 import { sqlIdent } from "./sql.ts";
 import type { SqlConnection } from "./sql-gateway.ts";
+import { scalarString } from "./values.ts";
 
 /** Platform registry. Spaces, actors, and which space is active. */
 export const CATALOG_DATABASE = "catalog";
@@ -108,7 +109,7 @@ export async function loadPlatform(conn: SqlConnection): Promise<PlatformState |
     list.push({
       id: String(row.id),
       name: String(row.name),
-      email: String(row.email ?? "") || undefined,
+      email: scalarString(row.email) || undefined,
       kind: row.kind as Actor["kind"],
       roles: JSON.parse(String(row.roles)),
     });
@@ -117,14 +118,14 @@ export async function loadPlatform(conn: SqlConnection): Promise<PlatformState |
   const spaces: SpaceState[] = rows.map((row) => ({
     id: String(row.id),
     name: String(row.name),
-    createdBy: row.created_by ? String(row.created_by) : undefined,
+    createdBy: row.created_by ? scalarString(row.created_by) : undefined,
     actors: actorsBySpace.get(String(row.id)) ?? [],
-    spec: applyDefaults(normalizeSpec(JSON.parse(String(row.spec)) as AppSpec)),
+    spec: applyDefaults(normalizeSpec(repairLegacyFields(JSON.parse(String(row.spec)) as AppSpec))),
   }));
   const active = await conn.query(`SELECT value FROM kv WHERE key = 'active_space_id'`);
   return {
     version: 1,
-    activeSpaceId: String(
+    activeSpaceId: scalarString(
       active[0]?.value ?? spaces.find((item) => item.createdBy)?.id ?? spaces[0]?.id ?? "",
     ),
     spaces,

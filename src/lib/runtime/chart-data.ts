@@ -17,12 +17,12 @@ export function asNumber(value: unknown): number {
 export function asLabel(value: unknown): string {
   if (value == null || value === "") return "None";
   if (typeof value === "boolean") return value ? "Yes" : "No";
-  return String(value);
+  return scalarString(value);
 }
 
 export function asDayKey(value: unknown): string | null {
   if (value == null || value === "") return null;
-  const text = String(value);
+  const text = scalarString(value);
   const day = text.slice(0, 10);
   if (/^\d{4}-\d{2}-\d{2}$/.test(day)) return day;
   const date = new Date(text);
@@ -106,3 +106,4 @@ export function totals(chart: GroupedChart): number[] {
 export function sparkline(chart: GroupedChart): number[] {
   return totals(chart);
 }
+import { scalarString } from "./values.ts";

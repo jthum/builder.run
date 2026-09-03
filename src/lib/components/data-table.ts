@@ -1,3 +1,5 @@
+import { scalarString } from "$lib/runtime/values.ts";
+
 export type DataTableColumn = {
   id: string;
   label: string;
@@ -13,7 +15,7 @@ export function cellValue(row: Record<string, unknown>, column: DataTableColumn)
 }
 
 export function rowId(row: Record<string, unknown>): string {
-  return String(row.id ?? "");
+  return scalarString(row.id);
 }
 
 export function compareRows(
@@ -34,7 +36,10 @@ export function compareRows(
   if (numeric || (typeof a === "number" && typeof b === "number")) {
     result = Number(a) - Number(b);
   } else {
-    result = String(a).localeCompare(String(b), undefined, { numeric: true, sensitivity: "base" });
+    result = scalarString(a).localeCompare(scalarString(b), undefined, {
+      numeric: true,
+      sensitivity: "base",
+    });
   }
   return direction === "asc" ? result : -result;
 }

@@ -1,4 +1,5 @@
 import { systemColumns, type ColumnInfo } from "./engine.ts";
+import { scalarString } from "./values.ts";
 
 export function sqlIdent(name: string): string {
   if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(name)) {
@@ -43,5 +44,5 @@ export function bindValue(value: unknown): string | number | null {
   if (value == null) return null;
   if (typeof value === "boolean") return value ? 1 : 0;
   if (typeof value === "number") return Number.isFinite(value) ? value : null;
-  return String(value);
+  return scalarString(value);
 }

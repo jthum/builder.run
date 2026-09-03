@@ -1,5 +1,6 @@
 import type { TableEngine } from "./engine.ts";
 import { sqlTypeFor, type AppSpec, type TypeDef } from "./model.ts";
+import { scalarString } from "./values.ts";
 
 export const META_TABLE = "_meta";
 const LEGACY_META_TABLE = "_br_meta";
@@ -135,7 +136,7 @@ async function loadIdentities(engine: TableEngine): Promise<IdentityRow[]> {
   return rows.map((row) => ({
     id: row.id,
     kind: row.kind as IdentityRow["kind"],
-    key: String(row.key ?? ""),
+    key: scalarString(row.key),
     parent: (row.parent as string | null) ?? null,
     table_name: (row.table_name as string | null) ?? null,
     column_name: (row.column_name as string | null) ?? null,

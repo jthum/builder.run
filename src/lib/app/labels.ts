@@ -1,5 +1,6 @@
 import { isId, labelFromKey } from "$lib/runtime/ids.ts";
 import type { AppSpec, FieldKind, TypeDef, ViewDef } from "$lib/runtime/model.ts";
+import { scalarString } from "$lib/runtime/values.ts";
 
 export const fieldKindLabel: Record<FieldKind, string> = {
   text: "Text",
@@ -47,7 +48,7 @@ export function recordTitle(
 ): string {
   if (!record) return type?.label ?? "Record";
   const value = record.name ?? record.title ?? record.number ?? record.email;
-  if (value) return String(value);
+  if (value) return scalarString(value);
   return type?.label ?? "Record";
 }
 
@@ -165,7 +166,7 @@ export function formatCell(path: string, value: unknown): string {
   if (typeof value === "string" && /^[a-z0-9]+(?:_[a-z0-9]+)*$/i.test(value)) {
     return labelFromKey(value);
   }
-  return String(value);
+  return scalarString(value);
 }
 
 export function typeByKey(spec: AppSpec | undefined, key: string | undefined): TypeDef | undefined {

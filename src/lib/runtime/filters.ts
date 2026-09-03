@@ -1,4 +1,5 @@
 import type { FilterClause, FilterOp } from "./model.ts";
+import { scalarString } from "./values.ts";
 
 export type { FilterClause, FilterOp };
 
@@ -71,13 +72,11 @@ export function matchFilter(row: Record<string, unknown>, clause: FilterClause):
     case "not_empty":
       return left != null && left !== "";
     case "contains":
-      return String(left ?? "")
-        .toLowerCase()
-        .includes(String(clause.value ?? "").toLowerCase());
+      return scalarString(left).toLowerCase().includes(scalarString(clause.value).toLowerCase());
     case "in":
-      return inValues(clause.value).some((item) => String(item) === String(left ?? ""));
+      return inValues(clause.value).some((item) => scalarString(item) === scalarString(left));
     case "neq":
-      return String(left ?? "") !== String(clause.value ?? "");
+      return scalarString(left) !== scalarString(clause.value);
     case "gt":
     case "gte":
     case "lt":
@@ -90,15 +89,15 @@ export function matchFilter(row: Record<string, unknown>, clause: FilterClause):
         if (op === "lt") return a < b;
         return a <= b;
       }
-      const as = String(left ?? "");
-      const bs = String(clause.value ?? "");
+      const as = scalarString(left);
+      const bs = scalarString(clause.value);
       if (op === "gt") return as > bs;
       if (op === "gte") return as >= bs;
       if (op === "lt") return as < bs;
       return as <= bs;
     }
     default:
-      return String(left ?? "") === String(clause.value ?? "");
+      return scalarString(left) === scalarString(clause.value);
   }
 }
 

@@ -1,1 +1,2 @@
-// place files you want to import through the `#lib` alias in this folder.
+// Public package entry point. Modules are currently consumed through the #lib/* alias.
+export {};

@@ -12,6 +12,7 @@ import { createId, labelFromKey, slugify } from "./ids.ts";
 import {
   cloneData,
   cloneSpec,
+  normalizeFieldKey,
   normalizeSpec,
   normalizeView,
   type Actor,
@@ -41,8 +42,9 @@ import { newAppSpec, rootSpaceSpec, sampleApps } from "./samples.ts";
 import { reconcileStore } from "./schema.ts";
 import { specFromText, specToJson, specToYaml } from "./serialize.ts";
 import { guessPageIcon, normalizePageIcon } from "./page-icons.ts";
-import { normalizePageRows } from "./widgets.ts";
+import { configurePageRows, normalizePageRows } from "./widgets.ts";
 import { SqliteEngine } from "./sql-engine.ts";
+import { scalarString } from "./values.ts";
 import { openSqlGateway, type SqlConnection, type SqlGateway } from "./sql-gateway.ts";
 
 export type { PlatformState, SpaceState } from "./platform.ts";
@@ -407,8 +409,12 @@ export class Host {
     const type = this.findWritableType(typeKey);
     const field = type.fields.find((item) => item.key === from);
     if (!field) throw new Error(`Unknown field ${from}`);
-    if (field.label === labelFromKey(from)) field.label = labelFromKey(to);
-    field.key = to;
+    const key = normalizeFieldKey(to);
+    if (type.fields.some((item) => item !== field && item.key === key)) {
+      throw new Error(`Field key "${key}" already exists on ${typeKey}`);
+    }
+    if (field.label === labelFromKey(from)) field.label = labelFromKey(key);
+    field.key = key;
     await this.reconcileAll();
     await this.persistAndEmit();
     return field;
@@ -451,13 +457,17 @@ export class Host {
   ): Promise<FieldDef> {
     field = cloneData(field);
     const type = this.findWritableType(typeKey);
-    const existing = type.fields.find((item) => item.key === field.key);
+    const key = normalizeFieldKey(field.key);
+    const existing = type.fields.find((item) => item.key === key);
+    const label =
+      String(field.label ?? "").trim() || String(existing?.label ?? "").trim() || labelFromKey(key);
     const updated = {
       id: existing?.id ?? createId("fld"),
-      label: labelFromKey(field.key),
       type: "text",
       ...existing,
       ...field,
+      key,
+      label,
     } as FieldDef;
     if (updated.type === "number" && updated.presentation === "rating") {
       updated.variant = "segments";
@@ -468,12 +478,12 @@ export class Host {
       delete updated.max;
     }
     const next = existing
-      ? type.fields.map((item) => (item.key === field.key ? updated : item))
+      ? type.fields.map((item) => (item.key === key ? updated : item))
       : [...type.fields, updated];
     type.fields = next;
     await this.reconcileAll();
     await this.persistAndEmit();
-    return next.find((item) => item.key === field.key) as FieldDef;
+    return next.find((item) => item.key === key) as FieldDef;
   }
 
   async reorderFields(typeKey: string, keys: string[]): Promise<TypeDef> {
@@ -551,9 +561,10 @@ export class Host {
     const spec = this.app().spec;
     const existing = spec.pages.find((page) => page.key === draft.key);
     const folder = draft.folder !== undefined ? folderName(draft.folder) : existing?.folder;
-    const blocks = normalizePageRows(
-      draft.blocks !== undefined ? draft.blocks : (existing?.blocks ?? []),
-    );
+    const blocks =
+      draft.blocks !== undefined
+        ? configurePageRows(this.resolvedSpec(), draft.blocks)
+        : normalizePageRows(existing?.blocks ?? []);
     const icon =
       draft.icon !== undefined
         ? (normalizePageIcon(draft.icon) ?? guessPageIcon(blocks))
@@ -625,7 +636,19 @@ export class Host {
 
   async applySpec(input: unknown): Promise<AppSpec> {
     const workspace = this.app();
-    workspace.spec = applyDefaults(normalizeSpec(cloneData(input) as never, workspace.spec));
+    const next = applyDefaults(normalizeSpec(cloneData(input) as never, workspace.spec));
+    const localKeys = new Set(next.types.map((type) => type.key));
+    const exposed = this.space().spec.types.filter(
+      (type) => isExposed(type) && !localKeys.has(type.key),
+    );
+    const validationSpec = applyDefaults({
+      ...cloneSpec(next),
+      types: [...cloneData(exposed), ...next.types],
+    });
+    for (const page of next.pages) {
+      page.blocks = configurePageRows(validationSpec, page.blocks);
+    }
+    workspace.spec = next;
     await this.reconcileAll();
     await this.persistAndEmit();
     return this.resolvedSpec();
@@ -872,7 +895,7 @@ export class Host {
 
 function folderName(value: unknown): string | undefined {
   if (value == null || value === false) return undefined;
-  const text = String(value).trim();
+  const text = scalarString(value).trim();
   return text || undefined;
 }
 

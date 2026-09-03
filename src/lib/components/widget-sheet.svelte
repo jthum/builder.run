@@ -8,12 +8,7 @@
 	import { Switch } from "$lib/components/ui/switch/index.js";
 	import { Textarea } from "$lib/components/ui/textarea/index.js";
 	import type { PageBlock } from "$lib/runtime/model.ts";
-	import {
-		fieldsForView,
-		fieldsMatching,
-		widgetByKey,
-		type WidgetFieldKind,
-	} from "$lib/runtime/widgets.ts";
+	import { widgetByKey, widgetInputOptions, widgetInputs } from "$lib/runtime/widgets.ts";
 
 	let {
 		open = $bindable(false),
@@ -37,29 +32,6 @@
 		};
 	});
 
-	const viewOptions = $derived(
-		(spec?.views ?? []).map((view) => ({ value: view.key, label: view.label })),
-	);
-	const formOptions = $derived(
-		(spec?.forms ?? []).map((form) => ({ value: form.key, label: form.label })),
-	);
-	const flowOptions = $derived(
-		(spec?.flows ?? [])
-			.filter((flow) => flow.expose?.includes("ui") && !flow.trigger)
-			.map((flow) => ({ value: flow.key, label: flow.label })),
-	);
-
-	const showCaption = $derived(Boolean(def?.inputs.some((input) => input.type === "view")));
-
-	function fieldOptions(of?: WidgetFieldKind) {
-		const viewKey = String(values.view ?? "");
-		const fields = spec ? fieldsForView(spec, viewKey) : [];
-		return fieldsMatching(fields, of).map((field) => ({
-			value: field.key,
-			label: field.label,
-		}));
-	}
-
 	function submit(event: Event) {
 		event.preventDefault();
 		onSave(values);
@@ -78,18 +50,7 @@
 			</Sheet.Header>
 			<div class="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-6">
 				<Field.Group>
-					{#if showCaption}
-						<Field.Field>
-							<Field.Label>Title</Field.Label>
-							<Input
-								bind:value={values.title as string}
-								placeholder="Leave blank to use the view name"
-								data-testid="widget-title"
-							/>
-							<Field.Description>Shown on the widget. Blank uses the view name.</Field.Description>
-						</Field.Field>
-					{/if}
-					{#each def?.inputs ?? [] as input (input.key)}
+					{#each def ? widgetInputs(def) : [] as input (input.key)}
 						{#if input.type === "boolean"}
 							<Field.Field orientation="horizontal">
 								<Switch
@@ -106,35 +67,41 @@
 								{:else if input.type === "view"}
 									<AppSelect
 										bind:value={values[input.key] as string}
-										options={viewOptions}
+										options={spec ? widgetInputOptions(spec, input, values) : []}
 										placeholder="Select a view"
 									/>
 								{:else if input.type === "form"}
 									<AppSelect
 										bind:value={values[input.key] as string}
-										options={formOptions}
+										options={spec ? widgetInputOptions(spec, input, values) : []}
 										placeholder="Select a form"
 									/>
 								{:else if input.type === "flow"}
 									<AppSelect
 										bind:value={values[input.key] as string}
-										options={flowOptions}
+										options={spec ? widgetInputOptions(spec, input, values) : []}
 										placeholder="Select a rule"
 									/>
 								{:else if input.type === "field"}
 									<AppSelect
 										bind:value={values[input.key] as string}
-										options={fieldOptions(input.of)}
+										options={spec ? widgetInputOptions(spec, input, values) : []}
 										placeholder="Select a field"
 									/>
 								{:else if input.type === "select"}
 									<AppSelect
 										bind:value={values[input.key] as string}
-										options={input.options ?? []}
+										options={spec ? widgetInputOptions(spec, input, values) : []}
 										placeholder="Select"
 									/>
 								{:else}
-									<Input bind:value={values[input.key] as string} data-testid="widget-field" />
+									<Input
+										bind:value={values[input.key] as string}
+										data-testid={input.key === "title" ? "widget-title" : "widget-field"}
+									/>
+								{/if}
+								{#if input.description}
+									<Field.Description>{input.description}</Field.Description>
 								{/if}
 							</Field.Field>
 						{/if}

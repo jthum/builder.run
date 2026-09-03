@@ -4,6 +4,7 @@ import { type ColumnInfo, type SelectOptions, type TableEngine, systemColumns } 
 import type { SqlConnection } from "./sql-gateway.ts";
 import { inValues, normalizeFilters, type FilterClause } from "./filters.ts";
 import { bindValue, createTableSql, placeholders, quoteList, sqlIdent } from "./sql.ts";
+import { scalarString } from "./values.ts";
 
 export class SqliteEngine implements TableEngine {
   readonly name: string;
@@ -36,7 +37,7 @@ export class SqliteEngine implements TableEngine {
     const rows = await this.conn.query(`PRAGMA table_info(${sqlIdent(table)})`);
     return rows.map((row) => ({
       name: String(row.name),
-      sqlType: String(row.type || "TEXT"),
+      sqlType: scalarString(row.type || "TEXT"),
     }));
   }
 
@@ -203,7 +204,7 @@ function sqlFilter(clause: FilterClause): { sql: string; params: unknown[] } | n
     case "neq":
       return { sql: `${column} != ?`, params: [bindValue(clause.value)] };
     case "contains":
-      return { sql: `${column} LIKE ?`, params: [`%${String(clause.value ?? "")}%`] };
+      return { sql: `${column} LIKE ?`, params: [`%${scalarString(clause.value)}%`] };
     case "empty":
       return { sql: `(${column} IS NULL OR ${column} = '')`, params: [] };
     case "not_empty":
@@ -231,11 +232,11 @@ function sqlFilter(clause: FilterClause): { sql: string; params: unknown[] } | n
 
 function asRecord(row: Record<string, unknown>): RecordValue {
   return {
-    id: String(row.id ?? ""),
-    created_at: String(row.created_at ?? ""),
-    updated_at: String(row.updated_at ?? ""),
-    created_by: String(row.created_by ?? ""),
-    updated_by: String(row.updated_by ?? ""),
     ...row,
+    id: scalarString(row.id),
+    created_at: scalarString(row.created_at),
+    updated_at: scalarString(row.updated_at),
+    created_by: scalarString(row.created_by),
+    updated_by: scalarString(row.updated_by),
   };
 }

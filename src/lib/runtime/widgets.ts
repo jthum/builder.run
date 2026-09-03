@@ -1,4 +1,4 @@
-import { homeViews, isBlankApp } from "$lib/app/labels.ts";
+import { columnLabel, homeViews, isBlankApp } from "$lib/app/labels.ts";
 import type { AppSpec, FieldDef, PageBlock, PageDef, PageRowHeight, TypeDef } from "./model.ts";
 import { labelFromKey } from "./ids.ts";
 
@@ -22,9 +22,12 @@ export interface WidgetInput {
   key: string;
   label: string;
   type: WidgetInputType;
+  description?: string;
   required?: boolean;
   default?: unknown;
   of?: WidgetFieldKind;
+  /** Key of the input that selects the source for a field input. */
+  source?: string;
   options?: Array<{ value: string; label: string }>;
 }
 
@@ -136,8 +139,8 @@ export const widgets: WidgetDef[] = [
     category: "data",
     inputs: [
       { key: "view", label: "View", type: "view", required: true },
-      { key: "value", label: "Value field", type: "field", of: "number" },
-      { key: "date", label: "Date field", type: "field", of: "date" },
+      { key: "value", label: "Value field", type: "field", of: "number", source: "view" },
+      { key: "date", label: "Date field", type: "field", of: "date", source: "view" },
     ],
   },
   {
@@ -147,8 +150,23 @@ export const widgets: WidgetDef[] = [
     category: "data",
     inputs: [
       { key: "view", label: "View", type: "view", required: true },
-      { key: "category", label: "Group by", type: "field", of: "any", required: true },
-      { key: "value", label: "Value field", type: "field", of: "number" },
+      {
+        key: "category",
+        label: "Group by",
+        type: "field",
+        of: "any",
+        source: "view",
+        required: true,
+        description: "Field used for the bars on the category axis.",
+      },
+      {
+        key: "value",
+        label: "Value field",
+        type: "field",
+        of: "number",
+        source: "view",
+        description: "Numeric field to sum. Omit it to count rows instead.",
+      },
     ],
   },
   {
@@ -158,8 +176,15 @@ export const widgets: WidgetDef[] = [
     category: "data",
     inputs: [
       { key: "view", label: "View", type: "view", required: true },
-      { key: "category", label: "Date field", type: "field", of: "date", required: true },
-      { key: "value", label: "Value field", type: "field", of: "number" },
+      {
+        key: "category",
+        label: "Date field",
+        type: "field",
+        of: "date",
+        source: "view",
+        required: true,
+      },
+      { key: "value", label: "Value field", type: "field", of: "number", source: "view" },
     ],
   },
   {
@@ -169,8 +194,15 @@ export const widgets: WidgetDef[] = [
     category: "data",
     inputs: [
       { key: "view", label: "View", type: "view", required: true },
-      { key: "category", label: "Group by", type: "field", of: "enum", required: true },
-      { key: "value", label: "Value field", type: "field", of: "number" },
+      {
+        key: "category",
+        label: "Group by",
+        type: "field",
+        of: "enum",
+        source: "view",
+        required: true,
+      },
+      { key: "value", label: "Value field", type: "field", of: "number", source: "view" },
     ],
   },
   {
@@ -180,9 +212,23 @@ export const widgets: WidgetDef[] = [
     category: "data",
     inputs: [
       { key: "view", label: "View", type: "view", required: true },
-      { key: "category", label: "Group by", type: "field", of: "any", required: true },
-      { key: "series", label: "Split by", type: "field", of: "enum", required: true },
-      { key: "value", label: "Value field", type: "field", of: "number" },
+      {
+        key: "category",
+        label: "Group by",
+        type: "field",
+        of: "any",
+        source: "view",
+        required: true,
+      },
+      {
+        key: "series",
+        label: "Split by",
+        type: "field",
+        of: "enum",
+        source: "view",
+        required: true,
+      },
+      { key: "value", label: "Value field", type: "field", of: "number", source: "view" },
     ],
   },
   {
@@ -192,7 +238,15 @@ export const widgets: WidgetDef[] = [
     category: "data",
     inputs: [
       { key: "view", label: "View", type: "view", required: true },
-      { key: "field", label: "Column field", type: "field", of: "enum", required: true },
+      {
+        key: "field",
+        label: "Column field",
+        type: "field",
+        of: "enum",
+        source: "view",
+        required: true,
+        description: "Enum field whose choices become the board columns.",
+      },
     ],
   },
   {
@@ -202,13 +256,178 @@ export const widgets: WidgetDef[] = [
     category: "data",
     inputs: [
       { key: "view", label: "View", type: "view", required: true },
-      { key: "date", label: "Date field", type: "field", of: "date", required: true },
+      {
+        key: "date",
+        label: "Date field",
+        type: "field",
+        of: "date",
+        source: "view",
+        required: true,
+      },
     ],
   },
 ];
 
 export function widgetByKey(key: string): WidgetDef | undefined {
   return widgets.find((item) => item.key === key);
+}
+
+const WIDGET_TITLE_INPUT: WidgetInput = {
+  key: "title",
+  label: "Title",
+  type: "text",
+  description: "Optional widget title. Omit it to use the selected View name.",
+};
+
+/** Effective inputs shared by the UI, agent discovery, defaults, and validation. */
+export function widgetInputs(widget: WidgetDef): WidgetInput[] {
+  return widget.inputs.some((input) => input.type === "view")
+    ? [WIDGET_TITLE_INPUT, ...widget.inputs]
+    : widget.inputs;
+}
+
+export interface WidgetOption {
+  value: string;
+  label: string;
+}
+
+export function widgetInputOptions(
+  spec: AppSpec,
+  input: WidgetInput,
+  values: Record<string, unknown>,
+): WidgetOption[] {
+  if (input.type === "view") {
+    return spec.views.map((view) => ({ value: view.key, label: view.label }));
+  }
+  if (input.type === "form") {
+    return spec.forms.map((form) => ({ value: form.key, label: form.label }));
+  }
+  if (input.type === "flow") {
+    return spec.flows
+      .filter((flow) => flow.expose?.includes("ui") && !flow.trigger)
+      .map((flow) => ({ value: flow.key, label: flow.label }));
+  }
+  if (input.type === "select") return input.options ?? [];
+  if (input.type !== "field") return [];
+  const source = input.source ?? "view";
+  const viewKey = typeof values[source] === "string" ? values[source] : "";
+  return fieldsMatching(fieldsForView(spec, viewKey), input.of).map((field) => ({
+    value: field.key,
+    label: field.label,
+  }));
+}
+
+export function describeWidget(
+  spec: AppSpec,
+  key: string,
+  values: Record<string, unknown> = {},
+): Record<string, unknown> {
+  const widget = widgetByKey(key);
+  if (!widget) {
+    return { error: `Unknown widget "${key}"`, widgets: widgets.map((item) => item.key) };
+  }
+  return {
+    key: widget.key,
+    label: widget.label,
+    description: widget.description,
+    category: widget.category,
+    inputs: widgetInputs(widget).map((input) => ({
+      key: input.key,
+      label: input.label,
+      type: input.type,
+      ...(input.description ? { description: input.description } : {}),
+      ...(input.required ? { required: true } : {}),
+      ...(input.default !== undefined ? { default: input.default } : {}),
+      ...(input.of ? { accepts: input.of } : {}),
+      ...(input.source ? { source: input.source } : {}),
+      ...(["view", "form", "flow", "field", "select"].includes(input.type)
+        ? { options: widgetInputOptions(spec, input, values) }
+        : {}),
+    })),
+  };
+}
+
+function configuredText(value: unknown): string {
+  return typeof value === "string" ? value.trim() : "";
+}
+
+function optionValues(options: WidgetOption[]): string {
+  return options.length ? options.map((option) => option.value).join(", ") : "none";
+}
+
+/** Validate and safely complete a widget's values from its registry definition. */
+export function configureWidgetValues(
+  spec: AppSpec,
+  widget: WidgetDef,
+  supplied: Record<string, unknown> = {},
+): Record<string, unknown> {
+  const inputs = widgetInputs(widget);
+  const allowed = new Set(inputs.map((input) => input.key));
+  const unknown = Object.keys(supplied).filter((key) => !allowed.has(key));
+  if (unknown.length) {
+    throw new Error(
+      `Widget "${widget.key}" does not accept values.${unknown[0]}. Valid inputs: ${[...allowed].join(", ")}`,
+    );
+  }
+  const values = { ...supplied };
+  for (const input of inputs) {
+    let value = values[input.key];
+    let present = value !== undefined && value !== null && value !== "";
+    const options = widgetInputOptions(spec, input, values);
+    if (!present && input.required && input.default !== undefined) {
+      value = input.default;
+      values[input.key] = value;
+      present = true;
+    }
+    if (!present && input.required && options.length === 1) {
+      value = options[0]?.value;
+      values[input.key] = value;
+      present = true;
+    }
+    if (!present) {
+      if (input.required) {
+        const choices = options.length ? ` Valid options: ${optionValues(options)}.` : "";
+        throw new Error(`Widget "${widget.key}" requires values.${input.key}.${choices}`);
+      }
+      continue;
+    }
+    if ((input.type === "text" || input.type === "textarea") && typeof value !== "string") {
+      throw new Error(`Widget "${widget.key}" values.${input.key} must be text`);
+    }
+    if (input.type === "boolean" && typeof value !== "boolean") {
+      throw new Error(`Widget "${widget.key}" values.${input.key} must be true or false`);
+    }
+    if (["view", "form", "flow", "field", "select"].includes(input.type)) {
+      const selected = configuredText(value);
+      if (!options.some((option) => option.value === selected)) {
+        throw new Error(
+          `Widget "${widget.key}" values.${input.key} cannot be "${selected}". Valid options: ${optionValues(options)}.`,
+        );
+      }
+      values[input.key] = selected;
+    }
+  }
+  return values;
+}
+
+function configurePageBlock(spec: AppSpec, block: PageBlock): PageBlock {
+  if (block.kind === "group") {
+    return { ...block, blocks: block.blocks.map((child) => configurePageBlock(spec, child)) };
+  }
+  const widget = widgetByKey(block.widget);
+  if (!widget) {
+    throw new Error(
+      `Unknown widget "${block.widget}". Valid widgets: ${widgets.map((item) => item.key).join(", ")}`,
+    );
+  }
+  return {
+    ...block,
+    values: configureWidgetValues(spec, widget, block.values ?? {}),
+  };
+}
+
+export function configurePageRows(spec: AppSpec, blocks: unknown): PageBlock[] {
+  return normalizePageRows(blocks).map((block) => configurePageBlock(spec, block));
 }
 
 const ROW_HEIGHTS = new Set<string>(["s", "m", "l", "xl"]);
@@ -261,7 +480,7 @@ export function collectViewKeys(blocks: PageBlock[]): string[] {
   for (const block of normalizeBlockList(blocks)) {
     if (block.kind === "group") keys.push(...collectViewKeys(block.blocks));
     if (block.kind === "widget") {
-      const view = String(block.values?.view ?? "");
+      const view = typeof block.values?.view === "string" ? block.values.view : "";
       if (view) keys.push(view);
     }
   }
@@ -379,7 +598,11 @@ export function typeForView(spec: AppSpec, viewKey: string): TypeDef | undefined
 export function fieldsForView(spec: AppSpec, viewKey: string): FieldDef[] {
   const view = spec.views.find((item) => item.key === viewKey);
   const type = typeForView(spec, viewKey);
-  if (!view?.group_by) return type?.fields ?? [];
+  if (!view || !type) return [];
+  if (!view.group_by) {
+    if (!view.fields.length) return type.fields;
+    return view.fields.map((path) => fieldForViewPath(spec, type, path));
+  }
   const groupField = type?.fields.find((field) => field.key === view.group_by) ?? {
     id: `group_${view.group_by}`,
     key: view.group_by,
@@ -393,6 +616,25 @@ export function fieldsForView(spec: AppSpec, viewKey: string): FieldDef[] {
     type: "number" as const,
   }));
   return [groupField, ...measures];
+}
+
+function fieldForViewPath(spec: AppSpec, type: TypeDef, path: string): FieldDef {
+  let current: TypeDef | undefined = type;
+  let found: FieldDef | undefined;
+  const parts = path.split(".");
+  for (const [index, part] of parts.entries()) {
+    found = current?.fields.find((field) => field.key === part);
+    if (!found) break;
+    if (index < parts.length - 1 && found.type === "reference") {
+      const targetKey: string | undefined = found.target?.split(".").at(-1);
+      current = spec.types.find((candidate): boolean => candidate.key === targetKey);
+    }
+  }
+  return {
+    ...(found ?? { id: `view_${type.key}_${path}`, type: "text" as const }),
+    key: path,
+    label: columnLabel(path, type),
+  };
 }
 
 export function defaultWidgetValues(widget: WidgetDef, spec: AppSpec): Record<string, unknown> {
@@ -409,7 +651,7 @@ export function defaultWidgetValues(widget: WidgetDef, spec: AppSpec): Record<st
     else if (input.type === "flow") values[input.key] = firstFlow;
     else if (input.type === "boolean") values[input.key] = Boolean(input.default);
     else if (input.type === "field") {
-      values[input.key] = fieldsMatching(fields, input.of)[0]?.key ?? fields[0]?.key ?? "";
+      values[input.key] = fieldsMatching(fields, input.of)[0]?.key ?? "";
     } else if (input.type === "select") {
       values[input.key] = input.default ?? input.options?.[0]?.value ?? "";
     } else values[input.key] = input.default ?? "";
@@ -550,7 +792,7 @@ export function gridClass(columns: number): string {
 export function firstViewKey(blocks: PageBlock[]): string | undefined {
   for (const block of normalizeBlockList(blocks)) {
     if (block.kind === "widget") {
-      const view = String(block.values?.view ?? "");
+      const view = typeof block.values?.view === "string" ? block.values.view : "";
       if (view) return view;
     }
     if (block.kind === "group") {

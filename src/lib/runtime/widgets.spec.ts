@@ -3,6 +3,8 @@ import type { AppSpec, PageBlock, PageDef } from "./model.ts";
 import {
   appendInGroup,
   collectViewKeys,
+  configurePageRows,
+  describeWidget,
   groupPagesByFolder,
   moveAuthoredPage,
   defaultWidgetValues,
@@ -76,7 +78,7 @@ describe("page widgets", () => {
   it("guesses view and field defaults for a bar chart", () => {
     expect.hasAssertions();
     const spec = {
-      views: [{ key: "project_list", source: "project", fields: ["name", "status"] }],
+      views: [{ key: "project_list", source: "project", fields: ["name", "status", "budget"] }],
       types: [
         {
           key: "project",
@@ -127,6 +129,64 @@ describe("page widgets", () => {
       ["submission", "reference"],
       ["overall_score", "number"],
     ]);
+    const description = describeWidget(spec, "bar", { view: "leaderboard" });
+    expect(description.inputs).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          key: "category",
+          source: "view",
+          options: [
+            { value: "submission", label: "Submission" },
+            { value: "overall_score", label: "Overall Score" },
+          ],
+        }),
+        expect.objectContaining({
+          key: "value",
+          accepts: "number",
+          options: [{ value: "overall_score", label: "Overall Score" }],
+        }),
+      ]),
+    );
+  });
+
+  it("validates widget values and fills only unambiguous required fields", () => {
+    expect.hasAssertions();
+    const spec = {
+      views: [
+        { key: "tasks", label: "Tasks", source: "task", fields: ["title", "status", "points"] },
+      ],
+      types: [
+        {
+          key: "task",
+          fields: [
+            { key: "title", type: "text", label: "Title" },
+            { key: "status", type: "enum", label: "Status" },
+            { key: "points", type: "number", label: "Points" },
+          ],
+        },
+      ],
+      forms: [],
+      flows: [],
+    } as never;
+    expect(
+      configurePageRows(spec, [{ kind: "widget", widget: "kanban", values: { view: "tasks" } }]),
+    ).toEqual([
+      {
+        kind: "group",
+        columns: 1,
+        blocks: [{ kind: "widget", widget: "kanban", values: { view: "tasks", field: "status" } }],
+      },
+    ]);
+    expect(() =>
+      configurePageRows(spec, [
+        { kind: "widget", widget: "bar", values: { view: "tasks", value: "points" } },
+      ]),
+    ).toThrow('Widget "bar" requires values.category. Valid options: title, status, points.');
+    expect(() =>
+      configurePageRows(spec, [
+        { kind: "widget", widget: "kanban", values: { view: "tasks", field: "points" } },
+      ]),
+    ).toThrow('Widget "kanban" values.field cannot be "points". Valid options: status.');
   });
 
   it("wraps a single nested block object so group.blocks.filter never throws", () => {

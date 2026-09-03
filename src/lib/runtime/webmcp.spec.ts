@@ -245,12 +245,12 @@ describe("webmcp bridge", () => {
         {
           kind: "group",
           columns: 1,
-          blocks: [{ kind: "widget", widget: "table", values: { view: "recent_time" } }],
+          blocks: [{ kind: "widget", widget: "heading", values: { title: "Diagnostics" } }],
         },
       ],
     });
     expect(JSON.parse(String(nested)).error).toBeUndefined();
-    expect(JSON.parse(String(nested)).blocks[0].blocks[0].widget).toBe("table");
+    expect(JSON.parse(String(nested)).blocks[0].blocks[0].widget).toBe("heading");
     const unwrapped = await upsert.execute({
       key: "diag_unwrapped",
       label: "Diagnostic Unwrapped",
@@ -259,14 +259,85 @@ describe("webmcp bridge", () => {
         {
           kind: "group",
           columns: 1,
-          blocks: { kind: "widget", widget: "table", values: { view: "recent_time" } },
+          blocks: { kind: "widget", widget: "heading", values: { title: "Diagnostics" } },
         },
       ],
     });
     expect(JSON.parse(String(unwrapped)).error).toBeUndefined();
     expect(JSON.parse(String(unwrapped)).blocks[0].blocks).toEqual([
-      { kind: "widget", widget: "table", values: { view: "recent_time" } },
+      { kind: "widget", widget: "heading", values: { title: "Diagnostics" } },
     ]);
+    bridge.stop();
+  });
+
+  it("describes widget fields and validates agent-authored chart and board values", async () => {
+    expect.hasAssertions();
+    const host = await Host.open({ persist: false });
+    await host.upsertType({
+      key: "task",
+      fields: [
+        { key: "title", label: "Title", type: "text" },
+        { key: "status", label: "Status", type: "enum", values: ["todo", "done"] },
+        { key: "points", label: "Points", type: "number" },
+      ] as never,
+    });
+    const registry = mockRegistry();
+    const bridge = createWebMcpBridge(host, registry);
+    await bridge.flush();
+
+    const description = JSON.parse(
+      String(
+        await registry.tools.get("get_widgets")!.execute({ widget: "bar", view: "task_list" }),
+      ),
+    );
+    expect(
+      description.inputs.find((input: { key: string }) => input.key === "category").options,
+    ).toEqual([
+      { value: "title", label: "Title" },
+      { value: "status", label: "Status" },
+      { value: "points", label: "Points" },
+    ]);
+    expect(
+      description.inputs.find((input: { key: string }) => input.key === "value").options,
+    ).toEqual([{ value: "points", label: "Points" }]);
+
+    const page = JSON.parse(
+      String(
+        await registry.tools.get("upsert_page")!.execute({
+          key: "task_dashboard",
+          blocks: [
+            {
+              kind: "group",
+              columns: 2,
+              blocks: [
+                {
+                  kind: "widget",
+                  widget: "bar",
+                  values: { view: "task_list", category: "status", value: "points" },
+                },
+                { kind: "widget", widget: "kanban", values: { view: "task_list" } },
+              ],
+            },
+          ],
+        }),
+      ),
+    );
+    expect(page.error).toBeUndefined();
+    expect(page.blocks[0].blocks[1].values).toEqual({ view: "task_list", field: "status" });
+
+    const invalid = JSON.parse(
+      String(
+        await registry.tools.get("upsert_page")!.execute({
+          key: "bad_board",
+          blocks: [
+            { kind: "widget", widget: "kanban", values: { view: "task_list", field: "points" } },
+          ],
+        }),
+      ),
+    );
+    expect(invalid.error).toBe(
+      'Widget "kanban" values.field cannot be "points". Valid options: status.',
+    );
     bridge.stop();
   });
 
@@ -297,6 +368,23 @@ describe("webmcp bridge", () => {
       "name",
       "website",
     ]);
+    bridge.stop();
+  });
+
+  it("returns a clear error when an agent supplies a blank field", async () => {
+    expect.hasAssertions();
+    const host = await Host.open({ persist: false });
+    const registry = mockRegistry();
+    const bridge = createWebMcpBridge(host, registry);
+    await bridge.flush();
+    const result = await registry.tools.get("upsert_type")!.execute({
+      key: "review",
+      fields: [{ key: " ", label: " ", type: "number" }],
+    });
+    expect(JSON.parse(String(result))).toEqual({
+      error: "Field needs a non-empty key or label",
+    });
+    expect(host.resolvedSpec().types.some((type) => type.key === "review")).toBe(false);
     bridge.stop();
   });
 

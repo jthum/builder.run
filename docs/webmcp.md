@@ -57,6 +57,8 @@ The human UI and WebMCP tools should not implement separate business logic.
 
 Both call into the same application runtime services, so validation, persistence, references, and Flow execution behave consistently whichever surface initiated the operation.
 
+Page widgets follow the same rule. An agent can call `get_widgets` with a widget key and optional View key to discover required inputs and compatible fields. The same widget registry drives the human editor, agent discovery, safe defaults, and `upsert_page` validation, so adding a widget does not require a separate agent-specific contract.
+
 WebMCP is therefore best understood as a **projection of the live spec**, not a second API.
 
 ## Tool lifecycle

@@ -8,6 +8,7 @@ import {
   type TypeDef,
 } from "./model.ts";
 import { findType, type QueryContext } from "./query.ts";
+import { scalarEqual, scalarString } from "./values.ts";
 
 export interface ChangeEvent {
   kind: "created" | "updated" | "deleted";
@@ -34,7 +35,7 @@ export function validateRecord(
       !missing &&
       field.type === "enum" &&
       field.values &&
-      !field.values.includes(String(value))
+      !field.values.includes(scalarString(value))
     ) {
       errors.push(`${field.label} must be one of: ${field.values.join(", ")}`);
     }
@@ -167,7 +168,7 @@ function changedFields(
   next: Record<string, unknown>,
 ): string[] {
   return fields
-    .filter((field) => String(before[field.key] ?? "") !== String(next[field.key] ?? ""))
+    .filter((field) => !scalarEqual(before[field.key], next[field.key]))
     .map((field) => field.key);
 }
 

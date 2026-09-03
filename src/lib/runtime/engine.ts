@@ -1,5 +1,6 @@
 import type { FilterClause, RecordValue } from "./model.ts";
 import { matchFilters, normalizeFilters } from "./filters.ts";
+import { scalarEqual } from "./values.ts";
 
 export interface ColumnInfo {
   name: string;
@@ -56,7 +57,7 @@ export function valuesEqual(left: unknown, right: unknown): boolean {
   if (typeof left === "boolean" || typeof right === "boolean") {
     return Boolean(left) === Boolean(right);
   }
-  return String(left ?? "") === String(right ?? "");
+  return scalarEqual(left, right);
 }
 
 export function coerceFieldValue(type: string, value: unknown): unknown {
