@@ -13,6 +13,7 @@ import {
   normalizeBlock,
   normalizeBlockList,
   removeBlock,
+  rowHeightClass,
   setBlock,
   setGroupColumns,
   widgetByKey,
@@ -190,5 +191,12 @@ describe("page widgets", () => {
     if (next?.kind !== "group") return;
     expect(next.columns).toBe(1);
     expect(next.blocks).toHaveLength(3);
+  });
+
+  it("maps row height tokens to min-height classes", () => {
+    expect.hasAssertions();
+    expect(rowHeightClass(undefined)).toBe("min-h-72");
+    expect(rowHeightClass("s")).toBe("min-h-48");
+    expect(rowHeightClass("xl")).toBe("min-h-[32rem]");
   });
 });

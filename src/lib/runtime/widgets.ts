@@ -220,10 +220,10 @@ export function rowHeight(value: unknown): PageRowHeight | undefined {
 
 export function rowHeightClass(value: unknown): string {
   if (value === "s") return "min-h-48";
-  if (value === "m") return "min-h-64";
-  if (value === "l") return "min-h-96";
-  if (value === "xl") return "min-h-[28rem]";
-  return "";
+  if (value === "m") return "min-h-80";
+  if (value === "l") return "min-h-[22rem]";
+  if (value === "xl") return "min-h-[32rem]";
+  return "min-h-72";
 }
 
 export function normalizeBlock(block: PageBlock): PageBlock {

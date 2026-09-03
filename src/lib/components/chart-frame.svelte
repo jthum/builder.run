@@ -24,7 +24,7 @@
 	} = $props();
 </script>
 
-<Card.Root class="flex h-full min-h-72 flex-col overflow-hidden">
+<Card.Root class="flex h-full min-h-0 w-full flex-1 flex-col overflow-hidden">
 	<Card.Header class="shrink-0">
 		<Card.Title class="text-base">{title}</Card.Title>
 	</Card.Header>
