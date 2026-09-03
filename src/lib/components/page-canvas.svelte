@@ -297,7 +297,7 @@
 				</div>
 			</div>
 		{:else}
-			<div class={editing ? "group/cell relative rounded-xl" : ""}>
+			<div class={editing ? "group/cell relative h-full min-h-0 rounded-xl" : "h-full min-h-0"}>
 				{#if editing}
 					<div class="absolute top-2 right-2 z-10 hidden gap-1 group-hover/cell:flex">
 						<Button size="xs" variant="outline" onclick={() => openSheet([index])}>Edit</Button>
