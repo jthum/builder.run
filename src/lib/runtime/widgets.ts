@@ -1,5 +1,5 @@
 import { homeViews, isBlankApp } from "$lib/app/labels.ts";
-import type { AppSpec, FieldDef, PageBlock, PageDef, TypeDef } from "./model.ts";
+import type { AppSpec, FieldDef, PageBlock, PageDef, PageRowHeight, TypeDef } from "./model.ts";
 import { labelFromKey } from "./ids.ts";
 
 export const HOME_PAGE_KEY = "home";
@@ -211,11 +211,28 @@ export function widgetByKey(key: string): WidgetDef | undefined {
   return widgets.find((item) => item.key === key);
 }
 
+const ROW_HEIGHTS = new Set<string>(["s", "m", "l", "xl"]);
+
+export function rowHeight(value: unknown): PageRowHeight | undefined {
+  if (typeof value === "string" && ROW_HEIGHTS.has(value)) return value as PageRowHeight;
+  return undefined;
+}
+
+export function rowHeightClass(value: unknown): string {
+  if (value === "s") return "min-h-48";
+  if (value === "m") return "min-h-64";
+  if (value === "l") return "min-h-96";
+  if (value === "xl") return "min-h-[28rem]";
+  return "";
+}
+
 export function normalizeBlock(block: PageBlock): PageBlock {
   if (block.kind === "group") {
+    const height = rowHeight(block.min_height);
     return {
       kind: "group",
       columns: clampColumns(block.columns),
+      ...(height ? { min_height: height } : {}),
       blocks: normalizeBlockList(block.blocks),
     };
   }
@@ -381,6 +398,53 @@ export function widgetBlock(widget: WidgetDef, spec: AppSpec): PageBlock {
 
 export function emptyGroup(columns = 1): PageBlock {
   return { kind: "group", columns: clampColumns(columns), blocks: [] };
+}
+
+export function moveSibling(blocks: PageBlock[], from: number, to: number): PageBlock[] {
+  if (from === to || from < 0 || to < 0 || from >= blocks.length || to >= blocks.length) {
+    return blocks;
+  }
+  const copy = [...blocks];
+  const [item] = copy.splice(from, 1);
+  if (!item) return blocks;
+  copy.splice(to, 0, item);
+  return copy;
+}
+
+export function moveInGroup(
+  blocks: PageBlock[],
+  groupIndex: number,
+  from: number,
+  to: number,
+): PageBlock[] {
+  const group = blocks[groupIndex];
+  if (group?.kind !== "group") return blocks;
+  const copy = [...blocks];
+  copy[groupIndex] = { ...group, blocks: moveSibling(group.blocks, from, to) };
+  return copy;
+}
+
+export function setGroupColumns(blocks: PageBlock[], index: number, columns: number): PageBlock[] {
+  const group = blocks[index];
+  if (group?.kind !== "group") return blocks;
+  const copy = [...blocks];
+  copy[index] = { ...group, columns: clampColumns(columns) };
+  return copy;
+}
+
+export function setGroupMinHeight(
+  blocks: PageBlock[],
+  index: number,
+  minHeight?: PageRowHeight,
+): PageBlock[] {
+  const group = blocks[index];
+  if (group?.kind !== "group") return blocks;
+  const copy = [...blocks];
+  const next = { ...group };
+  if (minHeight) next.min_height = minHeight;
+  else delete next.min_height;
+  copy[index] = next;
+  return copy;
 }
 
 export function setBlock(blocks: PageBlock[], path: number[], next: PageBlock): PageBlock[] {

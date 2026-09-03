@@ -37,12 +37,20 @@
 		total >= 1000 && Number.isInteger(total) ? total.toLocaleString() : String(total),
 	);
 	const points = $derived.by(() => {
-		if (trend.length < 2) return "";
+		if (!trend.length) return "";
 		const max = Math.max(...trend, 1);
 		const y = linear([0, max], [28, 4]);
-		const step = 120 / Math.max(trend.length - 1, 1);
-		return polyline(trend.map((item, index) => [index * step, y(item)] as [number, number]));
+		const step = trend.length === 1 ? 0 : 120 / (trend.length - 1);
+		const plotted =
+			trend.length === 1
+				? ([
+						[8, y(trend[0] ?? 0)],
+						[112, y(trend[0] ?? 0)],
+					] as Array<[number, number]>)
+				: trend.map((item, index) => [index * step, y(item)] as [number, number]);
+		return polyline(plotted);
 	});
+	const count = $derived(rows?.length ?? 0);
 </script>
 
 <Card.Root class="h-full min-h-32">
@@ -56,6 +64,11 @@
 					<a class="text-2xl font-medium tracking-tight hover:underline" {href}>{label}</a>
 				{:else}
 					<p class="text-2xl font-medium tracking-tight">{label}</p>
+				{/if}
+				{#if ready}
+					<p class="text-xs text-muted-foreground">
+						{count === 1 ? "1 record" : `${count} records`}{value ? ", summed" : ""}
+					</p>
 				{/if}
 			</div>
 			{#if ready && points}

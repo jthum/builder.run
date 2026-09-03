@@ -34,6 +34,7 @@
 	const form = $derived(spec?.forms.find((item) => item.key === String(values.form ?? "")));
 	const formType = $derived(spec?.types.find((item) => item.key === form?.type));
 	const viewRows = $derived(viewKey ? (rows[viewKey] ?? []) : []);
+	const caption = $derived(String(values.title || view?.label || ""));
 
 	async function runFlow() {
 		const flow = String(values.flow ?? "");
@@ -54,7 +55,7 @@
 	<p class="max-w-2xl text-muted-foreground whitespace-pre-wrap">{String(values.text ?? "")}</p>
 {:else if widget === "stat" && view}
 	<StatCard
-		label={view.label}
+		label={caption || view.label}
 		count={viewRows.length}
 		href={listHref(view)}
 		source={view.source}
@@ -65,7 +66,7 @@
 		rows={ready ? viewRows : null}
 		{view}
 		typeKey={view.source}
-		title={view.label}
+		title={caption || view.label}
 		compact={Boolean(values.compact)}
 		actionHref={listHref(view)}
 		actionLabel="View all"
@@ -87,7 +88,7 @@
 	/>
 {:else if widget === "metric" && view}
 	<MetricWidget
-		title={view.label}
+		title={caption || view.label}
 		rows={ready ? viewRows : null}
 		value={String(values.value ?? "")}
 		date={String(values.date ?? "created_at")}
@@ -98,6 +99,7 @@
 	<KanbanBoard
 		{view}
 		{type}
+		title={caption}
 		field={String(values.field ?? "")}
 		rows={ready ? viewRows : null}
 		{ready}
@@ -106,6 +108,7 @@
 	<CalendarMonth
 		{view}
 		{type}
+		title={caption}
 		dateField={String(values.date ?? "")}
 		rows={ready ? viewRows : null}
 		{ready}
@@ -113,7 +116,7 @@
 {:else if (widget === "bar" || widget === "line" || widget === "donut" || widget === "stacked_bar") && view}
 	<ChartMark
 		mark={widget === "stacked_bar" ? "stacked" : widget}
-		title={view.label}
+		title={caption || view.label}
 		rows={ready ? viewRows : null}
 		category={String(values.category ?? "")}
 		value={String(values.value ?? "")}

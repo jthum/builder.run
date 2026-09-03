@@ -25,10 +25,10 @@
 </script>
 
 <Card.Root class="flex h-full min-h-72 flex-col overflow-hidden">
-	<Card.Header class="shrink-0 pb-2">
+	<Card.Header class="shrink-0">
 		<Card.Title class="text-base">{title}</Card.Title>
 	</Card.Header>
-	<Card.Content class="flex min-h-0 flex-1 flex-col gap-3 pt-0">
+	<Card.Content class="flex min-h-0 flex-1 flex-col gap-3">
 		{#if !ready}
 			<Skeleton class="min-h-0 w-full flex-1" />
 		{:else if empty}
@@ -39,7 +39,7 @@
 				</Empty.Header>
 			</Empty.Root>
 		{:else}
-			<div class="flex min-h-0 w-full flex-1 flex-col">
+			<div class="flex min-h-0 w-full flex-1 flex-col px-1 pb-1">
 				{@render children?.()}
 			</div>
 			{#if legend.length}

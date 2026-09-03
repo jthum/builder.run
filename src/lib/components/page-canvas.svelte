@@ -7,7 +7,7 @@
 	import { Button } from "$lib/components/ui/button/index.js";
 	import * as DropdownMenu from "$lib/components/ui/dropdown-menu/index.js";
 	import * as Empty from "$lib/components/ui/empty/index.js";
-	import type { PageBlock, PageDef } from "$lib/runtime/model.ts";
+	import type { PageBlock, PageDef, PageRowHeight } from "$lib/runtime/model.ts";
 	import {
 		appendInGroup,
 		blockAt,
@@ -15,13 +15,22 @@
 		emptyGroup,
 		gridClass,
 		insertBlock,
+		moveInGroup,
+		moveSibling,
 		normalizePage,
 		removeBlock,
+		rowHeightClass,
 		setBlock,
+		setGroupColumns,
+		setGroupMinHeight,
 		widgetBlock,
 		widgetLabel,
 		type WidgetDef,
 	} from "$lib/runtime/widgets.ts";
+	import ArrowDownIcon from "@lucide/svelte/icons/arrow-down";
+	import ArrowLeftIcon from "@lucide/svelte/icons/arrow-left";
+	import ArrowRightIcon from "@lucide/svelte/icons/arrow-right";
+	import ArrowUpIcon from "@lucide/svelte/icons/arrow-up";
 	import CheckIcon from "@lucide/svelte/icons/check";
 	import Columns2Icon from "@lucide/svelte/icons/columns-2";
 	import Columns3Icon from "@lucide/svelte/icons/columns-3";
@@ -178,11 +187,34 @@
 		await persist(removeBlock(live, path));
 	}
 
+	async function changeColumns(index: number, columns: number) {
+		await persist(setGroupColumns(live, index, columns));
+	}
+
+	async function changeHeight(index: number, height?: PageRowHeight) {
+		await persist(setGroupMinHeight(live, index, height));
+	}
+
+	async function moveRow(index: number, to: number) {
+		await persist(moveSibling(live, index, to));
+	}
+
+	async function moveWidget(groupIndex: number, from: number, to: number) {
+		await persist(moveInGroup(live, groupIndex, from, to));
+	}
+
 	const gridChoices = [
 		{ columns: 1, label: "Full width", icon: SquareIcon },
 		{ columns: 2, label: "2 columns", icon: Columns2Icon },
 		{ columns: 3, label: "3 columns", icon: Columns3Icon },
 		{ columns: 4, label: "4 columns", icon: Columns4Icon },
+	];
+	const heightChoices: Array<{ value?: PageRowHeight; label: string }> = [
+		{ value: undefined, label: "Default height" },
+		{ value: "s", label: "Compact" },
+		{ value: "m", label: "Medium" },
+		{ value: "l", label: "Tall" },
+		{ value: "xl", label: "Extra tall" },
 	];
 </script>
 
@@ -248,17 +280,64 @@
 		{#if block.kind === "group"}
 			<div class="flex flex-col gap-2">
 				{#if editing}
-					<div class="flex items-center justify-between gap-2">
-						<p class="text-xs font-medium text-muted-foreground">
-							{block.columns && block.columns > 1 ? `${block.columns}-column grid` : "Full width"}
-						</p>
-						<Button variant="ghost" size="icon-sm" onclick={() => remove([index])}>
-							<Trash2Icon />
-							<span class="sr-only">Remove grid</span>
-						</Button>
+					<div class="flex flex-wrap items-center justify-between gap-2">
+						<div class="flex flex-wrap items-center gap-1">
+							{#each gridChoices as choice (choice.columns)}
+								{@const Icon = choice.icon}
+								<Button
+									variant={(block.columns ?? 1) === choice.columns ? "secondary" : "ghost"}
+									size="icon-sm"
+									onclick={() => changeColumns(index, choice.columns)}
+								>
+									<Icon />
+									<span class="sr-only">{choice.label}</span>
+								</Button>
+							{/each}
+							<DropdownMenu.Root>
+								<DropdownMenu.Trigger>
+									{#snippet child({ props })}
+										<Button variant="ghost" size="sm" class="h-8 px-2 text-xs" {...props}>
+											{heightChoices.find((item) => item.value === block.min_height)?.label ??
+												"Default height"}
+										</Button>
+									{/snippet}
+								</DropdownMenu.Trigger>
+								<DropdownMenu.Content align="start">
+									{#each heightChoices as choice (choice.value ?? "default")}
+										<DropdownMenu.Item onSelect={() => changeHeight(index, choice.value)}>
+											{choice.label}
+										</DropdownMenu.Item>
+									{/each}
+								</DropdownMenu.Content>
+							</DropdownMenu.Root>
+						</div>
+						<div class="flex items-center gap-1">
+							<Button
+								variant="ghost"
+								size="icon-sm"
+								disabled={index === 0}
+								onclick={() => moveRow(index, index - 1)}
+							>
+								<ArrowUpIcon />
+								<span class="sr-only">Move row up</span>
+							</Button>
+							<Button
+								variant="ghost"
+								size="icon-sm"
+								disabled={index === live.length - 1}
+								onclick={() => moveRow(index, index + 1)}
+							>
+								<ArrowDownIcon />
+								<span class="sr-only">Move row down</span>
+							</Button>
+							<Button variant="ghost" size="icon-sm" onclick={() => remove([index])}>
+								<Trash2Icon />
+								<span class="sr-only">Remove grid</span>
+							</Button>
+						</div>
 					</div>
 				{/if}
-				<div class={gridClass(block.columns ?? 1)}>
+				<div class="{gridClass(block.columns ?? 1)} {rowHeightClass(block.min_height)}">
 					{#each block.blocks as child, childIndex (`${index}-${childIndex}`)}
 						<div
 							class={editing
@@ -267,6 +346,24 @@
 						>
 							{#if editing}
 								<div class="absolute top-2 right-2 z-10 hidden gap-1 group-hover/cell:flex">
+									<Button
+										size="icon-xs"
+										variant="outline"
+										disabled={childIndex === 0}
+										onclick={() => moveWidget(index, childIndex, childIndex - 1)}
+									>
+										<ArrowLeftIcon />
+										<span class="sr-only">Move left</span>
+									</Button>
+									<Button
+										size="icon-xs"
+										variant="outline"
+										disabled={childIndex === block.blocks.length - 1}
+										onclick={() => moveWidget(index, childIndex, childIndex + 1)}
+									>
+										<ArrowRightIcon />
+										<span class="sr-only">Move right</span>
+									</Button>
 									<Button size="xs" variant="outline" onclick={() => openSheet([index, childIndex])}>
 										Edit
 									</Button>

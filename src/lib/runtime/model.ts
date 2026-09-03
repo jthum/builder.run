@@ -98,9 +98,11 @@ export interface FlowDef {
   steps: FlowStep[];
 }
 
+export type PageRowHeight = "s" | "m" | "l" | "xl";
+
 export type PageBlock =
   | { kind: "widget"; widget: string; values?: Record<string, unknown> }
-  | { kind: "group"; columns?: number; blocks: PageBlock[] };
+  | { kind: "group"; columns?: number; min_height?: PageRowHeight; blocks: PageBlock[] };
 
 export interface PageDef {
   id: string;

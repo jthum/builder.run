@@ -120,10 +120,10 @@
 >
 	<ChartPlot>
 		{#snippet children({ width, height })}
-			{@const padL = mark === "donut" ? 8 : 36}
-			{@const padR = 8}
-			{@const padT = 8}
-			{@const padB = mark === "donut" ? 8 : 28}
+			{@const padL = mark === "donut" ? 12 : 40}
+			{@const padR = 12}
+			{@const padT = mark === "donut" ? 12 : 18}
+			{@const padB = mark === "donut" ? 12 : 32}
 			{@const innerW = Math.max(width - padL - padR, 1)}
 			{@const innerH = Math.max(height - padT - padB, 1)}
 			{@const values = plot.series.flatMap((item) => item.values)}
@@ -141,7 +141,7 @@
 				width={width}
 				height={height}
 				viewBox="0 0 {width} {height}"
-				class="block size-full overflow-visible"
+				class="block size-full overflow-hidden"
 				role="img"
 				aria-label={title}
 				onmouseleave={() => (hover = null)}

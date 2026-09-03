@@ -49,6 +49,8 @@
 			.map((flow) => ({ value: flow.key, label: flow.label })),
 	);
 
+	const showCaption = $derived(Boolean(def?.inputs.some((input) => input.type === "view")));
+
 	function fieldOptions(of?: WidgetFieldKind) {
 		const viewKey = String(values.view ?? "");
 		const type = spec ? typeForView(spec, viewKey) : undefined;
@@ -76,6 +78,17 @@
 			</Sheet.Header>
 			<div class="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-6">
 				<Field.Group>
+					{#if showCaption}
+						<Field.Field>
+							<Field.Label>Title</Field.Label>
+							<Input
+								bind:value={values.title as string}
+								placeholder="Leave blank to use the view name"
+								data-testid="widget-title"
+							/>
+							<Field.Description>Shown on the widget. Blank uses the view name.</Field.Description>
+						</Field.Field>
+					{/if}
 					{#each def?.inputs ?? [] as input (input.key)}
 						{#if input.type === "boolean"}
 							<Field.Field orientation="horizontal">

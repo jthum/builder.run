@@ -8,10 +8,13 @@ import {
   defaultWidgetValues,
   implicitHomePage,
   insertBlock,
+  moveInGroup,
+  moveSibling,
   normalizeBlock,
   normalizeBlockList,
   removeBlock,
   setBlock,
+  setGroupColumns,
   widgetByKey,
 } from "./widgets.ts";
 
@@ -160,5 +163,32 @@ describe("page widgets", () => {
     if (inner?.kind !== "group") return;
     expect(inner.blocks).toHaveLength(1);
     expect(inner.blocks[0]).toMatchObject({ values: { title: "There" } });
+  });
+
+  it("reorders rows and widgets, and keeps widgets when shrinking columns", () => {
+    expect.hasAssertions();
+    const a: PageBlock = { kind: "widget", widget: "text", values: { text: "A" } };
+    const b: PageBlock = { kind: "widget", widget: "text", values: { text: "B" } };
+    const c: PageBlock = { kind: "widget", widget: "text", values: { text: "C" } };
+    const row: PageBlock = { kind: "group", columns: 2, blocks: [a, b, c] };
+    const other: PageBlock = { kind: "group", columns: 1, blocks: [a] };
+    expect(
+      moveSibling([row, other], 1, 0).map((item) => item.kind === "group" && item.columns),
+    ).toEqual([1, 2]);
+    const moved = moveInGroup([row], 0, 2, 0);
+    const inner = moved[0];
+    expect(inner?.kind).toBe("group");
+    if (inner?.kind !== "group") return;
+    expect(inner.blocks.map((item) => item.kind === "widget" && item.values?.text)).toEqual([
+      "C",
+      "A",
+      "B",
+    ]);
+    const stacked = setGroupColumns([row], 0, 1);
+    const next = stacked[0];
+    expect(next?.kind).toBe("group");
+    if (next?.kind !== "group") return;
+    expect(next.columns).toBe(1);
+    expect(next.blocks).toHaveLength(3);
   });
 });

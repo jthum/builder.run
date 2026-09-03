@@ -11,12 +11,14 @@
 	let {
 		view,
 		type,
+		title = "",
 		field,
 		rows,
 		ready = true,
 	}: {
 		view: ViewDef;
 		type?: TypeDef;
+		title?: string;
 		field: string;
 		rows: Array<Record<string, unknown>> | null;
 		ready?: boolean;
@@ -66,7 +68,11 @@
 		</Empty.Header>
 	</Empty.Root>
 {:else}
-	<div class="flex h-full min-h-80 gap-3 overflow-x-auto pb-1">
+	<div class="flex h-full min-h-80 flex-col gap-2">
+		{#if title}
+			<h3 class="text-base font-medium">{title}</h3>
+		{/if}
+	<div class="flex min-h-0 flex-1 gap-3 overflow-x-auto pb-1">
 		{#each columns as column (column)}
 			{@const items = grouped.get(column) ?? []}
 			<section class="flex w-64 shrink-0 flex-col gap-2">
@@ -95,5 +101,6 @@
 				</div>
 			</section>
 		{/each}
+	</div>
 	</div>
 {/if}

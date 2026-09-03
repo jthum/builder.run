@@ -11,12 +11,14 @@
 	let {
 		view,
 		type,
+		title = "",
 		dateField,
 		rows,
 		ready = true,
 	}: {
 		view: ViewDef;
 		type?: TypeDef;
+		title?: string;
 		dateField: string;
 		rows: Array<Record<string, unknown>> | null;
 		ready?: boolean;
@@ -64,7 +66,12 @@
 
 <Card.Root class="flex h-full min-h-96 flex-col overflow-hidden">
 	<Card.Header class="flex-row items-center justify-between gap-2">
-		<Card.Title class="text-base">{label}</Card.Title>
+		<div class="flex flex-col gap-0.5">
+			{#if title}
+				<Card.Description>{title}</Card.Description>
+			{/if}
+			<Card.Title class="text-base">{label}</Card.Title>
+		</div>
 		<div class="flex items-center gap-1">
 			<Button variant="ghost" size="icon-sm" onclick={() => (cursor = new Date(year, month - 1, 1))}>
 				<ChevronLeftIcon />
