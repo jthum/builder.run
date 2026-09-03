@@ -1,44 +1,113 @@
 # builder.run
 
-The **application spec is the canonical product artefact**. This repository is the first browser runtime: a Svelte 5 / SvelteKit 3 app that materialises a spec into local software, and exposes the same capabilities to humans and agents.
+**builder.run is a local-first application runtime that humans and agents can mould together.**
+
+The application **spec is the canonical product artefact**. The browser runtime materialises that spec into a working app: real SQLite tables, forms, views, pages, rules, and an agent-facing capability surface.
+
+The WebMCP integration has two layers:
 
 ```text
-Agent ──WebMCP──> moulds application
-                        │
-                     App spec
-                        │
-Agent ──WebMCP──> uses resulting application
+Agent
+  │
+  ├── builder tools ──> change the application spec
+  │                         │
+  │                         ▼
+  │                    builder.run
+  │                    materialises
+  │                         │
+  │              ┌──────────┴──────────┐
+  │              ▼                     ▼
+  │          Human UI          generated WebMCP tools
+  │                                    │
+  └────────────────────────────────────┘
+                    uses the app
 ```
 
-## Run
+An agent can therefore **build an application and then immediately use the new tools created from the application it just built**.
+
+## Why WebMCP
+
+Most application integrations expose a fixed API designed separately from the product.
+
+builder.run takes a different approach: WebMCP is a **projection of the live application spec**. When the spec changes, the application changes and its agent-facing tools can change with it.
+
+This creates two complementary surfaces:
+
+- **Builder tools** let an agent create and mould apps: types, fields, views, pages, widgets, forms, rules, and related primitives.
+- **Application tools** are generated from the resulting app so an agent can work with its records, views, and exposed actions.
+
+The human interface and agent tools meet at the same runtime boundary, rather than maintaining a second machine-only implementation.
+
+## What the runtime can build
+
+The current browser runtime supports:
+
+- **Spaces and Apps** — apps can keep local data while reusing types exposed by their parent Space.
+- **Types and fields** — including text, number, date, boolean, choice, and reference fields.
+- **Views** — reusable filtered and ordered projections over application data.
+- **Forms** — implicit create/edit forms from types, with custom forms where needed.
+- **Pages and widgets** — dashboards and app screens composed from content, number cards, lists, tables, and bar/donut/line charts.
+- **Rules (Flows)** — callable actions and triggered behaviour composed from runtime steps.
+- **Actors** — the runtime models actions against an actor identity; this version starts with one local human administrator.
+- **Portable specs** — export the application definition as YAML or JSON.
+
+Types are intentionally powerful defaults: defining a type already gives the runtime enough information to create storage, CRUD, basic forms, and navigation.
+
+## Local-first by design
+
+Application data is stored in **SQLite inside the browser** using `wa-sqlite` in a worker.
+
+Persistence falls back through:
+
+1. OPFS
+2. IndexedDB
+3. in-memory SQLite
+
+The catalogue tracks Spaces, actors, and the active Space. Application types materialise as real SQLite tables.
+
+The current runtime is intentionally browser-local. A spec can be exported and imported elsewhere, but record data remains in the browser where it was created.
+
+## Try it
+
+For WebMCP-enabled agent interaction, use either:
+
+- ChatGPT's in-app browser, where WebMCP is available for judging; or
+- Google Chrome 149+ with `chrome://flags/#enable-webmcp-testing` enabled.
+
+The app itself does not require WebMCP. In a browser without the API, the human interface still works; agent tools simply are not registered.
+
+See [WebMCP and agents](docs/webmcp.md) for a concise test flow.
+
+## Run locally
 
 ```bash
 vp install
 vp dev
 ```
 
-Toolchain: Vite+, pnpm, `vp check`, `vp test`, `vp build`.
+Useful development commands:
 
-Open in Chromium, or ChatGPT’s built-in browser for WebMCP. Persistence prefers OPFS, then IndexedDB, then memory. The app works without WebMCP; tools simply do not register.
+```bash
+vp check
+vp test
+vp build
+```
 
-## Primitives
+The project uses Vite+, pnpm, SvelteKit 3 RC, Svelte 5, Tailwind CSS 4, shadcn-svelte/Bits UI, and `wa-sqlite`.
 
-Space → Stores, Types, Views, Forms, Flows, Pages. UI still says Space and Apps: an app is a space you created from the space that holds your account.
+## Documentation
 
-- A type already produces storage, CRUD, a list view, create/edit forms, and navigation.
-- A callable flow is a capability (`expose: [ui, agent]`).
-- A triggered flow is an automation.
-- Actors own roles. Every user is an actor; not every actor is a user. v1 has one local human admin.
-- WebMCP is a projection of the live spec, not a second API.
+- [Getting started](docs/getting-started.md)
+- [Core concepts](docs/concepts.md)
+- [Building an app](docs/building.md)
+- [WebMCP and agents](docs/webmcp.md)
+- [Rules and flows](docs/flows.md)
+- [Data and persistence](docs/data-and-persistence.md)
+- [Architecture](docs/architecture.md)
+- [Judge / reviewer test guide](docs/testing.md)
 
-## Demo
+## Project status
 
-1. Load **Freelance CRM** from the gallery (or ask an agent to `create_app` with sample `freelance_crm`).
-2. Create an organisation (exposed from the space), then a project and invoice.
-3. Invoke **Mark invoice paid** — `paid_at` is stamped by a triggered flow.
-4. Mould the spec: add a `priority` enum on projects.
-5. Export the YAML spec.
+This repository is the first browser runtime for a broader schema-first application model. It is deliberately experimental: the goal is to test how far a small set of composable primitives can go when the same application can be shaped by a person or an agent.
 
-## Stack
-
-SvelteKit 3 RC, Svelte 5, Tailwind 4, shadcn-svelte (Bits UI). Application data is **SQLite**: `wa-sqlite` in a worker in the browser (OPFS → IndexedDB → in-memory SQLite), `node:sqlite` in tests. Spaces, actors, and the active space live in a `catalog` database; each space has one SQLite file (`space-{id}`) whose types become real tables.
+The WebMCP integration is not an add-on to a finished app. It is part of the runtime model itself: **agents can mould the software, and the software can expose newly created capabilities back to agents.**
