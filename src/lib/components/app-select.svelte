@@ -41,8 +41,10 @@
 		<span class={selected ? "" : "text-muted-foreground"}>{selected?.label ?? placeholder}</span>
 	</Select.Trigger>
 	<Select.Content>
-		{#each items as option (option.value)}
-			<Select.Item value={option.value} label={option.label} />
-		{/each}
+		<Select.Group>
+			{#each items as option (option.value)}
+				<Select.Item value={option.value} label={option.label} />
+			{/each}
+		</Select.Group>
 	</Select.Content>
 </Select.Root>

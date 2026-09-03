@@ -40,6 +40,10 @@
 		enum: ListIcon,
 		reference: LinkIcon,
 	};
+	const presentationOptions = [
+		{ value: "", label: "Standard number" },
+		{ value: "rating", label: "Rating" },
+	];
 
 	const spec = $derived(session.snapshot?.spec);
 	const targets = $derived(spec?.types ?? []);
@@ -68,6 +72,9 @@
 	let fieldChoices = $state<string[]>([]);
 	let choiceDraft = $state("");
 	let fieldTarget = $state("");
+	let fieldPresentation = $state<"" | "rating">("");
+	let fieldRatingVariant = $state<"segments">("segments");
+	let fieldRatingMax = $state("10");
 	let advanced = $state(false);
 	let removeKey = $state<string | null>(null);
 	let deleteOpen = $state(false);
@@ -84,6 +91,9 @@
 		fieldChoices = kind === "enum" ? ["draft", "active"] : [];
 		choiceDraft = "";
 		fieldTarget = targetOptions[0]?.value ?? "";
+		fieldPresentation = "";
+		fieldRatingVariant = "segments";
+		fieldRatingMax = "10";
 		advanced = false;
 		sheetOpen = true;
 	}
@@ -97,6 +107,9 @@
 		fieldChoices = [...(field.values ?? [])];
 		choiceDraft = "";
 		fieldTarget = field.target ?? "";
+		fieldPresentation = field.presentation ?? "";
+		fieldRatingVariant = field.variant ?? "segments";
+		fieldRatingMax = String(field.max ?? 10);
 		advanced = false;
 		sheetOpen = true;
 	}
@@ -136,6 +149,12 @@
 			required: fieldRequired,
 			values: fieldType === "enum" ? fieldChoices : undefined,
 			target: fieldType === "reference" ? fieldTarget : undefined,
+			presentation: fieldType === "number" && fieldPresentation === "rating" ? "rating" : undefined,
+			variant: fieldType === "number" && fieldPresentation === "rating" ? fieldRatingVariant : undefined,
+			max:
+				fieldType === "number" && fieldPresentation === "rating"
+					? Math.min(10, Math.max(2, Math.round(Number(fieldRatingMax) || 10)))
+					: undefined,
 		});
 		sheetOpen = false;
 		toast.success(editing ? "Field saved" : "Field added");
@@ -286,6 +305,9 @@
 								{#if field.type === "enum" && field.values?.length}
 									· {field.values.map((value) => value.replaceAll("_", " ")).join(", ")}
 								{/if}
+								{#if field.type === "number" && field.presentation === "rating"}
+									· Rating · {field.max ?? 10} points
+								{/if}
 							</div>
 						</div>
 					</button>
@@ -396,6 +418,35 @@
 							{/if}
 						</Field.Description>
 					</Field.Field>
+				{/if}
+				{#if fieldType === "number"}
+					<Field.Field>
+						<Field.Label>Presentation</Field.Label>
+						<AppSelect bind:value={fieldPresentation} options={presentationOptions} />
+						<Field.Description>Choose how people enter and see this number.</Field.Description>
+					</Field.Field>
+					{#if fieldPresentation === "rating"}
+						<Field.Field>
+							<Field.Label>Style</Field.Label>
+							<AppSelect
+								bind:value={fieldRatingVariant}
+								options={[{ value: "segments", label: "Numbered segments" }]}
+							/>
+							<Field.Description>More rating styles, such as stars, can be added here later.</Field.Description>
+						</Field.Field>
+						<Field.Field>
+							<Field.Label for="rating-maximum">Highest rating</Field.Label>
+							<Input
+								id="rating-maximum"
+								type="number"
+								min="2"
+								max="10"
+								step="1"
+								bind:value={fieldRatingMax}
+							/>
+							<Field.Description>Use a scale from 2 to 10. New ratings start at 1.</Field.Description>
+						</Field.Field>
+					{/if}
 				{/if}
 				<Field.Field orientation="horizontal">
 					<Switch bind:checked={fieldRequired} id="required" />

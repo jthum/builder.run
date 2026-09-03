@@ -3,6 +3,7 @@
 	import { runtime, session } from "$lib/app/session.svelte.ts";
 	import AppSelect from "$lib/components/app-select.svelte";
 	import ReferencePicker from "$lib/components/reference-picker.svelte";
+	import RatingInput from "$lib/components/rating-input.svelte";
 	import * as Alert from "$lib/components/ui/alert/index.js";
 	import { Button } from "$lib/components/ui/button/index.js";
 	import * as Field from "$lib/components/ui/field/index.js";
@@ -157,6 +158,13 @@
 							label: option.label,
 						}))}
 						placeholder={`Select ${field.label.toLowerCase()}`}
+					/>
+				{:else if widget === "rating"}
+					<RatingInput
+						bind:value={values[field.key]}
+						max={field.max ?? 10}
+						label={field.label}
+						required={field.required}
 					/>
 				{:else}
 					<Input

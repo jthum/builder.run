@@ -41,6 +41,18 @@ export function validateRecord(
     if (!missing && field.type === "number" && Number.isNaN(Number(value))) {
       errors.push(`${field.label} must be a number`);
     }
+    if (
+      !missing &&
+      field.type === "number" &&
+      field.presentation === "rating" &&
+      !Number.isNaN(Number(value))
+    ) {
+      const numeric = Number(value);
+      const max = field.max ?? 10;
+      if (!Number.isInteger(numeric) || numeric < 1 || numeric > max) {
+        errors.push(`${field.label} must be a whole number from 1 to ${max}`);
+      }
+    }
   }
   return errors;
 }

@@ -256,6 +256,9 @@ const fieldDraftSchema = {
     required: { type: "boolean" },
     values: { type: "array", items: { type: "string" } },
     target: { type: "string", description: "Referenced type key (reference fields)" },
+    presentation: { type: "string", enum: ["rating"] },
+    variant: { type: "string", enum: ["segments"] },
+    max: { type: "number", minimum: 2, maximum: 10 },
     default: {},
   },
 };
@@ -455,7 +458,7 @@ export function buildTools(host: Host): ToolDefinition[] {
       name: "upsert_field",
       title: "Add or update a field",
       description:
-        'Add or update one field on a type without removing the others. type is the type key; field_type is the field kind: text, number, date, boolean, enum, reference. Enum fields need values; reference fields need target. Example: upsert_field({ type: "project", key: "priority", field_type: "enum", values: ["low", "medium", "high"] }).',
+        'Add or update one field on a type without removing the others. type is the type key; field_type is the field kind: text, number, date, boolean, enum, reference. Enum fields need values; reference fields need target. A number field can use presentation: "rating", variant: "segments", and max from 2 to 10. Example: upsert_field({ type: "project", key: "priority", field_type: "enum", values: ["low", "medium", "high"] }).',
       inputSchema: {
         type: "object",
         properties: {
@@ -471,6 +474,9 @@ export function buildTools(host: Host): ToolDefinition[] {
           required: { type: "boolean" },
           values: { type: "array", items: { type: "string" } },
           target: { type: "string", description: "Referenced type key (reference fields)" },
+          presentation: { type: "string", enum: ["rating"] },
+          variant: { type: "string", enum: ["segments"] },
+          max: { type: "number", minimum: 2, maximum: 10 },
         },
         required: ["key"],
         additionalProperties: false,
@@ -483,6 +489,13 @@ export function buildTools(host: Host): ToolDefinition[] {
           required: Boolean(input.required),
           values: input.values as string[] | undefined,
           target: input.target as string | undefined,
+          ...(Object.hasOwn(input, "presentation")
+            ? { presentation: input.presentation as FieldDef["presentation"] }
+            : {}),
+          ...(Object.hasOwn(input, "variant")
+            ? { variant: input.variant as FieldDef["variant"] }
+            : {}),
+          ...(Object.hasOwn(input, "max") ? { max: input.max as number } : {}),
         }),
     },
     {
@@ -830,6 +843,11 @@ function fieldInputSchema(field: FieldDef): Record<string, unknown> {
     description: fieldInputDescription(field),
   };
   if (field.type === "enum" && field.values?.length) schema.enum = field.values;
+  if (field.type === "number" && field.presentation === "rating") {
+    schema.minimum = 1;
+    schema.maximum = field.max ?? 10;
+    schema.multipleOf = 1;
+  }
   return schema;
 }
 
@@ -840,6 +858,9 @@ function fieldInputDescription(field: FieldDef): string {
   }
   if (field.type === "enum" && field.values?.length) {
     return `${field.label}. One of: ${field.values.join(", ")}`;
+  }
+  if (field.type === "number" && field.presentation === "rating") {
+    return `${field.label}. A whole-number rating from 1 to ${field.max ?? 10}`;
   }
   return field.label;
 }

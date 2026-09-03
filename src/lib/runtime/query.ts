@@ -139,7 +139,8 @@ export function filterRows(
 
 export function fieldWidget(
   field: FieldDef,
-): "text" | "number" | "date" | "checkbox" | "select" | "reference" {
+): "text" | "number" | "date" | "checkbox" | "select" | "reference" | "rating" {
+  if (field.type === "number" && field.presentation === "rating") return "rating";
   if (field.type === "boolean") return "checkbox";
   if (field.type === "enum") return "select";
   if (field.type === "reference") return "reference";

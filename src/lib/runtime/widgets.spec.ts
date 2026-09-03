@@ -193,9 +193,9 @@ describe("page widgets", () => {
     expect(next.blocks).toHaveLength(3);
   });
 
-  it("maps row height tokens to min-height classes", () => {
+  it("keeps default rows automatic and maps explicit height tokens", () => {
     expect.hasAssertions();
-    expect(rowHeightClass(undefined)).toBe("min-h-72");
+    expect(rowHeightClass(undefined)).toBe("");
     expect(rowHeightClass("s")).toBe("min-h-48");
     expect(rowHeightClass("xl")).toBe("min-h-[32rem]");
   });

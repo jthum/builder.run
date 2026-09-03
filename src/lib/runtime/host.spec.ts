@@ -53,9 +53,54 @@ types:
     fields:
       title: text
       done: boolean
+      score:
+        type: number
+        presentation: rating
+        max: 5
 `);
     expect(spec.types[0]?.key).toBe("task");
-    expect(spec.types[0]?.fields.map((field) => field.key)).toEqual(["title", "done"]);
+    expect(spec.types[0]?.fields.map((field) => field.key)).toEqual(["title", "done", "score"]);
+    expect(spec.types[0]?.fields.at(-1)).toMatchObject({
+      type: "number",
+      presentation: "rating",
+      variant: "segments",
+      max: 5,
+    });
+  });
+
+  it("stores ratings as validated numbers", async () => {
+    expect.hasAssertions();
+    const host = await Host.open({ persist: false });
+    await host.upsertType({
+      key: "review",
+      fields: [
+        {
+          id: "fld_score",
+          key: "score",
+          label: "Score",
+          type: "number",
+          presentation: "rating",
+          variant: "segments",
+          max: 10,
+        },
+      ] as never,
+    });
+    const review = await host.create("review", { score: 8 });
+    expect(review.score).toBe(8);
+    await expect(host.create("review", { score: 11 })).rejects.toThrow(
+      "Score must be a whole number from 1 to 10",
+    );
+    await expect(host.create("review", { score: 7.5 })).rejects.toThrow(
+      "Score must be a whole number from 1 to 10",
+    );
+    await host.upsertField("review", {
+      key: "score",
+      type: "number",
+      presentation: undefined,
+    });
+    expect(host.resolvedSpec().types[0]?.fields[0]).not.toHaveProperty("presentation");
+    expect(host.resolvedSpec().types[0]?.fields[0]).not.toHaveProperty("variant");
+    expect(host.resolvedSpec().types[0]?.fields[0]).not.toHaveProperty("max");
   });
 
   it("walks the freelance CRM mould-and-use loop", async () => {

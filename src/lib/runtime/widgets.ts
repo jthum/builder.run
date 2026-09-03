@@ -223,7 +223,7 @@ export function rowHeightClass(value: unknown): string {
   if (value === "m") return "min-h-80";
   if (value === "l") return "min-h-[22rem]";
   if (value === "xl") return "min-h-[32rem]";
-  return "min-h-72";
+  return "";
 }
 
 export function normalizeBlock(block: PageBlock): PageBlock {

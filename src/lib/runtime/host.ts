@@ -451,19 +451,24 @@ export class Host {
     field = cloneData(field);
     const type = this.findWritableType(typeKey);
     const existing = type.fields.find((item) => item.key === field.key);
+    const updated = {
+      id: existing?.id ?? createId("fld"),
+      label: labelFromKey(field.key),
+      type: "text",
+      ...existing,
+      ...field,
+    } as FieldDef;
+    if (updated.type === "number" && updated.presentation === "rating") {
+      updated.variant = "segments";
+      updated.max = Math.min(10, Math.max(2, Math.round(Number(updated.max) || 10)));
+    } else {
+      delete updated.presentation;
+      delete updated.variant;
+      delete updated.max;
+    }
     const next = existing
-      ? type.fields.map((item) =>
-          item.key === field.key ? { ...item, ...field, id: item.id } : item,
-        )
-      : [
-          ...type.fields,
-          {
-            id: createId("fld"),
-            label: labelFromKey(field.key),
-            type: "text",
-            ...field,
-          } as FieldDef,
-        ];
+      ? type.fields.map((item) => (item.key === field.key ? updated : item))
+      : [...type.fields, updated];
     type.fields = next;
     await this.reconcileAll();
     await this.persistAndEmit();

@@ -3,6 +3,8 @@ import { createId, labelFromKey, slugify } from "./ids.ts";
 export const SPEC_VERSION = 1 as const;
 
 export type FieldKind = "text" | "number" | "date" | "boolean" | "enum" | "reference";
+export type FieldPresentation = "rating";
+export type FieldPresentationVariant = "segments";
 export type StoreKind = "local" | "shared";
 export type ActorKind = "human" | "agent" | "system";
 export type Exposure = "ui" | "agent";
@@ -41,6 +43,9 @@ export interface FieldDef {
   default?: unknown;
   values?: string[];
   target?: string;
+  presentation?: FieldPresentation;
+  variant?: FieldPresentationVariant;
+  max?: number;
 }
 
 export interface TypeDef {
@@ -253,6 +258,17 @@ function normalizeField(key: string, draft: FieldDraft, existing?: FieldDef): Fi
     const target = objectDraft.target || existing?.target;
     if (!target) throw new Error(`Reference field "${key}" needs a target`);
     field.target = target;
+  }
+  const presentation = Object.hasOwn(objectDraft, "presentation")
+    ? objectDraft.presentation
+    : existing?.presentation;
+  if (type === "number" && presentation === "rating") {
+    const requestedMax = Number(objectDraft.max ?? existing?.max ?? 10);
+    field.presentation = "rating";
+    field.variant = "segments";
+    field.max = Number.isFinite(requestedMax)
+      ? Math.min(10, Math.max(2, Math.round(requestedMax)))
+      : 10;
   }
   return field;
 }
