@@ -192,7 +192,7 @@ function isLegacySharedStore(value?: string): boolean {
 
 export type FieldDraft = FieldKind | (Partial<FieldDef> & { field_type?: string });
 export type TypeDraft = Partial<Omit<TypeDef, "fields">> & {
-  fields?: Record<string, FieldDraft> | FieldDef[];
+  fields?: Record<string, FieldDraft> | FieldDraft[];
 };
 type SpecDraft = Partial<
   Omit<AppSpec, "types" | "views" | "forms" | "flows" | "pages" | "stores">

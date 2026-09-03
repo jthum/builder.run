@@ -192,6 +192,8 @@
 				<div class="flex flex-col gap-2">
 					{#if group.folder}
 						<div
+							role="group"
+							aria-label={`Folder ${group.folder}`}
 							class="flex items-center justify-between gap-2 rounded-xl px-1 py-1 {over ===
 							`folder:${group.folder}`
 								? 'bg-primary/5 ring-1 ring-primary/40'
