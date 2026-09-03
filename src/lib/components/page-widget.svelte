@@ -5,6 +5,11 @@
 	import RecordTable from "$lib/components/record-table.svelte";
 	import StatCard from "$lib/components/stat-card.svelte";
 	import { Button } from "$lib/components/ui/button/index.js";
+	import CalendarMonth from "$lib/components/calendar-month.svelte";
+	import CalloutWidget from "$lib/components/callout-widget.svelte";
+	import ChartMark from "$lib/components/chart-mark.svelte";
+	import KanbanBoard from "$lib/components/kanban-board.svelte";
+	import MetricWidget from "$lib/components/metric-widget.svelte";
 	import ViewCards from "$lib/components/view-cards.svelte";
 	import ViewList from "$lib/components/view-list.svelte";
 	import type { PageBlock } from "$lib/runtime/model.ts";
@@ -74,7 +79,49 @@
 	<RecordForm type={formType} {form} fields={form.fields} />
 {:else if widget === "action"}
 	<Button onclick={runFlow}>{String(values.label || "Run")}</Button>
-{:else if widget === "stat" || widget === "table" || widget === "cards" || widget === "list"}
+{:else if widget === "callout"}
+	<CalloutWidget
+		title={String(values.title ?? "Note")}
+		text={String(values.text ?? "")}
+		tone={String(values.tone ?? "note")}
+	/>
+{:else if widget === "metric" && view}
+	<MetricWidget
+		title={view.label}
+		rows={ready ? viewRows : null}
+		value={String(values.value ?? "")}
+		date={String(values.date ?? "created_at")}
+		href={listHref(view)}
+		{ready}
+	/>
+{:else if widget === "kanban" && view}
+	<KanbanBoard
+		{view}
+		{type}
+		field={String(values.field ?? "")}
+		rows={ready ? viewRows : null}
+		{ready}
+	/>
+{:else if widget === "calendar" && view}
+	<CalendarMonth
+		{view}
+		{type}
+		dateField={String(values.date ?? "")}
+		rows={ready ? viewRows : null}
+		{ready}
+	/>
+{:else if (widget === "bar" || widget === "line" || widget === "donut" || widget === "stacked_bar") && view}
+	<ChartMark
+		mark={widget === "stacked_bar" ? "stacked" : widget}
+		title={view.label}
+		rows={ready ? viewRows : null}
+		category={String(values.category ?? "")}
+		value={String(values.value ?? "")}
+		series={String(values.series ?? "")}
+		time={widget === "line"}
+		{ready}
+	/>
+{:else if widget === "stat" || widget === "table" || widget === "cards" || widget === "list" || widget === "bar" || widget === "line" || widget === "donut" || widget === "stacked_bar" || widget === "metric" || widget === "kanban" || widget === "calendar"}
 	<p class="text-sm text-muted-foreground">Pick a view for this widget.</p>
 {:else if widget === "form"}
 	<p class="text-sm text-muted-foreground">Pick a form for this widget.</p>

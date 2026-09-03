@@ -16,6 +16,13 @@
 	import ListIcon from "@lucide/svelte/icons/list";
 	import MousePointerClickIcon from "@lucide/svelte/icons/mouse-pointer-click";
 	import SearchIcon from "@lucide/svelte/icons/search";
+	import CalendarIcon from "@lucide/svelte/icons/calendar";
+	import ChartBarIcon from "@lucide/svelte/icons/chart-bar";
+	import ChartLineIcon from "@lucide/svelte/icons/chart-line";
+	import ChartPieIcon from "@lucide/svelte/icons/chart-pie";
+	import Columns3Icon from "@lucide/svelte/icons/columns-3";
+	import GaugeIcon from "@lucide/svelte/icons/gauge";
+	import MegaphoneIcon from "@lucide/svelte/icons/megaphone";
 	import TableIcon from "@lucide/svelte/icons/table";
 	import TextIcon from "@lucide/svelte/icons/text";
 	import type { Component } from "svelte";
@@ -37,6 +44,14 @@
 		list: ListIcon,
 		form: FormInputIcon,
 		action: MousePointerClickIcon,
+		callout: MegaphoneIcon,
+		metric: GaugeIcon,
+		bar: ChartBarIcon,
+		line: ChartLineIcon,
+		donut: ChartPieIcon,
+		stacked_bar: ChartBarIcon,
+		kanban: Columns3Icon,
+		calendar: CalendarIcon,
 	};
 
 	let query = $state("");

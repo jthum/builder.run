@@ -8,7 +8,12 @@
 	import { Switch } from "$lib/components/ui/switch/index.js";
 	import { Textarea } from "$lib/components/ui/textarea/index.js";
 	import type { PageBlock } from "$lib/runtime/model.ts";
-	import { widgetByKey } from "$lib/runtime/widgets.ts";
+	import {
+		fieldsMatching,
+		typeForView,
+		widgetByKey,
+		type WidgetFieldKind,
+	} from "$lib/runtime/widgets.ts";
 
 	let {
 		open = $bindable(false),
@@ -43,6 +48,15 @@
 			.filter((flow) => flow.expose?.includes("ui") && !flow.trigger)
 			.map((flow) => ({ value: flow.key, label: flow.label })),
 	);
+
+	function fieldOptions(of?: WidgetFieldKind) {
+		const viewKey = String(values.view ?? "");
+		const type = spec ? typeForView(spec, viewKey) : undefined;
+		return fieldsMatching(type?.fields ?? [], of).map((field) => ({
+			value: field.key,
+			label: field.label,
+		}));
+	}
 
 	function submit(event: Event) {
 		event.preventDefault();
@@ -93,6 +107,18 @@
 										bind:value={values[input.key] as string}
 										options={flowOptions}
 										placeholder="Select a rule"
+									/>
+								{:else if input.type === "field"}
+									<AppSelect
+										bind:value={values[input.key] as string}
+										options={fieldOptions(input.of)}
+										placeholder="Select a field"
+									/>
+								{:else if input.type === "select"}
+									<AppSelect
+										bind:value={values[input.key] as string}
+										options={input.options ?? []}
+										placeholder="Select"
 									/>
 								{:else}
 									<Input bind:value={values[input.key] as string} data-testid="widget-field" />

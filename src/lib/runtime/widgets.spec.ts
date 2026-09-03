@@ -5,12 +5,14 @@ import {
   collectViewKeys,
   groupPagesByFolder,
   moveAuthoredPage,
+  defaultWidgetValues,
   implicitHomePage,
   insertBlock,
   normalizeBlock,
   normalizeBlockList,
   removeBlock,
   setBlock,
+  widgetByKey,
 } from "./widgets.ts";
 
 describe("page folders", () => {
@@ -62,6 +64,32 @@ describe("page widgets", () => {
       kind: "group",
       columns: 4,
       blocks: [],
+    });
+  });
+
+  it("guesses view and field defaults for a bar chart", () => {
+    expect.hasAssertions();
+    const spec = {
+      views: [{ key: "project_list", source: "project", fields: ["name", "status"] }],
+      types: [
+        {
+          key: "project",
+          fields: [
+            { key: "name", type: "text", label: "Name" },
+            { key: "status", type: "enum", label: "Status" },
+            { key: "budget", type: "number", label: "Budget" },
+          ],
+        },
+      ],
+      forms: [],
+      flows: [],
+    } as never;
+    const bar = widgetByKey("bar");
+    expect(bar).toBeTruthy();
+    expect(defaultWidgetValues(bar!, spec)).toMatchObject({
+      view: "project_list",
+      category: "name",
+      value: "budget",
     });
   });
 

@@ -262,8 +262,8 @@
 					{#each block.blocks as child, childIndex (`${index}-${childIndex}`)}
 						<div
 							class={editing
-								? "group/cell relative rounded-xl ring-1 ring-transparent hover:ring-border"
-								: ""}
+								? "group/cell relative h-full min-h-0 rounded-xl ring-1 ring-transparent hover:ring-border"
+								: "h-full min-h-0"}
 						>
 							{#if editing}
 								<div class="absolute top-2 right-2 z-10 hidden gap-1 group-hover/cell:flex">

@@ -1,12 +1,22 @@
 import { homeViews, isBlankApp } from "$lib/app/labels.ts";
-import type { AppSpec, PageBlock, PageDef } from "./model.ts";
+import type { AppSpec, FieldDef, PageBlock, PageDef, TypeDef } from "./model.ts";
 import { labelFromKey } from "./ids.ts";
 
 export const HOME_PAGE_KEY = "home";
 
 export type WidgetCategory = "content" | "data" | "actions";
 
-export type WidgetInputType = "text" | "textarea" | "boolean" | "view" | "form" | "flow";
+export type WidgetInputType =
+  | "text"
+  | "textarea"
+  | "boolean"
+  | "view"
+  | "form"
+  | "flow"
+  | "field"
+  | "select";
+
+export type WidgetFieldKind = "number" | "date" | "enum" | "any";
 
 export interface WidgetInput {
   key: string;
@@ -14,6 +24,8 @@ export interface WidgetInput {
   type: WidgetInputType;
   required?: boolean;
   default?: unknown;
+  of?: WidgetFieldKind;
+  options?: Array<{ value: string; label: string }>;
 }
 
 export interface WidgetDef {
@@ -94,6 +106,103 @@ export const widgets: WidgetDef[] = [
     inputs: [
       { key: "flow", label: "Rule", type: "flow", required: true },
       { key: "label", label: "Label", type: "text", default: "Run" },
+    ],
+  },
+  {
+    key: "callout",
+    label: "Callout",
+    description: "A short note, warning, or next step on the page.",
+    category: "content",
+    inputs: [
+      { key: "title", label: "Title", type: "text", default: "Note" },
+      { key: "text", label: "Text", type: "textarea", required: true },
+      {
+        key: "tone",
+        label: "Tone",
+        type: "select",
+        default: "note",
+        options: [
+          { value: "note", label: "Note" },
+          { value: "warning", label: "Warning" },
+          { value: "danger", label: "Danger" },
+        ],
+      },
+    ],
+  },
+  {
+    key: "metric",
+    label: "Metric",
+    description: "A total from a view, with a sparkline when there is a date.",
+    category: "data",
+    inputs: [
+      { key: "view", label: "View", type: "view", required: true },
+      { key: "value", label: "Value field", type: "field", of: "number" },
+      { key: "date", label: "Date field", type: "field", of: "date" },
+    ],
+  },
+  {
+    key: "bar",
+    label: "Bar chart",
+    description: "Counts or sums from a view, grouped by a field.",
+    category: "data",
+    inputs: [
+      { key: "view", label: "View", type: "view", required: true },
+      { key: "category", label: "Group by", type: "field", of: "any", required: true },
+      { key: "value", label: "Value field", type: "field", of: "number" },
+    ],
+  },
+  {
+    key: "line",
+    label: "Line chart",
+    description: "A number over time from a view.",
+    category: "data",
+    inputs: [
+      { key: "view", label: "View", type: "view", required: true },
+      { key: "category", label: "Date field", type: "field", of: "date", required: true },
+      { key: "value", label: "Value field", type: "field", of: "number" },
+    ],
+  },
+  {
+    key: "donut",
+    label: "Donut chart",
+    description: "Share of a whole from a view.",
+    category: "data",
+    inputs: [
+      { key: "view", label: "View", type: "view", required: true },
+      { key: "category", label: "Group by", type: "field", of: "enum", required: true },
+      { key: "value", label: "Value field", type: "field", of: "number" },
+    ],
+  },
+  {
+    key: "stacked_bar",
+    label: "Stacked bar",
+    description: "A bar chart split by a second field, such as billable vs unbilled.",
+    category: "data",
+    inputs: [
+      { key: "view", label: "View", type: "view", required: true },
+      { key: "category", label: "Group by", type: "field", of: "any", required: true },
+      { key: "series", label: "Split by", type: "field", of: "enum", required: true },
+      { key: "value", label: "Value field", type: "field", of: "number" },
+    ],
+  },
+  {
+    key: "kanban",
+    label: "Board",
+    description: "Cards from a view, in columns by an enum field.",
+    category: "data",
+    inputs: [
+      { key: "view", label: "View", type: "view", required: true },
+      { key: "field", label: "Column field", type: "field", of: "enum", required: true },
+    ],
+  },
+  {
+    key: "calendar",
+    label: "Calendar",
+    description: "Records from a view, placed on a month by a date field.",
+    category: "data",
+    inputs: [
+      { key: "view", label: "View", type: "view", required: true },
+      { key: "date", label: "Date field", type: "field", of: "date", required: true },
     ],
   },
 ];
@@ -215,6 +324,34 @@ export function resolvePage(spec: AppSpec, key: string): PageDef | undefined {
   return page ? normalizePage(page) : undefined;
 }
 
+export function fieldsMatching(fields: FieldDef[], of?: WidgetFieldKind): FieldDef[] {
+  if (!of || of === "any") return fields;
+  if (of === "date") {
+    return [
+      ...fields.filter((field) => field.type === "date"),
+      {
+        id: "created_at",
+        key: "created_at",
+        label: "Created",
+        type: "date",
+      },
+      {
+        id: "updated_at",
+        key: "updated_at",
+        label: "Updated",
+        type: "date",
+      },
+    ];
+  }
+  return fields.filter((field) => field.type === of);
+}
+
+export function typeForView(spec: AppSpec, viewKey: string): TypeDef | undefined {
+  const view = spec.views.find((item) => item.key === viewKey);
+  if (!view) return undefined;
+  return spec.types.find((item) => item.key === view.source);
+}
+
 export function defaultWidgetValues(widget: WidgetDef, spec: AppSpec): Record<string, unknown> {
   const values: Record<string, unknown> = {};
   const firstView = homeViews(spec)[0]?.key ?? spec.views[0]?.key ?? "";
@@ -222,12 +359,18 @@ export function defaultWidgetValues(widget: WidgetDef, spec: AppSpec): Record<st
     spec.forms.find((form) => form.mode === "create")?.key ?? spec.forms[0]?.key ?? "";
   const firstFlow =
     spec.flows.find((flow) => flow.expose?.includes("ui") && !flow.trigger)?.key ?? "";
+  const type = typeForView(spec, firstView);
+  const fields = type?.fields ?? [];
   for (const input of widget.inputs) {
     if (input.type === "view") values[input.key] = firstView;
     else if (input.type === "form") values[input.key] = firstForm;
     else if (input.type === "flow") values[input.key] = firstFlow;
     else if (input.type === "boolean") values[input.key] = Boolean(input.default);
-    else values[input.key] = input.default ?? "";
+    else if (input.type === "field") {
+      values[input.key] = fieldsMatching(fields, input.of)[0]?.key ?? fields[0]?.key ?? "";
+    } else if (input.type === "select") {
+      values[input.key] = input.default ?? input.options?.[0]?.value ?? "";
+    } else values[input.key] = input.default ?? "";
   }
   return values;
 }

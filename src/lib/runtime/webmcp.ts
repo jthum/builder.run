@@ -585,7 +585,7 @@ export function buildTools(host: Host): ToolDefinition[] {
       name: "upsert_page",
       title: "Create or update a page",
       description:
-        'Create or update a page of grids and widgets. Optional folder groups it under Home. A group nests children in a blocks array even when there is only one widget. columns is how many widgets sit side by side; unused columns stay empty. Example: upsert_page({ key: "board", path: "/board", blocks: [{ kind: "group", columns: 1, blocks: [{ kind: "widget", widget: "table", values: { view: "active_projects" } }] }] }).',
+        'Create or update a page of grids and widgets. Optional folder groups it under Home. A group nests children in a blocks array even when there is only one widget. columns is how many widgets sit side by side; unused columns stay empty. Widgets include table, cards, list, stat, metric, bar, line, donut, stacked_bar, kanban, calendar, form, action, heading, text, and callout. Example: upsert_page({ key: "board", path: "/board", blocks: [{ kind: "group", columns: 1, blocks: [{ kind: "widget", widget: "table", values: { view: "active_projects" } }] }] }).',
       inputSchema: {
         type: "object",
         properties: {
