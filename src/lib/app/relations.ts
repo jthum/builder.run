@@ -126,7 +126,9 @@ function typeLabel(spec: AppSpec | undefined, key: string): string {
 }
 
 function fieldLabel(spec: AppSpec | undefined, typeKey: string, fieldKey: string): string {
-  const field = spec?.types.find((type) => type.key === typeKey)?.fields.find((item) => item.key === fieldKey);
+  const field = spec?.types
+    .find((type) => type.key === typeKey)
+    ?.fields.find((item) => item.key === fieldKey);
   return field?.label ?? labelFromKey(fieldKey);
 }
 
