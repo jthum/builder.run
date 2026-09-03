@@ -110,6 +110,7 @@ export interface PageDef {
   label: string;
   path?: string;
   folder?: string;
+  icon?: string;
   blocks: PageBlock[];
   implicit?: boolean;
 }

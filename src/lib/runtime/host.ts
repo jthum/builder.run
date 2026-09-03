@@ -39,6 +39,7 @@ import {
 import { newAppSpec, rootSpaceSpec, sampleApps } from "./samples.ts";
 import { reconcileStore } from "./schema.ts";
 import { specFromText, specToJson, specToYaml } from "./serialize.ts";
+import { guessPageIcon, normalizePageIcon } from "./page-icons.ts";
 import { normalizeBlockList } from "./widgets.ts";
 import { SqliteEngine } from "./sql-engine.ts";
 import { openSqlGateway, type SqlConnection, type SqlGateway } from "./sql-gateway.ts";
@@ -540,16 +541,22 @@ export class Host {
     const spec = this.app().spec;
     const existing = spec.pages.find((page) => page.key === draft.key);
     const folder = draft.folder !== undefined ? folderName(draft.folder) : existing?.folder;
+    const blocks = normalizeBlockList(
+      draft.blocks !== undefined ? draft.blocks : (existing?.blocks ?? []),
+    );
+    const icon =
+      draft.icon !== undefined
+        ? (normalizePageIcon(draft.icon) ?? guessPageIcon(blocks))
+        : (existing?.icon ?? guessPageIcon(blocks));
     const pages = upsertNamed(spec.pages, {
       id: existing?.id || createId("pg"),
       label: labelFromKey(draft.key),
       ...existing,
       ...draft,
       folder,
+      icon,
       implicit: false,
-      blocks: normalizeBlockList(
-        draft.blocks !== undefined ? draft.blocks : (existing?.blocks ?? []),
-      ),
+      blocks,
     });
     this.app().spec = applyDefaults({ ...spec, pages });
     await this.persistAndEmit();

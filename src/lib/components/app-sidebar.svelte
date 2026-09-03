@@ -32,6 +32,7 @@
 	import UsersIcon from "@lucide/svelte/icons/users";
 	import WorkflowIcon from "@lucide/svelte/icons/workflow";
 	import type { PageDef, TypeDef } from "$lib/runtime/model.ts";
+	import { pageIconEntry } from "$lib/runtime/page-icons.ts";
 	import { authoredNavPages, groupPagesByFolder, pageHref } from "$lib/runtime/widgets.ts";
 	import type { Component, ComponentProps } from "svelte";
 
@@ -89,6 +90,7 @@
 {/snippet}
 
 {#snippet pageLink(item: PageDef)}
+	{@const Icon = pageIconEntry(item.icon).icon}
 	<Sidebar.MenuItem>
 		<Sidebar.MenuButton
 			isActive={path === pageHref(item) || path.startsWith(`${pageHref(item)}/`)}
@@ -96,7 +98,7 @@
 		>
 			{#snippet child({ props })}
 				<a href={pageHref(item)} {...props}>
-					<LayersIcon />
+					<Icon />
 					<span>{item.label}</span>
 				</a>
 			{/snippet}
@@ -220,11 +222,13 @@
 						{#if group.folder}
 							<SidebarNavGroup label={group.folder} icon={FolderIcon}>
 								{#each group.pages as item (item.id)}
+									{@const Icon = pageIconEntry(item.icon).icon}
 									<Sidebar.MenuSubItem>
 										<Sidebar.MenuSubButton
 											href={pageHref(item)}
 											isActive={path === pageHref(item) || path.startsWith(`${pageHref(item)}/`)}
 										>
+											<Icon />
 											<span>{item.label}</span>
 										</Sidebar.MenuSubButton>
 									</Sidebar.MenuSubItem>

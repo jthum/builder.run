@@ -226,6 +226,7 @@ types:
       ],
     });
     expect(page.folder).toBeUndefined();
+    expect(page.icon).toBe("table");
     expect(page.blocks).toEqual([
       {
         kind: "group",

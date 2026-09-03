@@ -1,6 +1,7 @@
 import type { Host } from "./host.ts";
 import { cloneData, FIELD_KINDS, type FieldDef } from "./model.ts";
 import { sampleApps } from "./samples.ts";
+import { PAGE_ICON_KEYS } from "./page-icons.ts";
 import { specFromText } from "./serialize.ts";
 
 export type ToolSurface = "builder" | "app";
@@ -585,7 +586,7 @@ export function buildTools(host: Host): ToolDefinition[] {
       name: "upsert_page",
       title: "Create or update a page",
       description:
-        'Create or update a page of grids and widgets. Optional folder groups it under Home. A group nests children in a blocks array even when there is only one widget. columns is how many widgets sit side by side; unused columns stay empty. Widgets include table, cards, list, stat, metric, bar, line, donut, stacked_bar, kanban, calendar, form, action, heading, text, and callout. Example: upsert_page({ key: "board", path: "/board", blocks: [{ kind: "group", columns: 1, blocks: [{ kind: "widget", widget: "table", values: { view: "active_projects" } }] }] }).',
+        'Create or update a page of grids and widgets. Optional folder groups it in the app menu. Optional icon is one of: page, dashboard, table, chart, line, donut, board, calendar, list, inbox, people, money, time. A group nests children in a blocks array even when there is only one widget. columns is how many widgets sit side by side; unused columns stay empty. Widgets include table, cards, list, stat, metric, bar, line, donut, stacked_bar, kanban, calendar, form, action, heading, text, and callout. Example: upsert_page({ key: "board", icon: "board", path: "/board", blocks: [{ kind: "group", columns: 1, blocks: [{ kind: "widget", widget: "table", values: { view: "active_projects" } }] }] }).',
       inputSchema: {
         type: "object",
         properties: {
@@ -593,6 +594,11 @@ export function buildTools(host: Host): ToolDefinition[] {
           label: { type: "string" },
           path: { type: "string" },
           folder: { type: "string" },
+          icon: {
+            type: "string",
+            enum: [...PAGE_ICON_KEYS],
+            description: "Sidebar icon for this page.",
+          },
           blocks: {
             type: "array",
             description:

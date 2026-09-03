@@ -12,6 +12,7 @@
 	import { Input } from "$lib/components/ui/input/index.js";
 	import { uniqueKey } from "$lib/runtime/ids.ts";
 	import type { PageDef } from "$lib/runtime/model.ts";
+	import { pageIconEntry, pageIconList, type PageIconKey } from "$lib/runtime/page-icons.ts";
 	import { authoredNavPages, groupPagesByFolder, moveAuthoredPage, pageHref } from "$lib/runtime/widgets.ts";
 	import EllipsisIcon from "@lucide/svelte/icons/ellipsis";
 	import FolderIcon from "@lucide/svelte/icons/folder";
@@ -30,6 +31,7 @@
 	let createOpen = $state(false);
 	let createName = $state("");
 	let createFolder = $state("");
+	let createIcon = $state<PageIconKey>("page");
 	let folderFor = $state<PageDef | null>(null);
 	let folderOpen = $state(false);
 	let removePage = $state<PageDef | null>(null);
@@ -40,6 +42,7 @@
 	function openCreate(folder = "") {
 		createName = "";
 		createFolder = folder;
+		createIcon = "page";
 		createOpen = true;
 	}
 
@@ -57,6 +60,7 @@
 			await runtime().upsertPage({
 				key,
 				label: name,
+				icon: createIcon,
 				folder: createFolder.trim() || undefined,
 				blocks: [
 					{
@@ -84,7 +88,18 @@
 		await runtime().upsertPage({
 			key: page.key,
 			label: page.label,
+			icon: page.icon,
 			folder,
+			blocks: page.blocks,
+		});
+	}
+
+	async function setIcon(page: PageDef, icon: PageIconKey) {
+		await runtime().upsertPage({
+			key: page.key,
+			label: page.label,
+			icon,
+			folder: page.folder,
 			blocks: page.blocks,
 		});
 	}
@@ -196,6 +211,7 @@
 					{/if}
 					<div class="flex flex-col gap-2" role="list">
 						{#each group.pages as item (item.id)}
+							{@const Icon = pageIconEntry(item.icon).icon}
 							<div
 								role="listitem"
 								class="flex items-center gap-2 rounded-2xl bg-card px-2 py-2 ring-1 ring-foreground/10 {dragKey ===
@@ -215,10 +231,28 @@
 								>
 									<GripVerticalIcon class="size-4" />
 								</button>
+								<DropdownMenu.Root>
+									<DropdownMenu.Trigger>
+										{#snippet child({ props })}
+											<Button variant="ghost" size="icon-sm" {...props} aria-label="Page icon">
+												<Icon />
+											</Button>
+										{/snippet}
+									</DropdownMenu.Trigger>
+									<DropdownMenu.Content align="start" class="max-h-72 overflow-y-auto">
+										{#each pageIconList as choice (choice.key)}
+											{@const Icon = choice.icon}
+											<DropdownMenu.Item onSelect={() => setIcon(item, choice.key)}>
+												<Icon />
+												{choice.label}
+											</DropdownMenu.Item>
+										{/each}
+									</DropdownMenu.Content>
+								</DropdownMenu.Root>
 								<a href={pageHref(item)} class="min-w-0 flex-1 rounded-md outline-none focus-visible:ring-2 focus-visible:ring-ring">
 									<div class="font-medium">{item.label}</div>
 									<div class="text-sm text-muted-foreground">
-										{item.folder ? item.folder : "Under Home"}
+										{item.folder ? item.folder : "In the menu"}
 									</div>
 								</a>
 								<DropdownMenu.Root>
@@ -277,6 +311,23 @@
 				<Field.Field>
 					<Field.Label>Name</Field.Label>
 					<Input bind:value={createName} placeholder="Weekly review" autofocus />
+				</Field.Field>
+				<Field.Field>
+					<Field.Label>Icon</Field.Label>
+					<div class="flex flex-wrap gap-1">
+						{#each pageIconList as choice (choice.key)}
+							{@const Icon = choice.icon}
+							<Button
+								type="button"
+								variant={createIcon === choice.key ? "secondary" : "ghost"}
+								size="icon-sm"
+								onclick={() => (createIcon = choice.key)}
+								aria-label={choice.label}
+							>
+								<Icon />
+							</Button>
+						{/each}
+					</div>
 				</Field.Field>
 				<Field.Field>
 					<Field.Label>Folder</Field.Label>
