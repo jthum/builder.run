@@ -13,6 +13,22 @@ Open the deployed builder.run URL supplied with the submission.
 
 No account or backend setup should be required for the local browser runtime.
 
+### Browser-injected performance warning
+
+Some WebMCP-enabled or instrumented browsers may log this warning in the developer console:
+
+```text
+Uncaught TypeError: Cannot read properties of undefined (reading 'startTime')
+    at …reportAllChanges
+```
+
+A stack frame beginning with `VM…` or `<anonymous>` identifies dynamically injected browser
+instrumentation rather than builder.run's application bundle. The warning is caused by a performance
+collector receiving no timing entry; it does not affect application data, views, or WebMCP tools.
+
+Application errors instead point into builder.run's `/_app/…` assets and normally coincide with a
+visible feature failing. Please report those separately.
+
 ## Confirm WebMCP is available
 
 Open **Inspect** in builder.run.

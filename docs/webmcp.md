@@ -94,6 +94,11 @@ For the WebMCP Challenge, use either:
 
 Without WebMCP, builder.run remains a normal browser application and simply skips tool registration.
 
+Some instrumented browsers may emit a `reportAllChanges`/`startTime` console warning from a `VM…` or
+`<anonymous>` script. This comes from browser-injected performance measurement rather than the
+builder.run bundle and does not affect WebMCP operation. See the
+[judge / reviewer test guide](testing.md#browser-injected-performance-warning) for details.
+
 ## Quick test
 
 A useful end-to-end test is:
