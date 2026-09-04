@@ -13,6 +13,12 @@ Open the deployed builder.run URL supplied with the submission.
 
 No account or backend setup should be required for the local browser runtime.
 
+### Testing with WebChat
+
+builder.run was tested in Chrome using the WebChat extension as the WebMCP client. WebChat discovers and invokes the tools exposed by the current page and was used to exercise both builder.run’s fixed builder tools and the dynamically generated application tools with an OpenAI-compatible model provider.
+
+WebChat is not required by builder.run itself; it was simply the client used for development and end-to-end testing.
+
 ### Browser-injected performance warning
 
 Some WebMCP-enabled or instrumented browsers may log this warning in the developer console:
