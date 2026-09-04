@@ -20,7 +20,14 @@
 	import { compactWhere, FILTER_OPS, normalizeFilters, type FilterOp } from "$lib/runtime/filters.ts";
 	import { labelFromKey, slugify, uniqueKey } from "$lib/runtime/ids.ts";
 	import { RECORD_ID_TOKEN } from "$lib/runtime/query.ts";
-	import type { FieldKind, SortDirection, TypeDef, ViewDef, ViewMeasure } from "$lib/runtime/model.ts";
+	import {
+		cloneData,
+		type FieldKind,
+		type SortDirection,
+		type TypeDef,
+		type ViewDef,
+		type ViewMeasure,
+	} from "$lib/runtime/model.ts";
 	import { cn } from "$lib/utils.js";
 	import ArrowUpDownIcon from "@lucide/svelte/icons/arrow-up-down";
 	import CalendarIcon from "@lucide/svelte/icons/calendar";
@@ -126,7 +133,7 @@
 			groupBy = view.group_by ?? "";
 			measureRows = Object.entries(view.measures ?? {}).map(([key, measure]) => ({
 				key,
-				...structuredClone(measure),
+				...cloneData(measure),
 			}));
 			columns = mergeColumns(
 				[],
@@ -482,7 +489,7 @@
 			limit: limitOn ? Number(limit) || undefined : undefined,
 			order_by: builtOrder(),
 			group_by: summarize ? groupBy || undefined : undefined,
-			measures: summarize && groupBy ? structuredClone(measures) : undefined,
+			measures: summarize && groupBy ? cloneData(measures) : undefined,
 			implicit: featured ? false : view.implicit,
 		});
 		toast.success("View saved");
@@ -501,7 +508,7 @@
 			limit: limitOn ? Number(limit) || undefined : undefined,
 			order_by: builtOrder(),
 			group_by: summarize ? groupBy || undefined : undefined,
-			measures: summarize && groupBy ? structuredClone(measures) : undefined,
+			measures: summarize && groupBy ? cloneData(measures) : undefined,
 			implicit: false,
 		});
 		toast.success("View duplicated");
@@ -541,7 +548,7 @@
 
 	$effect(() => {
 		void session.revision;
-		const draft = previewView;
+		const draft = cloneData(previewView);
 		const extra = Object.fromEntries(
 			Object.entries(previewExpose).filter(([, value]) => value !== ""),
 		);

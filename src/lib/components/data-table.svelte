@@ -21,6 +21,7 @@
 	import SearchIcon from "@lucide/svelte/icons/search";
 	import XIcon from "@lucide/svelte/icons/x";
 	import type { Snippet } from "svelte";
+	import { cn } from "$lib/utils.ts";
 
 	const anyFilter = "all";
 
@@ -269,7 +270,7 @@
 						<DropdownMenu.Root>
 							<DropdownMenu.Trigger>
 								{#snippet child({ props })}
-									<Button variant={active ? "secondary" : "outline"} size="sm" class="h-8" {...props}>
+									<Button variant="outline" size="sm" class="h-8 bg-background" {...props}>
 										{#if isStatusPath(column.id) && active}
 											<span class="size-1.5 rounded-full {statusDotClass(filters[column.id])}"></span>
 										{/if}
@@ -420,7 +421,9 @@
 							{/if}
 							{#each visible as column, columnIndex (column.id)}
 								{@const value = cellValue(row, column)}
-								<Table.Cell class={column.numeric ? "text-end tabular-nums" : undefined}>
+								<Table.Cell
+									class={cn(column.numeric && "text-end tabular-nums", column.clamp && "align-top")}
+								>
 									{#if cell}
 										{@render cell({ row, column, value, index: columnIndex })}
 									{:else}

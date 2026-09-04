@@ -6,6 +6,7 @@ export type DataTableColumn = {
   accessor?: (row: Record<string, unknown>) => unknown;
   sortable?: boolean;
   numeric?: boolean;
+  clamp?: boolean;
   filterValues?: string[];
   href?: (row: Record<string, unknown>) => string | undefined;
 };

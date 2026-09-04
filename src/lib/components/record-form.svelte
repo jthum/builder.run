@@ -13,6 +13,7 @@
 	import { labelFromKey } from "$lib/runtime/ids.ts";
 	import type { FieldDef, FormDef, RecordValue, TypeDef } from "$lib/runtime/model.ts";
 	import { fieldWidget, findType } from "$lib/runtime/query.ts";
+	import { cn } from "$lib/utils.ts";
 
 	let {
 		type,
@@ -24,6 +25,7 @@
 		onSaved,
 		onCancel,
 		submitLabel,
+		fullWidth = false,
 	}: {
 		type: TypeDef;
 		record?: RecordValue | null;
@@ -34,6 +36,7 @@
 		onSaved?: (record: RecordValue | null) => void;
 		onCancel?: () => void;
 		submitLabel?: string;
+		fullWidth?: boolean;
 	} = $props();
 
 	const keys = $derived(
@@ -133,7 +136,7 @@
 	}
 </script>
 
-<form class="flex max-w-xl flex-col gap-6" onsubmit={submit}>
+<form class={cn("flex flex-col gap-6", fullWidth ? "w-full" : "max-w-xl")} onsubmit={submit}>
 	<Field.Group>
 		{#each visible as field (field.id)}
 			{@const widget = fieldWidget(field)}

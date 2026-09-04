@@ -5,6 +5,7 @@
 	import RecordTable from "$lib/components/record-table.svelte";
 	import StatCard from "$lib/components/stat-card.svelte";
 	import { Button } from "$lib/components/ui/button/index.js";
+	import * as Card from "$lib/components/ui/card/index.js";
 	import CalendarMonth from "$lib/components/calendar-month.svelte";
 	import CalloutWidget from "$lib/components/callout-widget.svelte";
 	import ChartMark from "$lib/components/chart-mark.svelte";
@@ -77,7 +78,14 @@
 {:else if widget === "list" && view}
 	<ViewList rows={ready ? viewRows : null} {view} {type} />
 {:else if widget === "form" && form && formType}
-	<RecordForm type={formType} {form} fields={form.fields} />
+	<Card.Root class="w-full">
+		<Card.Header>
+			<Card.Title>{String(values.title || form.label)}</Card.Title>
+		</Card.Header>
+		<Card.Content>
+			<RecordForm type={formType} {form} fields={form.fields} fullWidth />
+		</Card.Content>
+	</Card.Root>
 {:else if widget === "action"}
 	<Button onclick={runFlow}>{String(values.label || "Run")}</Button>
 {:else if widget === "callout"}

@@ -1,5 +1,12 @@
 import { describe, expect, it } from "vite-plus/test";
-import { greeting, homeViews, statusDotClass, statusTone } from "./labels.ts";
+import {
+  aggregateRatingMax,
+  formatCell,
+  greeting,
+  homeViews,
+  statusDotClass,
+  statusTone,
+} from "./labels.ts";
 import type { AppSpec, TypeDef, ViewDef } from "$lib/runtime/model.ts";
 
 describe("status tones", () => {
@@ -13,6 +20,61 @@ describe("status tones", () => {
     expect(statusDotClass("paid")).toContain("emerald");
     expect(statusDotClass("overdue")).toContain("red");
     expect(statusDotClass("draft")).toContain("sky");
+  });
+});
+
+describe("cell formatting", () => {
+  it("can limit aggregate presentation to two decimal places", () => {
+    expect(formatCell("overall_score", 4.6666, { maximumFractionDigits: 2 })).toBe("4.67");
+    expect(formatCell("overall_score", 4.5, { maximumFractionDigits: 2 })).toBe("4.5");
+  });
+});
+
+describe("aggregate rating formatting", () => {
+  const type: TypeDef = {
+    id: "typ_review",
+    key: "review",
+    label: "Review",
+    store: "local",
+    fields: [
+      {
+        id: "fld_quality",
+        key: "quality",
+        label: "Quality",
+        type: "number",
+        presentation: "rating",
+        max: 5,
+      },
+      {
+        id: "fld_impact",
+        key: "impact",
+        label: "Impact",
+        type: "number",
+        presentation: "rating",
+        max: 5,
+      },
+      { id: "fld_budget", key: "budget", label: "Budget", type: "number" },
+    ],
+  };
+  const view: ViewDef = {
+    id: "vie_scores",
+    key: "scores",
+    label: "Scores",
+    source: "review",
+    fields: ["overall_score"],
+    group_by: "submission",
+    measures: {
+      overall_score: { op: "avg", fields: ["quality", "impact"] },
+      average_budget: { op: "avg", field: "budget" },
+    },
+  };
+
+  it("returns the shared scale for averages of rating fields", () => {
+    expect(aggregateRatingMax(view, type, "overall_score")).toBe(5);
+  });
+
+  it("does not style ordinary numeric averages as ratings", () => {
+    expect(aggregateRatingMax(view, type, "average_budget")).toBeUndefined();
   });
 });
 

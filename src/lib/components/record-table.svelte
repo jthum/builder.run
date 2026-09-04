@@ -2,6 +2,7 @@
 	import { goto } from "$app/navigation";
 	import {
 		addLabel,
+		aggregateRatingMax,
 		collectionLabel,
 		columnLabel,
 		emptyCollectionDescription,
@@ -67,8 +68,15 @@
 				label: columnLabel(key, type),
 				sortable: true,
 				numeric: isAmountPath(key) || field?.type === "number" || Boolean(view.measures?.[key]),
+				clamp: field?.type === "text",
 				filterValues: field?.type === "enum" ? field.values : undefined,
-				href: (row) => (!aggregated && key === keys[0] ? `/t/${typeKey}/${row.id}` : undefined),
+				href: (row) => {
+					if (!aggregated) return key === keys[0] ? `/t/${typeKey}/${row.id}` : undefined;
+					if (key !== view.group_by || field?.type !== "reference" || !field.target) return undefined;
+					const id = String(row.id ?? "");
+					const target = field.target.split(".").at(-1);
+					return id && target ? `/t/${target}/${id}` : undefined;
+				},
 			};
 		});
 	});
@@ -128,13 +136,16 @@
 	{#snippet filterControls()}
 		<ViewExposeBar fields={exposedFields} bind:values={exposedValues} />
 	{/snippet}
-	{#snippet cell({ row, column, value, index })}
+	{#snippet cell({ row, column, value })}
 		<FormattedValue
 			path={column.id}
 			{value}
 			{type}
 			badge={isStatusPath(column.id)}
-			href={aggregated ? undefined : index === 0 ? `/t/${typeKey}/${row.id}` : column.href?.(row)}
+			clamp={column.clamp}
+			maximumFractionDigits={view.measures?.[column.id] ? 2 : undefined}
+			ratingMax={aggregateRatingMax(view, type, column.id)}
+			href={column.href?.(row)}
 		/>
 	{/snippet}
 	{#snippet footer({ rows: visibleRows, columns: visibleCols })}

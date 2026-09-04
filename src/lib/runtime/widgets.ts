@@ -36,6 +36,8 @@ export interface WidgetDef {
   label: string;
   description: string;
   category: WidgetCategory;
+  /** Used when a grid row is automatic and the widget needs plot space. */
+  defaultRowHeight?: PageRowHeight;
   inputs: WidgetInput[];
 }
 
@@ -148,6 +150,7 @@ export const widgets: WidgetDef[] = [
     label: "Bar chart",
     description: "Counts or sums from a view, grouped by a field.",
     category: "data",
+    defaultRowHeight: "m",
     inputs: [
       { key: "view", label: "View", type: "view", required: true },
       {
@@ -174,6 +177,7 @@ export const widgets: WidgetDef[] = [
     label: "Line chart",
     description: "A number over time from a view.",
     category: "data",
+    defaultRowHeight: "m",
     inputs: [
       { key: "view", label: "View", type: "view", required: true },
       {
@@ -192,6 +196,7 @@ export const widgets: WidgetDef[] = [
     label: "Donut chart",
     description: "Share of a whole from a view.",
     category: "data",
+    defaultRowHeight: "m",
     inputs: [
       { key: "view", label: "View", type: "view", required: true },
       {
@@ -210,6 +215,7 @@ export const widgets: WidgetDef[] = [
     label: "Stacked bar",
     description: "A bar chart split by a second field, such as billable vs unbilled.",
     category: "data",
+    defaultRowHeight: "m",
     inputs: [
       { key: "view", label: "View", type: "view", required: true },
       {
@@ -276,12 +282,12 @@ const WIDGET_TITLE_INPUT: WidgetInput = {
   key: "title",
   label: "Title",
   type: "text",
-  description: "Optional widget title. Omit it to use the selected View name.",
+  description: "Optional widget title. Omit it to use the selected View or Form name.",
 };
 
 /** Effective inputs shared by the UI, agent discovery, defaults, and validation. */
 export function widgetInputs(widget: WidgetDef): WidgetInput[] {
-  return widget.inputs.some((input) => input.type === "view")
+  return widget.inputs.some((input) => input.type === "view" || input.type === "form")
     ? [WIDGET_TITLE_INPUT, ...widget.inputs]
     : widget.inputs;
 }
@@ -443,6 +449,28 @@ export function rowHeightClass(value: unknown): string {
   if (value === "l") return "min-h-[22rem]";
   if (value === "xl") return "min-h-[32rem]";
   return "";
+}
+
+const ROW_HEIGHT_RANK: Record<PageRowHeight, number> = { s: 1, m: 2, l: 3, xl: 4 };
+
+export function defaultRowHeight(blocks: PageBlock[]): PageRowHeight | undefined {
+  let preferred: PageRowHeight | undefined;
+  for (const block of normalizeBlockList(blocks)) {
+    const candidate =
+      block.kind === "group"
+        ? (rowHeight(block.min_height) ?? defaultRowHeight(block.blocks))
+        : widgetByKey(block.widget)?.defaultRowHeight;
+    if (candidate && (!preferred || ROW_HEIGHT_RANK[candidate] > ROW_HEIGHT_RANK[preferred])) {
+      preferred = candidate;
+    }
+  }
+  return preferred;
+}
+
+/** Explicit row height wins; otherwise let widgets request the space their content needs. */
+export function groupHeightClass(group: PageBlock): string {
+  if (group.kind !== "group") return "";
+  return rowHeightClass(rowHeight(group.min_height) ?? defaultRowHeight(group.blocks));
 }
 
 export function normalizeBlock(block: PageBlock): PageBlock {

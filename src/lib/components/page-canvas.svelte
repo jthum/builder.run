@@ -14,12 +14,12 @@
 		collectViewKeys,
 		emptyGroup,
 		gridClass,
+		groupHeightClass,
 		insertBlock,
 		moveInGroup,
 		moveSibling,
 		normalizePage,
 		removeBlock,
-		rowHeightClass,
 		setBlock,
 		setGroupColumns,
 		setGroupMinHeight,
@@ -337,10 +337,10 @@
 						</div>
 					</div>
 				{/if}
-				<div class="{gridClass(block.columns ?? 1)} items-stretch {rowHeightClass(block.min_height)}">
+				<div class="{gridClass(block.columns ?? 1)} items-stretch {groupHeightClass(block)}">
 					{#each block.blocks as child, childIndex (`${index}-${childIndex}`)}
 						<div
-							class="flex h-full flex-col {rowHeightClass(block.min_height)} {editing
+							class="flex h-full flex-col {groupHeightClass(block)} {editing
 								? 'group/cell relative rounded-xl p-2 ring-1 ring-transparent hover:ring-border'
 								: ''}"
 						>

@@ -675,7 +675,7 @@ export function buildTools(host: Host): ToolDefinition[] {
       name: "upsert_page",
       title: "Create or update a page",
       description:
-        'Create or update a page of grids and widgets. Call get_widgets first to discover widget keys, required values, and compatible fields. Widget values are validated against that contract. Optional folder groups it in the app menu. Optional icon is one of: page, dashboard, table, chart, line, donut, board, calendar, list, inbox, people, money, time. A group nests children in a blocks array even when there is only one widget. columns is how many widgets sit side by side; unused columns stay empty. Example: upsert_page({ key: "board", icon: "board", path: "/board", blocks: [{ kind: "group", columns: 1, blocks: [{ kind: "widget", widget: "table", values: { view: "active_projects" } }] }] }).',
+        'Create or update a page of grids and widgets. Call get_widgets first to discover widget keys, required values, and compatible fields. Widget values are validated against that contract. Optional folder groups it in the app menu. Optional icon is one of: page, dashboard, table, chart, line, donut, board, calendar, list, inbox, people, money, time. If icon is omitted when creating a page, a one-time default is inferred from its widgets; later edits do not change it. A group nests children in a blocks array even when there is only one widget. columns is how many widgets sit side by side; unused columns stay empty. Example: upsert_page({ key: "board", icon: "board", path: "/board", blocks: [{ kind: "group", columns: 1, blocks: [{ kind: "widget", widget: "table", values: { view: "active_projects" } }] }] }).',
       inputSchema: {
         type: "object",
         properties: {

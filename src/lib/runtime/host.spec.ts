@@ -197,6 +197,7 @@ types:
     ]);
     const initial = await host.queryView("leaderboard");
     expect(initial.map((row) => row.submission)).toEqual(["Submission A", "Submission B"]);
+    expect(initial[0]?.id).toBe(submissionA.id);
     expect(initial[0]).toMatchObject({
       review_count: 2,
       webmcp_score: 4.5,
@@ -396,6 +397,23 @@ types:
         blocks: [{ kind: "widget", widget: "table", values: { view: "client_list" } }],
       },
     ]);
+
+    const updated = await host.upsertPage({
+      key: "clients",
+      blocks: [{ kind: "widget", widget: "heading", values: { title: "Clients" } }],
+    });
+    expect(updated.icon).toBe("table");
+  });
+
+  it("rejects supplied invalid page icons instead of silently inferring one", async () => {
+    expect.hasAssertions();
+    const host = await Host.open({ persist: false });
+    await expect(host.upsertPage({ key: "blank", icon: "" as never })).rejects.toThrow(
+      'Invalid page icon ""',
+    );
+    await expect(host.upsertPage({ key: "invalid", icon: "sparkles" as never })).rejects.toThrow(
+      'Invalid page icon "sparkles"',
+    );
   });
 
   it("accepts upsert_page when a group's inner blocks is a single object", async () => {

@@ -62,9 +62,9 @@
 					<DropdownMenu.Trigger>
 						{#snippet child({ props })}
 							<Button
-								variant={current ? "secondary" : "outline"}
+								variant="outline"
 								size="sm"
-								class="h-8"
+								class="h-8 bg-background"
 								{...props}
 							>
 								{#if isStatusPath(field.key) && current}

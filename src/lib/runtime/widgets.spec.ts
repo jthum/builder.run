@@ -4,7 +4,9 @@ import {
   appendInGroup,
   collectViewKeys,
   configurePageRows,
+  defaultRowHeight,
   describeWidget,
+  groupHeightClass,
   groupPagesByFolder,
   moveAuthoredPage,
   defaultWidgetValues,
@@ -21,6 +23,7 @@ import {
   setBlock,
   setGroupColumns,
   widgetByKey,
+  widgetInputs,
 } from "./widgets.ts";
 
 describe("page folders", () => {
@@ -147,6 +150,13 @@ describe("page widgets", () => {
         }),
       ]),
     );
+  });
+
+  it("offers an optional title for form widgets", () => {
+    expect.hasAssertions();
+    const form = widgetByKey("form");
+    expect(form).toBeTruthy();
+    expect(widgetInputs(form!).map((input) => input.key)).toEqual(["title", "form"]);
   });
 
   it("validates widget values and fills only unambiguous required fields", () => {
@@ -308,5 +318,18 @@ describe("page widgets", () => {
     expect(rowHeightClass(undefined)).toBe("");
     expect(rowHeightClass("s")).toBe("min-h-48");
     expect(rowHeightClass("xl")).toBe("min-h-[32rem]");
+  });
+
+  it("gives automatic chart rows enough plot space while respecting explicit heights", () => {
+    expect.hasAssertions();
+    const chart: PageBlock = { kind: "widget", widget: "bar", values: {} };
+    const heading: PageBlock = { kind: "widget", widget: "heading", values: {} };
+    const automatic: PageBlock = { kind: "group", columns: 2, blocks: [heading, chart] };
+    const compact: PageBlock = { ...automatic, min_height: "s" };
+
+    expect(defaultRowHeight([heading])).toBeUndefined();
+    expect(defaultRowHeight([chart])).toBe("m");
+    expect(groupHeightClass(automatic)).toBe("min-h-80");
+    expect(groupHeightClass(compact)).toBe("min-h-48");
   });
 });

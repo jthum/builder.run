@@ -565,10 +565,13 @@ export class Host {
       draft.blocks !== undefined
         ? configurePageRows(this.resolvedSpec(), draft.blocks)
         : normalizePageRows(existing?.blocks ?? []);
-    const icon =
-      draft.icon !== undefined
-        ? (normalizePageIcon(draft.icon) ?? guessPageIcon(blocks))
-        : (existing?.icon ?? guessPageIcon(blocks));
+    let icon = existing?.icon;
+    if (draft.icon !== undefined) {
+      icon = normalizePageIcon(draft.icon);
+      if (!icon) throw new Error(`Invalid page icon "${scalarString(draft.icon)}"`);
+    } else if (!existing) {
+      icon = guessPageIcon(blocks);
+    }
     const pages = upsertNamed(spec.pages, {
       id: existing?.id || createId("pg"),
       label: labelFromKey(draft.key),

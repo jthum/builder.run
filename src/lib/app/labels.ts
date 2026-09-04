@@ -99,6 +99,23 @@ export function isAmountPath(path: string): boolean {
   return ["amount", "budget", "total", "price"].includes(leaf);
 }
 
+export function aggregateRatingMax(
+  view: ViewDef,
+  type: TypeDef | undefined,
+  path: string,
+): number | undefined {
+  const measure = view.measures?.[path];
+  if (!measure || measure.op !== "avg" || !type) return undefined;
+  const keys = measure.fields?.length ? measure.fields : measure.field ? [measure.field] : [];
+  if (!keys.length) return undefined;
+  const fields = keys.map((key) => type.fields.find((field) => field.key === key));
+  if (fields.some((field) => field?.type !== "number" || field.presentation !== "rating")) {
+    return undefined;
+  }
+  const maxima = fields.map((field) => field?.max ?? 10);
+  return maxima.every((maximum) => maximum === maxima[0]) ? maxima[0] : undefined;
+}
+
 export function statusVariant(value: string): "default" | "secondary" | "destructive" | "outline" {
   const tone = statusTone(value);
   if (tone === "danger") return "destructive";
@@ -143,13 +160,24 @@ export function formatMoney(value: unknown): string {
   }).format(numeric);
 }
 
-export function formatCell(path: string, value: unknown): string {
+export function formatCell(
+  path: string,
+  value: unknown,
+  options: { maximumFractionDigits?: number } = {},
+): string {
   if (value == null || value === "") return "—";
   if (typeof value === "boolean") return value ? "Yes" : "No";
   if (typeof value === "number" || isAmountPath(path)) {
     const numeric = typeof value === "number" ? value : Number(value);
     if (!Number.isNaN(numeric)) {
-      return isAmountPath(path) ? formatMoney(numeric) : numeric.toLocaleString();
+      return isAmountPath(path)
+        ? formatMoney(numeric)
+        : numeric.toLocaleString(
+            undefined,
+            options.maximumFractionDigits === undefined
+              ? undefined
+              : { maximumFractionDigits: options.maximumFractionDigits },
+          );
     }
   }
   if (typeof value === "string" && /^\d{4}-\d{2}-\d{2}/.test(value)) {
