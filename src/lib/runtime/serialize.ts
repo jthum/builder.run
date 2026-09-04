@@ -1,6 +1,50 @@
 import { parse, stringify } from "yaml";
 import { compactWhere, normalizeFilters } from "./filters.ts";
-import { cloneSpec, normalizeSpec, type AppSpec } from "./model.ts";
+import {
+  cloneSpec,
+  normalizeSpec,
+  parseTypeRef,
+  type AppSpec,
+  type FlowStep,
+  type TypeDef,
+} from "./model.ts";
+
+export function sharedTypeDependencies(spec: AppSpec, sharedTypes: TypeDef[]): TypeDef[] {
+  const local = new Set(spec.types.map((type) => type.key));
+  const shared = new Map(sharedTypes.map((type) => [type.key, type]));
+  const required = new Set<string>();
+  const add = (reference: string | undefined) => {
+    if (!reference) return;
+    const key = parseTypeRef(reference).type;
+    if (!local.has(key) && shared.has(key)) required.add(key);
+  };
+  const addPath = (path: string | undefined) => add(path?.split(".", 1)[0]);
+  const visitSteps = (steps: FlowStep[]) => {
+    for (const step of steps) {
+      if ("create" in step) add(step.create.type);
+      else if ("query" in step) add(step.query.type);
+      else if ("set" in step) Object.keys(step.set).forEach(addPath);
+      else if ("when" in step) {
+        visitSteps(step.when.then);
+        visitSteps(step.when.else ?? []);
+      }
+    }
+  };
+
+  for (const type of spec.types) {
+    for (const field of type.fields) add(field.target);
+  }
+  for (const view of spec.views) add(view.source);
+  for (const form of spec.forms) add(form.type);
+  for (const flow of spec.flows) {
+    for (const expression of Object.values(flow.input ?? {})) {
+      for (const match of expression.matchAll(/ref\(([^)]+)\)/g)) add(match[1]);
+    }
+    addPath(flow.trigger?.when);
+    visitSteps(flow.steps);
+  }
+  return sharedTypes.filter((type) => required.has(type.key));
+}
 
 export function specToJson(spec: AppSpec): string {
   return JSON.stringify(authoringSpec(spec), null, 2);

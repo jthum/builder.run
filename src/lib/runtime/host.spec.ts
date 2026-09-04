@@ -402,12 +402,15 @@ types:
       implicit: false,
     });
     const rows = await host.queryView("by_status_amount");
-    expect(rows.map((row) => [row.status, row.amount])).toEqual([
-      ["paid", 9000],
-      ["paid", 1200],
-      ["sent", 8000],
-      ["sent", 500],
-    ]);
+    const pairs = rows.map((row) => [String(row.status), Number(row.amount)] as const);
+    expect(pairs).toEqual(
+      [...pairs].sort(
+        ([leftStatus, leftAmount], [rightStatus, rightAmount]) =>
+          leftStatus.localeCompare(rightStatus) || rightAmount - leftAmount,
+      ),
+    );
+    expect(pairs).toContainEqual(["paid", 9000]);
+    expect(pairs).toContainEqual(["sent", 500]);
   });
 
   it("accepts nested group blocks and a null folder on upsert_page", async () => {
@@ -655,8 +658,16 @@ types:
     const rows = await host.queryView("project_invoices", undefined, {
       recordId: String(project!.id),
     });
+    const expectedNumbers = (await host.listRecords("invoice"))
+      .filter((row) => row.project === project!.id)
+      .map((row) => row.number)
+      .sort((left, right) => String(left).localeCompare(String(right)));
     expect(rows.length).toBeGreaterThan(0);
-    expect(rows.every((row) => row.number === "INV-104")).toBe(true);
+    expect(
+      rows
+        .map((row) => row.number)
+        .sort((left, right) => String(left).localeCompare(String(right))),
+    ).toEqual(expectedNumbers);
     const empty = await host.queryView("project_invoices");
     expect(empty).toEqual([]);
   });

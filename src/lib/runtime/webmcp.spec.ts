@@ -419,7 +419,7 @@ describe("webmcp bridge", () => {
       string,
       { enum?: string[]; description?: string }
     >;
-    expect(properties.status?.enum).toEqual(["planned", "active", "completed"]);
+    expect(properties.status?.enum).toEqual(["planned", "active", "paused", "completed"]);
     expect(properties.client?.description).toMatch(/id of a organisation record/);
     const invoke = buildTools(host).find((tool) => tool.name === "invoke_mark_invoice_paid");
     expect(invoke).toBeTruthy();

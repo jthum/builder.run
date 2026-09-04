@@ -1,9 +1,26 @@
 import { describe, expect, it } from "vite-plus/test";
 import { applyDefaults } from "./defaults.ts";
 import { normalizeSpec, repairLegacyFields } from "./model.ts";
-import { authoringSpec } from "./serialize.ts";
+import { authoringSpec, sharedTypeDependencies } from "./serialize.ts";
 
 describe("authoring spec export", () => {
+  it("reports shared types that an app export depends on", () => {
+    const shared = normalizeSpec({
+      types: {
+        organisation: { expose: true, fields: { name: "text" } },
+        person: { expose: true, fields: { name: "text" } },
+      },
+    }).types;
+    const app = normalizeSpec({
+      types: {
+        submission: {
+          fields: { organisation: { type: "reference", target: "organisation" } },
+        },
+      },
+    });
+    expect(sharedTypeDependencies(app, shared).map((type) => type.key)).toEqual(["organisation"]);
+  });
+
   it("omits generated default forms, views, and pages", () => {
     expect.hasAssertions();
     const spec = applyDefaults(normalizeSpec({ types: { note: { fields: { title: "text" } } } }));
