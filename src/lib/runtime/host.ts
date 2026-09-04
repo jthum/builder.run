@@ -5,7 +5,7 @@ import {
   loadPlatform,
   savePlatform,
 } from "./catalog.ts";
-import { applyDefaults, effectiveSpec } from "./defaults.ts";
+import { applyDefaults, defaultViewFields, effectiveSpec } from "./defaults.ts";
 import type { TableEngine } from "./engine.ts";
 import { invokeFlow, matchingTriggers, type FlowRun } from "./flows.ts";
 import { createId, labelFromKey, slugify } from "./ids.ts";
@@ -502,6 +502,18 @@ export class Host {
     draft = cloneData(draft);
     const spec = this.app().spec;
     const existing = spec.views.find((view) => view.key === draft.key);
+    const groupBy = draft.group_by ?? existing?.group_by;
+    const suppliedFields = Object.hasOwn(draft, "fields");
+    if (!groupBy && suppliedFields && draft.fields?.length === 0) {
+      throw new Error(
+        `View "${draft.key}" needs at least one field. Omit fields to choose useful defaults automatically.`,
+      );
+    }
+    if (!existing && !groupBy && !suppliedFields) {
+      const source = this.resolvedSpec().types.find((type) => type.key === draft.source);
+      if (!source) throw new Error(`Unknown source type "${draft.source ?? ""}"`);
+      draft.fields = defaultViewFields(source);
+    }
     const views = upsertNamed(
       spec.views,
       normalizeView({

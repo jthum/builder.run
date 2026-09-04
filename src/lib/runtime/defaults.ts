@@ -25,7 +25,7 @@ export function implicitPageKey(typeKey: string): string {
   return `${typeKey}_page`;
 }
 
-function defaultViewFields(type: TypeDef): string[] {
+export function defaultViewFields(type: TypeDef): string[] {
   const fields = type.fields.map((field) =>
     field.type === "reference" ? `${field.key}.${guessLabelField(field.target || "")}` : field.key,
   );

@@ -413,6 +413,40 @@ types:
     expect(pairs).toContainEqual(["sent", 500]);
   });
 
+  it("chooses useful fields for new views and protects them on updates", async () => {
+    expect.hasAssertions();
+    const host = await Host.open({ persist: false });
+    await host.upsertType({ key: "organisation", fields: { name: "text" } });
+    await host.upsertType({
+      key: "project",
+      fields: {
+        name: "text",
+        client: { type: "reference", target: "organisation" },
+        status: "text",
+        owner: "text",
+        budget: "number",
+        due_date: "date",
+        notes: "text",
+      },
+    });
+
+    const created = await host.upsertView({ key: "delivery", source: "project" });
+    expect(created.fields).toEqual([
+      "name",
+      "client.name",
+      "status",
+      "owner",
+      "budget",
+      "due_date",
+    ]);
+
+    const updated = await host.upsertView({ key: "delivery", label: "Delivery overview" });
+    expect(updated.fields).toEqual(created.fields);
+    await expect(host.upsertView({ key: "empty", source: "project", fields: [] })).rejects.toThrow(
+      'View "empty" needs at least one field. Omit fields to choose useful defaults automatically.',
+    );
+  });
+
   it("accepts nested group blocks and a null folder on upsert_page", async () => {
     expect.hasAssertions();
     const host = await Host.open({ persist: false });

@@ -633,14 +633,20 @@ export function buildTools(host: Host): ToolDefinition[] {
       name: "upsert_view",
       title: "Create or update a view",
       description:
-        'Create or update a named view (a stored query: filter, sort, limit, columns, or live grouped measures). group_by accepts one source field. measures supports count, sum, avg, min, and max; avg accepts field or fields. Sort aggregate aliases with order_by. Run it with query_view. Example: upsert_view({ key: "scores", source: "review", group_by: "submission", measures: { review_count: { op: "count" }, overall_score: { op: "avg", fields: ["quality", "impact"] } }, order_by: { overall_score: "desc" } }).',
+        'Create or update a named view (a stored query: filter, sort, limit, columns, or live grouped measures). For a normal view, include fields in the order people should see them, such as fields: ["name", "status", "client.name"]. If fields is omitted while creating a normal view, builder.run chooses up to six useful source fields automatically; an empty fields array is invalid. Omitting fields while updating preserves the existing selection. For a grouped view, omit fields to derive them from group_by and measure aliases. group_by accepts one source field. measures supports count, sum, avg, min, and max; avg accepts field or fields. Sort aggregate aliases with order_by. Run it with query_view. Example: upsert_view({ key: "scores", source: "review", group_by: "submission", measures: { review_count: { op: "count" }, overall_score: { op: "avg", fields: ["quality", "impact"] } }, order_by: { overall_score: "desc" } }).',
       inputSchema: {
         type: "object",
         properties: {
           key: { type: "string" },
           label: { type: "string" },
           source: { type: "string" },
-          fields: { type: "array", items: { type: "string" } },
+          fields: {
+            type: "array",
+            minItems: 1,
+            items: { type: "string" },
+            description:
+              "Ordered visible columns for a normal view. Reference labels may use paths such as client.name. Omit on creation to infer useful defaults; omit on update to preserve existing columns; omit for grouped views to derive aggregate columns.",
+          },
           where: { type: "object" },
           expose: { type: "array", items: { type: "string" } },
           limit: { type: "number" },

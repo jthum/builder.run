@@ -228,6 +228,33 @@ describe("webmcp bridge", () => {
     bridge.stop();
   });
 
+  it("guides and repairs normal views created without visible fields", async () => {
+    expect.hasAssertions();
+    const host = await Host.open({ persist: false });
+    await host.upsertType({
+      key: "task",
+      fields: { title: "text", status: "text", owner: "text" },
+    });
+    const registry = mockRegistry();
+    const bridge = createWebMcpBridge(host, registry);
+    await bridge.flush();
+    const upsert = registry.tools.get("upsert_view")!;
+    const definition = buildTools(host).find((tool) => tool.name === "upsert_view")!;
+    const fieldsSchema = (
+      definition.inputSchema.properties as Record<string, Record<string, unknown>>
+    ).fields;
+    expect(fieldsSchema.minItems).toBe(1);
+    expect(String(fieldsSchema.description)).toMatch(/Omit on creation to infer useful defaults/);
+
+    const created = JSON.parse(String(await upsert.execute({ key: "work_queue", source: "task" })));
+    expect(created.fields).toEqual(["title", "status", "owner"]);
+    const invalid = JSON.parse(
+      String(await upsert.execute({ key: "empty_queue", source: "task", fields: [] })),
+    );
+    expect(invalid.error).toMatch(/needs at least one field/);
+    bridge.stop();
+  });
+
   it("lists space-exposed types on get_space and shares them across apps", async () => {
     expect.hasAssertions();
     const host = await Host.open({ persist: false });
