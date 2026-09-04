@@ -28,6 +28,12 @@
 	const text = $derived(formatCell(path, value, { maximumFractionDigits }));
 	const asStatus = $derived(badge || isStatusPath(path));
 	const field = $derived(path.includes(".") ? undefined : type?.fields.find((item) => item.key === path));
+	const enumTone = $derived(
+		field?.type === "enum" && field.presentation === "badge"
+			? (field.value_semantics?.[String(value ?? "")] ?? "neutral")
+			: undefined,
+	);
+	const asPill = $derived(asStatus || enumTone !== undefined);
 	const ratingMaximum = $derived(
 		ratingMax ??
 			(field?.type === "number" && field.presentation === "rating" ? (field.max ?? 10) : undefined),
@@ -39,14 +45,16 @@
 
 {#if href}
 	<a class={cn("font-medium hover:underline", textClass)} {href} title={fullText}>
-		{#if asRating && text !== "—"}
+		{#if asPill && text !== "—"}
+			<StatusPill {path} {value} tone={enumTone} />
+		{:else if asRating && text !== "—"}
 			<RatingValue {value} text={text} max={ratingMaximum ?? 10} />
 		{:else}
 			{text === "—" ? "Open" : text}
 		{/if}
 	</a>
-{:else if asStatus && text !== "—"}
-	<StatusPill {path} {value} />
+{:else if asPill && text !== "—"}
+	<StatusPill {path} {value} tone={enumTone} />
 {:else if asRating && text !== "—"}
 	<RatingValue {value} text={text} max={ratingMaximum ?? 10} />
 {:else}

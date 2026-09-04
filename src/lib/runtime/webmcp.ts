@@ -257,9 +257,16 @@ const fieldDraftSchema = {
     required: { type: "boolean" },
     values: { type: "array", items: { type: "string" } },
     target: { type: "string", description: "Referenced type key (reference fields)" },
-    presentation: { type: "string", enum: ["rating"] },
+    presentation: { type: "string", enum: ["rating", "badge"] },
     variant: { type: "string", enum: ["segments"] },
     max: { type: "number", minimum: 2, maximum: 10 },
+    value_semantics: {
+      type: "object",
+      additionalProperties: {
+        type: "string",
+        enum: ["neutral", "info", "success", "warning", "danger"],
+      },
+    },
     default: {},
   },
 };
@@ -494,7 +501,7 @@ export function buildTools(host: Host): ToolDefinition[] {
       name: "upsert_type",
       title: "Create or update a type",
       description:
-        'Create or update a type and its fields. Providing fields replaces the type\'s field list; omitting fields leaves existing fields unchanged. Add or change one field with upsert_field. fields is an array of {key, type, label, ...} or a map of key → field. Reference fields need target. expose: true stores the type on the account space so every app shares the same records — use this instead of duplicating client/organisation in each app. Omit expose (or false) for app-only types. Example: upsert_type({ key: "client", expose: true, fields: [{ key: "name", type: "text", required: true }] }).',
+        'Create or update a type and its fields. Providing fields replaces the type\'s field list; omitting fields leaves existing fields unchanged. Add or change one field with upsert_field. fields is an array of {key, type, label, ...} or a map of key → field. Enum fields can use presentation: "badge" and explicit value_semantics; number fields can use presentation: "rating". Reference fields need target. expose: true stores the type on the account space so every app shares the same records — use this instead of duplicating client/organisation in each app. Omit expose (or false) for app-only types. Example: upsert_type({ key: "client", expose: true, fields: [{ key: "name", type: "text", required: true }] }).',
       inputSchema: {
         type: "object",
         properties: {
@@ -532,7 +539,7 @@ export function buildTools(host: Host): ToolDefinition[] {
       name: "upsert_field",
       title: "Add or update a field",
       description:
-        'Add or update one field on a type without removing the others. type is the type key; field_type is the field kind: text, number, date, boolean, enum, reference. Enum fields need values; reference fields need target. A number field can use presentation: "rating", variant: "segments", and max from 2 to 10. Example: upsert_field({ type: "project", key: "priority", field_type: "enum", values: ["low", "medium", "high"] }).',
+        'Add or update one field on a type without removing the others. type is the type key; field_type is the field kind: text, number, date, boolean, enum, reference. Enum fields need values and can use presentation: "badge" with explicit value_semantics of neutral, info, success, warning, or danger; use neutral when meaning is unclear. Reference fields need target. A number field can use presentation: "rating", variant: "segments", and max from 2 to 10. Example: upsert_field({ type: "submission", key: "stage", field_type: "enum", values: ["submitted", "winner", "rejected"], presentation: "badge", value_semantics: { submitted: "neutral", winner: "success", rejected: "danger" } }).',
       inputSchema: {
         type: "object",
         properties: {
@@ -548,9 +555,16 @@ export function buildTools(host: Host): ToolDefinition[] {
           required: { type: "boolean" },
           values: { type: "array", items: { type: "string" } },
           target: { type: "string", description: "Referenced type key (reference fields)" },
-          presentation: { type: "string", enum: ["rating"] },
+          presentation: { type: "string", enum: ["rating", "badge"] },
           variant: { type: "string", enum: ["segments"] },
           max: { type: "number", minimum: 2, maximum: 10 },
+          value_semantics: {
+            type: "object",
+            additionalProperties: {
+              type: "string",
+              enum: ["neutral", "info", "success", "warning", "danger"],
+            },
+          },
         },
         required: ["key"],
         additionalProperties: false,
@@ -570,6 +584,9 @@ export function buildTools(host: Host): ToolDefinition[] {
             ? { variant: input.variant as FieldDef["variant"] }
             : {}),
           ...(Object.hasOwn(input, "max") ? { max: input.max as number } : {}),
+          ...(Object.hasOwn(input, "value_semantics")
+            ? { value_semantics: input.value_semantics as FieldDef["value_semantics"] }
+            : {}),
         }),
     },
     {

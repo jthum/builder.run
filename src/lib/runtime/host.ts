@@ -12,6 +12,7 @@ import { createId, labelFromKey, slugify } from "./ids.ts";
 import {
   cloneData,
   cloneSpec,
+  normalizeField,
   normalizeFieldKey,
   normalizeSpec,
   normalizeView,
@@ -461,22 +462,18 @@ export class Host {
     const existing = type.fields.find((item) => item.key === key);
     const label =
       String(field.label ?? "").trim() || String(existing?.label ?? "").trim() || labelFromKey(key);
-    const updated = {
-      id: existing?.id ?? createId("fld"),
-      type: "text",
-      ...existing,
-      ...field,
+    const updated = normalizeField(
       key,
-      label,
-    } as FieldDef;
-    if (updated.type === "number" && updated.presentation === "rating") {
-      updated.variant = "segments";
-      updated.max = Math.min(10, Math.max(2, Math.round(Number(updated.max) || 10)));
-    } else {
-      delete updated.presentation;
-      delete updated.variant;
-      delete updated.max;
-    }
+      {
+        id: existing?.id ?? createId("fld"),
+        type: "text",
+        ...existing,
+        ...field,
+        key,
+        label,
+      } as FieldDef,
+      existing,
+    );
     const next = existing
       ? type.fields.map((item) => (item.key === key ? updated : item))
       : [...type.fields, updated];

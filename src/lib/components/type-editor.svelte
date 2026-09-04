@@ -4,6 +4,7 @@
 	import { runtime, session } from "$lib/app/session.svelte.ts";
 	import AppSelect from "$lib/components/app-select.svelte";
 	import PageHeader from "$lib/components/page-header.svelte";
+	import StatusPill from "$lib/components/status-pill.svelte";
 	import * as AlertDialog from "$lib/components/ui/alert-dialog/index.js";
 	import { Badge } from "$lib/components/ui/badge/index.js";
 	import { Button } from "$lib/components/ui/button/index.js";
@@ -15,7 +16,13 @@
 	import * as Sheet from "$lib/components/ui/sheet/index.js";
 	import { Switch } from "$lib/components/ui/switch/index.js";
 	import { slugify } from "$lib/runtime/ids.ts";
-	import { FIELD_KINDS, type FieldDef, type FieldKind, type TypeDef } from "$lib/runtime/model.ts";
+	import {
+		FIELD_KINDS,
+		type FieldDef,
+		type FieldKind,
+		type TypeDef,
+		type ValueSemantic,
+	} from "$lib/runtime/model.ts";
 	import CalendarIcon from "@lucide/svelte/icons/calendar";
 	import ChevronDownIcon from "@lucide/svelte/icons/chevron-down";
 	import ChevronUpIcon from "@lucide/svelte/icons/chevron-up";
@@ -40,9 +47,20 @@
 		enum: ListIcon,
 		reference: LinkIcon,
 	};
-	const presentationOptions = [
+	const numberPresentationOptions = [
 		{ value: "", label: "Standard number" },
 		{ value: "rating", label: "Rating" },
+	];
+	const enumPresentationOptions = [
+		{ value: "", label: "Standard text" },
+		{ value: "badge", label: "Badge" },
+	];
+	const semanticOptions: Array<{ value: ValueSemantic; label: string }> = [
+		{ value: "neutral", label: "Normal" },
+		{ value: "info", label: "Info" },
+		{ value: "success", label: "Success" },
+		{ value: "warning", label: "Warning" },
+		{ value: "danger", label: "Danger" },
 	];
 
 	const spec = $derived(session.snapshot?.spec);
@@ -70,9 +88,10 @@
 	let fieldType = $state<string>("text");
 	let fieldRequired = $state(false);
 	let fieldChoices = $state<string[]>([]);
+	let fieldValueSemantics = $state<Record<string, ValueSemantic>>({});
 	let choiceDraft = $state("");
 	let fieldTarget = $state("");
-	let fieldPresentation = $state<"" | "rating">("");
+	let fieldPresentation = $state<"" | "rating" | "badge">("");
 	let fieldRatingVariant = $state<"segments">("segments");
 	let fieldRatingMax = $state("10");
 	let advanced = $state(false);
@@ -89,6 +108,7 @@
 		fieldType = kind;
 		fieldRequired = false;
 		fieldChoices = kind === "enum" ? ["draft", "active"] : [];
+		fieldValueSemantics = {};
 		choiceDraft = "";
 		fieldTarget = targetOptions[0]?.value ?? "";
 		fieldPresentation = "";
@@ -105,6 +125,7 @@
 		fieldType = field.type;
 		fieldRequired = Boolean(field.required);
 		fieldChoices = [...(field.values ?? [])];
+		fieldValueSemantics = field.value_semantics ? { ...field.value_semantics } : {};
 		choiceDraft = "";
 		fieldTarget = field.target ?? "";
 		fieldPresentation = field.presentation ?? "";
@@ -121,11 +142,24 @@
 			return;
 		}
 		fieldChoices = [...fieldChoices, value];
+		fieldValueSemantics = { ...fieldValueSemantics, [value]: "neutral" };
 		choiceDraft = "";
 	}
 
 	function removeChoice(value: string) {
 		fieldChoices = fieldChoices.filter((item) => item !== value);
+		const next = { ...fieldValueSemantics };
+		delete next[value];
+		fieldValueSemantics = next;
+	}
+
+	function setChoiceSemantic(value: string, semantic: string) {
+		fieldValueSemantics = { ...fieldValueSemantics, [value]: semantic as ValueSemantic };
+	}
+
+	function setFieldType(kind: FieldKind) {
+		if (fieldType !== kind) fieldPresentation = "";
+		fieldType = kind;
 	}
 
 	async function saveField() {
@@ -149,11 +183,22 @@
 			required: fieldRequired,
 			values: fieldType === "enum" ? fieldChoices : undefined,
 			target: fieldType === "reference" ? fieldTarget : undefined,
-			presentation: fieldType === "number" && fieldPresentation === "rating" ? "rating" : undefined,
+			presentation:
+				fieldType === "number" && fieldPresentation === "rating"
+					? "rating"
+					: fieldType === "enum" && fieldPresentation === "badge"
+						? "badge"
+						: undefined,
 			variant: fieldType === "number" && fieldPresentation === "rating" ? fieldRatingVariant : undefined,
 			max:
 				fieldType === "number" && fieldPresentation === "rating"
 					? Math.min(10, Math.max(2, Math.round(Number(fieldRatingMax) || 10)))
+					: undefined,
+			value_semantics:
+				fieldType === "enum" && fieldPresentation === "badge"
+					? Object.fromEntries(
+							fieldChoices.map((value) => [value, fieldValueSemantics[value] ?? "neutral"]),
+						)
 					: undefined,
 		});
 		sheetOpen = false;
@@ -305,6 +350,9 @@
 								{#if field.type === "enum" && field.values?.length}
 									· {field.values.map((value) => value.replaceAll("_", " ")).join(", ")}
 								{/if}
+								{#if field.type === "enum" && field.presentation === "badge"}
+									· Badges
+								{/if}
 								{#if field.type === "number" && field.presentation === "rating"}
 									· Rating · {field.max ?? 10} points
 								{/if}
@@ -364,7 +412,7 @@
 								kind
 									? 'border-primary bg-primary/5 ring-2 ring-primary/20'
 									: 'border-border'}"
-								onclick={() => (fieldType = kind)}
+								onclick={() => setFieldType(kind)}
 							>
 								<Icon class="mt-0.5 size-4 shrink-0 text-muted-foreground" />
 								<span class="min-w-0">
@@ -405,6 +453,37 @@
 						</div>
 						<Field.Description>People pick one. Click a choice to remove it.</Field.Description>
 					</Field.Field>
+					<Field.Field>
+						<Field.Label>Presentation</Field.Label>
+						<AppSelect bind:value={fieldPresentation} options={enumPresentationOptions} />
+						<Field.Description>Show choices as plain text or compact badges.</Field.Description>
+					</Field.Field>
+					{#if fieldPresentation === "badge"}
+						<Field.Field>
+							<Field.Label>Badge meaning</Field.Label>
+							<div class="flex flex-col gap-2">
+								{#each fieldChoices as value (value)}
+									<div class="grid grid-cols-[minmax(0,1fr)_9rem] items-center gap-3 rounded-xl border bg-background p-2">
+										<div class="min-w-0">
+											<StatusPill
+												path={fieldKey || slugify(fieldLabel) || "choice"}
+												{value}
+												tone={fieldValueSemantics[value] ?? "neutral"}
+											/>
+										</div>
+										<AppSelect
+											value={fieldValueSemantics[value] ?? "neutral"}
+											options={semanticOptions}
+											onValueChange={(semantic) => setChoiceSemantic(value, semantic)}
+										/>
+									</div>
+								{/each}
+							</div>
+							<Field.Description>
+								Use meaning consistently. Leave ordinary workflow stages as normal or informational.
+							</Field.Description>
+						</Field.Field>
+					{/if}
 				{/if}
 				{#if fieldType === "reference"}
 					<Field.Field>
@@ -422,7 +501,7 @@
 				{#if fieldType === "number"}
 					<Field.Field>
 						<Field.Label>Presentation</Field.Label>
-						<AppSelect bind:value={fieldPresentation} options={presentationOptions} />
+						<AppSelect bind:value={fieldPresentation} options={numberPresentationOptions} />
 						<Field.Description>Choose how people enter and see this number.</Field.Description>
 					</Field.Field>
 					{#if fieldPresentation === "rating"}

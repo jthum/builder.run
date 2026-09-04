@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { isStatusPath, statusDotClass } from "$lib/app/labels.ts";
+	import { isStatusPath, semanticDotClass, statusDotClass } from "$lib/app/labels.ts";
 	import AppSelect from "$lib/components/app-select.svelte";
 	import { cellValue, compareRows, rowId, type DataTableColumn } from "$lib/components/data-table.ts";
 	import { Badge } from "$lib/components/ui/badge/index.js";
@@ -203,6 +203,12 @@
 		return `Any ${column.label.toLowerCase()}`;
 	}
 
+	function filterDotClass(column: DataTableColumn, value: string): string | undefined {
+		const semantic = column.valueSemantics?.[value];
+		if (semantic) return semanticDotClass(semantic);
+		return isStatusPath(column.id) ? statusDotClass(value) : undefined;
+	}
+
 </script>
 
 {#snippet createButton(size?: "sm" | "default")}
@@ -267,12 +273,13 @@
 				{#if !compact}
 					{#each filterColumns as column (column.id)}
 						{@const active = Boolean(filters[column.id])}
+						{@const activeDot = active ? filterDotClass(column, filters[column.id]) : undefined}
 						<DropdownMenu.Root>
 							<DropdownMenu.Trigger>
 								{#snippet child({ props })}
 									<Button variant="outline" size="sm" class="h-8 bg-background" {...props}>
-										{#if isStatusPath(column.id) && active}
-											<span class="size-1.5 rounded-full {statusDotClass(filters[column.id])}"></span>
+										{#if activeDot}
+											<span class="size-1.5 rounded-full {activeDot}"></span>
 										{/if}
 										{filterLabel(column)}
 										<ChevronDownIcon data-icon="inline-end" class="text-muted-foreground" />
@@ -288,9 +295,10 @@
 								>
 									<DropdownMenu.RadioItem value={anyFilter}>Any {column.label.toLowerCase()}</DropdownMenu.RadioItem>
 									{#each column.filterValues ?? [] as value (value)}
+										{@const dot = filterDotClass(column, value)}
 										<DropdownMenu.RadioItem value={value}>
-											{#if isStatusPath(column.id)}
-												<span class="size-1.5 rounded-full {statusDotClass(value)}"></span>
+											{#if dot}
+												<span class="size-1.5 rounded-full {dot}"></span>
 											{/if}
 											{labelFromKey(value)}
 										</DropdownMenu.RadioItem>

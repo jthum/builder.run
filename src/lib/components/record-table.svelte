@@ -63,6 +63,12 @@
 		return keys.map((key) => {
 			const fieldKey = key.split(".")[0] ?? key;
 			const field = type?.fields.find((item) => item.key === fieldKey);
+			const valueSemantics =
+				field?.type === "enum" && field.presentation === "badge"
+					? Object.fromEntries(
+							(field.values ?? []).map((value) => [value, field.value_semantics?.[value] ?? "neutral"]),
+						)
+					: undefined;
 			return {
 				id: key,
 				label: columnLabel(key, type),
@@ -70,6 +76,7 @@
 				numeric: isAmountPath(key) || field?.type === "number" || Boolean(view.measures?.[key]),
 				clamp: field?.type === "text",
 				filterValues: field?.type === "enum" ? field.values : undefined,
+				valueSemantics,
 				href: (row) => {
 					if (!aggregated) return key === keys[0] ? `/t/${typeKey}/${row.id}` : undefined;
 					if (key !== view.group_by || field?.type !== "reference" || !field.target) return undefined;

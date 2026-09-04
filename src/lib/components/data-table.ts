@@ -1,4 +1,5 @@
 import { scalarString } from "$lib/runtime/values.ts";
+import type { ValueSemantic } from "$lib/runtime/model.ts";
 
 export type DataTableColumn = {
   id: string;
@@ -8,6 +9,7 @@ export type DataTableColumn = {
   numeric?: boolean;
   clamp?: boolean;
   filterValues?: string[];
+  valueSemantics?: Record<string, ValueSemantic>;
   href?: (row: Record<string, unknown>) => string | undefined;
 };
 

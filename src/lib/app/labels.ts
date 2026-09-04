@@ -1,5 +1,12 @@
 import { isId, labelFromKey } from "$lib/runtime/ids.ts";
-import type { AppSpec, FieldKind, TypeDef, ViewDef } from "$lib/runtime/model.ts";
+import type {
+  AppSpec,
+  FieldDef,
+  FieldKind,
+  TypeDef,
+  ValueSemantic,
+  ViewDef,
+} from "$lib/runtime/model.ts";
 import { scalarString } from "$lib/runtime/values.ts";
 
 export const fieldKindLabel: Record<FieldKind, string> = {
@@ -123,7 +130,7 @@ export function statusVariant(value: string): "default" | "secondary" | "destruc
   return "secondary";
 }
 
-export type StatusTone = "success" | "danger" | "warning" | "info" | "neutral";
+export type StatusTone = ValueSemantic;
 
 export function statusTone(value: string): StatusTone {
   const normalized = value.toLowerCase();
@@ -136,7 +143,11 @@ export function statusTone(value: string): StatusTone {
 }
 
 export function statusDotClass(value: string): string {
-  switch (statusTone(value)) {
+  return semanticDotClass(statusTone(value));
+}
+
+export function semanticDotClass(semantic: ValueSemantic): string {
+  switch (semantic) {
     case "success":
       return "bg-emerald-500";
     case "danger":
@@ -148,6 +159,11 @@ export function statusDotClass(value: string): string {
     default:
       return "bg-muted-foreground/45";
   }
+}
+
+export function fieldValueSemantic(field: FieldDef, value: unknown): ValueSemantic | undefined {
+  if (field.type !== "enum" || field.presentation !== "badge") return undefined;
+  return field.value_semantics?.[scalarString(value)] ?? "neutral";
 }
 
 export function formatMoney(value: unknown): string {

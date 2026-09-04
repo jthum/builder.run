@@ -1,10 +1,11 @@
 <script lang="ts">
 	import { formatCell, statusTone } from "$lib/app/labels.ts";
+	import type { ValueSemantic } from "$lib/runtime/model.ts";
 
-	let { path, value }: { path: string; value: unknown } = $props();
+	let { path, value, tone }: { path: string; value: unknown; tone?: ValueSemantic } = $props();
 
 	const text = $derived(formatCell(path, value));
-	const tone = $derived(statusTone(String(value ?? "")));
+	const resolvedTone = $derived(tone ?? statusTone(String(value ?? "")));
 	const styles = {
 		success: {
 			wrap: "bg-emerald-50 text-emerald-700 ring-emerald-600/15 dark:bg-emerald-500/15 dark:text-emerald-400 dark:ring-emerald-400/20",
@@ -33,9 +34,9 @@
 	<span class="text-muted-foreground">—</span>
 {:else}
 	<span
-		class="inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-xs font-medium ring-1 ring-inset {styles[tone].wrap}"
+		class="inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-xs font-medium ring-1 ring-inset {styles[resolvedTone].wrap}"
 	>
-		<span class="size-1.5 shrink-0 rounded-full {styles[tone].dot}"></span>
+		<span class="size-1.5 shrink-0 rounded-full {styles[resolvedTone].dot}"></span>
 		{text}
 	</span>
 {/if}

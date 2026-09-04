@@ -27,6 +27,40 @@ describe("authoring spec export", () => {
     expect(Object.keys(authored.forms as object)).toContain("note_create");
   });
 
+  it("preserves field presentation metadata in authored exports", () => {
+    const spec = normalizeSpec({
+      types: {
+        submission: {
+          fields: {
+            stage: {
+              type: "enum",
+              values: ["submitted", "winner", "rejected"],
+              presentation: "badge",
+              value_semantics: {
+                submitted: "neutral",
+                winner: "success",
+                rejected: "danger",
+              },
+            },
+            score: { type: "number", presentation: "rating", max: 5 },
+          },
+        },
+      },
+    });
+    const authored = authoringSpec(spec) as {
+      types: { submission: { fields: Record<string, Record<string, unknown>> } };
+    };
+    expect(authored.types.submission.fields.stage).toMatchObject({
+      presentation: "badge",
+      value_semantics: { submitted: "neutral", winner: "success", rejected: "danger" },
+    });
+    expect(authored.types.submission.fields.score).toMatchObject({
+      presentation: "rating",
+      variant: "segments",
+      max: 5,
+    });
+  });
+
   it("normalizes field keys and rejects anonymous, duplicate, or reserved fields", () => {
     expect.hasAssertions();
     const spec = normalizeSpec({

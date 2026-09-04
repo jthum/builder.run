@@ -151,6 +151,28 @@ describe("webmcp bridge", () => {
     bridge.stop();
   });
 
+  it("lets an agent assign explicit enum badge semantics", async () => {
+    const host = await Host.open({ persist: false });
+    await host.upsertType({ key: "submission", fields: [] });
+    const tools = new Map(buildTools(host).map((tool) => [tool.name, tool]));
+    await tools.get("upsert_field")!.execute({
+      type: "submission",
+      key: "stage",
+      field_type: "enum",
+      values: ["submitted", "winner", "rejected"],
+      presentation: "badge",
+      value_semantics: {
+        submitted: "neutral",
+        winner: "success",
+        rejected: "danger",
+      },
+    });
+    expect(host.resolvedSpec().types[0]?.fields[0]).toMatchObject({
+      presentation: "badge",
+      value_semantics: { submitted: "neutral", winner: "success", rejected: "danger" },
+    });
+  });
+
   it("returns grouped view measures through the shared query_view tool", async () => {
     expect.hasAssertions();
     const host = await Host.open({ persist: false });

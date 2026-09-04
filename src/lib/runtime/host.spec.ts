@@ -104,6 +104,47 @@ types:
     expect(host.resolvedSpec().types[0]?.fields[0]).not.toHaveProperty("max");
   });
 
+  it("stores explicit badge semantics for enum values", async () => {
+    expect.hasAssertions();
+    const host = await Host.open({ persist: false });
+    await host.upsertType({ key: "submission", fields: [] });
+    const stage = await host.upsertField("submission", {
+      key: "stage",
+      type: "enum",
+      values: ["submitted", "winner", "rejected"],
+      presentation: "badge",
+      value_semantics: {
+        submitted: "neutral",
+        winner: "success",
+        rejected: "danger",
+      },
+    });
+    expect(stage).toMatchObject({
+      presentation: "badge",
+      value_semantics: {
+        submitted: "neutral",
+        winner: "success",
+        rejected: "danger",
+      },
+    });
+    await expect(
+      host.upsertField("submission", {
+        key: "stage",
+        type: "enum",
+        values: ["submitted", "winner", "rejected"],
+        presentation: "badge",
+        value_semantics: { missing: "warning" },
+      }),
+    ).rejects.toThrow('Badge semantic value "missing" is not a choice');
+    await host.upsertField("submission", {
+      key: "stage",
+      type: "enum",
+      presentation: undefined,
+    });
+    expect(host.resolvedSpec().types[0]?.fields[0]).not.toHaveProperty("presentation");
+    expect(host.resolvedSpec().types[0]?.fields[0]).not.toHaveProperty("value_semantics");
+  });
+
   it("enforces field identity rules on direct field changes", async () => {
     expect.hasAssertions();
     const host = await Host.open({ persist: false });

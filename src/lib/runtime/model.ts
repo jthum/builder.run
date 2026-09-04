@@ -3,8 +3,9 @@ import { createId, labelFromKey, slugify, uniqueKey } from "./ids.ts";
 export const SPEC_VERSION = 1 as const;
 
 export type FieldKind = "text" | "number" | "date" | "boolean" | "enum" | "reference";
-export type FieldPresentation = "rating";
+export type FieldPresentation = "rating" | "badge";
 export type FieldPresentationVariant = "segments";
+export type ValueSemantic = "neutral" | "info" | "success" | "warning" | "danger";
 export type StoreKind = "local" | "shared";
 export type ActorKind = "human" | "agent" | "system";
 export type Exposure = "ui" | "agent";
@@ -47,6 +48,7 @@ export interface FieldDef {
   presentation?: FieldPresentation;
   variant?: FieldPresentationVariant;
   max?: number;
+  value_semantics?: Record<string, ValueSemantic>;
 }
 
 export interface TypeDef {
@@ -165,6 +167,7 @@ export interface RecordValue {
 }
 
 export const FIELD_KINDS: FieldKind[] = ["text", "number", "date", "boolean", "enum", "reference"];
+export const VALUE_SEMANTICS: ValueSemantic[] = ["neutral", "info", "success", "warning", "danger"];
 export const RESERVED_FIELD_KEYS = new Set([
   "id",
   "created_at",
@@ -265,7 +268,7 @@ function fieldKeyFrom(mapKey: string | undefined, draft: FieldDraft): string {
   return normalizeFieldKey(namedMapKey || fromDraft || label || mapKey);
 }
 
-function normalizeField(key: string, draft: FieldDraft, existing?: FieldDef): FieldDef {
+export function normalizeField(key: string, draft: FieldDraft, existing?: FieldDef): FieldDef {
   const objectDraft: Partial<FieldDef> & { field_type?: string } =
     typeof draft === "string" ? { type: draft as FieldKind } : { ...draft };
   const type = fieldKindFrom(objectDraft, existing);
@@ -302,6 +305,19 @@ function normalizeField(key: string, draft: FieldDraft, existing?: FieldDef): Fi
     field.max = Number.isFinite(requestedMax)
       ? Math.min(10, Math.max(2, Math.round(requestedMax)))
       : 10;
+  } else if (type === "enum" && presentation === "badge") {
+    field.presentation = "badge";
+    const semantics = objectDraft.value_semantics ?? existing?.value_semantics ?? {};
+    const choices = new Set(field.values);
+    for (const [value, semantic] of Object.entries(semantics)) {
+      if (!choices.has(value)) {
+        throw new Error(`Badge semantic value "${value}" is not a choice on ${key}`);
+      }
+      if (!VALUE_SEMANTICS.includes(semantic)) {
+        throw new Error(`Unknown badge semantic "${String(semantic)}" on ${key}.${value}`);
+      }
+    }
+    if (Object.keys(semantics).length) field.value_semantics = { ...semantics };
   }
   return field;
 }

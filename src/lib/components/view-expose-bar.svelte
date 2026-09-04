@@ -1,5 +1,10 @@
 <script lang="ts">
-	import { isStatusPath, statusDotClass } from "$lib/app/labels.ts";
+	import {
+		fieldValueSemantic,
+		isStatusPath,
+		semanticDotClass,
+		statusDotClass,
+	} from "$lib/app/labels.ts";
 	import { Button } from "$lib/components/ui/button/index.js";
 	import * as DropdownMenu from "$lib/components/ui/dropdown-menu/index.js";
 	import * as InputGroup from "$lib/components/ui/input-group/index.js";
@@ -50,6 +55,12 @@
 		if (field.type === "number") return "number";
 		return "search";
 	}
+
+	function dotClass(field: FieldDef, value: string): string | undefined {
+		const semantic = fieldValueSemantic(field, value);
+		if (semantic) return semanticDotClass(semantic);
+		return isStatusPath(field.key) ? statusDotClass(value) : undefined;
+	}
 </script>
 
 {#if fields.length}
@@ -57,6 +68,7 @@
 		{#each fields as field (field.key)}
 			{@const options = choices(field)}
 			{@const current = values[field.key] ?? ""}
+			{@const currentDot = current ? dotClass(field, current) : undefined}
 			{#if options}
 				<DropdownMenu.Root>
 					<DropdownMenu.Trigger>
@@ -67,8 +79,8 @@
 								class="h-8 bg-background"
 								{...props}
 							>
-								{#if isStatusPath(field.key) && current}
-									<span class="size-1.5 rounded-full {statusDotClass(current)}"></span>
+								{#if currentDot}
+									<span class="size-1.5 rounded-full {currentDot}"></span>
 								{:else}
 									<ListFilterIcon data-icon="inline-start" class="text-muted-foreground" />
 								{/if}
@@ -86,9 +98,10 @@
 						>
 							<DropdownMenu.RadioItem value={anyFilter}>Any {field.label.toLowerCase()}</DropdownMenu.RadioItem>
 							{#each options as option (option.value)}
+								{@const dot = dotClass(field, option.value)}
 								<DropdownMenu.RadioItem value={option.value}>
-									{#if isStatusPath(field.key)}
-										<span class="size-1.5 rounded-full {statusDotClass(option.value)}"></span>
+									{#if dot}
+										<span class="size-1.5 rounded-full {dot}"></span>
 									{/if}
 									{option.label}
 								</DropdownMenu.RadioItem>
