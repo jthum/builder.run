@@ -37,7 +37,6 @@
 
 <svelte:head>
 	<title>{docTitle}</title>
-	<link rel="icon" href="/favicon.svg" />
 </svelte:head>
 
 <ModeWatcher />
