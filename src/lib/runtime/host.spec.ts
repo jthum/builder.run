@@ -556,10 +556,15 @@ types:
         .types.find((type) => type.key === "client")
         ?.fields.map((field) => field.key),
     ).toEqual(["name", "industry"]);
-    await host.upsertType({ key: "client", label: "Clients" });
+    await host.upsertType({ key: "client", label: "Customer", collection_label: "Customers" });
     const kept = host.resolvedSpec().types.find((type) => type.key === "client");
-    expect(kept?.label).toBe("Clients");
+    expect(kept?.label).toBe("Customer");
+    expect(kept?.collection_label).toBe("Customers");
     expect(kept?.fields.map((field) => field.key)).toEqual(["name", "industry"]);
+    await host.upsertType({ key: "client", collection_label: "" });
+    const cleared = host.resolvedSpec().types.find((type) => type.key === "client");
+    expect(cleared?.collection_label).toBeUndefined();
+    expect(cleared?.fields.map((field) => field.key)).toEqual(["name", "industry"]);
     await host.upsertType({
       key: "project",
       fields: [

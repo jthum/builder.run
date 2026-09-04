@@ -55,6 +55,8 @@ export interface TypeDef {
   id: string;
   key: string;
   label: string;
+  /** Optional plural name used for lists and navigation. */
+  collection_label?: string;
   store: StoreKind;
   /** Available to spaces this space’s users create. Whole type, all fields. */
   expose?: boolean;
@@ -336,10 +338,14 @@ function normalizeType(key: string, draft: TypeDraft, existing?: TypeDef): TypeD
     draft.expose ??
     existing?.expose ??
     (isLegacySharedStore(draft.store) || isLegacySharedStore(existing?.store));
+  const collectionLabel = Object.hasOwn(draft, "collection_label")
+    ? String(draft.collection_label ?? "").trim()
+    : existing?.collection_label;
   return {
     id: draft.id || existing?.id || createId("typ"),
     key,
     label: draft.label || existing?.label || labelFromKey(key),
+    ...(collectionLabel ? { collection_label: collectionLabel } : {}),
     store: "local",
     ...(expose ? { expose: true as const } : {}),
     fields,

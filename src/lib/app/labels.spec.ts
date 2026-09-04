@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vite-plus/test";
 import {
   aggregateRatingMax,
+  collectionLabel,
   formatCell,
   greeting,
   homeViews,
@@ -114,5 +115,22 @@ describe("home copy", () => {
     const localOnly = { views: [implicit], types: [type] } as AppSpec;
     expect(homeViews(withFeatured).map((view) => view.key)).toEqual(["active_projects"]);
     expect(homeViews(localOnly).map((view) => view.key)).toEqual(["all_expense"]);
+  });
+});
+
+describe("collection labels", () => {
+  const type = (label: string, collection_label?: string) =>
+    ({ id: "typ_1", key: "item", label, collection_label, store: "local", fields: [] }) as TypeDef;
+
+  it("infers regular, irregular, already-plural, and uncountable English names", () => {
+    expect(collectionLabel(type("Project"))).toBe("Projects");
+    expect(collectionLabel(type("Person"))).toBe("People");
+    expect(collectionLabel(type("People"))).toBe("People");
+    expect(collectionLabel(type("Category"))).toBe("Categories");
+    expect(collectionLabel(type("Equipment"))).toBe("Equipment");
+  });
+
+  it("prefers an explicit collection name", () => {
+    expect(collectionLabel(type("Person", "Team directory"))).toBe("Team directory");
   });
 });

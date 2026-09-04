@@ -501,12 +501,17 @@ export function buildTools(host: Host): ToolDefinition[] {
       name: "upsert_type",
       title: "Create or update a type",
       description:
-        'Create or update a type and its fields. Providing fields replaces the type\'s field list; omitting fields leaves existing fields unchanged. Add or change one field with upsert_field. fields is an array of {key, type, label, ...} or a map of key → field. Enum fields can use presentation: "badge" and explicit value_semantics; number fields can use presentation: "rating". Reference fields need target. expose: true stores the type on the account space so every app shares the same records — use this instead of duplicating client/organisation in each app. Omit expose (or false) for app-only types. Example: upsert_type({ key: "client", expose: true, fields: [{ key: "name", type: "text", required: true }] }).',
+        'Create or update a type and its fields. Use a singular key and label for one record; optional collection_label overrides the automatically pluralized list name (for example label: "Person", collection_label: "People"). Providing fields replaces the type\'s field list; omitting fields leaves existing fields unchanged. Add or change one field with upsert_field. fields is an array of {key, type, label, ...} or a map of key → field. Enum fields can use presentation: "badge" and explicit value_semantics; number fields can use presentation: "rating". Reference fields need target. expose: true stores the type on the account space so every app shares its records. Omit expose (or false) for app-only types. Example: upsert_type({ key: "person", label: "Person", collection_label: "People", expose: true, fields: [{ key: "name", type: "text", required: true }] }).',
       inputSchema: {
         type: "object",
         properties: {
           key: { type: "string", minLength: 1, pattern: "\\S" },
           label: { type: "string" },
+          collection_label: {
+            type: "string",
+            description:
+              "Optional plural label for lists and navigation. Omit it to infer an English plural from label; pass an empty string to clear an existing override.",
+          },
           store: { type: "string" },
           expose: {
             type: "boolean",

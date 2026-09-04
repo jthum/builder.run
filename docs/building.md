@@ -21,6 +21,9 @@ For a judging workspace:
 
 These become **Types**.
 
+Name a Type in the singular, such as `Person` rather than `People`. builder.run infers its collection
+name, and you can override that name in the Type editor when the terminology requires it.
+
 Then decide what each record needs to know. Those become fields.
 
 Example:

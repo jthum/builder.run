@@ -84,6 +84,7 @@ export function authoringSpec(spec: AppSpec): Record<string, unknown> {
         {
           id: type.id,
           label: type.label,
+          ...(type.collection_label ? { collection_label: type.collection_label } : {}),
           store: type.store,
           ...(type.expose ? { expose: true } : {}),
           fields: Object.fromEntries(

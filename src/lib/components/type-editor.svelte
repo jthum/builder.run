@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { goto } from "$app/navigation";
-	import { fieldKindHint, fieldKindLabel } from "$lib/app/labels.ts";
+	import { defaultCollectionLabel, fieldKindHint, fieldKindLabel } from "$lib/app/labels.ts";
 	import { runtime, session } from "$lib/app/session.svelte.ts";
 	import AppSelect from "$lib/components/app-select.svelte";
 	import PageHeader from "$lib/components/page-header.svelte";
@@ -14,6 +14,7 @@
 	import { Separator } from "$lib/components/ui/separator/index.js";
 	import { Input } from "$lib/components/ui/input/index.js";
 	import * as Sheet from "$lib/components/ui/sheet/index.js";
+	import { Spinner } from "$lib/components/ui/spinner/index.js";
 	import { Switch } from "$lib/components/ui/switch/index.js";
 	import { slugify } from "$lib/runtime/ids.ts";
 	import {
@@ -82,6 +83,10 @@
 	);
 
 	let sheetOpen = $state(false);
+	let namingTypeId = $state("");
+	let typeLabel = $state("");
+	let collectionName = $state("");
+	let namingPending = $state(false);
 	let editing = $state<FieldDef | null>(null);
 	let fieldKey = $state("");
 	let fieldLabel = $state("");
@@ -98,6 +103,32 @@
 	let removeKey = $state<string | null>(null);
 	let deleteOpen = $state(false);
 	let dragKey = $state<string | null>(null);
+	const inferredCollectionName = $derived(defaultCollectionLabel(typeLabel.trim() || type.label));
+
+	$effect(() => {
+		if (type.id === namingTypeId) return;
+		namingTypeId = type.id;
+		typeLabel = type.label;
+		collectionName = type.collection_label ?? "";
+	});
+
+	async function saveNaming(event: SubmitEvent) {
+		event.preventDefault();
+		const label = typeLabel.trim();
+		if (!label) return;
+		namingPending = true;
+		try {
+			await runtime().upsertType({
+				key: type.key,
+				label,
+				collection_label: collectionName.trim(),
+				expose: type.expose,
+			});
+			toast.success("Type naming saved");
+		} finally {
+			namingPending = false;
+		}
+	}
 
 	const selectedKind = $derived((FIELD_KINDS.includes(fieldType as FieldKind) ? fieldType : "text") as FieldKind);
 
@@ -282,6 +313,37 @@
 			{inbound.map((item) => `${item.type.label} (${item.field.label})`).join(", ")}.
 		</p>
 	{/if}
+
+	<Card.Root>
+		<Card.Header>
+			<Card.Title>Naming</Card.Title>
+			<Card.Description>Choose how one record and the full collection are named.</Card.Description>
+		</Card.Header>
+		<Card.Content>
+			<form id="type-naming" onsubmit={saveNaming}>
+				<Field.Group class="grid gap-4 sm:grid-cols-2">
+					<Field.Field>
+						<Field.Label for="type-label">Singular name</Field.Label>
+						<Input id="type-label" bind:value={typeLabel} placeholder="Person" />
+						<Field.Description>Used when referring to one record.</Field.Description>
+					</Field.Field>
+					<Field.Field>
+						<Field.Label for="collection-label">Collection name</Field.Label>
+						<Input id="collection-label" bind:value={collectionName} placeholder={inferredCollectionName} />
+						<Field.Description>
+							Optional. Defaults to {inferredCollectionName}; set it for unusual or translated names.
+						</Field.Description>
+					</Field.Field>
+				</Field.Group>
+			</form>
+		</Card.Content>
+		<Card.Footer class="justify-end">
+			<Button type="submit" form="type-naming" disabled={!typeLabel.trim() || namingPending}>
+				{#if namingPending}<Spinner data-icon="inline-start" />{/if}
+				Save naming
+			</Button>
+		</Card.Footer>
+	</Card.Root>
 
 	{#if type.fields.length === 0}
 		<Card.Root>

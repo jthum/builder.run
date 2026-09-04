@@ -78,6 +78,19 @@ describe("authoring spec export", () => {
     });
   });
 
+  it("preserves explicit collection labels in authored exports", () => {
+    const spec = normalizeSpec({
+      types: { person: { label: "Person", collection_label: "People", fields: {} } },
+    });
+    const authored = authoringSpec(spec) as {
+      types: { person: { label: string; collection_label?: string } };
+    };
+    expect(authored.types.person).toMatchObject({
+      label: "Person",
+      collection_label: "People",
+    });
+  });
+
   it("normalizes field keys and rejects anonymous, duplicate, or reserved fields", () => {
     expect.hasAssertions();
     const spec = normalizeSpec({

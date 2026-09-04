@@ -372,12 +372,15 @@ describe("webmcp bridge", () => {
     const upsert = registry.tools.get("upsert_type")!;
     const fromArray = await upsert.execute({
       key: "client",
+      label: "Client",
+      collection_label: "Client directory",
       fields: [
         { key: "name", type: "text", required: true },
         { key: "industry", type: "text" },
       ],
     });
     expect(JSON.parse(String(fromArray)).error).toBeUndefined();
+    expect(JSON.parse(String(fromArray)).collection_label).toBe("Client directory");
     expect(JSON.parse(String(fromArray)).fields.map((field: { key: string }) => field.key)).toEqual(
       ["name", "industry"],
     );

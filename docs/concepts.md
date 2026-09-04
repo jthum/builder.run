@@ -42,6 +42,10 @@ A type exposed by the parent Space can be reused by child apps. This avoids forc
 
 A **Type** describes a kind of record: Project, Contact, Submission, Session, Expense, and so on.
 
+Type names describe one record. builder.run infers the collection name used in navigation and lists
+(`Person` → `People`, `Category` → `Categories`), and an optional collection name can override that
+default for domain-specific or translated terminology.
+
 A type is more than a database declaration. It gives the runtime enough information to derive useful defaults such as:
 
 - a real SQLite table;

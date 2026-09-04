@@ -8,6 +8,7 @@ import type {
   ViewDef,
 } from "$lib/runtime/model.ts";
 import { scalarString } from "$lib/runtime/values.ts";
+import pluralize from "pluralize";
 
 export const fieldKindLabel: Record<FieldKind, string> = {
   text: "Text",
@@ -33,8 +34,11 @@ export function spaceLabel(name: string | undefined): string {
 }
 
 export function collectionLabel(type: TypeDef): string {
-  if (type.label.endsWith("s")) return type.label;
-  return `${type.label}s`;
+  return type.collection_label?.trim() || defaultCollectionLabel(type.label);
+}
+
+export function defaultCollectionLabel(label: string): string {
+  return pluralize.plural(label);
 }
 
 export function addLabel(type: TypeDef): string {

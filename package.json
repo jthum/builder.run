@@ -20,6 +20,7 @@
   },
   "dependencies": {
     "nanoid": "^6.0.1",
+    "pluralize": "^8.0.0",
     "wa-sqlite": "^1.0.0",
     "yaml": "^2.9.0"
   },
@@ -32,6 +33,7 @@
     "@sveltejs/vite-plugin-svelte": "^7.2.0",
     "@tailwindcss/vite": "^4.3.0",
     "@types/node": "^26.4.0",
+    "@types/pluralize": "^0.0.33",
     "bits-ui": "^2.19.0",
     "clsx": "^2.1.1",
     "mode-watcher": "^1.1.0",
