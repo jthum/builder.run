@@ -5,13 +5,13 @@
 		semanticDotClass,
 		statusDotClass,
 	} from "$lib/app/labels.ts";
+	import { Badge } from "$lib/components/ui/badge/index.js";
 	import { Button } from "$lib/components/ui/button/index.js";
 	import * as DropdownMenu from "$lib/components/ui/dropdown-menu/index.js";
 	import * as InputGroup from "$lib/components/ui/input-group/index.js";
 	import { labelFromKey } from "$lib/runtime/ids.ts";
 	import type { FieldDef } from "$lib/runtime/model.ts";
 	import ChevronDownIcon from "@lucide/svelte/icons/chevron-down";
-	import ListFilterIcon from "@lucide/svelte/icons/list-filter";
 	import SearchIcon from "@lucide/svelte/icons/search";
 	import XIcon from "@lucide/svelte/icons/x";
 
@@ -21,13 +21,13 @@
 		fields,
 		values = $bindable(),
 		idPrefix = "expose",
+		mode = "panel",
 	}: {
 		fields: FieldDef[];
 		values: Record<string, string>;
 		idPrefix?: string;
+		mode?: "panel" | "active";
 	} = $props();
-
-	const hasValues = $derived(fields.some((field) => Boolean(values[field.key])));
 
 	function choices(field: FieldDef): Array<{ value: string; label: string }> | null {
 		if (field.type === "enum") {
@@ -46,10 +46,6 @@
 		values = { ...values, [field]: value };
 	}
 
-	function clear() {
-		values = Object.fromEntries(fields.map((field) => [field.key, ""]));
-	}
-
 	function inputType(field: FieldDef): "date" | "number" | "search" {
 		if (field.type === "date") return "date";
 		if (field.type === "number") return "number";
@@ -64,83 +60,90 @@
 </script>
 
 {#if fields.length}
-	<div class="flex min-w-0 flex-1 flex-wrap items-center gap-2">
-		{#each fields as field (field.key)}
+	{#if mode === "active"}
+		{#each fields.filter((field) => Boolean(values[field.key])) as field (field.key)}
 			{@const options = choices(field)}
 			{@const current = values[field.key] ?? ""}
-			{@const currentDot = current ? dotClass(field, current) : undefined}
-			{#if options}
-				<DropdownMenu.Root>
-					<DropdownMenu.Trigger>
-						{#snippet child({ props })}
-							<Button
-								variant="outline"
-								size="sm"
-								class="h-8 bg-background"
-								{...props}
-							>
-								{#if currentDot}
-									<span class="size-1.5 rounded-full {currentDot}"></span>
-								{:else}
-									<ListFilterIcon data-icon="inline-start" class="text-muted-foreground" />
-								{/if}
-								{field.label}{current ? `: ${options.find((option) => option.value === current)?.label ?? labelFromKey(current)}` : ""}
-								<ChevronDownIcon data-icon="inline-end" class="text-muted-foreground" />
-							</Button>
-						{/snippet}
-					</DropdownMenu.Trigger>
-					<DropdownMenu.Content align="start" class="w-auto min-w-52">
-						<DropdownMenu.Label>Filter by {field.label.toLowerCase()}</DropdownMenu.Label>
-						<DropdownMenu.Separator />
-						<DropdownMenu.RadioGroup
-							value={current || anyFilter}
-							onValueChange={(value) => setValue(field.key, value === anyFilter ? "" : value)}
-						>
-							<DropdownMenu.RadioItem value={anyFilter}>Any {field.label.toLowerCase()}</DropdownMenu.RadioItem>
-							{#each options as option (option.value)}
-								{@const dot = dotClass(field, option.value)}
-								<DropdownMenu.RadioItem value={option.value}>
-									{#if dot}
-										<span class="size-1.5 rounded-full {dot}"></span>
-									{/if}
-									{option.label}
-								</DropdownMenu.RadioItem>
-							{/each}
-						</DropdownMenu.RadioGroup>
-					</DropdownMenu.Content>
-				</DropdownMenu.Root>
-			{:else}
-				<InputGroup.Root class="h-8 min-w-40 max-w-56 flex-1 bg-background sm:flex-none">
-					<InputGroup.Addon>
-						<SearchIcon />
-					</InputGroup.Addon>
-					<InputGroup.Input
-						id="{idPrefix}-{field.key}"
-						type={inputType(field)}
-						value={current}
-						oninput={(event) => setValue(field.key, event.currentTarget.value)}
-						placeholder={field.label}
-						aria-label={`Filter by ${field.label.toLowerCase()}`}
-					/>
-					{#if current}
-						<InputGroup.Addon align="inline-end">
-							<InputGroup.Button
-								size="icon-xs"
-								onclick={() => setValue(field.key, "")}
-								aria-label={`Clear ${field.label.toLowerCase()} filter`}
-							>
-								<XIcon />
-							</InputGroup.Button>
-						</InputGroup.Addon>
-					{/if}
-				</InputGroup.Root>
-			{/if}
+			{@const currentDot = dotClass(field, current)}
+			<Badge variant="outline" class="h-8 gap-1.5 bg-background pr-1 pl-2.5 text-sm font-normal">
+				{#if currentDot}<span class="size-1.5 rounded-full {currentDot}"></span>{/if}
+				<span class="text-muted-foreground">{field.label}:</span>
+				{options?.find((option) => option.value === current)?.label ?? labelFromKey(current)}
+				<Button
+					variant="ghost"
+					size="icon-xs"
+					onclick={() => setValue(field.key, "")}
+					aria-label={`Clear ${field.label.toLowerCase()} filter`}
+				>
+					<XIcon />
+				</Button>
+			</Badge>
 		{/each}
-		{#if hasValues}
-			<Button variant="ghost" size="xs" onclick={clear}>
-				<XIcon data-icon="inline-start" />
-				Clear filters
-			</Button>
-		{/if}
-	</div>
+	{:else}
+		<div class="flex flex-col gap-3">
+			{#each fields as field (field.key)}
+				{@const options = choices(field)}
+				{@const current = values[field.key] ?? ""}
+				{@const currentDot = current ? dotClass(field, current) : undefined}
+				<div class="flex flex-col gap-1.5">
+					<span class="text-xs font-medium text-muted-foreground">{field.label}</span>
+					{#if options}
+						<DropdownMenu.Root>
+							<DropdownMenu.Trigger>
+								{#snippet child({ props })}
+									<Button variant="outline" size="sm" class="w-full justify-between" {...props}>
+										<span class="flex min-w-0 items-center gap-2">
+											{#if currentDot}<span class="size-1.5 rounded-full {currentDot}"></span>{/if}
+											{current
+												? options.find((option) => option.value === current)?.label ?? labelFromKey(current)
+												: `Any ${field.label.toLowerCase()}`}
+										</span>
+										<ChevronDownIcon data-icon="inline-end" class="text-muted-foreground" />
+									</Button>
+								{/snippet}
+							</DropdownMenu.Trigger>
+							<DropdownMenu.Content align="end" class="w-auto min-w-52">
+								<DropdownMenu.RadioGroup
+									value={current || anyFilter}
+									onValueChange={(value) => setValue(field.key, value === anyFilter ? "" : value)}
+								>
+									<DropdownMenu.RadioItem value={anyFilter}>Any {field.label.toLowerCase()}</DropdownMenu.RadioItem>
+									{#each options as option (option.value)}
+										{@const dot = dotClass(field, option.value)}
+										<DropdownMenu.RadioItem value={option.value}>
+											{#if dot}<span class="size-1.5 rounded-full {dot}"></span>{/if}
+											{option.label}
+										</DropdownMenu.RadioItem>
+									{/each}
+								</DropdownMenu.RadioGroup>
+							</DropdownMenu.Content>
+						</DropdownMenu.Root>
+					{:else}
+						<InputGroup.Root class="h-8 w-full bg-background">
+							<InputGroup.Addon><SearchIcon /></InputGroup.Addon>
+							<InputGroup.Input
+								id="{idPrefix}-{field.key}"
+								type={inputType(field)}
+								value={current}
+								oninput={(event) => setValue(field.key, event.currentTarget.value)}
+								placeholder={`Any ${field.label.toLowerCase()}`}
+								aria-label={`Filter by ${field.label.toLowerCase()}`}
+							/>
+							{#if current}
+								<InputGroup.Addon align="inline-end">
+									<InputGroup.Button
+										size="icon-xs"
+										onclick={() => setValue(field.key, "")}
+										aria-label={`Clear ${field.label.toLowerCase()} filter`}
+									>
+										<XIcon />
+									</InputGroup.Button>
+								</InputGroup.Addon>
+							{/if}
+						</InputGroup.Root>
+					{/if}
+				</div>
+			{/each}
+		</div>
+	{/if}
 {/if}

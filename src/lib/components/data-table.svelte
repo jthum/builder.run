@@ -9,6 +9,7 @@
 	import * as Empty from "$lib/components/ui/empty/index.js";
 	import * as InputGroup from "$lib/components/ui/input-group/index.js";
 	import * as Pagination from "$lib/components/ui/pagination/index.js";
+	import * as Popover from "$lib/components/ui/popover/index.js";
 	import { Skeleton } from "$lib/components/ui/skeleton/index.js";
 	import * as Table from "$lib/components/ui/table/index.js";
 	import { labelFromKey } from "$lib/runtime/ids.ts";
@@ -17,6 +18,7 @@
 	import Columns3Icon from "@lucide/svelte/icons/columns-3";
 	import EllipsisIcon from "@lucide/svelte/icons/ellipsis";
 	import InboxIcon from "@lucide/svelte/icons/inbox";
+	import ListFilterIcon from "@lucide/svelte/icons/list-filter";
 	import PlusIcon from "@lucide/svelte/icons/plus";
 	import SearchIcon from "@lucide/svelte/icons/search";
 	import XIcon from "@lucide/svelte/icons/x";
@@ -41,8 +43,10 @@
 		onCreate,
 		onDelete,
 		externalFilterIds = [],
-		externallyFiltered = false,
+		externalFilterCount = 0,
 		filterControls,
+		activeFilterControls,
+		clearExternalFilters,
 		footer,
 		cell,
 	}: {
@@ -61,8 +65,10 @@
 		onCreate?: () => void;
 		onDelete?: (rows: Array<Record<string, unknown>>) => void;
 		externalFilterIds?: string[];
-		externallyFiltered?: boolean;
+		externalFilterCount?: number;
 		filterControls?: Snippet;
+		activeFilterControls?: Snippet;
+		clearExternalFilters?: () => void;
 		footer?: Snippet<[{ rows: Array<Record<string, unknown>>; columns: DataTableColumn[] }]>;
 		cell?: Snippet<
 			[{ row: Record<string, unknown>; column: DataTableColumn; value: unknown; index: number }]
@@ -94,7 +100,12 @@
 		})),
 	);
 	const hasLocalQuery = $derived(Boolean(query.trim() || activeFilters.length));
-	const hasQuery = $derived(hasLocalQuery || externallyFiltered);
+	const hasQuery = $derived(hasLocalQuery || externalFilterCount > 0);
+	const visibleFilterColumns = $derived(compact ? [] : filterColumns);
+	const activeFilterCount = $derived(activeFilters.length + externalFilterCount);
+	const hasAvailableFilters = $derived(
+		visibleFilterColumns.length > 0 || externalFilterIds.length > 0,
+	);
 
 	const filtered = $derived.by(() => {
 		if (!rows) return null;
@@ -132,9 +143,15 @@
 	const totalCount = $derived(rows?.length ?? 0);
 	const canCreate = $derived(Boolean(onCreate || createHref));
 	const showToolbar = $derived(
-		Boolean(title || actionHref || selectedCount || (compact && canCreate && sorted.length > 0)),
+		Boolean(
+			title ||
+				actionHref ||
+				selectedCount ||
+				hasAvailableFilters ||
+				!compact ||
+				(compact && canCreate && sorted.length > 0),
+		),
 	);
-	const showFilterBar = $derived(!compact || externalFilterIds.length > 0);
 
 	$effect(() => {
 		void query;
@@ -191,6 +208,7 @@
 	function clearFilters() {
 		query = "";
 		filters = {};
+		clearExternalFilters?.();
 	}
 
 	function openRow(row: Record<string, unknown>) {
@@ -227,92 +245,114 @@
 
 <div class="flex flex-col gap-3">
 	{#if showToolbar}
-		<div class="flex flex-col gap-2.5">
-			<div class="flex flex-wrap items-center justify-between gap-2">
-				{#if title || selectedCount}
-					<div class="flex min-w-0 flex-wrap items-center gap-2">
-						{#if title}
-							<p class="text-sm font-medium tracking-tight">{title}</p>
-							{#if rows}
-								<Badge variant="secondary">
-									{hasLocalQuery ? `${sorted.length}/${totalCount}` : totalCount}
-								</Badge>
-							{/if}
+		<div class="flex flex-wrap items-center gap-2">
+			{#if title || selectedCount}
+				<div class="flex min-w-0 flex-wrap items-center gap-2">
+					{#if title}
+						<p class="text-sm font-medium tracking-tight">{title}</p>
+						{#if rows}
+							<Badge variant="secondary">
+								{hasQuery ? `${sorted.length}/${totalCount}` : totalCount}
+							</Badge>
 						{/if}
-						{#if selectedCount}
-							{#if title}
-								<span class="h-4 w-px bg-border"></span>
-							{/if}
-							<span class="text-sm text-muted-foreground">{selectedCount} selected</span>
-							{#if onDelete}
-								<Button size="sm" variant="destructive" onclick={() => onDelete(selectedRows)}>Delete</Button>
-							{/if}
-							<Button size="sm" variant="ghost" onclick={clearSelection}>Clear</Button>
-						{/if}
-					</div>
-				{/if}
-				<div class="flex min-w-0 flex-wrap items-center gap-2 sm:justify-end">
-					{#if actionHref}
-						<Button href={actionHref} size="sm" variant={compact ? "outline" : "ghost"}>
-							{actionLabel}
-							<ChevronRightIcon data-icon="inline-end" />
-						</Button>
 					{/if}
-					{#if compact && canCreate && sorted.length > 0}
-						{@render createButton("sm")}
+					{#if selectedCount}
+						{#if title}
+							<span class="h-4 w-px bg-border"></span>
+						{/if}
+						<span class="text-sm text-muted-foreground">{selectedCount} selected</span>
+						{#if onDelete}
+							<Button size="sm" variant="destructive-outline" onclick={() => onDelete(selectedRows)}>Delete</Button>
+						{/if}
+						<Button size="sm" variant="ghost" onclick={clearSelection}>Clear</Button>
 					{/if}
 				</div>
-			</div>
-		</div>
-	{/if}
+			{/if}
 
-	<div
-		class="flex flex-col gap-[2px] overflow-hidden rounded-2xl bg-muted/70 p-[4px] [--chrome:4px] [--frame-radius:var(--radius-2xl)]"
-	>
-		{#if showFilterBar}
-			<div class="flex flex-wrap items-center gap-2 px-3 py-2">
-				{@render filterControls?.()}
+			<div class="ms-auto flex min-w-0 flex-wrap items-center justify-end gap-2">
+				{@render activeFilterControls?.()}
+				{#each activeFilters as active (active.id)}
+					{@const column = filterColumns.find((item) => item.id === active.id)}
+					{@const dot = column ? filterDotClass(column, active.value) : undefined}
+					<Badge variant="outline" class="h-8 gap-1.5 bg-background pr-1 pl-2.5 text-sm font-normal">
+						{#if dot}<span class="size-1.5 rounded-full {dot}"></span>{/if}
+						<span class="text-muted-foreground">{active.label}:</span>
+						{labelFromKey(active.value)}
+						<Button
+							variant="ghost"
+							size="icon-xs"
+							onclick={() => setFilter(active.id, "")}
+							aria-label={`Clear ${active.label.toLowerCase()} filter`}
+						>
+							<XIcon />
+						</Button>
+					</Badge>
+				{/each}
+
+				{#if hasAvailableFilters}
+					<Popover.Root>
+						<Popover.Trigger>
+							{#snippet child({ props })}
+								<Button variant="outline" size="sm" {...props}>
+									<ListFilterIcon data-icon="inline-start" />
+									Filters
+									{#if activeFilterCount}
+										<Badge variant="secondary" class="ms-0.5 px-1.5">{activeFilterCount}</Badge>
+									{/if}
+								</Button>
+							{/snippet}
+						</Popover.Trigger>
+						<Popover.Content align="start" class="w-[min(24rem,calc(100vw-2rem))] gap-3">
+							<div class="flex items-start justify-between gap-3">
+								<Popover.Header>
+									<Popover.Title>Filters</Popover.Title>
+									<Popover.Description>Choose which records appear in this table.</Popover.Description>
+								</Popover.Header>
+								{#if activeFilterCount}
+									<Button variant="ghost" size="xs" onclick={clearFilters}>Clear all</Button>
+								{/if}
+							</div>
+							{@render filterControls?.()}
+							{#each visibleFilterColumns as column (column.id)}
+								<div class="flex flex-col gap-1.5">
+									<span class="text-xs font-medium text-muted-foreground">{column.label}</span>
+									<DropdownMenu.Root>
+										<DropdownMenu.Trigger>
+											{#snippet child({ props })}
+												<Button variant="outline" size="sm" class="w-full justify-between" {...props}>
+													{filterLabel(column)}
+													<ChevronDownIcon data-icon="inline-end" class="text-muted-foreground" />
+												</Button>
+											{/snippet}
+										</DropdownMenu.Trigger>
+										<DropdownMenu.Content align="end" class="w-auto min-w-52">
+											<DropdownMenu.RadioGroup
+												value={filters[column.id] || anyFilter}
+												onValueChange={(value) =>
+													setFilter(column.id, value === anyFilter ? "" : value)}
+											>
+												<DropdownMenu.RadioItem value={anyFilter}>Any {column.label.toLowerCase()}</DropdownMenu.RadioItem>
+												{#each column.filterValues ?? [] as value (value)}
+													{@const optionDot = filterDotClass(column, value)}
+													<DropdownMenu.RadioItem value={value}>
+														{#if optionDot}<span class="size-1.5 rounded-full {optionDot}"></span>{/if}
+														{labelFromKey(value)}
+													</DropdownMenu.RadioItem>
+												{/each}
+											</DropdownMenu.RadioGroup>
+										</DropdownMenu.Content>
+									</DropdownMenu.Root>
+								</div>
+							{/each}
+						</Popover.Content>
+					</Popover.Root>
+				{/if}
+
 				{#if !compact}
-					{#each filterColumns as column (column.id)}
-						{@const active = Boolean(filters[column.id])}
-						{@const activeDot = active ? filterDotClass(column, filters[column.id]) : undefined}
-						<DropdownMenu.Root>
-							<DropdownMenu.Trigger>
-								{#snippet child({ props })}
-									<Button variant="outline" size="sm" class="h-8 bg-background" {...props}>
-										{#if activeDot}
-											<span class="size-1.5 rounded-full {activeDot}"></span>
-										{/if}
-										{filterLabel(column)}
-										<ChevronDownIcon data-icon="inline-end" class="text-muted-foreground" />
-									</Button>
-								{/snippet}
-							</DropdownMenu.Trigger>
-							<DropdownMenu.Content align="start" class="w-auto min-w-52">
-								<DropdownMenu.Label>Filter by {column.label.toLowerCase()}</DropdownMenu.Label>
-								<DropdownMenu.Separator />
-								<DropdownMenu.RadioGroup
-									value={filters[column.id] || anyFilter}
-									onValueChange={(value) => setFilter(column.id, value === anyFilter ? "" : value)}
-								>
-									<DropdownMenu.RadioItem value={anyFilter}>Any {column.label.toLowerCase()}</DropdownMenu.RadioItem>
-									{#each column.filterValues ?? [] as value (value)}
-										{@const dot = filterDotClass(column, value)}
-										<DropdownMenu.RadioItem value={value}>
-											{#if dot}
-												<span class="size-1.5 rounded-full {dot}"></span>
-											{/if}
-											{labelFromKey(value)}
-										</DropdownMenu.RadioItem>
-									{/each}
-								</DropdownMenu.RadioGroup>
-							</DropdownMenu.Content>
-						</DropdownMenu.Root>
-					{/each}
 					<DropdownMenu.Root>
 						<DropdownMenu.Trigger>
 							{#snippet child({ props })}
-								<Button variant="outline" size="sm" class="h-8 bg-background" {...props}>
+								<Button variant="outline" size="sm" {...props}>
 									<Columns3Icon data-icon="inline-start" />
 									Columns
 								</Button>
@@ -333,21 +373,34 @@
 							</DropdownMenu.Group>
 						</DropdownMenu.Content>
 					</DropdownMenu.Root>
-					<InputGroup.Root class="ms-auto h-8 min-w-44 flex-1 bg-background sm:max-w-56 sm:flex-none">
-						<InputGroup.Addon>
-							<SearchIcon />
-						</InputGroup.Addon>
+
+					<InputGroup.Root class="h-8 min-w-44 flex-1 bg-background sm:max-w-56 sm:flex-none">
+						<InputGroup.Addon><SearchIcon /></InputGroup.Addon>
 						<InputGroup.Input bind:value={query} placeholder={searchPlaceholder} />
+						{#if query}
+							<InputGroup.Addon align="inline-end">
+								<InputGroup.Button size="icon-xs" onclick={() => (query = "")} aria-label="Clear search">
+									<XIcon />
+								</InputGroup.Button>
+							</InputGroup.Addon>
+						{/if}
 					</InputGroup.Root>
-					{#if query || activeFilters.length}
-						<Button size="xs" variant="ghost" onclick={clearFilters}>
-							<XIcon data-icon="inline-start" />
-							Clear
-						</Button>
-					{/if}
+				{/if}
+
+				{#if actionHref}
+					<Button href={actionHref} size="sm" variant={compact ? "outline" : "ghost"}>
+						{actionLabel}
+						<ChevronRightIcon data-icon="inline-end" />
+					</Button>
+				{/if}
+				{#if compact && canCreate && sorted.length > 0}
+					{@render createButton("sm")}
 				{/if}
 			</div>
-		{/if}
+		</div>
+	{/if}
+
+	<div class="flex flex-col gap-[2px] overflow-hidden [--chrome:4px] [--frame-radius:var(--radius-2xl)]">
 		{#if rows === null}
 			<div
 				class="flex flex-col gap-2 rounded-[calc(var(--frame-radius)-var(--chrome))] bg-card p-4 shadow-xs"
@@ -378,11 +431,10 @@
 				{/if}
 			</Empty.Root>
 		{:else}
-			<div
-				class="overflow-hidden rounded-[calc(var(--frame-radius)-var(--chrome))] bg-card shadow-xs"
+			<Table.Root
+				class="overflow-hidden rounded-2xl bg-surface-chrome p-[4px] [border-collapse:separate] [border-spacing:0]"
 			>
-				<Table.Root>
-					<Table.Header>
+				<Table.Header class="bg-transparent">
 					<Table.Row>
 						{#if !compact}
 							<Table.Head class="w-10">
@@ -420,8 +472,10 @@
 							<Table.Head class="w-12"><span class="sr-only">Actions</span></Table.Head>
 						{/if}
 					</Table.Row>
-					</Table.Header>
-					<Table.Body>
+				</Table.Header>
+				<Table.Body
+					class="bg-transparent drop-shadow-xs [&_td]:bg-card [&_tr:not(:last-child)>td]:border-b [&_tr:not(:last-child)>td]:border-border/60 [&_tr:hover>td]:bg-muted/40 [&_tr[data-state=selected]>td]:bg-muted/50 [&_tr[data-state=selected]:hover>td]:bg-muted/60 [&_tr:first-child>td:first-child]:rounded-tl-[calc(var(--frame-radius)-var(--chrome))] [&_tr:first-child>td:last-child]:rounded-tr-[calc(var(--frame-radius)-var(--chrome))] [&_tr:last-child>td:first-child]:rounded-bl-[calc(var(--frame-radius)-var(--chrome))] [&_tr:last-child>td:last-child]:rounded-br-[calc(var(--frame-radius)-var(--chrome))]"
+				>
 					{#each pageRows as row, index (rowId(row) || index)}
 						{@const id = rowId(row)}
 						<Table.Row
@@ -474,14 +528,13 @@
 							{/if}
 						</Table.Row>
 					{/each}
-					</Table.Body>
-					{#if footer && !compact}
-						<Table.Footer>
-							{@render footer({ rows: sorted, columns: visible })}
-						</Table.Footer>
-					{/if}
-				</Table.Root>
-			</div>
+				</Table.Body>
+				{#if footer && !compact}
+					<Table.Footer class="bg-transparent">
+						{@render footer({ rows: sorted, columns: visible })}
+					</Table.Footer>
+				{/if}
+			</Table.Root>
 		{/if}
 	</div>
 

@@ -90,12 +90,14 @@
 		</Card.Header>
 		<Card.Content>
 			<Tabs.Root bind:value={toolTab} class="gap-4">
-				<Tabs.List>
-					<Tabs.Trigger value="builder" class="gap-2">
+				<Tabs.List
+					class="h-auto w-full max-w-full justify-start gap-1 overflow-x-auto p-1 group-data-horizontal/tabs:h-auto"
+				>
+					<Tabs.Trigger value="builder" class="h-8 flex-none gap-2 px-3">
 						Builder
 						<span class="text-xs text-muted-foreground tabular-nums">{builderTools.length}</span>
 					</Tabs.Trigger>
-					<Tabs.Trigger value="app" class="gap-2">
+					<Tabs.Trigger value="app" class="h-8 flex-none gap-2 px-3">
 						This app
 						<span class="text-xs text-muted-foreground tabular-nums">{appTools.length}</span>
 					</Tabs.Trigger>

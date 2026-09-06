@@ -15,10 +15,11 @@ describe("name color", () => {
     expect(you.gradient).toContain("linear-gradient");
   });
 
-  it("builds initials from one or two words", () => {
+  it("builds up to two initials from the first and last words", () => {
     expect.hasAssertions();
     expect(initialsFromName("You")).toBe("Y");
     expect(initialsFromName("Ada Lovelace")).toBe("AL");
+    expect(initialsFromName("Ada King Lovelace")).toBe("AL");
     expect(initialsFromName("  ")).toBe("A");
   });
 });

@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { initialsFromName, toneFromName } from "$lib/app/color.ts";
 	import { runtime, session } from "$lib/app/session.svelte.ts";
 	import * as Avatar from "$lib/components/ui/avatar/index.js";
 	import { Button } from "$lib/components/ui/button/index.js";
@@ -14,7 +15,8 @@
 	let email = $state("");
 	let pending = $state(false);
 
-	const initial = $derived((name.trim().slice(0, 1) || "Y").toUpperCase());
+	const initials = $derived(initialsFromName(name.trim() || "You"));
+	const tone = $derived(toneFromName(name.trim() || "You"));
 
 	$effect(() => {
 		if (!open) return;
@@ -46,9 +48,14 @@
 			<Dialog.Body class="flex flex-col gap-5">
 				<div class="flex flex-col items-center gap-3">
 					<Avatar.Root size="lg" class="size-16">
-						<Avatar.Fallback class="text-lg">{initial}</Avatar.Fallback>
+						<Avatar.Fallback
+							class="text-lg font-medium"
+							style="background-color: {tone.background}; color: {tone.foreground}"
+						>
+							{initials}
+						</Avatar.Fallback>
 					</Avatar.Root>
-					<p class="text-sm text-muted-foreground">Your initial updates as you type.</p>
+					<p class="text-sm text-muted-foreground">Your initials and colour update as you type.</p>
 				</div>
 				<Field.Group>
 					<Field.Field>

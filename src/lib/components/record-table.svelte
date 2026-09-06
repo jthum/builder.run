@@ -89,8 +89,8 @@
 	});
 	const amountColumns = $derived(columns.filter((column) => isAmountPath(column.id)));
 	const externalFilterIds = $derived(exposedFields.map((field) => field.key));
-	const externallyFiltered = $derived(
-		exposedFields.some((field) => Boolean(exposedValues[field.key])),
+	const externalFilterCount = $derived(
+		exposedFields.filter((field) => Boolean(exposedValues[field.key])).length,
 	);
 
 	let pending = $state<Array<Record<string, unknown>>>([]);
@@ -98,6 +98,10 @@
 	function openRow(row: Record<string, unknown>) {
 		const id = String(row.id ?? "");
 		if (id) void goto(`/t/${typeKey}/${id}`);
+	}
+
+	function clearExposedFilters() {
+		exposedValues = Object.fromEntries(exposedFields.map((field) => [field.key, ""]));
 	}
 
 	async function remove() {
@@ -136,12 +140,16 @@
 	{actionLabel}
 	searchPlaceholder={`Search ${type ? collectionLabel(type).toLowerCase() : "records"}`}
 	{externalFilterIds}
-	{externallyFiltered}
+	{externalFilterCount}
+	clearExternalFilters={clearExposedFilters}
 	onOpen={aggregated ? undefined : openRow}
 	onDelete={aggregated ? undefined : (items) => (pending = items)}
 >
 	{#snippet filterControls()}
-		<ViewExposeBar fields={exposedFields} bind:values={exposedValues} />
+		<ViewExposeBar fields={exposedFields} bind:values={exposedValues} mode="panel" />
+	{/snippet}
+	{#snippet activeFilterControls()}
+		<ViewExposeBar fields={exposedFields} bind:values={exposedValues} mode="active" />
 	{/snippet}
 	{#snippet cell({ row, column, value })}
 		<FormattedValue
