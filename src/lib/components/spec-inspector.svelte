@@ -64,9 +64,9 @@
 			<Field.Label class="sr-only">Spec</Field.Label>
 			<Textarea class="min-h-96 font-mono text-xs" bind:value={draft} />
 		</Field.Field>
-		<div class="flex gap-2">
-			<Button onclick={apply}>Apply</Button>
-			<Button variant="outline" onclick={download}>Export</Button>
-		</div>
 	</Card.Content>
+	<Card.Footer class="gap-2">
+		<Button onclick={apply}>Apply</Button>
+		<Button variant="outline" onclick={download}>Export</Button>
+	</Card.Footer>
 </Card.Root>

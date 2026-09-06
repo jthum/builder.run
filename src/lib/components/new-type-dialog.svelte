@@ -9,6 +9,7 @@
 	import { Spinner } from "$lib/components/ui/spinner/index.js";
 	import * as ToggleGroup from "$lib/components/ui/toggle-group/index.js";
 	import { labelFromKey } from "$lib/runtime/ids.ts";
+	import { cn } from "$lib/utils.js";
 	import {
 		typeDraftFromTemplate,
 		typeTemplateCategories,
@@ -18,7 +19,6 @@
 	import BriefcaseIcon from "@lucide/svelte/icons/briefcase";
 	import Building2Icon from "@lucide/svelte/icons/building-2";
 	import CalendarIcon from "@lucide/svelte/icons/calendar";
-	import CheckIcon from "@lucide/svelte/icons/check";
 	import LayersIcon from "@lucide/svelte/icons/layers";
 	import ReceiptIcon from "@lucide/svelte/icons/receipt";
 	import SearchIcon from "@lucide/svelte/icons/search";
@@ -105,12 +105,12 @@
 					A kind of thing this app keeps. Start blank, or pick a template and change the fields.
 				</Dialog.Description>
 			</Dialog.Header>
-			<Dialog.Body class="flex min-h-0 flex-1 flex-col gap-4 overflow-hidden">
+			<Dialog.Body class="flex min-h-0 flex-1 flex-col gap-6 overflow-hidden">
 				<Field.Field>
 					<Field.Label>Name</Field.Label>
 					<Input bind:value={name} placeholder="Ticket" autofocus />
 				</Field.Field>
-				<div class="flex min-h-0 flex-1 flex-col gap-3">
+				<div class="flex min-h-0 flex-1 flex-col gap-4">
 					<div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
 						<p class="text-sm font-medium">Start from</p>
 						<InputGroup.Root class="sm:max-w-64">
@@ -130,22 +130,30 @@
 						<div class="grid gap-3 sm:grid-cols-2">
 							<button
 								type="button"
-								class="flex flex-col gap-2 rounded-2xl border p-4 text-start transition-colors hover:bg-muted/40 {selected ===
-								''
-									? 'border-primary ring-2 ring-primary/20'
-									: 'border-border'}"
+								aria-pressed={selected === ""}
+								class={cn(
+									"relative flex min-h-40 flex-col gap-3 rounded-2xl border bg-card p-4 text-start shadow-xs transition-[border-color,box-shadow,background-color] hover:border-foreground/20 hover:shadow-sm",
+									selected === ""
+										? "border-primary bg-primary/3 ring-1 ring-primary"
+										: "border-border"
+								)}
 								onclick={() => choose("")}
 							>
-								<div class="flex items-start justify-between gap-2">
-									<div class="flex size-9 items-center justify-center rounded-lg bg-muted text-muted-foreground">
+								<div class="flex items-start justify-between gap-3">
+									<div class="flex size-10 items-center justify-center rounded-xl bg-muted text-muted-foreground">
 										<LayersIcon />
 									</div>
-									{#if selected === ""}
-										<CheckIcon class="size-4 text-primary" />
-									{/if}
+									<span
+										class={cn(
+											"flex size-5 items-center justify-center rounded-full border bg-background",
+											selected === "" ? "border-primary bg-primary" : "border-input"
+										)}
+									>
+										{#if selected === ""}<span class="size-2 rounded-full bg-primary-foreground"></span>{/if}
+									</span>
 								</div>
-								<div class="font-medium">Blank type</div>
-								<p class="text-sm text-muted-foreground">
+								<div class="font-semibold">Blank type</div>
+								<p class="text-sm leading-relaxed text-muted-foreground">
 									Start from scratch. Add a name, a status, a date — whatever this record needs.
 								</p>
 							</button>
@@ -153,24 +161,32 @@
 								{@const Icon = icons[sample.key] ?? LayersIcon}
 								<button
 									type="button"
-									class="flex flex-col gap-2 rounded-2xl border p-4 text-start transition-colors hover:bg-muted/40 {selected ===
-									sample.key
-										? 'border-primary ring-2 ring-primary/20'
-										: 'border-border'}"
+									aria-pressed={selected === sample.key}
+									class={cn(
+										"relative flex min-h-40 flex-col gap-3 rounded-2xl border bg-card p-4 text-start shadow-xs transition-[border-color,box-shadow,background-color] hover:border-foreground/20 hover:shadow-sm",
+										selected === sample.key
+											? "border-primary bg-primary/3 ring-1 ring-primary"
+											: "border-border"
+									)}
 									data-testid="type-template"
 									data-template={sample.key}
 									onclick={() => choose(sample)}
 								>
-									<div class="flex items-start justify-between gap-2">
-										<div class="flex size-9 items-center justify-center rounded-lg bg-muted text-muted-foreground">
+									<div class="flex items-start justify-between gap-3">
+										<div class="flex size-10 items-center justify-center rounded-xl bg-muted text-muted-foreground">
 											<Icon />
 										</div>
-										{#if selected === sample.key}
-											<CheckIcon class="size-4 text-primary" />
-										{/if}
+										<span
+											class={cn(
+												"flex size-5 items-center justify-center rounded-full border bg-background",
+												selected === sample.key ? "border-primary bg-primary" : "border-input"
+											)}
+										>
+											{#if selected === sample.key}<span class="size-2 rounded-full bg-primary-foreground"></span>{/if}
+										</span>
 									</div>
-									<div class="font-medium">{sample.label}</div>
-									<p class="text-sm text-muted-foreground">{sample.description}</p>
+									<div class="font-semibold">{sample.label}</div>
+									<p class="text-sm leading-relaxed text-muted-foreground">{sample.description}</p>
 									<p class="text-xs text-muted-foreground">
 										{sample.fields.map((field) => field.label ?? labelFromKey(field.key)).join(" · ")}
 									</p>
@@ -183,7 +199,7 @@
 					</div>
 				</div>
 			</Dialog.Body>
-			<Dialog.Footer>
+			<Dialog.Footer class="sm:justify-between">
 				<Button type="button" variant="outline" onclick={() => (open = false)}>Cancel</Button>
 				<Button type="submit" disabled={pending || !name.trim()} data-testid="create-type">
 					{#if pending}<Spinner data-icon="inline-start" />{/if}

@@ -80,25 +80,25 @@
 			<div class="flex min-h-0 flex-1 gap-3 overflow-x-auto pb-1">
 				{#each columns as column (column)}
 					{@const items = grouped.get(column) ?? []}
-					<section class="flex w-64 shrink-0 flex-col gap-2 rounded-xl bg-muted/40 p-2">
-						<header class="flex items-center justify-between gap-2 px-1 py-0.5">
+					<section class="flex w-64 shrink-0 flex-col gap-2.5 rounded-2xl bg-muted/55 p-2.5">
+						<header class="flex items-center justify-between gap-2 rounded-xl border bg-card px-3 py-2 shadow-xs">
 							<h3 class="text-sm font-medium">{labelFromKey(column)}</h3>
 							<Badge variant="secondary" class="tabular-nums">{items.length}</Badge>
 						</header>
-						<div class="flex flex-1 flex-col gap-2">
+						<div class="flex flex-1 flex-col gap-2.5">
 							{#each items as row (String(row.id ?? JSON.stringify(row)))}
 								<a
 									href="/t/{view.source}/{row.id}"
 									class="block rounded-2xl outline-none focus-visible:ring-2 focus-visible:ring-ring"
 								>
-									<Card.Root class="hover:ring-foreground/20">
-										<Card.Content class="flex flex-col gap-1.5 p-3">
+								<Card.Root variant="inset" class="transition-all hover:-translate-y-px hover:shadow-sm">
+									<Card.Content class="flex flex-col gap-1.5 p-3.5">
 											<p class="text-sm font-medium">
 												<FormattedValue path={titleField} value={row[titleField]} {type} />
 											</p>
 											{#each rest as path (path)}
-												<p class="text-xs text-muted-foreground">
-													{columnLabel(path, type)}
+											<p class="flex items-center gap-1 text-xs text-muted-foreground">
+												<span>{columnLabel(path, type)}:</span>
 													<FormattedValue {path} value={row[path]} {type} badge={isStatusPath(path)} />
 												</p>
 											{/each}

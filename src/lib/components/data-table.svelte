@@ -266,9 +266,11 @@
 		</div>
 	{/if}
 
-	<div class="overflow-hidden rounded-xl border bg-background">
+	<div
+		class="flex flex-col gap-[2px] overflow-hidden rounded-2xl bg-muted/70 p-[4px] [--chrome:4px] [--frame-radius:var(--radius-2xl)]"
+	>
 		{#if showFilterBar}
-			<div class="flex flex-wrap items-center gap-2 border-b bg-muted/30 px-3 py-2">
+			<div class="flex flex-wrap items-center gap-2 px-3 py-2">
 				{@render filterControls?.()}
 				{#if !compact}
 					{#each filterColumns as column (column.id)}
@@ -347,13 +349,19 @@
 			</div>
 		{/if}
 		{#if rows === null}
-			<div class="flex flex-col gap-2 p-4">
+			<div
+				class="flex flex-col gap-2 rounded-[calc(var(--frame-radius)-var(--chrome))] bg-card p-4 shadow-xs"
+			>
 				<Skeleton class="h-10 w-full" />
 				<Skeleton class="h-10 w-full" />
 				<Skeleton class="h-10 w-full" />
 			</div>
 		{:else if sorted.length === 0}
-			<Empty.Root class="border-0 {compact ? 'py-8' : 'py-12'}">
+			<Empty.Root
+				class="rounded-[calc(var(--frame-radius)-var(--chrome))] border-0 bg-card shadow-xs {compact
+					? 'py-8'
+					: 'py-12'}"
+			>
 				<Empty.Header>
 					<Empty.Media variant="icon">
 						<InboxIcon />
@@ -370,8 +378,11 @@
 				{/if}
 			</Empty.Root>
 		{:else}
-			<Table.Root>
-				<Table.Header>
+			<div
+				class="overflow-hidden rounded-[calc(var(--frame-radius)-var(--chrome))] bg-card shadow-xs"
+			>
+				<Table.Root>
+					<Table.Header>
 					<Table.Row>
 						{#if !compact}
 							<Table.Head class="w-10">
@@ -409,8 +420,8 @@
 							<Table.Head class="w-12"><span class="sr-only">Actions</span></Table.Head>
 						{/if}
 					</Table.Row>
-				</Table.Header>
-				<Table.Body>
+					</Table.Header>
+					<Table.Body>
 					{#each pageRows as row, index (rowId(row) || index)}
 						{@const id = rowId(row)}
 						<Table.Row
@@ -419,7 +430,7 @@
 							onclick={() => openRow(row)}
 						>
 							{#if !compact}
-								<Table.Cell onclick={(event) => event.stopPropagation()}>
+								<Table.Cell class="py-1.5" onclick={(event) => event.stopPropagation()}>
 									<Checkbox
 										checked={Boolean(selected[id])}
 										onCheckedChange={(value) => toggleRow(id, Boolean(value))}
@@ -429,9 +440,7 @@
 							{/if}
 							{#each visible as column, columnIndex (column.id)}
 								{@const value = cellValue(row, column)}
-								<Table.Cell
-									class={cn(column.numeric && "text-end tabular-nums", column.clamp && "align-top")}
-								>
+								<Table.Cell class={cn(column.numeric && "text-end tabular-nums")}>
 									{#if cell}
 										{@render cell({ row, column, value, index: columnIndex })}
 									{:else}
@@ -440,7 +449,7 @@
 								</Table.Cell>
 							{/each}
 							{#if !compact}
-								<Table.Cell onclick={(event) => event.stopPropagation()}>
+								<Table.Cell class="py-1.5" onclick={(event) => event.stopPropagation()}>
 									<DropdownMenu.Root>
 										<DropdownMenu.Trigger>
 											{#snippet child({ props })}
@@ -465,13 +474,14 @@
 							{/if}
 						</Table.Row>
 					{/each}
-				</Table.Body>
-				{#if footer && !compact}
-					<Table.Footer>
-						{@render footer({ rows: sorted, columns: visible })}
-					</Table.Footer>
-				{/if}
-			</Table.Root>
+					</Table.Body>
+					{#if footer && !compact}
+						<Table.Footer>
+							{@render footer({ rows: sorted, columns: visible })}
+						</Table.Footer>
+					{/if}
+				</Table.Root>
+			</div>
 		{/if}
 	</div>
 

@@ -60,15 +60,18 @@
 							<p class="font-medium">{sample.label}</p>
 							<p class="text-sm text-muted-foreground">{sample.description}</p>
 						</div>
+					</Card.Content>
+					<Card.Footer>
 						<Button
 							size="sm"
+							class="w-full"
 							data-testid="load-sample"
 							data-sample={sample.key}
 							onclick={() => openNewApp(sample.key)}
 						>
 							Use template
 						</Button>
-					</Card.Content>
+					</Card.Footer>
 				</Card.Root>
 			{/each}
 		</div>

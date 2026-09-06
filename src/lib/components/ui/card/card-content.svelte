@@ -14,7 +14,7 @@
 	bind:this={ref}
 	data-slot="card-content"
 	class={cn(
-		"flex-1 rounded-[calc(var(--frame-radius)-var(--chrome))] bg-background px-4 py-3 text-foreground group-has-data-[slot=card-header]/card:rounded-t-none group-has-data-[slot=card-footer]/card:rounded-b-none group-data-[size=sm]/card:px-3 group-data-[size=sm]/card:py-2.5",
+		"flex-1 rounded-[calc(var(--frame-radius)-var(--chrome))] bg-card px-5 py-5 text-foreground shadow-xs group-data-[size=sm]/card:px-4 group-data-[size=sm]/card:py-3.5 group-data-[variant=inset]/card:px-3 group-data-[variant=inset]/card:py-3",
 		className
 	)}
 	{...restProps}

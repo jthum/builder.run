@@ -7,16 +7,21 @@
 		class: className,
 		children,
 		size = "default",
+		variant = "default",
 		...restProps
-	}: WithElementRef<HTMLAttributes<HTMLDivElement>> & { size?: "default" | "sm" } = $props();
+	}: WithElementRef<HTMLAttributes<HTMLDivElement>> & {
+		size?: "default" | "sm";
+		variant?: "default" | "inset";
+	} = $props();
 </script>
 
 <div
 	bind:this={ref}
 	data-slot="card"
 	data-size={size}
+	data-variant={variant}
 	class={cn(
-		"group/card flex h-full flex-col gap-[2px] overflow-hidden rounded-2xl bg-muted p-[2px] text-sm text-card-foreground ring-1 ring-foreground/10 has-[>img:first-child]:p-0 [--chrome:2px] [--frame-radius:var(--radius-2xl)] data-[size=sm]:rounded-xl data-[size=sm]:[--frame-radius:var(--radius-xl)]",
+		"group/card flex h-full flex-col gap-[2px] overflow-hidden rounded-2xl bg-muted/70 p-[4px] text-sm text-card-foreground has-[>img:first-child]:p-0 [--chrome:4px] [--frame-radius:var(--radius-2xl)] data-[size=sm]:rounded-xl data-[size=sm]:[--frame-radius:var(--radius-xl)] data-[variant=inset]:gap-0 data-[variant=inset]:bg-card data-[variant=inset]:p-0 data-[variant=inset]:[--chrome:0px]",
 		className
 	)}
 	{...restProps}
