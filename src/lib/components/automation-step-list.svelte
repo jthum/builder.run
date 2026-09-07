@@ -1,0 +1,694 @@
+<script lang="ts">
+	import AutomationPredicateEditor from "$lib/components/automation-predicate-editor.svelte";
+	import AutomationStepList from "$lib/components/automation-step-list.svelte";
+	import AutomationValueInput, { type AutomationReferenceOption } from "$lib/components/automation-value-input.svelte";
+	import AutomationValueMapEditor from "$lib/components/automation-value-map-editor.svelte";
+	import AppSelect from "$lib/components/app-select.svelte";
+	import { reorderAtVerticalTarget, startVerticalDrag, type VerticalDragSession, type VerticalDropTarget } from "$lib/app/drag.ts";
+	import * as Collapsible from "$lib/components/ui/collapsible/index.js";
+	import * as DropdownMenu from "$lib/components/ui/dropdown-menu/index.js";
+	import { Button } from "$lib/components/ui/button/index.js";
+	import * as Card from "$lib/components/ui/card/index.js";
+	import * as Field from "$lib/components/ui/field/index.js";
+	import { Input } from "$lib/components/ui/input/index.js";
+	import { humanStep } from "$lib/app/relations.ts";
+	import { DEFAULT_AUTOMATION_REGISTRY } from "$lib/runtime/automation/registry.ts";
+	import { labelFromKey } from "$lib/runtime/ids.ts";
+	import type { AutomationPredicate, AutomationStep, AutomationValue } from "$lib/runtime/automation/model.ts";
+	import type { AppSpec, FlowDef, TypeDef } from "$lib/runtime/model.ts";
+	import ArrowDownIcon from "@lucide/svelte/icons/arrow-down";
+	import ArrowUpIcon from "@lucide/svelte/icons/arrow-up";
+	import GripVerticalIcon from "@lucide/svelte/icons/grip-vertical";
+	import PlusIcon from "@lucide/svelte/icons/plus";
+	import Trash2Icon from "@lucide/svelte/icons/trash-2";
+	import { onDestroy } from "svelte";
+	import { flip } from "svelte/animate";
+
+	let {
+		steps,
+		onStepsChange,
+		inputName,
+		inputType,
+		types,
+		flows,
+		spec,
+		depth = 0,
+		references = [],
+	}: {
+		steps: AutomationStep[];
+		onStepsChange: (steps: AutomationStep[]) => void;
+		inputName: string;
+		inputType: string;
+		types: TypeDef[];
+		flows: FlowDef[];
+		spec?: AppSpec;
+		depth?: number;
+		references?: AutomationReferenceOption[];
+	} = $props();
+
+	const inputTypeDef = $derived(types.find((type) => type.key === inputType));
+	const registeredEffects = [...DEFAULT_AUTOMATION_REGISTRY.effects.values()];
+	let stepList = $state<HTMLDivElement | null>(null);
+	let dragStep = $state<AutomationStep | null>(null);
+	let dragSession: VerticalDragSession | null = null;
+	let sortableIdSeed = 0;
+	const sortableIds = new WeakMap<object, string>();
+	const baseReferences = $derived(uniqueReferences([
+		{ value: "meta.now", label: "Current date and time", group: "Runtime" },
+		{ value: "actor.id", label: "Current actor ID", group: "Runtime" },
+		{ value: "trigger.key", label: "Trigger key", group: "Runtime" },
+		{ value: `vars.${inputName}`, label: inputTypeDef?.label ?? "Current record", group: "Current record" },
+		...(inputTypeDef?.fields ?? []).map((field) => ({ value: `vars.${inputName}.${field.key}`, label: field.label, group: "Current record" })),
+		...references,
+	]));
+
+	function referencesBefore(index: number): AutomationReferenceOption[] {
+		const options = [...baseReferences];
+		for (const step of steps.slice(0, index)) {
+			if ("effect" in step && step.effect.as) options.push({ value: `vars.${step.effect.as}`, label: labelFromKey(step.effect.as), group: "Previous steps" });
+			if ("invoke" in step && step.invoke.as) options.push({ value: `vars.${step.invoke.as}`, label: labelFromKey(step.invoke.as), group: "Previous steps" });
+			if ("compute" in step) {
+				for (const name of Object.keys(step.compute.assign)) options.push({ value: `vars.${name}`, label: labelFromKey(name), group: "Previous steps" });
+			}
+			if ("wait" in step && step.wait.as) options.push({ value: `vars.${step.wait.as}`, label: labelFromKey(step.wait.as), group: "Previous steps" });
+		}
+		return uniqueReferences(options);
+	}
+
+	function uniqueReferences(options: AutomationReferenceOption[]): AutomationReferenceOption[] {
+		return [...new Map(options.map((option) => [option.value, option])).values()];
+	}
+
+	function sortableId(step: AutomationStep): string {
+		const existing = sortableIds.get(step);
+		if (existing) return existing;
+		const id = `automation-step-${++sortableIdSeed}`;
+		sortableIds.set(step, id);
+		return id;
+	}
+
+	function startStepDrag(step: AutomationStep, event: PointerEvent) {
+		const origin = [...steps];
+		const key = sortableId(step);
+		dragStep = step;
+		const handle = event.currentTarget as HTMLElement;
+		dragSession = startVerticalDrag({
+			event,
+			container: stepList,
+			item: handle.closest<HTMLElement>("[data-sort-card]"),
+			onMove: (clientY) => {
+				const target = stepDropTarget(clientY);
+				if (target) onStepsChange(reorderAtVerticalTarget(steps, key, target, sortableId));
+			},
+			onDrop: () => {
+				dragSession = null;
+				dragStep = null;
+			},
+			onCancel: () => {
+				dragSession = null;
+				dragStep = null;
+				onStepsChange(origin);
+			},
+		});
+		if (!dragSession) dragStep = null;
+	}
+
+	function stepDropTarget(clientY: number): VerticalDropTarget | null {
+		if (!stepList) return null;
+		const items = [...stepList.children].filter(
+			(item): item is HTMLElement => item instanceof HTMLElement && Boolean(item.dataset.sortKey),
+		);
+		if (!items.length) return null;
+		const target = items.reduce((closest, item) => {
+			const bounds = item.getBoundingClientRect();
+			const distance = Math.abs(clientY - (bounds.top + bounds.height / 2));
+			return distance < closest.distance ? { item, distance } : closest;
+		}, { item: items[0] as HTMLElement, distance: Number.POSITIVE_INFINITY }).item;
+		const bounds = target.getBoundingClientRect();
+		return { key: target.dataset.sortKey as string, after: clientY > bounds.top + bounds.height / 2 };
+	}
+
+	onDestroy(() => dragSession?.cancel());
+
+	function replace(index: number, step: AutomationStep) {
+		onStepsChange(steps.map((item, itemIndex) => (itemIndex === index ? step : item)));
+	}
+
+	function remove(index: number) {
+		onStepsChange(steps.filter((_, itemIndex) => itemIndex !== index));
+	}
+
+	function move(index: number, offset: number) {
+		const target = index + offset;
+		if (target < 0 || target >= steps.length) return;
+		const next = [...steps];
+		[next[index], next[target]] = [next[target], next[index]];
+		onStepsChange(next);
+	}
+
+	function add(kind: string) {
+		let step: AutomationStep;
+		if (kind === "set") {
+			const field = inputTypeDef?.fields[0];
+			step = {
+				effect: {
+					key: "records.set",
+					params: {
+						record: { $ref: `vars.${inputName}` },
+						values: field ? { [field.key]: defaultValue(field.type) } : {},
+					},
+				},
+			};
+		} else if (kind === "create") {
+			step = { effect: { key: "records.create", params: { type: types[0]?.key ?? "", fields: {} } } };
+		} else if (kind === "delete") {
+			step = { effect: { key: "records.delete", params: { record: { $ref: `vars.${inputName}` } } } };
+		} else if (kind === "invoke") {
+			step = { invoke: { flow: flows[0]?.key ?? "" } };
+		} else if (kind === "delay") {
+			step = { delay: { duration: "5 minutes" } };
+		} else if (kind === "query") {
+			step = { effect: { key: "records.query", params: { type: inputType }, as: "records" } };
+		} else if (kind === "compute") {
+			step = { compute: { assign: { result: "" } } };
+		} else if (kind === "foreach") {
+			step = { foreach: { source: { $ref: "vars.records" }, as: "item", steps: [] } };
+		} else if (kind === "repeat") {
+			step = { repeat: { times: 3, as: "index", steps: [] } };
+		} else if (kind === "parallel") {
+			step = { parallel: { join: "all", branches: [{ key: "branch_1", steps: [] }, { key: "branch_2", steps: [] }] } };
+		} else if (kind === "wait") {
+			step = { wait: { timeout: "5 minutes", on_timeout: [] } };
+		} else if (kind === "effect") {
+			step = { effect: { key: "null", params: {} } };
+		} else {
+			step = {
+				gate: {
+					predicate: simplePredicate(),
+					pass: [],
+				},
+			};
+		}
+		onStepsChange([...steps, step]);
+	}
+
+	function createFieldsFor(step: AutomationStep): Record<string, AutomationValue> {
+		if (!("effect" in step)) return {};
+		const fields = step.effect.params?.fields;
+		return isObject(fields) ? fields : {};
+	}
+
+	function setCreateFields(step: AutomationStep, fields: Record<string, AutomationValue>): AutomationStep {
+		return setEffectParam(step, "fields", fields);
+	}
+
+	function querySource(step: AutomationStep): string {
+		if (!("effect" in step)) return "";
+		if (typeof step.effect.params?.view === "string") return `view:${step.effect.params.view}`;
+		return `type:${String(step.effect.params?.type ?? "")}`;
+	}
+
+	function setQuerySource(step: AutomationStep, source: string): AutomationStep {
+		if (!("effect" in step)) return step;
+		const { type: _type, view: _view, ...params } = step.effect.params ?? {};
+		const [kind, key] = source.split(":", 2);
+		return {
+			...step,
+			effect: { ...step.effect, params: { ...params, [kind === "view" ? "view" : "type"]: key } },
+		};
+	}
+
+	function whereFor(step: AutomationStep): Record<string, AutomationValue> {
+		if (!("effect" in step)) return {};
+		return isObject(step.effect.params?.where) ? step.effect.params.where : {};
+	}
+
+	function setEffectAs(step: AutomationStep, as: string): AutomationStep {
+		if (!("effect" in step)) return step;
+		return { ...step, effect: { ...step.effect, as: as || undefined } };
+	}
+
+	function setRetry(step: AutomationStep, raw: string): AutomationStep {
+		if (!("effect" in step)) return step;
+		if (!raw.trim()) {
+			const { retry: _retry, ...effect } = step.effect;
+			return { ...step, effect };
+		}
+		const max = Math.max(1, Math.trunc(Number(raw) || 1));
+		return { ...step, effect: { ...step.effect, retry: { ...step.effect.retry, max } } };
+	}
+
+	function setBackoff(step: AutomationStep, raw: string): AutomationStep {
+		if (!("effect" in step) || !step.effect.retry) return step;
+		const backoff = raw.split(",").map((item) => Number(item.trim())).filter((item) => Number.isFinite(item) && item >= 0);
+		return { ...step, effect: { ...step.effect, retry: { ...step.effect.retry, backoff } } };
+	}
+
+	function setCompensation(step: AutomationStep, key: string): AutomationStep {
+		if (!("effect" in step)) return step;
+		if (!key) {
+			const { compensate: _compensate, ...effect } = step.effect;
+			return { ...step, effect };
+		}
+		return { ...step, effect: { ...step.effect, compensate: { key, params: step.effect.compensate?.params ?? {} } } };
+	}
+
+	function compensationParams(step: AutomationStep): Record<string, AutomationValue> {
+		if (!("effect" in step)) return {};
+		return step.effect.compensate && isObject(step.effect.compensate.params)
+			? step.effect.compensate.params
+			: {};
+	}
+
+	function setCompensationParams(step: AutomationStep, params: Record<string, AutomationValue>): AutomationStep {
+		if (!("effect" in step) || !step.effect.compensate) return step;
+		return { ...step, effect: { ...step.effect, compensate: { ...step.effect.compensate, params } } };
+	}
+
+	function binding(raw: string): { $ref: string } {
+		return { $ref: raw.replace(/^=/, "") };
+	}
+
+	function countValue(raw: string): number | { $ref: string } {
+		return raw.startsWith("=") ? binding(raw) : Math.max(0, Math.trunc(Number(raw) || 0));
+	}
+
+	function simplePredicate(): AutomationPredicate {
+		return {
+			op: "context.equals",
+			path: `vars.${inputName}.${inputTypeDef?.fields[0]?.key ?? "id"}`,
+			value: "",
+		};
+	}
+
+	function defaultValue(type?: string): AutomationValue {
+		if (type === "boolean") return false;
+		if (type === "number") return 0;
+		return "";
+	}
+
+	function valuesFor(step: AutomationStep): Record<string, AutomationValue> {
+		if (!("effect" in step)) return {};
+		const values = step.effect.params?.values;
+		return isObject(values) ? values : {};
+	}
+
+	function setAssignment(step: AutomationStep, oldKey: string, nextKey: string, value: AutomationValue): AutomationStep {
+		if (!("effect" in step)) return step;
+		const nextValues = { ...valuesFor(step) };
+		delete nextValues[oldKey];
+		if (nextKey) nextValues[nextKey] = value;
+		return {
+			...step,
+			effect: {
+				...step.effect,
+				params: { ...step.effect.params, values: nextValues },
+			},
+		};
+	}
+
+	function setEffectParam(step: AutomationStep, key: string, value: AutomationValue): AutomationStep {
+		if (!("effect" in step)) return step;
+		return {
+			...step,
+			effect: { ...step.effect, params: { ...step.effect.params, [key]: value } },
+		};
+	}
+
+	function setEffectParams(step: AutomationStep, params: Record<string, AutomationValue>): AutomationStep {
+		if (!("effect" in step)) return step;
+		return { ...step, effect: { ...step.effect, params } };
+	}
+
+	function isObject(value: unknown): value is Record<string, AutomationValue> {
+		return value !== null && typeof value === "object" && !Array.isArray(value) && !("$ref" in value);
+	}
+
+	function isBinding(value: unknown): value is { $ref: string } {
+		return value !== null && typeof value === "object" && !Array.isArray(value) && "$ref" in value;
+	}
+
+	function displayValue(value: AutomationValue): string {
+		return isBinding(value) && value.$ref === "meta.now" ? "now" : String(value ?? "");
+	}
+
+	type StepCategory = "action" | "condition" | "loop" | "wait" | "data";
+
+	function stepCategory(step: AutomationStep): StepCategory {
+		if ("gate" in step || "parallel" in step) return "condition";
+		if ("foreach" in step || "repeat" in step) return "loop";
+		if ("delay" in step || "wait" in step) return "wait";
+		if ("compute" in step || ("effect" in step && step.effect.key === "records.query")) return "data";
+		return "action";
+	}
+
+	function categoryLabel(step: AutomationStep): string {
+		const category = stepCategory(step);
+		if (category === "condition") return "Branch";
+		if (category === "loop") return "Loop";
+		if (category === "wait") return "Pause";
+		if (category === "data") return "Data";
+		return "Action";
+	}
+</script>
+
+<div class="flex min-w-0 flex-col" bind:this={stepList}>
+	{#each steps as step, index (index)}
+		<div data-sort-card data-sort-key={sortableId(step)} animate:flip={{ duration: 160 }} class="min-w-0" class:opacity-40={dragStep === step}>
+			<Card.Root size="sm">
+				<Card.Header class="flex flex-row items-center gap-2">
+					<Button size="icon-sm" variant="ghost" aria-label="Drag to reorder step" class="cursor-grab touch-none active:cursor-grabbing" onpointerdown={(event) => startStepDrag(step, event)}><GripVerticalIcon /></Button>
+					<div class="min-w-0">
+						<p class="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">{categoryLabel(step)} · Step {index + 1}</p>
+						<p class="truncate text-sm font-medium">{humanStep(step, spec)}</p>
+					</div>
+					<div class="ml-auto flex shrink-0 items-center gap-0.5">
+						<Button size="icon-xs" variant="ghost" aria-label="Move step up" disabled={index === 0} onclick={() => move(index, -1)}>
+							<ArrowUpIcon />
+						</Button>
+						<Button size="icon-xs" variant="ghost" aria-label="Move step down" disabled={index === steps.length - 1} onclick={() => move(index, 1)}>
+							<ArrowDownIcon />
+						</Button>
+						<Button size="icon-xs" variant="ghost" aria-label="Remove step" onclick={() => remove(index)}>
+							<Trash2Icon />
+						</Button>
+					</div>
+				</Card.Header>
+
+				<Card.Content>
+			{#if "effect" in step && step.effect.key === "records.set"}
+				<div class="flex min-w-0 flex-col gap-2">
+					{#if isBinding(step.effect.params?.record) && step.effect.params.record.$ref !== `vars.${inputName}`}
+						<p class="text-xs text-muted-foreground">Target: <code>{step.effect.params.record.$ref}</code></p>
+					{/if}
+					{#each Object.entries(valuesFor(step)) as [fieldKey, value] (fieldKey)}
+						{@const field = inputTypeDef?.fields.find((item) => item.key === fieldKey)}
+						<div class="grid min-w-0 grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] items-center gap-2">
+							<AppSelect
+								value={fieldKey}
+								onValueChange={(next) => replace(index, setAssignment(step, fieldKey, next, value))}
+								options={[
+									...(inputTypeDef?.fields ?? []).map((field) => ({ value: field.key, label: field.label })),
+									...(inputTypeDef?.fields.some((field) => field.key === fieldKey) ? [] : [{ value: fieldKey, label: labelFromKey(fieldKey) }]),
+								]}
+								placeholder="Field"
+							/>
+							{#if isBinding(value) && value.$ref !== "meta.now"}
+								<div class="flex h-9 items-center rounded-md border bg-muted/40 px-3 font-mono text-xs text-muted-foreground">
+									{value.$ref}
+								</div>
+							{:else if field?.type === "enum"}
+								<AppSelect
+									value={displayValue(value)}
+									onValueChange={(next) => replace(index, setAssignment(step, fieldKey, fieldKey, next))}
+									options={(field.values ?? []).map((item) => ({ value: item, label: labelFromKey(item) }))}
+								/>
+							{:else if field?.type === "boolean"}
+								<AppSelect
+									value={displayValue(value)}
+									onValueChange={(next) => replace(index, setAssignment(step, fieldKey, fieldKey, next === "true"))}
+									options={[
+										{ value: "true", label: "Yes" },
+										{ value: "false", label: "No" },
+									]}
+								/>
+							{:else}
+								<AutomationValueInput
+									{value}
+									onValueChange={(next) => replace(index, setAssignment(step, fieldKey, fieldKey, next))}
+									references={referencesBefore(index)}
+									type={field?.type}
+									placeholder="Value"
+								/>
+							{/if}
+							<Button size="icon-xs" variant="ghost" aria-label={`Remove ${field?.label ?? fieldKey}`} onclick={() => replace(index, setAssignment(step, fieldKey, "", value))}><Trash2Icon /></Button>
+						</div>
+					{/each}
+					{#if (inputTypeDef?.fields ?? []).some((field) => !Object.hasOwn(valuesFor(step), field.key))}
+						<Button
+							variant="outline"
+							size="sm"
+							class="w-fit"
+							onclick={() => {
+								const field = inputTypeDef?.fields.find((item) => !Object.hasOwn(valuesFor(step), item.key));
+								if (field) replace(index, setAssignment(step, "", field.key, defaultValue(field.type)));
+							}}
+						>
+							<PlusIcon data-icon="inline-start" /> Add field
+						</Button>
+					{/if}
+				</div>
+			{:else if "effect" in step && step.effect.key === "records.create"}
+				{@const createdType = types.find((type) => type.key === String(step.effect.params?.type ?? ""))}
+				<div class="flex flex-col gap-2">
+					<AppSelect
+						value={String(step.effect.params?.type ?? "")}
+						onValueChange={(next) => replace(index, setEffectParam(step, "type", next))}
+						options={types.map((type) => ({ value: type.key, label: type.label }))}
+						placeholder="Record type"
+					/>
+					<AutomationValueMapEditor
+						values={createFieldsFor(step)}
+						onValuesChange={(fields) => replace(index, setCreateFields(step, fields))}
+						keys={(createdType?.fields ?? []).map((field) => ({ value: field.key, label: field.label, type: field.type, values: field.values }))}
+						keyPlaceholder="Field"
+						references={referencesBefore(index)}
+					/>
+				</div>
+			{:else if "effect" in step && step.effect.key === "records.query"}
+				<Field.Group>
+					<Field.Field>
+						<Field.Label>Query</Field.Label>
+						<AppSelect
+							value={querySource(step)}
+							onValueChange={(source) => replace(index, setQuerySource(step, source))}
+							options={[
+								...types.map((type) => ({ value: `type:${type.key}`, label: `All ${type.collection_label ?? type.label}` })),
+								...(spec?.views ?? []).map((view) => ({ value: `view:${view.key}`, label: `View: ${view.label}` })),
+							]}
+						/>
+					</Field.Field>
+					<Field.Field>
+						<Field.Label>Result name</Field.Label>
+						<Input value={step.effect.as ?? ""} oninput={(event) => replace(index, setEffectAs(step, event.currentTarget.value))} placeholder="records" />
+					</Field.Field>
+					<Field.Field>
+						<Field.Label>Additional filters</Field.Label>
+						<AutomationValueMapEditor values={whereFor(step)} onValuesChange={(where) => replace(index, setEffectParam(step, "where", where))} keyPlaceholder="Field" references={referencesBefore(index)} />
+					</Field.Field>
+				</Field.Group>
+			{:else if "compute" in step}
+				<AutomationValueMapEditor values={step.compute.assign} onValuesChange={(assign) => replace(index, { ...step, compute: { assign } })} keyPlaceholder="Variable name" references={referencesBefore(index)} />
+			{:else if "invoke" in step}
+				<Field.Group>
+					<Field.Field><Field.Label>Workflow</Field.Label><AppSelect value={step.invoke.flow} onValueChange={(next) => replace(index, { ...step, invoke: { ...step.invoke, flow: next } })} options={flows.map((flow) => ({ value: flow.key, label: flow.label }))} placeholder="Workflow" /></Field.Field>
+					<Field.Field><Field.Label>Inputs</Field.Label><AutomationValueMapEditor values={step.invoke.input ?? {}} onValuesChange={(input) => replace(index, { ...step, invoke: { ...step.invoke, input } })} keyPlaceholder="Input name" references={referencesBefore(index)} /></Field.Field>
+					<Field.Field><Field.Label>Result name</Field.Label><Input value={step.invoke.as ?? ""} oninput={(event) => replace(index, { ...step, invoke: { ...step.invoke, as: event.currentTarget.value || undefined } })} placeholder="Optional variable name" /></Field.Field>
+				</Field.Group>
+			{:else if "delay" in step}
+				<Field.Group><Field.Field><Field.Label>Duration</Field.Label><Input value={String(step.delay.duration)} oninput={(event) => replace(index, { ...step, delay: { duration: event.currentTarget.value } })} placeholder="5 minutes or 2 hours" /></Field.Field></Field.Group>
+			{:else if "gate" in step}
+				<div class="flex min-w-0 flex-col gap-4">
+					<AutomationPredicateEditor
+						predicate={step.gate.predicate}
+						onPredicateChange={(predicate) => replace(index, { ...step, gate: { ...step.gate, predicate } })}
+						{inputName}
+						type={inputTypeDef}
+						references={referencesBefore(index)}
+					/>
+					<div class="flex min-w-0 flex-col gap-3 rounded-xl bg-primary/4 p-3 ring-1 ring-primary/12">
+						<div class="flex items-center gap-2">
+							<span class="size-2 rounded-full bg-primary" aria-hidden="true"></span>
+							<p class="text-xs font-semibold">Yes · condition matches</p>
+						</div>
+						<AutomationStepList
+							steps={step.gate.pass ?? []}
+							onStepsChange={(pass) => replace(index, { ...step, gate: { ...step.gate, pass } })}
+							{inputName}
+							{inputType}
+							{types}
+							{flows}
+							{spec}
+							references={referencesBefore(index)}
+							depth={depth + 1}
+						/>
+					</div>
+					{#if step.gate.fail}
+						<div class="flex min-w-0 flex-col gap-3 rounded-xl bg-muted/45 p-3 ring-1 ring-foreground/8">
+							<div class="flex items-center gap-2">
+								<span class="size-2 rounded-full bg-muted-foreground/50" aria-hidden="true"></span>
+								<p class="text-xs font-semibold">No · condition does not match</p>
+							</div>
+							<AutomationStepList
+								steps={step.gate.fail}
+								onStepsChange={(fail) => replace(index, { ...step, gate: { ...step.gate, fail } })}
+								{inputName}
+								{inputType}
+								{types}
+								{flows}
+								{spec}
+								references={referencesBefore(index)}
+								depth={depth + 1}
+							/>
+						</div>
+					{:else}
+						<Button
+							variant="ghost"
+							size="sm"
+							class="w-fit"
+							onclick={() => replace(index, { ...step, gate: { ...step.gate, fail: [] } })}
+						>
+							<PlusIcon data-icon="inline-start" /> Add “if no” branch
+						</Button>
+					{/if}
+				</div>
+			{:else if "foreach" in step}
+				<div class="flex min-w-0 flex-col gap-4">
+					<Field.Group class="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+						<Field.Field><Field.Label>List reference</Field.Label><AutomationValueInput value={step.foreach.source} onValueChange={(next) => replace(index, { ...step, foreach: { ...step.foreach, source: isBinding(next) ? next : binding(String(next)) } })} references={referencesBefore(index)} placeholder="=vars.records" /></Field.Field>
+						<Field.Field><Field.Label>Item name</Field.Label><Input value={step.foreach.as ?? "item"} oninput={(event) => replace(index, { ...step, foreach: { ...step.foreach, as: event.currentTarget.value || undefined } })} /></Field.Field>
+						<Field.Field><Field.Label>Maximum items</Field.Label><Input type="number" min="1" value={step.foreach.max ?? ""} oninput={(event) => replace(index, { ...step, foreach: { ...step.foreach, max: event.currentTarget.value ? Math.max(1, Math.trunc(event.currentTarget.valueAsNumber || 1)) : undefined } })} placeholder="1000" /></Field.Field>
+						<Field.Field><Field.Label>On failure</Field.Label><AppSelect value={step.foreach.on_item_failure ?? "stop"} onValueChange={(next) => replace(index, { ...step, foreach: { ...step.foreach, on_item_failure: next as "stop" | "continue" } })} options={[{ value: "stop", label: "Stop workflow" }, { value: "continue", label: "Continue" }]} /></Field.Field>
+					</Field.Group>
+					<div class="flex min-w-0 flex-col gap-3 rounded-xl bg-chart-2/5 p-3 ring-1 ring-chart-2/12">
+						<p class="text-xs font-semibold">For each item, run</p>
+						<AutomationStepList steps={step.foreach.steps} onStepsChange={(childSteps) => replace(index, { ...step, foreach: { ...step.foreach, steps: childSteps } })} {inputName} {inputType} {types} {flows} {spec} references={[...referencesBefore(index), { value: `vars.${step.foreach.as ?? "item"}`, label: labelFromKey(step.foreach.as ?? "item"), group: "Loop" }]} depth={depth + 1} />
+					</div>
+				</div>
+			{:else if "repeat" in step}
+				<div class="flex min-w-0 flex-col gap-4">
+					<Field.Group class="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+						<Field.Field><Field.Label>Times</Field.Label><AutomationValueInput value={step.repeat.times} onValueChange={(next) => replace(index, { ...step, repeat: { ...step.repeat, times: typeof next === "number" || isBinding(next) ? next : countValue(String(next)) } })} references={referencesBefore(index)} type="number" /></Field.Field>
+						<Field.Field><Field.Label>Index name</Field.Label><Input value={step.repeat.as ?? "index"} oninput={(event) => replace(index, { ...step, repeat: { ...step.repeat, as: event.currentTarget.value || undefined } })} /></Field.Field>
+						<Field.Field><Field.Label>Maximum repeats</Field.Label><Input type="number" min="1" value={step.repeat.max ?? ""} oninput={(event) => replace(index, { ...step, repeat: { ...step.repeat, max: event.currentTarget.value ? Math.max(1, Math.trunc(event.currentTarget.valueAsNumber || 1)) : undefined } })} placeholder="1000" /></Field.Field>
+						<Field.Field><Field.Label>On failure</Field.Label><AppSelect value={step.repeat.on_item_failure ?? "stop"} onValueChange={(next) => replace(index, { ...step, repeat: { ...step.repeat, on_item_failure: next as "stop" | "continue" } })} options={[{ value: "stop", label: "Stop workflow" }, { value: "continue", label: "Continue" }]} /></Field.Field>
+					</Field.Group>
+					<div class="flex min-w-0 flex-col gap-3 rounded-xl bg-chart-2/5 p-3 ring-1 ring-chart-2/12">
+						<p class="text-xs font-semibold">On every repetition, run</p>
+						<AutomationStepList steps={step.repeat.steps} onStepsChange={(childSteps) => replace(index, { ...step, repeat: { ...step.repeat, steps: childSteps } })} {inputName} {inputType} {types} {flows} {spec} references={[...referencesBefore(index), { value: `vars.${step.repeat.as ?? "index"}`, label: labelFromKey(step.repeat.as ?? "index"), group: "Loop" }]} depth={depth + 1} />
+					</div>
+				</div>
+			{:else if "parallel" in step}
+				<div class="flex min-w-0 flex-col gap-4">
+					<Field.Field><Field.Label>Continue when</Field.Label><AppSelect value={step.parallel.join ?? "all"} onValueChange={(join) => replace(index, { ...step, parallel: { ...step.parallel, join: join as "all" | "any" } })} options={[{ value: "all", label: "All branches finish" }, { value: "any", label: "Any branch finishes" }]} /></Field.Field>
+					{#each step.parallel.branches as branch, branchIndex (branchIndex)}
+						<div class="flex min-w-0 flex-col gap-3 rounded-xl bg-chart-4/4 p-3 ring-1 ring-chart-4/12">
+							<div class="flex items-center gap-2">
+								<Input class="max-w-52" value={branch.key ?? `branch_${branchIndex + 1}`} oninput={(event) => replace(index, { ...step, parallel: { ...step.parallel, branches: step.parallel.branches.map((item, itemIndex) => itemIndex === branchIndex ? { ...item, key: event.currentTarget.value || undefined } : item) } })} aria-label="Branch name" />
+								<Button class="ml-auto" size="icon-xs" variant="ghost" aria-label="Remove branch" disabled={step.parallel.branches.length === 1} onclick={() => replace(index, { ...step, parallel: { ...step.parallel, branches: step.parallel.branches.filter((_, itemIndex) => itemIndex !== branchIndex) } })}><Trash2Icon /></Button>
+							</div>
+							<AutomationStepList steps={branch.steps} onStepsChange={(childSteps) => replace(index, { ...step, parallel: { ...step.parallel, branches: step.parallel.branches.map((item, itemIndex) => itemIndex === branchIndex ? { ...item, steps: childSteps } : item) } })} {inputName} {inputType} {types} {flows} {spec} references={referencesBefore(index)} depth={depth + 1} />
+						</div>
+					{/each}
+					<Button variant="ghost" size="sm" class="w-fit" onclick={() => replace(index, { ...step, parallel: { ...step.parallel, branches: [...step.parallel.branches, { key: `branch_${step.parallel.branches.length + 1}`, steps: [] }] } })}><PlusIcon data-icon="inline-start" /> Add branch</Button>
+				</div>
+			{:else if "wait" in step}
+				<div class="flex min-w-0 flex-col gap-4">
+					<Field.Group class="grid gap-3 sm:grid-cols-3">
+						<Field.Field><Field.Label>Signal</Field.Label><Input value={step.wait.signal ?? ""} oninput={(event) => replace(index, { ...step, wait: { ...step.wait, signal: event.currentTarget.value || undefined } })} placeholder="Optional signal key" /></Field.Field>
+						<Field.Field><Field.Label>Timeout</Field.Label><Input value={String(step.wait.timeout ?? "")} oninput={(event) => replace(index, { ...step, wait: { ...step.wait, timeout: event.currentTarget.value || undefined } })} placeholder="5 minutes" /></Field.Field>
+						<Field.Field><Field.Label>Result name</Field.Label><Input value={step.wait.as ?? ""} oninput={(event) => replace(index, { ...step, wait: { ...step.wait, as: event.currentTarget.value || undefined } })} placeholder="Optional" /></Field.Field>
+					</Field.Group>
+					{#if step.wait.signal}
+						<div class="flex min-w-0 flex-col gap-3 rounded-xl bg-muted/45 p-3 ring-1 ring-foreground/8"><p class="text-xs font-semibold">When the signal arrives</p><AutomationStepList steps={step.wait.on_signal ?? []} onStepsChange={(childSteps) => replace(index, { ...step, wait: { ...step.wait, on_signal: childSteps } })} {inputName} {inputType} {types} {flows} {spec} references={referencesBefore(index)} depth={depth + 1} /></div>
+					{/if}
+					{#if step.wait.timeout !== undefined}
+						<div class="flex min-w-0 flex-col gap-3 rounded-xl bg-muted/45 p-3 ring-1 ring-foreground/8"><p class="text-xs font-semibold">If the wait times out</p><AutomationStepList steps={step.wait.on_timeout ?? []} onStepsChange={(childSteps) => replace(index, { ...step, wait: { ...step.wait, on_timeout: childSteps } })} {inputName} {inputType} {types} {flows} {spec} references={referencesBefore(index)} depth={depth + 1} /></div>
+					{/if}
+				</div>
+			{:else if "effect" in step && step.effect.key === "records.delete"}
+				<p class="text-xs text-muted-foreground">Deletes the current {inputTypeDef?.label?.toLowerCase() ?? "record"}.</p>
+			{:else if "effect" in step}
+				<Field.Group>
+					<Field.Field><Field.Label>Effect</Field.Label><AppSelect value={step.effect.key} onValueChange={(key) => replace(index, { ...step, effect: { ...step.effect, key } })} options={[...registeredEffects.map((effect) => ({ value: effect.key, label: effect.label })), ...(registeredEffects.some((effect) => effect.key === step.effect.key) ? [] : [{ value: step.effect.key, label: labelFromKey(step.effect.key) }])]} placeholder="Effect" /></Field.Field>
+					<Field.Field><Field.Label>Parameters</Field.Label><AutomationValueMapEditor values={isObject(step.effect.params) ? step.effect.params : {}} onValuesChange={(params) => replace(index, setEffectParams(step, params))} references={referencesBefore(index)} /></Field.Field>
+				</Field.Group>
+			{/if}
+
+			{#if "effect" in step}
+				<Collapsible.Root class="mt-3 border-t pt-2">
+					<Collapsible.Trigger class="text-xs font-medium text-muted-foreground hover:text-foreground">Reliability and output</Collapsible.Trigger>
+					<Collapsible.Content class="pt-3">
+						<Field.Group>
+							{#if step.effect.key !== "records.query"}
+								<Field.Field>
+									<Field.Label>Output variable</Field.Label>
+									<Input value={step.effect.as ?? ""} oninput={(event) => replace(index, setEffectAs(step, event.currentTarget.value))} placeholder="Optional result name" />
+								</Field.Field>
+							{/if}
+							<div class="grid gap-3 sm:grid-cols-2">
+								<Field.Field>
+									<Field.Label>Maximum attempts</Field.Label>
+									<Input type="number" min="1" value={step.effect.retry?.max ?? ""} oninput={(event) => replace(index, setRetry(step, event.currentTarget.value))} placeholder="1" />
+								</Field.Field>
+								<Field.Field data-disabled={!step.effect.retry}>
+									<Field.Label>Retry delays</Field.Label>
+									<Input disabled={!step.effect.retry} value={step.effect.retry?.backoff?.join(", ") ?? ""} oninput={(event) => replace(index, setBackoff(step, event.currentTarget.value))} placeholder="Seconds: 1, 5, 15" />
+								</Field.Field>
+							</div>
+							<Field.Field>
+								<Field.Label>On rollback</Field.Label>
+								<AppSelect
+									value={step.effect.compensate?.key ?? ""}
+									onValueChange={(key) => replace(index, setCompensation(step, key))}
+									options={[
+										{ value: "", label: "No compensation" },
+										{ value: "records.create", label: "Create record" },
+										{ value: "records.set", label: "Update record" },
+										{ value: "records.delete", label: "Delete record" },
+										...(step.effect.compensate && !["records.create", "records.set", "records.delete"].includes(step.effect.compensate.key)
+											? [{ value: step.effect.compensate.key, label: labelFromKey(step.effect.compensate.key) }]
+											: []),
+									]}
+								/>
+							</Field.Field>
+							{#if step.effect.compensate}
+								<Field.Field><Field.Label>Rollback parameters</Field.Label><AutomationValueMapEditor values={compensationParams(step)} onValuesChange={(params) => replace(index, setCompensationParams(step, params))} references={referencesBefore(index)} /></Field.Field>
+							{/if}
+						</Field.Group>
+					</Collapsible.Content>
+				</Collapsible.Root>
+			{/if}
+				</Card.Content>
+			</Card.Root>
+			{#if index < steps.length - 1}
+				<div class="ml-[2.15rem] flex h-5 items-center" aria-hidden="true">
+					<div class="h-full w-px bg-border"></div>
+				</div>
+			{/if}
+		</div>
+	{/each}
+
+	{#if steps.length > 0}
+		<div class="ml-[2.15rem] h-3 w-px bg-border" aria-hidden="true"></div>
+	{/if}
+	<DropdownMenu.Root>
+		<DropdownMenu.Trigger>
+			{#snippet child({ props })}
+				<Button {...props} variant="outline" size="sm" class="w-fit">
+					<PlusIcon data-icon="inline-start" /> Add step
+				</Button>
+			{/snippet}
+		</DropdownMenu.Trigger>
+		<DropdownMenu.Content align="start" class="min-w-52">
+			<DropdownMenu.Group>
+				<DropdownMenu.Item onSelect={() => add("query")}>Query records</DropdownMenu.Item>
+				<DropdownMenu.Item onSelect={() => add("set")}>Update current record</DropdownMenu.Item>
+				<DropdownMenu.Item onSelect={() => add("create")}>Create a record</DropdownMenu.Item>
+				<DropdownMenu.Item onSelect={() => add("delete")}>Delete current record</DropdownMenu.Item>
+				<DropdownMenu.Item onSelect={() => add("effect")}>Registry effect</DropdownMenu.Item>
+			</DropdownMenu.Group>
+			<DropdownMenu.Separator />
+			<DropdownMenu.Group>
+				<DropdownMenu.Item onSelect={() => add("gate")}>Add condition branch</DropdownMenu.Item>
+				<DropdownMenu.Item onSelect={() => add("compute")}>Set variables</DropdownMenu.Item>
+				<DropdownMenu.Item onSelect={() => add("invoke")}>Run another workflow</DropdownMenu.Item>
+				<DropdownMenu.Item onSelect={() => add("delay")}>Wait for a duration</DropdownMenu.Item>
+				<DropdownMenu.Item onSelect={() => add("wait")}>Wait for signal or timeout</DropdownMenu.Item>
+				<DropdownMenu.Item onSelect={() => add("foreach")}>For each item</DropdownMenu.Item>
+				<DropdownMenu.Item onSelect={() => add("repeat")}>Repeat steps</DropdownMenu.Item>
+				<DropdownMenu.Item onSelect={() => add("parallel")}>Parallel branches</DropdownMenu.Item>
+			</DropdownMenu.Group>
+		</DropdownMenu.Content>
+	</DropdownMenu.Root>
+</div>

@@ -18,7 +18,7 @@
 	const buttons = $derived(flows.filter((flow) => flowKind(flow) === "button"));
 	const rules = $derived(flows.filter((flow) => flowKind(flow) === "rule"));
 
-	let createKind = $state<"button" | "rule">("button");
+	let createKind = $state<"button" | "rule">("rule");
 	let open = $state(false);
 
 	function start(kind: "button" | "rule") {
@@ -44,13 +44,13 @@
 <div class="flex flex-col gap-6">
 	<PageHeader
 		title="Rules"
-		description="Buttons people tap on a record, and automations that run when something changes."
+		description="Automations that respond to events, and manual actions people or agents can run."
 	>
 		{#snippet actions()}
-			<Button variant="outline" onclick={() => start("rule")} disabled={!types.length}>Add automation</Button>
-			<Button onclick={() => start("button")} disabled={!types.length}>
+			<Button variant="outline" onclick={() => start("button")} disabled={!types.length}>Add manual action</Button>
+			<Button onclick={() => start("rule")} disabled={!types.length}>
 				<PlusIcon data-icon="inline-start" />
-				Add button
+				Add automation
 			</Button>
 		{/snippet}
 	</PageHeader>
@@ -61,24 +61,24 @@
 				<Empty.Media variant="icon"><WorkflowIcon /></Empty.Media>
 				<Empty.Title>No rules yet</Empty.Title>
 				<Empty.Description>
-					Add a button like “Mark paid”, or an automation like “when status becomes paid, stamp today’s date.”
+					Add an automation like “when status becomes paid, stamp today’s date,” or a manual action like “Mark paid.”
 				</Empty.Description>
 			</Empty.Header>
 			<Empty.Content>
-				<Button onclick={() => start("button")} disabled={!types.length}>Add button</Button>
+				<Button onclick={() => start("rule")} disabled={!types.length}>Add automation</Button>
 			</Empty.Content>
 		</Empty.Root>
 	{:else}
 		{#if buttons.length}
 			<div class="flex flex-col gap-2">
-				<h2 class="text-sm font-medium text-muted-foreground">Buttons</h2>
+				<h2 class="text-sm font-medium text-muted-foreground">Manual actions</h2>
 				{#each buttons as flow (flow.id)}
 					<a href="/build/flows/{flow.key}">
 						<Card.Root size="sm" class="transition-colors hover:bg-foreground/[0.04]">
 							<Card.Header>
 								<Card.Title class="flex items-center gap-2">
 									{flow.label}
-									<Badge variant="secondary">Button</Badge>
+									<Badge variant="secondary">Manual</Badge>
 								</Card.Title>
 								<Card.Description>{flowSummary(flow, spec)}</Card.Description>
 							</Card.Header>
@@ -110,9 +110,9 @@
 
 <NameDialog
 	bind:open
-	title={createKind === "button" ? "New button" : "New automation"}
+	title={createKind === "button" ? "New manual action" : "New automation"}
 	description={createKind === "button"
-		? "A named action people can tap on a record."
+		? "A named action a person or agent can run."
 		: "Runs by itself when a record changes."}
 	confirm="Continue"
 	onSubmit={create}
