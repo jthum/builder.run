@@ -17,16 +17,19 @@
 			You're signed in locally as an admin. Sign-in and agent runtimes will attach to these people — they don't replace them.
 		</Alert.Description>
 	</Alert.Root>
-	<div class="overflow-hidden rounded-xl border bg-background">
-		<Table.Root>
-			<Table.Header>
+	<Table.Root
+		class="overflow-hidden rounded-2xl bg-surface-chrome p-[4px] [border-collapse:separate] [border-spacing:0]"
+	>
+		<Table.Header class="bg-transparent">
 				<Table.Row>
 					<Table.Head>Name</Table.Head>
 					<Table.Head>Kind</Table.Head>
 					<Table.Head>Roles</Table.Head>
 				</Table.Row>
 			</Table.Header>
-			<Table.Body>
+			<Table.Body
+				class="bg-transparent drop-shadow-xs [&_td]:bg-card [&_tr:not(:last-child)>td]:border-b [&_tr:not(:last-child)>td]:border-border/60 [&_tr:hover>td]:bg-muted/40 [&_tr:first-child>td:first-child]:rounded-tl-[calc(var(--radius-2xl)-4px)] [&_tr:first-child>td:last-child]:rounded-tr-[calc(var(--radius-2xl)-4px)] [&_tr:last-child>td:first-child]:rounded-bl-[calc(var(--radius-2xl)-4px)] [&_tr:last-child>td:last-child]:rounded-br-[calc(var(--radius-2xl)-4px)]"
+			>
 				{#each actors as actor (actor.id)}
 					<Table.Row>
 						<Table.Cell class="font-medium">{actor.name}</Table.Cell>
@@ -38,5 +41,4 @@
 				{/each}
 			</Table.Body>
 		</Table.Root>
-	</div>
 </div>

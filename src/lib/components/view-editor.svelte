@@ -1,5 +1,11 @@
 <script lang="ts">
 	import { goto } from "$app/navigation";
+	import {
+		reorderAtVerticalTarget,
+		startVerticalDrag,
+		type VerticalDragSession,
+		verticalDropTarget,
+	} from "$lib/app/drag.ts";
 	import { columnLabel, fieldKindLabel } from "$lib/app/labels.ts";
 	import { runtime, session } from "$lib/app/session.svelte.ts";
 	import AppSelect from "$lib/components/app-select.svelte";
@@ -46,8 +52,8 @@
 	import ToggleLeftIcon from "@lucide/svelte/icons/toggle-left";
 	import TypeIcon from "@lucide/svelte/icons/type";
 	import XIcon from "@lucide/svelte/icons/x";
-	import type { Component } from "svelte";
-	import { untrack } from "svelte";
+	import { onDestroy, type Component, untrack } from "svelte";
+	import { flip } from "svelte/animate";
 	import { toast } from "svelte-sonner";
 
 	let { view }: { view: ViewDef } = $props();
@@ -62,6 +68,7 @@
 	};
 
 	type ColumnRow = { field: string; on: boolean };
+	type FilterRow = { field: string; op: string; value: string };
 	type SortRow = { field: string; dir: SortDirection };
 	type MeasureRow = ViewMeasure & { key: string };
 
@@ -70,7 +77,7 @@
 	let label = $state("");
 	let source = $state("");
 	let columns = $state<ColumnRow[]>([]);
-	let filters = $state<Array<{ field: string; op: string; value: string }>>([]);
+	let filters = $state<FilterRow[]>([]);
 	let expose = $state<string[]>([]);
 	let exposeOn = $state(false);
 	let limit = $state("");
@@ -85,11 +92,22 @@
 	let previewOpen = $state(true);
 	let previewExpose = $state<Record<string, string>>({});
 	let dragField = $state<string | null>(null);
-	let overField = $state<string | null>(null);
-	let dragFilter = $state<number | null>(null);
-	let overFilter = $state<number | null>(null);
-	let dragSort = $state<number | null>(null);
-	let overSort = $state<number | null>(null);
+	let dragFilter = $state<FilterRow | null>(null);
+	let dragSort = $state<SortRow | null>(null);
+	let columnList = $state<HTMLDivElement | null>(null);
+	let filterList = $state<HTMLDivElement | null>(null);
+	let sortList = $state<HTMLDivElement | null>(null);
+	let dragSession: VerticalDragSession | null = null;
+	let sortableIdSeed = 0;
+	const sortableIds = new WeakMap<object, string>();
+
+	function sortableId(item: object, prefix: string): string {
+		const existing = sortableIds.get(item);
+		if (existing) return existing;
+		const id = `${prefix}-${++sortableIdSeed}`;
+		sortableIds.set(item, id);
+		return id;
+	}
 
 	const sourceType = $derived(
 		types.find((item) => item.key === source) ?? types.find((item) => item.key === view.source),
@@ -249,67 +267,84 @@
 		columns = next;
 	}
 
-	function onDragStart(field: string, event: DragEvent) {
+	function onColumnDragStart(field: string, event: PointerEvent) {
+		const origin = [...columns];
 		dragField = field;
-		event.dataTransfer?.setData("text/plain", field);
-		if (event.dataTransfer) event.dataTransfer.effectAllowed = "move";
+		const handle = event.currentTarget as HTMLElement;
+		dragSession = startVerticalDrag({
+			event,
+			container: columnList,
+			item: handle.closest<HTMLElement>("[role=listitem]"),
+			onMove: (clientY) => {
+				const target = verticalDropTarget(columnList, clientY);
+				if (target) columns = reorderAtVerticalTarget(columns, field, target, (column) => column.field);
+			},
+			onDrop: () => {
+				dragSession = null;
+				dragField = null;
+			},
+			onCancel: () => {
+				dragSession = null;
+				columns = origin;
+				dragField = null;
+			},
+		});
+		if (!dragSession) dragField = null;
 	}
 
-	function onDragOver(field: string, event: DragEvent) {
-		event.preventDefault();
-		overField = field;
+	function onFilterDragStart(clause: FilterRow, event: PointerEvent) {
+		const origin = [...filters];
+		const key = sortableId(clause, "filter");
+		dragFilter = clause;
+		const handle = event.currentTarget as HTMLElement;
+		dragSession = startVerticalDrag({
+			event,
+			container: filterList,
+			item: handle.closest<HTMLElement>("[data-sort-card]"),
+			onMove: (clientY) => {
+				const target = verticalDropTarget(filterList, clientY);
+				if (target) filters = reorderAtVerticalTarget(filters, key, target, (item) => sortableId(item, "filter"));
+			},
+			onDrop: () => {
+				dragSession = null;
+				dragFilter = null;
+			},
+			onCancel: () => {
+				dragSession = null;
+				filters = origin;
+				dragFilter = null;
+			},
+		});
+		if (!dragSession) dragFilter = null;
 	}
 
-	function onDrop(field: string) {
-		if (!dragField || dragField === field) {
-			dragField = null;
-			overField = null;
-			return;
-		}
-		const from = columns.findIndex((column) => column.field === dragField);
-		const to = columns.findIndex((column) => column.field === field);
-		if (from < 0 || to < 0) {
-			dragField = null;
-			overField = null;
-			return;
-		}
-		const next = [...columns];
-		const [item] = next.splice(from, 1);
-		if (!item) return;
-		next.splice(to, 0, item);
-		columns = next;
-		dragField = null;
-		overField = null;
+	function onSortDragStart(row: SortRow, event: PointerEvent) {
+		const origin = [...sorts];
+		const key = sortableId(row, "sort");
+		dragSort = row;
+		const handle = event.currentTarget as HTMLElement;
+		dragSession = startVerticalDrag({
+			event,
+			container: sortList,
+			item: handle.closest<HTMLElement>("[data-sort-card]"),
+			onMove: (clientY) => {
+				const target = verticalDropTarget(sortList, clientY);
+				if (target) sorts = reorderAtVerticalTarget(sorts, key, target, (item) => sortableId(item, "sort"));
+			},
+			onDrop: () => {
+				dragSession = null;
+				dragSort = null;
+			},
+			onCancel: () => {
+				dragSession = null;
+				sorts = origin;
+				dragSort = null;
+			},
+		});
+		if (!dragSession) dragSort = null;
 	}
 
-	function moveItem<T>(list: T[], from: number, to: number): T[] {
-		if (from === to || from < 0 || to < 0 || from >= list.length || to >= list.length) return list;
-		const next = [...list];
-		const [item] = next.splice(from, 1);
-		if (!item) return list;
-		next.splice(to, 0, item);
-		return next;
-	}
-
-	function onFilterDrop(index: number) {
-		if (dragFilter == null) {
-			overFilter = null;
-			return;
-		}
-		filters = moveItem(filters, dragFilter, index);
-		dragFilter = null;
-		overFilter = null;
-	}
-
-	function onSortDrop(index: number) {
-		if (dragSort == null) {
-			overSort = null;
-			return;
-		}
-		sorts = moveItem(sorts, dragSort, index);
-		dragSort = null;
-		overSort = null;
-	}
+	onDestroy(() => dragSession?.cancel());
 
 	function sortFieldOptions(current: string) {
 		const used = new Set(sorts.map((row) => row.field).filter((field) => field && field !== current));
@@ -673,42 +708,27 @@
 							</Empty.Content>
 						</Empty.Root>
 					{:else}
-						<div class="flex flex-col gap-2" role="list">
-							{#each filters as clause, index (index)}
+						<div class="flex flex-col gap-2" role="list" bind:this={filterList}>
+							{#each filters as clause, index (clause)}
 								{@const def = fieldDef(clause.field)}
-								{#if index > 0}
-									<p class="px-1 text-xs font-medium tracking-wide text-muted-foreground uppercase">And</p>
-								{/if}
 								<div
 									role="listitem"
-									class={cn(
-										"grid items-center gap-2 rounded-2xl bg-card p-3 ring-1 ring-foreground/10 md:grid-cols-[auto_minmax(0,1fr)_10rem_minmax(0,1.2fr)_auto]",
-										dragFilter === index && "opacity-60",
-										overFilter === index &&
-											dragFilter != null &&
-											dragFilter !== index &&
-											"bg-primary/5 ring-primary/40",
-									)}
-									ondragover={(event) => {
-										event.preventDefault();
-										overFilter = index;
-									}}
-									ondrop={() => onFilterDrop(index)}
+									data-sort-key={sortableId(clause, "filter")}
+									animate:flip={{ duration: 160 }}
+									class={cn("flex flex-col gap-2", dragFilter === clause && "pointer-events-none opacity-0")}
 								>
-									<button
+									{#if index > 0}
+										<p class="px-1 text-xs font-medium tracking-wide text-muted-foreground uppercase">And</p>
+									{/if}
+									<div
+										data-sort-card
+										class="grid items-center gap-2 rounded-2xl bg-card p-3 ring-1 ring-foreground/10 md:grid-cols-[auto_minmax(0,1fr)_10rem_minmax(0,1.2fr)_auto]"
+									>
+										<button
 										type="button"
-										class="cursor-grab text-muted-foreground hover:text-foreground active:cursor-grabbing"
-										draggable="true"
+										class="touch-none cursor-grab text-muted-foreground select-none hover:text-foreground active:cursor-grabbing"
 										aria-label="Drag to reorder filter"
-										ondragstart={(event) => {
-											dragFilter = index;
-											event.dataTransfer?.setData("text/plain", String(index));
-											if (event.dataTransfer) event.dataTransfer.effectAllowed = "move";
-										}}
-										ondragend={() => {
-											dragFilter = null;
-											overFilter = null;
-										}}
+										onpointerdown={(event) => onFilterDragStart(clause, event)}
 									>
 										<GripVerticalIcon class="size-4" />
 									</button>
@@ -762,7 +782,7 @@
 									{:else}
 										<div class="hidden md:block"></div>
 									{/if}
-									<Button
+										<Button
 										variant="ghost"
 										size="icon-xs"
 										onclick={() => removeFilter(index)}
@@ -770,7 +790,8 @@
 										class="justify-self-end"
 									>
 										<XIcon />
-									</Button>
+										</Button>
+									</div>
 								</div>
 							{/each}
 							<div>
@@ -814,31 +835,25 @@
 						Drag to set the table order. Turn a column off to hide it. At least one stays on.
 					</p>
 					{#if columns.length}
-						<div class="flex flex-col gap-2" role="list">
+						<div class="flex flex-col gap-2" role="list" bind:this={columnList}>
 							{#each columns as column, index (column.field)}
 								{@const kind = columnKind(column.field)}
 								{@const Icon = kindIcons[kind] ?? TypeIcon}
 								<div
 									role="listitem"
+									data-sort-key={column.field}
+									animate:flip={{ duration: 160 }}
 									class={cn(
 										"flex items-center gap-3 rounded-2xl bg-card px-3 py-3 ring-1 ring-foreground/10",
-										dragField === column.field && "opacity-60",
-										overField === column.field && dragField && dragField !== column.field && "bg-primary/5 ring-primary/40",
 										!column.on && "opacity-70",
+										dragField === column.field && "pointer-events-none opacity-0",
 									)}
-									ondragover={(event) => onDragOver(column.field, event)}
-									ondrop={() => onDrop(column.field)}
 								>
 									<button
 										type="button"
-										class="cursor-grab text-muted-foreground hover:text-foreground active:cursor-grabbing"
-										draggable="true"
+										class="touch-none cursor-grab text-muted-foreground select-none hover:text-foreground active:cursor-grabbing"
 										aria-label="Drag to reorder"
-										ondragstart={(event) => onDragStart(column.field, event)}
-										ondragend={() => {
-											dragField = null;
-											overField = null;
-										}}
+										onpointerdown={(event) => onColumnDragStart(column.field, event)}
 									>
 										<GripVerticalIcon class="size-4" />
 									</button>
@@ -1044,42 +1059,27 @@
 							</Empty.Content>
 						</Empty.Root>
 					{:else}
-						<div class="flex flex-col gap-2" role="list">
-							{#each sorts as row, index (index)}
+						<div class="flex flex-col gap-2" role="list" bind:this={sortList}>
+							{#each sorts as row, index (row)}
 								{@const dirs = sortDirLabels(row.field)}
-								{#if index > 0}
-									<p class="px-1 text-xs font-medium tracking-wide text-muted-foreground uppercase">Then by</p>
-								{/if}
 								<div
 									role="listitem"
-									class={cn(
-										"grid items-center gap-2 rounded-2xl bg-card p-3 ring-1 ring-foreground/10 md:grid-cols-[auto_minmax(0,1fr)_auto_auto]",
-										dragSort === index && "opacity-60",
-										overSort === index &&
-											dragSort != null &&
-											dragSort !== index &&
-											"bg-primary/5 ring-primary/40",
-									)}
-									ondragover={(event) => {
-										event.preventDefault();
-										overSort = index;
-									}}
-									ondrop={() => onSortDrop(index)}
+									data-sort-key={sortableId(row, "sort")}
+									animate:flip={{ duration: 160 }}
+									class={cn("flex flex-col gap-2", dragSort === row && "pointer-events-none opacity-0")}
 								>
-									<button
+									{#if index > 0}
+										<p class="px-1 text-xs font-medium tracking-wide text-muted-foreground uppercase">Then by</p>
+									{/if}
+									<div
+										data-sort-card
+										class="grid items-center gap-2 rounded-2xl bg-card p-3 ring-1 ring-foreground/10 md:grid-cols-[auto_minmax(0,1fr)_auto_auto]"
+									>
+										<button
 										type="button"
-										class="cursor-grab text-muted-foreground hover:text-foreground active:cursor-grabbing"
-										draggable="true"
+										class="touch-none cursor-grab text-muted-foreground select-none hover:text-foreground active:cursor-grabbing"
 										aria-label="Drag to reorder sort"
-										ondragstart={(event) => {
-											dragSort = index;
-											event.dataTransfer?.setData("text/plain", String(index));
-											if (event.dataTransfer) event.dataTransfer.effectAllowed = "move";
-										}}
-										ondragend={() => {
-											dragSort = null;
-											overSort = null;
-										}}
+										onpointerdown={(event) => onSortDragStart(row, event)}
 									>
 										<GripVerticalIcon class="size-4" />
 									</button>
@@ -1088,14 +1088,15 @@
 										<ToggleGroup.Item value="asc">{dirs.asc}</ToggleGroup.Item>
 										<ToggleGroup.Item value="desc">{dirs.desc}</ToggleGroup.Item>
 									</ToggleGroup.Root>
-									<Button
+										<Button
 										variant="ghost"
 										size="icon-xs"
 										onclick={() => removeSort(index)}
 										aria-label="Remove sort"
 									>
 										<XIcon />
-									</Button>
+										</Button>
+									</div>
 								</div>
 							{/each}
 							{#if sortFieldOptions("").length}

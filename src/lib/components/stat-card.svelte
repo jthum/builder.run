@@ -1,6 +1,8 @@
 <script lang="ts">
+	import { toneFromName } from "$lib/app/color.ts";
 	import * as Card from "$lib/components/ui/card/index.js";
 	import { Skeleton } from "$lib/components/ui/skeleton/index.js";
+	import ArrowUpRightIcon from "@lucide/svelte/icons/arrow-up-right";
 	import BriefcaseIcon from "@lucide/svelte/icons/briefcase";
 	import LayersIcon from "@lucide/svelte/icons/layers";
 	import ReceiptIcon from "@lucide/svelte/icons/receipt";
@@ -29,26 +31,32 @@
 		contact: UsersIcon,
 		organisation: UsersIcon,
 	};
-	const tones: Record<string, string> = {
-		project: "bg-emerald-50 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-400",
-		invoice: "bg-amber-50 text-amber-800 dark:bg-amber-500/15 dark:text-amber-400",
-		expense: "bg-sky-50 text-sky-800 dark:bg-sky-500/15 dark:text-sky-300",
-	};
 	const Icon = $derived(icons[source] ?? LayersIcon);
-	const tone = $derived(tones[source] ?? "bg-muted text-foreground/70");
+	const tone = $derived(toneFromName(source || label));
 </script>
 
 {#snippet body()}
 	<Card.Root class="h-full {href ? 'transition-all hover:ring-foreground/20' : ''}">
-		<Card.Content class="flex flex-col gap-3 p-5">
-			<div class="flex items-center gap-2 text-muted-foreground">
-				<span class="flex size-8 items-center justify-center rounded-lg {tone}">
-					<Icon class="size-4" />
+		<Card.Header>
+			<div class="flex items-center gap-2.5">
+				<span
+					class="flex size-7 items-center justify-center rounded-lg"
+					style="background-color: color-mix(in oklab, {tone.accent} 12%, var(--background)); color: {tone.accent}"
+				>
+					<Icon />
 				</span>
-				<span class="text-sm font-medium">{label}</span>
+				<span class="text-sm font-medium text-muted-foreground">{label}</span>
 			</div>
+			{#if href}
+				<Card.Action>
+					<ArrowUpRightIcon class="size-4 text-muted-foreground" aria-hidden="true" />
+				</Card.Action>
+			{/if}
+		</Card.Header>
+		<Card.Content class="flex min-h-24 flex-col justify-center gap-1.5">
 			{#if ready}
 				<p class="text-3xl font-semibold tracking-tight tabular-nums">{count}</p>
+				<p class="text-xs text-muted-foreground">{count === 1 ? "1 record" : `${count} records`}</p>
 			{:else}
 				<Skeleton class="h-9 w-16" />
 			{/if}
@@ -57,7 +65,7 @@
 {/snippet}
 
 {#if href}
-	<a {href} class="block rounded-2xl outline-none focus-visible:ring-2 focus-visible:ring-ring">
+	<a {href} class="block h-full rounded-2xl outline-none focus-visible:ring-2 focus-visible:ring-ring">
 		{@render body()}
 	</a>
 {:else}

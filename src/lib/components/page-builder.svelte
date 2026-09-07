@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { goto } from "$app/navigation";
+	import { startVerticalDrag, type VerticalDragSession } from "$lib/app/drag.ts";
 	import { runtime, session } from "$lib/app/session.svelte.ts";
 	import NameDialog from "$lib/components/name-dialog.svelte";
 	import PageHeader from "$lib/components/page-header.svelte";
@@ -19,10 +20,15 @@
 	import GripVerticalIcon from "@lucide/svelte/icons/grip-vertical";
 	import LayersIcon from "@lucide/svelte/icons/layers";
 	import PlusIcon from "@lucide/svelte/icons/plus";
+	import { onDestroy, untrack } from "svelte";
+	import { flip } from "svelte/animate";
 	import { toast } from "svelte-sonner";
 
 	const spec = $derived(session.snapshot?.spec);
-	const pages = $derived(spec ? authoredNavPages(spec) : []);
+	const authoredPages = $derived(spec ? authoredNavPages(spec) : []);
+	let orderedPages = $state<PageDef[]>([]);
+	let syncedPageOrder = "";
+	const pages = $derived(orderedPages.length || !authoredPages.length ? orderedPages : authoredPages);
 	const groups = $derived(groupPagesByFolder(pages));
 	const folders = $derived(
 		groups.map((group) => group.folder).filter((name): name is string => Boolean(name)),
@@ -38,7 +44,18 @@
 	let removePage = $state<PageDef | null>(null);
 	let pending = $state(false);
 	let dragKey = $state<string | null>(null);
-	let over = $state<string | null>(null);
+	let dragSession: VerticalDragSession | null = null;
+	let dragOrigin: PageDef[] = [];
+	let pageList = $state<HTMLDivElement | null>(null);
+
+	$effect(() => {
+		const signature = authoredPages.map((page) => `${page.key}\u0000${page.folder ?? ""}`).join("\u0001");
+		if (signature === syncedPageOrder) return;
+		syncedPageOrder = signature;
+		untrack(() => {
+			orderedPages = authoredPages;
+		});
+	});
 
 	function openCreate(folder = "") {
 		editingPage = null;
@@ -144,29 +161,71 @@
 		removePage = null;
 	}
 
-	function onDragStart(key: string, event: DragEvent) {
+	function movePageBeside(key: string, targetKey: string, after: boolean) {
+		if (key === targetKey) return;
+		const source = pages.find((page) => page.key === key);
+		const target = pages.find((page) => page.key === targetKey);
+		if (!source || !target) return;
+		const from = pages.findIndex((page) => page.key === key);
+		const to = pages.findIndex((page) => page.key === targetKey);
+		const sameFolder = (source.folder ?? "") === (target.folder ?? "");
+		if (sameFolder && ((from < to && !after) || (from > to && after))) return;
+
+		const next = pages.filter((page) => page.key !== key).map((page) => ({ ...page }));
+		const moving = { ...source, folder: target.folder };
+		if (!moving.folder) delete moving.folder;
+		const targetIndex = next.findIndex((page) => page.key === targetKey);
+		next.splice(targetIndex + (after ? 1 : 0), 0, moving);
+		orderedPages = next;
+	}
+
+	function onPageDragMove(key: string, clientY: number) {
+		if (!pageList) return;
+		const bounds = pageList.getBoundingClientRect();
+		const element = document.elementFromPoint(bounds.left + bounds.width / 2, clientY);
+		const row = element?.closest<HTMLElement>("[data-page-key]");
+		if (row && pageList.contains(row)) {
+			const targetKey = row.dataset.pageKey;
+			if (!targetKey) return;
+			const rowBounds = row.getBoundingClientRect();
+			movePageBeside(key, targetKey, clientY > rowBounds.top + rowBounds.height / 2);
+			return;
+		}
+
+		const folderTarget = element?.closest<HTMLElement>("[data-page-folder]");
+		if (!folderTarget || !pageList.contains(folderTarget)) return;
+		const folder = folderTarget.dataset.pageFolder || null;
+		const source = pages.find((page) => page.key === key);
+		if ((source?.folder ?? null) !== folder) {
+			orderedPages = moveAuthoredPage(pages, key, { folder });
+		}
+	}
+
+	function onDragStart(key: string, event: PointerEvent) {
+		const handle = event.currentTarget as HTMLElement;
+		dragOrigin = [...pages];
 		dragKey = key;
-		event.dataTransfer?.setData("text/plain", key);
-		if (event.dataTransfer) event.dataTransfer.effectAllowed = "move";
+		dragSession = startVerticalDrag({
+			event,
+			container: pageList,
+			item: handle.closest<HTMLElement>("[role=listitem]"),
+			onMove: (clientY) => onPageDragMove(key, clientY),
+			onDrop: async () => {
+				const next = [...pages];
+				dragSession = null;
+				dragKey = null;
+				await runtime().replaceAuthoredPages(next);
+			},
+			onCancel: () => {
+				dragSession = null;
+				orderedPages = dragOrigin;
+				dragKey = null;
+			},
+		});
+		if (!dragSession) dragKey = null;
 	}
 
-	function onDragOver(id: string, event: DragEvent) {
-		event.preventDefault();
-		over = id;
-	}
-
-	async function dropOn(target: { folder: string | null; beforeKey?: string }) {
-		if (!dragKey) return;
-		const next = moveAuthoredPage(pages, dragKey, target);
-		dragKey = null;
-		over = null;
-		await runtime().replaceAuthoredPages(next);
-	}
-
-	function endDrag() {
-		dragKey = null;
-		over = null;
-	}
+	onDestroy(() => dragSession?.cancel());
 </script>
 
 <div class="flex flex-col gap-6">
@@ -197,15 +256,11 @@
 			</Empty.Content>
 		</Empty.Root>
 	{:else}
-		<div class="flex flex-col gap-4">
+		<div class="flex flex-col gap-4" bind:this={pageList}>
 			{#if folders.length}
 				<div
-					role="listitem"
-					class="rounded-xl border border-dashed px-3 py-2 text-sm text-muted-foreground {over === 'root'
-						? 'border-primary bg-primary/5 text-foreground'
-						: ''}"
-					ondragover={(event) => onDragOver("root", event)}
-					ondrop={() => dropOn({ folder: null })}
+					data-page-folder=""
+					class="rounded-xl border border-dashed px-3 py-2 text-sm text-muted-foreground"
 				>
 					Drop here to keep a page under Home, outside a folder.
 				</div>
@@ -215,13 +270,9 @@
 					{#if group.folder}
 						<div
 							role="group"
+							data-page-folder={group.folder}
 							aria-label={`Folder ${group.folder}`}
-							class="flex items-center justify-between gap-2 rounded-xl px-1 py-1 {over ===
-							`folder:${group.folder}`
-								? 'bg-primary/5 ring-1 ring-primary/40'
-								: ''}"
-							ondragover={(event) => onDragOver(`folder:${group.folder}`, event)}
-							ondrop={() => dropOn({ folder: group.folder })}
+							class="flex items-center justify-between gap-2 rounded-xl px-1 py-1"
 						>
 							<h2 class="flex items-center gap-2 text-sm font-medium">
 								<FolderIcon class="size-4 text-muted-foreground" />
@@ -238,20 +289,18 @@
 							{@const Icon = pageIconEntry(item.icon).icon}
 							<div
 								role="listitem"
+								data-page-key={item.key}
+								animate:flip={{ duration: 160 }}
 								class="flex items-center gap-2 rounded-2xl bg-card px-2 py-2 ring-1 ring-foreground/10 {dragKey ===
 								item.key
-									? 'opacity-50'
-									: ''} {over === `page:${item.key}` ? 'ring-primary/50' : ''}"
-								ondragover={(event) => onDragOver(`page:${item.key}`, event)}
-								ondrop={() => dropOn({ folder: item.folder ?? null, beforeKey: item.key })}
-								ondragend={endDrag}
+									? 'pointer-events-none opacity-0'
+									: ''}"
 							>
 								<button
 									type="button"
-									class="cursor-grab px-1 text-muted-foreground hover:text-foreground active:cursor-grabbing"
-									draggable="true"
+									class="touch-none cursor-grab px-1 text-muted-foreground select-none hover:text-foreground active:cursor-grabbing"
 									aria-label="Drag to reorder"
-									ondragstart={(event) => onDragStart(item.key, event)}
+									onpointerdown={(event) => onDragStart(item.key, event)}
 								>
 									<GripVerticalIcon class="size-4" />
 								</button>

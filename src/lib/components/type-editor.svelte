@@ -2,6 +2,12 @@
 	import { goto } from "$app/navigation";
 	import { defaultCollectionLabel, fieldKindHint, fieldKindLabel } from "$lib/app/labels.ts";
 	import { runtime, session } from "$lib/app/session.svelte.ts";
+	import {
+		reorderAtVerticalTarget,
+		startVerticalDrag,
+		type VerticalDragSession,
+		verticalDropTarget,
+	} from "$lib/app/drag.ts";
 	import AppSelect from "$lib/components/app-select.svelte";
 	import PageHeader from "$lib/components/page-header.svelte";
 	import StatusPill from "$lib/components/status-pill.svelte";
@@ -24,6 +30,7 @@
 		type TypeDef,
 		type ValueSemantic,
 	} from "$lib/runtime/model.ts";
+	import { cn } from "$lib/utils.js";
 	import CalendarIcon from "@lucide/svelte/icons/calendar";
 	import ChevronDownIcon from "@lucide/svelte/icons/chevron-down";
 	import ChevronUpIcon from "@lucide/svelte/icons/chevron-up";
@@ -35,7 +42,8 @@
 	import ToggleLeftIcon from "@lucide/svelte/icons/toggle-left";
 	import TypeIcon from "@lucide/svelte/icons/type";
 	import XIcon from "@lucide/svelte/icons/x";
-	import type { Component } from "svelte";
+	import { onDestroy, type Component, untrack } from "svelte";
+	import { flip } from "svelte/animate";
 	import { toast } from "svelte-sonner";
 
 	let { type }: { type: TypeDef } = $props();
@@ -103,7 +111,29 @@
 	let removeKey = $state<string | null>(null);
 	let deleteOpen = $state(false);
 	let dragKey = $state<string | null>(null);
+	let dragSession: VerticalDragSession | null = null;
+	let dragOriginOrder: string[] = [];
+	let fieldList = $state<HTMLDivElement | null>(null);
+	let fieldOrder = $state<string[]>([]);
+	let syncedFieldOrder = "";
+	const orderedFields = $derived(
+		fieldOrder.length
+			? fieldOrder
+					.map((key) => type.fields.find((field) => field.key === key))
+					.filter((field): field is FieldDef => Boolean(field))
+			: type.fields,
+	);
 	const inferredCollectionName = $derived(defaultCollectionLabel(typeLabel.trim() || type.label));
+
+	$effect(() => {
+		const keys = type.fields.map((field) => field.key);
+		const signature = keys.join("\u0000");
+		if (signature === syncedFieldOrder) return;
+		syncedFieldOrder = signature;
+		untrack(() => {
+			fieldOrder = keys;
+		});
+	});
 
 	$effect(() => {
 		if (type.id === namingTypeId) return;
@@ -237,36 +267,47 @@
 	}
 
 	async function move(index: number, delta: number) {
-		const next = type.fields.map((field) => field.key);
+		const next = [...fieldOrder];
 		const target = index + delta;
 		if (target < 0 || target >= next.length) return;
 		[next[index], next[target]] = [next[target], next[index]];
+		fieldOrder = next;
 		await runtime().reorderFields(type.key, next);
 	}
 
-	function onDragStart(key: string, event: DragEvent) {
+	function onDragStart(key: string, event: PointerEvent) {
+		const handle = event.currentTarget as HTMLElement;
+		const row = handle.closest<HTMLElement>("[data-field-key]");
+		const currentOrder = fieldOrder.length ? [...fieldOrder] : orderedFields.map((field) => field.key);
+		fieldOrder = currentOrder;
+		dragOriginOrder = currentOrder;
 		dragKey = key;
-		event.dataTransfer?.setData("text/plain", key);
-		if (event.dataTransfer) event.dataTransfer.effectAllowed = "move";
+		dragSession = startVerticalDrag({
+			event,
+			container: fieldList,
+			item: row,
+			onMove: (clientY) => {
+				const target = verticalDropTarget(fieldList, clientY);
+				if (target) fieldOrder = reorderAtVerticalTarget(fieldOrder, key, target, (item) => item);
+			},
+			onDrop: async () => {
+				const next = [...fieldOrder];
+				dragSession = null;
+				dragKey = null;
+				if (next.join("\u0000") !== type.fields.map((field) => field.key).join("\u0000")) {
+					await runtime().reorderFields(type.key, next);
+				}
+			},
+			onCancel: () => {
+				dragSession = null;
+				fieldOrder = dragOriginOrder;
+				dragKey = null;
+			},
+		});
+		if (!dragSession) dragKey = null;
 	}
 
-	async function onDrop(key: string) {
-		if (!dragKey || dragKey === key) {
-			dragKey = null;
-			return;
-		}
-		const keys = type.fields.map((field) => field.key);
-		const from = keys.indexOf(dragKey);
-		const to = keys.indexOf(key);
-		if (from < 0 || to < 0) {
-			dragKey = null;
-			return;
-		}
-		keys.splice(from, 1);
-		keys.splice(to, 0, dragKey);
-		dragKey = null;
-		await runtime().reorderFields(type.key, keys);
-	}
+	onDestroy(() => dragSession?.cancel());
 
 	async function remove() {
 		if (!removeKey) return;
@@ -375,25 +416,24 @@
 			</Card.Content>
 		</Card.Root>
 	{:else}
-		<div class="flex flex-col gap-2" role="list">
-			{#each type.fields as field, index (field.id)}
+		<div class="flex flex-col gap-2" role="list" bind:this={fieldList}>
+			{#each orderedFields as field, index (field.id)}
 				{@const Icon = kindIcons[field.type] ?? TypeIcon}
 				<div
 					role="listitem"
-					class="flex items-center gap-3 rounded-2xl bg-card px-3 py-3 ring-1 ring-foreground/10 {dragKey ===
-					field.key
-						? 'opacity-60'
-						: ''}"
-					ondragover={(event) => event.preventDefault()}
-					ondrop={() => onDrop(field.key)}
+					data-field-key={field.key}
+					data-sort-key={field.key}
+					animate:flip={{ duration: 160 }}
+					class={cn(
+						"relative flex items-center gap-3 rounded-2xl bg-card px-3 py-3 ring-1 ring-foreground/10 transition-[box-shadow,opacity] duration-150",
+						dragKey === field.key && "pointer-events-none opacity-0",
+					)}
 				>
 					<button
 						type="button"
-						class="cursor-grab text-muted-foreground hover:text-foreground active:cursor-grabbing"
-						draggable="true"
+						class="touch-none cursor-grab text-muted-foreground select-none hover:text-foreground active:cursor-grabbing"
 						aria-label="Drag to reorder"
-						ondragstart={(event) => onDragStart(field.key, event)}
-						ondragend={() => (dragKey = null)}
+						onpointerdown={(event) => onDragStart(field.key, event)}
 					>
 						<GripVerticalIcon class="size-4" />
 					</button>
@@ -432,7 +472,7 @@
 						<Button
 							size="icon-sm"
 							variant="ghost"
-							disabled={index === type.fields.length - 1}
+							disabled={index === orderedFields.length - 1}
 							onclick={() => move(index, 1)}
 						>
 							<ChevronDownIcon />
