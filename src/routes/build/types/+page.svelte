@@ -7,6 +7,7 @@
 	import { Button } from "$lib/components/ui/button/index.js";
 	import * as Card from "$lib/components/ui/card/index.js";
 	import * as Empty from "$lib/components/ui/empty/index.js";
+	import ArrowRightIcon from "@lucide/svelte/icons/arrow-right";
 	import BoxIcon from "@lucide/svelte/icons/box";
 	import PlusIcon from "@lucide/svelte/icons/plus";
 
@@ -43,36 +44,33 @@
 			</Empty.Content>
 		</Empty.Root>
 	{:else}
-		<div class="grid gap-4 md:grid-cols-2">
+		<div class="grid items-start gap-4 md:grid-cols-2">
 			{#each types as type (type.id)}
-				<a href="/build/types/{type.key}" class="block rounded-2xl outline-none focus-visible:ring-2 focus-visible:ring-ring">
-					<Card.Root class="h-full transition-all hover:ring-foreground/20">
-						<Card.Content class="flex flex-col gap-3 p-4">
-							<div class="flex items-center justify-between gap-2">
-								<span class="flex min-w-0 items-center gap-2 font-medium">
-									<span class="truncate">{type.label}</span>
-									{#if type.expose}
-										<Badge variant="secondary">From {space}</Badge>
-									{/if}
-								</span>
-								<span class="text-sm text-muted-foreground">
-									{type.fields.length}
-									{type.fields.length === 1 ? "field" : "fields"}
-								</span>
-							</div>
+				<a href="/build/types/{type.key}" class="block self-start rounded-2xl outline-none focus-visible:ring-2 focus-visible:ring-ring">
+					<Card.Root class="h-auto transition-all hover:ring-foreground/20">
+						<Card.Header class="gap-0">
+							<Card.Title>{type.label}</Card.Title>
+							<Card.Description>{type.collection_label ?? `${type.label} records`}</Card.Description>
+							<Card.Action><Badge variant="secondary">{type.fields.length} {type.fields.length === 1 ? "field" : "fields"}</Badge></Card.Action>
+						</Card.Header>
+						<Card.Content class="flex flex-1 flex-col gap-3">
 							{#if type.fields.length}
 								<div class="flex flex-wrap gap-1.5">
-									{#each type.fields.slice(0, 8) as field (field.id)}
+									{#each type.fields.slice(0, 6) as field (field.id)}
 										<Badge variant="outline">{field.label}</Badge>
 									{/each}
-									{#if type.fields.length > 8}
-										<Badge variant="outline">+{type.fields.length - 8}</Badge>
+									{#if type.fields.length > 6}
+										<Badge variant="outline">+{type.fields.length - 6}</Badge>
 									{/if}
 								</div>
 							{:else}
-								<p class="text-sm text-muted-foreground">No fields yet</p>
+								<p class="text-sm text-muted-foreground">Add the first field to define what each record remembers.</p>
 							{/if}
 						</Card.Content>
+						<Card.Footer class="justify-between gap-3">
+							<span class="text-xs text-muted-foreground">{type.expose ? `Shared from ${space}` : "App type"}</span>
+							<span class="flex items-center gap-1 text-sm font-medium">Open schema <ArrowRightIcon class="size-4" /></span>
+						</Card.Footer>
 					</Card.Root>
 				</a>
 			{/each}

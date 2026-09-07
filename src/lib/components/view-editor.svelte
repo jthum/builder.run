@@ -622,12 +622,12 @@
 	</PageHeader>
 
 	<Card.Root class="h-auto">
-		<Card.Header>
+		<Card.Header class="gap-0">
 			<Card.Title>This list</Card.Title>
 			<Card.Description>What it is called, which records it uses, and whether it appears in the menu.</Card.Description>
 		</Card.Header>
 		<Card.Content>
-			<div class="grid gap-4 sm:grid-cols-2">
+			<Field.Group>
 				<Field.Field>
 					<Field.Label for="view-name">Name</Field.Label>
 					<Input id="view-name" bind:value={label} placeholder="Active projects" />
@@ -639,18 +639,19 @@
 						options={types.map((item) => ({ value: item.key, label: item.label }))}
 					/>
 				</Field.Field>
-			</div>
+				<Field.Field orientation="horizontal" class="justify-between rounded-xl border bg-muted/30 p-3">
+					<div class="flex flex-col gap-0.5">
+						<Field.Label for="featured">{featured ? "Shown in the app menu" : "Hidden from the app menu"}</Field.Label>
+						<Field.Description>{featured ? "People can open this view from the app navigation." : "The view remains available to widgets, rules, and agents."}</Field.Description>
+					</div>
+					<Switch bind:checked={featured} id="featured" />
+				</Field.Field>
+			</Field.Group>
 		</Card.Content>
-		<Card.Footer>
-			<Field.Field orientation="horizontal" class="w-auto">
-				<Switch bind:checked={featured} id="featured" />
-				<Field.Label for="featured" class="font-normal">Show in the app menu</Field.Label>
-			</Field.Field>
-		</Card.Footer>
 	</Card.Root>
 
 	<Card.Root class="h-auto">
-		<Card.Header>
+		<Card.Header class="gap-0">
 			<Card.Title>Query</Card.Title>
 			<Card.Description>Narrow the records, choose columns, set the order, and cap how many.</Card.Description>
 		</Card.Header>

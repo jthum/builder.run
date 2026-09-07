@@ -109,6 +109,7 @@
 	let fieldRatingVariant = $state<"segments">("segments");
 	let fieldRatingMax = $state("10");
 	let advanced = $state(false);
+	let schemaAdvanced = $state(false);
 	let removeKey = $state<string | null>(null);
 	let deleteOpen = $state(false);
 	let dragKey = $state<string | null>(null);
@@ -339,10 +340,6 @@
 			: "The shape of this record. Lists, forms, and home update as you add fields."}
 	>
 		{#snippet actions()}
-			<Button onclick={() => openAdd()}>
-				<PlusIcon data-icon="inline-start" />
-				Add field
-			</Button>
 			{#if !type.expose}
 				<Button variant="ghost" onclick={() => (deleteOpen = true)}>Delete</Button>
 			{/if}
@@ -356,8 +353,8 @@
 		</p>
 	{/if}
 
-	<Card.Root>
-		<Card.Header>
+	<Card.Root class="h-auto">
+		<Card.Header class="gap-0">
 			<Card.Title>Naming</Card.Title>
 			<Card.Description>Choose how one record and the full collection are named.</Card.Description>
 		</Card.Header>
@@ -387,11 +384,17 @@
 		</Card.Footer>
 	</Card.Root>
 
-	<LifecycleEditor {type} />
-
-	{#if type.fields.length === 0}
-		<Card.Root>
-			<Card.Content class="flex flex-col gap-4 p-5">
+	<Card.Root class="h-auto">
+		<Card.Header class="gap-0">
+			<Card.Title>Fields</Card.Title>
+			<Card.Description>Define the information stored on every {type.label.toLowerCase()} record.</Card.Description>
+			<Card.Action>
+				<Button size="sm" onclick={() => openAdd()}><PlusIcon data-icon="inline-start" /> Add field</Button>
+			</Card.Action>
+		</Card.Header>
+		<Card.Content>
+		{#if type.fields.length === 0}
+			<div class="flex flex-col gap-4">
 				<div class="flex flex-col gap-1">
 					<p class="font-medium">What does a {type.label.toLowerCase()} remember?</p>
 					<p class="text-sm text-muted-foreground">
@@ -416,10 +419,9 @@
 						</button>
 					{/each}
 				</div>
-			</Card.Content>
-		</Card.Root>
-	{:else}
-		<div class="flex flex-col gap-2" role="list" bind:this={fieldList}>
+			</div>
+		{:else}
+			<div class="flex flex-col gap-2" role="list" bind:this={fieldList}>
 			{#each orderedFields as field, index (field.id)}
 				{@const Icon = kindIcons[field.type] ?? TypeIcon}
 				<div
@@ -484,12 +486,31 @@
 					</div>
 				</div>
 			{/each}
-			<Button variant="outline" onclick={() => openAdd()}>
-				<PlusIcon data-icon="inline-start" />
-				Add field
-			</Button>
-		</div>
-	{/if}
+			</div>
+		{/if}
+		</Card.Content>
+		<Card.Footer class="justify-between gap-3">
+			<span class="text-xs text-muted-foreground">{type.fields.length} {type.fields.length === 1 ? "field" : "fields"} in this schema</span>
+			{#if type.fields.length}<Button variant="outline" size="sm" onclick={() => openAdd()}><PlusIcon data-icon="inline-start" /> Add another</Button>{/if}
+		</Card.Footer>
+	</Card.Root>
+
+	<Separator />
+	<Collapsible.Root bind:open={schemaAdvanced}>
+		<Collapsible.Trigger class="flex w-full items-center justify-between gap-3 rounded-xl px-1 py-2 text-start text-muted-foreground hover:text-foreground">
+			<span class="flex flex-col gap-0">
+				<span class="font-medium text-foreground">Advanced</span>
+				<span class="text-sm">Optional behavior for records with a defined lifecycle.</span>
+			</span>
+			<span class="flex shrink-0 items-center gap-2">
+				{#if type.lifecycle}<Badge variant="secondary">Lifecycle configured</Badge>{/if}
+				<ChevronDownIcon class="size-4 transition-transform {schemaAdvanced ? 'rotate-180' : ''}" />
+			</span>
+		</Collapsible.Trigger>
+		<Collapsible.Content class="pt-3">
+			<LifecycleEditor {type} />
+		</Collapsible.Content>
+	</Collapsible.Root>
 </div>
 
 <Sheet.Root bind:open={sheetOpen}>
