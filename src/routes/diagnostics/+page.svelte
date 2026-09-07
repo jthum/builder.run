@@ -13,7 +13,7 @@
 
 	const tools = $derived.by(() => {
 		void session.revision;
-		return session.host ? buildTools(runtime()) : [];
+		return session.host ? buildTools(runtime(), { appTools: session.webmcpToolMode }) : [];
 	});
 	const builderTools = $derived(tools.filter((tool) => toolSurface(tool) === "builder"));
 	const appTools = $derived(tools.filter((tool) => toolSurface(tool) === "app"));
@@ -66,9 +66,12 @@
 				<Card.Title>Agent connection</Card.Title>
 				<Card.Description>Whether this browser can register tools for an agent.</Card.Description>
 			</Card.Header>
-			<Card.Content>
+			<Card.Content class="flex flex-wrap gap-2">
 				<Badge variant={webmcpSupported() ? "default" : "secondary"}>
 					{webmcpSupported() ? "Available in this browser" : "Not in this browser"}
+				</Badge>
+				<Badge variant="secondary">
+					{session.webmcpToolMode === "typed" ? "Typed tools" : "Compact tools"}
 				</Badge>
 			</Card.Content>
 		</Card.Root>
@@ -84,8 +87,8 @@
 		<Card.Header>
 			<Card.Title>Tools</Card.Title>
 			<Card.Description>
-				Builder tools shape the spec. App tools are generated from this app's types and agent flows.
-				They register when an agent connection is present.
+				Builder tools shape the spec. App tools use the selected compact or typed record surface,
+				plus exposed views and agent flows. They register when an agent connection is present.
 			</Card.Description>
 		</Card.Header>
 		<Card.Content>

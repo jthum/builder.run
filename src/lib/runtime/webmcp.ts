@@ -1,13 +1,50 @@
 import type { Host } from "./host.ts";
 import { BROWSER_LOCAL_AUTOMATION_PROFILE } from "./automation/capabilities.ts";
 import { DEFAULT_AUTOMATION_REGISTRY } from "./automation/registry.ts";
-import { cloneData, FIELD_KINDS, type FieldDef } from "./model.ts";
+import { cloneData, FIELD_KINDS, type FieldDef, type TypeDef } from "./model.ts";
 import { sampleApps } from "./samples.ts";
 import { PAGE_ICON_KEYS } from "./page-icons.ts";
 import { specFromText } from "./serialize.ts";
 import { describeWidget, widgets } from "./widgets.ts";
 
 export type ToolSurface = "builder" | "app";
+export type WebMcpAppToolMode = "compact" | "typed";
+
+export const DEFAULT_WEBMCP_APP_TOOL_MODE: WebMcpAppToolMode = "compact";
+const WEBMCP_APP_TOOL_MODE_KEY = "builder.run:webmcp-app-tools";
+const WEBMCP_APP_TOOL_MODE_EVENT = "builder-run-webmcp-app-tools";
+
+export function getWebMcpAppToolMode(): WebMcpAppToolMode {
+  if (typeof localStorage === "undefined") return DEFAULT_WEBMCP_APP_TOOL_MODE;
+  try {
+    return localStorage.getItem(WEBMCP_APP_TOOL_MODE_KEY) === "typed" ? "typed" : "compact";
+  } catch {
+    return DEFAULT_WEBMCP_APP_TOOL_MODE;
+  }
+}
+
+export function setWebMcpAppToolMode(mode: WebMcpAppToolMode): void {
+  if (typeof localStorage !== "undefined") {
+    try {
+      localStorage.setItem(WEBMCP_APP_TOOL_MODE_KEY, mode);
+    } catch {
+      // The active page still updates even when storage is unavailable.
+    }
+  }
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(new CustomEvent(WEBMCP_APP_TOOL_MODE_EVENT, { detail: mode }));
+  }
+}
+
+function subscribeWebMcpAppToolMode(listener: (mode: WebMcpAppToolMode) => void): () => void {
+  if (typeof window === "undefined") return () => {};
+  const receive = (event: Event) => {
+    const mode = (event as CustomEvent<unknown>).detail;
+    if (mode === "compact" || mode === "typed") listener(mode);
+  };
+  window.addEventListener(WEBMCP_APP_TOOL_MODE_EVENT, receive);
+  return () => window.removeEventListener(WEBMCP_APP_TOOL_MODE_EVENT, receive);
+}
 
 export interface ToolDefinition {
   name: string;
@@ -42,6 +79,10 @@ export interface WebMcpBridge {
   flush(): Promise<void>;
 }
 
+export interface WebMcpBridgeOptions {
+  appTools?: WebMcpAppToolMode;
+}
+
 function supported(registry?: WebMcpToolRegistry | null): boolean {
   if (registry) return typeof registry.registerTool === "function";
   return (
@@ -70,7 +111,11 @@ function toolOutput(value: unknown): string {
   return JSON.stringify(cloneData(value ?? { ok: true }));
 }
 
-export function createWebMcpBridge(host: Host, registry?: WebMcpToolRegistry | null): WebMcpBridge {
+export function createWebMcpBridge(
+  host: Host,
+  registry?: WebMcpToolRegistry | null,
+  options: WebMcpBridgeOptions = {},
+): WebMcpBridge {
   const api = registry ?? (typeof document !== "undefined" ? document.modelContext : null);
   if (!api?.registerTool) {
     return { stop() {}, async flush() {} };
@@ -88,6 +133,8 @@ export function createWebMcpBridge(host: Host, registry?: WebMcpToolRegistry | n
   let timerResolve: (() => void) | null = null;
   let timerPromise = Promise.resolve();
   let chain = Promise.resolve();
+  let appToolMode = options.appTools ?? getWebMcpAppToolMode();
+  const currentTools = () => buildTools(host, { appTools: appToolMode });
 
   const oneFingerprint = (tool: ToolDefinition) => toolFingerprint([tool]);
 
@@ -144,7 +191,7 @@ export function createWebMcpBridge(host: Host, registry?: WebMcpToolRegistry | n
       dirty = true;
       return;
     }
-    const tools = buildTools(host);
+    const tools = currentTools();
     const wanted = new Set(tools.map((tool) => tool.name));
 
     for (const tool of tools) {
@@ -211,9 +258,16 @@ export function createWebMcpBridge(host: Host, registry?: WebMcpToolRegistry | n
   };
 
   const unsubscribe = host.subscribe(() => {
-    if (inSync(buildTools(host))) return;
+    if (inSync(currentTools())) return;
     schedule();
   });
+  const unsubscribeMode = options.appTools
+    ? () => {}
+    : subscribeWebMcpAppToolMode((mode) => {
+        if (mode === appToolMode) return;
+        appToolMode = mode;
+        schedule();
+      });
 
   schedule();
 
@@ -221,6 +275,7 @@ export function createWebMcpBridge(host: Host, registry?: WebMcpToolRegistry | n
     stop() {
       stopped = true;
       unsubscribe();
+      unsubscribeMode();
       if (timer) {
         clearTimeout(timer);
         timer = null;
@@ -314,7 +369,11 @@ const viewMeasuresSchema = {
   },
 };
 
-export function buildTools(host: Host): ToolDefinition[] {
+export interface BuildToolsOptions {
+  appTools?: WebMcpAppToolMode;
+}
+
+export function buildTools(host: Host, options: BuildToolsOptions = {}): ToolDefinition[] {
   const spec = host.resolvedSpec();
   const tools: ToolDefinition[] = [
     {
@@ -486,10 +545,11 @@ export function buildTools(host: Host): ToolDefinition[] {
       }),
     },
     {
+      surface: "app",
       name: "query_view",
       title: "Run a view",
       description:
-        'Run a named view and return its rows. Views can filter, sort, limit, and derive live grouped measures — list_* returns every source record. Discover view keys via get_spec. Example: query_view({ view: "active_projects" }).',
+        'Run a named view and return its rows. Views can filter, sort, limit, and derive live grouped measures — list_records returns every source record (list_<type> in typed mode). Discover view keys via get_spec. Example: query_view({ view: "active_projects" }).',
       inputSchema: {
         type: "object",
         properties: {
@@ -914,8 +974,271 @@ export function buildTools(host: Host): ToolDefinition[] {
     },
   ];
 
-  for (const type of spec.types) {
+  tools.push(...(options.appTools === "typed" ? typedRecordTools(host) : compactRecordTools(host)));
+
+  for (const flow of spec.flows) {
+    if (!flow.expose?.includes("agent")) continue;
+    const inputs = Object.entries(flow.input ?? {});
+    tools.push({
+      surface: "app",
+      name: `invoke_${flow.key}`,
+      title: flow.label,
+      description: invokeFlowDescription(flow.key, flow.label, inputs),
+      inputSchema: {
+        type: "object",
+        properties: Object.fromEntries(
+          inputs.map(([name, definition]) => [name, flowInputProperty(definition)]),
+        ),
+        required: inputs
+          .filter(([, definition]) => definition.required !== false)
+          .map(([name]) => name),
+        additionalProperties: false,
+      },
+      execute: (input) => host.invoke(flow.key, input),
+    });
+  }
+
+  return tools;
+}
+
+interface RecordOperations {
+  describe(typeKey: string, id?: string): Promise<Record<string, unknown>>;
+  list(typeKey: string): ReturnType<Host["listRecords"]>;
+  get(typeKey: string, id: string): ReturnType<Host["getRecord"]>;
+  create(typeKey: string, values: Record<string, unknown>): ReturnType<Host["create"]>;
+  update(typeKey: string, id: string, values: Record<string, unknown>): ReturnType<Host["update"]>;
+  remove(typeKey: string, id: string): Promise<{ ok: true }>;
+  transition(typeKey: string, id: string, transition: string): ReturnType<Host["transition"]>;
+}
+
+function requireAppType(host: Host, typeKey: string): TypeDef {
+  const type = host.resolvedSpec().types.find((item) => item.key === typeKey);
+  if (type) return type;
+  const available = host
+    .resolvedSpec()
+    .types.map((item) => item.key)
+    .join(", ");
+  throw new Error(
+    available
+      ? `Unknown type "${typeKey}". Available types: ${available}`
+      : `Unknown type "${typeKey}". This app has no types yet.`,
+  );
+}
+
+function recordValues(value: unknown): Record<string, unknown> {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    throw new Error("values must be an object");
+  }
+  return value as Record<string, unknown>;
+}
+
+function recordOperations(host: Host): RecordOperations {
+  return {
+    async describe(typeKey, id) {
+      const type = requireAppType(host, typeKey);
+      const record = id ? await host.getRecord(type.key, id) : undefined;
+      if (id && !record) throw new Error(`${type.label} ${id} not found`);
+      const currentState =
+        record && type.lifecycle ? asText(record[type.lifecycle.field]) : undefined;
+      return {
+        key: type.key,
+        label: type.label,
+        collection_label: type.collection_label,
+        scope: type.expose ? "space" : "app",
+        fields: type.fields.map((field) => ({
+          key: field.key,
+          label: field.label,
+          type: field.type,
+          ...(field.required ? { required: true } : {}),
+          ...(field.default !== undefined ? { default: cloneData(field.default) } : {}),
+          ...(field.values ? { values: [...field.values] } : {}),
+          ...(field.target ? { target: field.target } : {}),
+          ...(field.presentation ? { presentation: field.presentation } : {}),
+          ...(field.variant ? { variant: field.variant } : {}),
+          ...(field.max ? { max: field.max } : {}),
+          ...(field.value_semantics ? { value_semantics: cloneData(field.value_semantics) } : {}),
+        })),
+        ...(type.lifecycle ? { lifecycle: cloneData(type.lifecycle) } : {}),
+        ...(record
+          ? {
+              record,
+              ...(type.lifecycle
+                ? {
+                    current_state: currentState,
+                    available_transitions: type.lifecycle.transitions
+                      .filter((transition) => transition.from.includes(currentState ?? ""))
+                      .map((transition) => ({
+                        key: transition.key,
+                        label: transition.label,
+                        to: transition.to,
+                      })),
+                  }
+                : {}),
+            }
+          : {}),
+      };
+    },
+    list(typeKey) {
+      requireAppType(host, typeKey);
+      return host.listRecords(typeKey);
+    },
+    get(typeKey, id) {
+      const type = requireAppType(host, typeKey);
+      return host.getRecord(type.key, id);
+    },
+    create(typeKey, values) {
+      const type = requireAppType(host, typeKey);
+      return host.create(type.key, values);
+    },
+    update(typeKey, id, values) {
+      const type = requireAppType(host, typeKey);
+      return host.update(type.key, id, values);
+    },
+    async remove(typeKey, id) {
+      const type = requireAppType(host, typeKey);
+      await host.remove(type.key, id);
+      return { ok: true };
+    },
+    transition(typeKey, id, transition) {
+      const type = requireAppType(host, typeKey);
+      return host.transition(type.key, id, transition);
+    },
+  };
+}
+
+function describeTypeTool(operations: RecordOperations): ToolDefinition {
+  return {
+    surface: "app",
+    name: "describe_type",
+    title: "Describe a record type",
+    description:
+      "Inspect one record type on demand, including field constraints and lifecycle transitions. Pass a record id to also see its current state and available transitions. Call this before creating or updating unfamiliar records.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        type: { type: "string", description: "Type key from get_spec" },
+        id: { type: "string", description: "Optional record id" },
+      },
+      required: ["type"],
+      additionalProperties: false,
+    },
+    annotations: { readOnlyHint: true },
+    execute: ({ type, id }) => operations.describe(asText(type), id ? asText(id) : undefined),
+  };
+}
+
+function compactRecordTools(host: Host): ToolDefinition[] {
+  const operations = recordOperations(host);
+  const typeProperty = { type: "string", description: "Type key from get_spec or describe_type" };
+  const idProperty = { type: "string", description: "Record id" };
+  const valuesProperty = {
+    type: "object",
+    description: "Field values accepted by the selected type. Use describe_type for the contract.",
+    additionalProperties: true,
+  };
+
+  return [
+    describeTypeTool(operations),
+    {
+      surface: "app",
+      name: "list_records",
+      title: "List records",
+      description:
+        "List every record of one type, unfiltered. Use query_view when you need filtering, sorting, limits, or aggregates.",
+      inputSchema: {
+        type: "object",
+        properties: { type: typeProperty },
+        required: ["type"],
+        additionalProperties: false,
+      },
+      annotations: { readOnlyHint: true },
+      execute: ({ type }) => operations.list(asText(type)),
+    },
+    {
+      surface: "app",
+      name: "get_record",
+      title: "Get a record",
+      description: "Get one record by type and id.",
+      inputSchema: {
+        type: "object",
+        properties: { type: typeProperty, id: idProperty },
+        required: ["type", "id"],
+        additionalProperties: false,
+      },
+      annotations: { readOnlyHint: true },
+      execute: ({ type, id }) => operations.get(asText(type), asText(id)),
+    },
+    {
+      surface: "app",
+      name: "create_record",
+      title: "Create a record",
+      description:
+        "Create a record of one type. Call describe_type first for fields and constraints; lifecycle state and audit fields are system-managed.",
+      inputSchema: {
+        type: "object",
+        properties: { type: typeProperty, values: valuesProperty },
+        required: ["type", "values"],
+        additionalProperties: false,
+      },
+      execute: ({ type, values }) => operations.create(asText(type), recordValues(values)),
+    },
+    {
+      surface: "app",
+      name: "update_record",
+      title: "Update a record",
+      description:
+        "Update fields on one record. Call describe_type first; use transition_record for lifecycle state changes.",
+      inputSchema: {
+        type: "object",
+        properties: { type: typeProperty, id: idProperty, values: valuesProperty },
+        required: ["type", "id", "values"],
+        additionalProperties: false,
+      },
+      execute: ({ type, id, values }) =>
+        operations.update(asText(type), asText(id), recordValues(values)),
+    },
+    {
+      surface: "app",
+      name: "delete_record",
+      title: "Delete a record",
+      description: "Delete one record by type and id.",
+      inputSchema: {
+        type: "object",
+        properties: { type: typeProperty, id: idProperty },
+        required: ["type", "id"],
+        additionalProperties: false,
+      },
+      execute: ({ type, id }) => operations.remove(asText(type), asText(id)),
+    },
+    {
+      surface: "app",
+      name: "transition_record",
+      title: "Transition a record",
+      description:
+        "Apply a named lifecycle transition to a record. Use describe_type with the record id to discover transitions currently available.",
+      inputSchema: {
+        type: "object",
+        properties: {
+          type: typeProperty,
+          id: idProperty,
+          transition: { type: "string", description: "Lifecycle transition key" },
+        },
+        required: ["type", "id", "transition"],
+        additionalProperties: false,
+      },
+      execute: ({ type, id, transition }) =>
+        operations.transition(asText(type), asText(id), asText(transition)),
+    },
+  ];
+}
+
+function typedRecordTools(host: Host): ToolDefinition[] {
+  const operations = recordOperations(host);
+  const tools = [describeTypeTool(operations)];
+
+  for (const type of host.resolvedSpec().types) {
     const key = type.key;
+    const createFields = type.fields.filter((field) => field.key !== type.lifecycle?.field);
     tools.push(
       {
         surface: "app",
@@ -924,7 +1247,7 @@ export function buildTools(host: Host): ToolDefinition[] {
         description: `List all ${type.label} records, unfiltered. To filter, sort, or limit, run a view with query_view.`,
         inputSchema: { type: "object", properties: {}, additionalProperties: false },
         annotations: { readOnlyHint: true },
-        execute: () => host.listRecords(key),
+        execute: () => operations.list(key),
       },
       {
         surface: "app",
@@ -938,7 +1261,7 @@ export function buildTools(host: Host): ToolDefinition[] {
           additionalProperties: false,
         },
         annotations: { readOnlyHint: true },
-        execute: ({ id }) => host.getRecord(key, String(id)),
+        execute: ({ id }) => operations.get(key, asText(id)),
       },
       {
         surface: "app",
@@ -948,14 +1271,12 @@ export function buildTools(host: Host): ToolDefinition[] {
         inputSchema: {
           type: "object",
           properties: Object.fromEntries(
-            type.fields.map((field) => [field.key, fieldInputSchema(field)]),
+            createFields.map((field) => [field.key, fieldInputSchema(field)]),
           ),
-          required: type.fields
-            .filter((field) => field.required && field.key !== type.lifecycle?.field)
-            .map((field) => field.key),
+          required: createFields.filter((field) => field.required).map((field) => field.key),
           additionalProperties: false,
         },
-        execute: (input) => host.create(key, input),
+        execute: (input) => operations.create(key, input),
       },
       {
         surface: "app",
@@ -971,7 +1292,7 @@ export function buildTools(host: Host): ToolDefinition[] {
           required: ["id"],
           additionalProperties: false,
         },
-        execute: ({ id, ...fields }) => host.update(key, String(id), fields),
+        execute: ({ id, ...fields }) => operations.update(key, asText(id), fields),
       },
       {
         surface: "app",
@@ -984,10 +1305,7 @@ export function buildTools(host: Host): ToolDefinition[] {
           required: ["id"],
           additionalProperties: false,
         },
-        execute: async ({ id }) => {
-          await host.remove(key, String(id));
-          return { ok: true };
-        },
+        execute: ({ id }) => operations.remove(key, asText(id)),
       },
     );
     if (type.lifecycle) {
@@ -1014,31 +1332,9 @@ export function buildTools(host: Host): ToolDefinition[] {
           required: ["id", "transition"],
           additionalProperties: false,
         },
-        execute: ({ id, transition }) => host.transition(key, String(id), String(transition)),
+        execute: ({ id, transition }) => operations.transition(key, asText(id), asText(transition)),
       });
     }
-  }
-
-  for (const flow of spec.flows) {
-    if (!flow.expose?.includes("agent")) continue;
-    const inputs = Object.entries(flow.input ?? {});
-    tools.push({
-      surface: "app",
-      name: `invoke_${flow.key}`,
-      title: flow.label,
-      description: invokeFlowDescription(flow.key, flow.label, inputs),
-      inputSchema: {
-        type: "object",
-        properties: Object.fromEntries(
-          inputs.map(([name, definition]) => [name, flowInputProperty(definition)]),
-        ),
-        required: inputs
-          .filter(([, definition]) => definition.required !== false)
-          .map(([name]) => name),
-        additionalProperties: false,
-      },
-      execute: (input) => host.invoke(flow.key, input),
-    });
   }
 
   return tools;

@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { toneFromName } from "$lib/app/color.ts";
+	import { toneFromAccent } from "$lib/app/color.ts";
 	import { session } from "$lib/app/session.svelte.ts";
 	import * as Card from "$lib/components/ui/card/index.js";
 	import { Skeleton } from "$lib/components/ui/skeleton/index.js";
@@ -24,9 +24,9 @@
 		href?: string;
 	} = $props();
 
-	const hue = $derived(toneFromName(session.snapshot?.app.name ?? "app").hue);
+	const hue = $derived(toneFromAccent(session.snapshot?.space.appearance?.accent).hue);
 	const color = $derived(chartPalette(hue, 1)[0] ?? "currentColor");
-	const tone = $derived(toneFromName(session.snapshot?.app.name ?? "app"));
+	const tone = $derived(toneFromAccent(session.snapshot?.space.appearance?.accent));
 	const total = $derived.by(() => {
 		if (!rows) return 0;
 		if (!value) return rows.length;

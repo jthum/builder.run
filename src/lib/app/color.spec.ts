@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vite-plus/test";
-import { initialsFromName, toneFromName } from "./color.ts";
+import { initialsFromName, toneFromAccent, toneFromName } from "./color.ts";
 
 describe("name color", () => {
   it("is stable for a name and different across names", () => {
@@ -21,5 +21,11 @@ describe("name color", () => {
     expect(initialsFromName("Ada Lovelace")).toBe("AL");
     expect(initialsFromName("Ada King Lovelace")).toBe("AL");
     expect(initialsFromName("  ")).toBe("A");
+  });
+
+  it("uses blue by default and resolves named space accents", () => {
+    expect(toneFromAccent()).toMatchObject({ key: "blue", hue: 264 });
+    expect(toneFromAccent("green")).toMatchObject({ key: "green", hue: 152 });
+    expect(toneFromAccent("green").primary).toContain("oklch");
   });
 });

@@ -32,7 +32,12 @@ import {
   isExposed,
 } from "./model.ts";
 import { readPlatformJson, type PersistenceBackend } from "./persist.ts";
-import type { PlatformState, SpaceState } from "./platform.ts";
+import {
+  SPACE_ACCENT_KEYS,
+  type PlatformState,
+  type SpaceAccent,
+  type SpaceState,
+} from "./platform.ts";
 import { executeView, findType, type QueryContext, type ViewRunContext } from "./query.ts";
 import {
   createRecord,
@@ -781,6 +786,12 @@ export class Host {
     await this.persistAndEmit();
   }
 
+  async updateSpaceAppearance(accent: SpaceAccent): Promise<void> {
+    if (!SPACE_ACCENT_KEYS.includes(accent)) throw new Error("Unknown accent colour");
+    this.space().appearance = { accent };
+    await this.persistAndEmit();
+  }
+
   async updateActor(patch: { name?: string; email?: string }): Promise<Actor> {
     patch = cloneData(patch);
     const actor = this.actor();
@@ -980,6 +991,7 @@ function seedSpace(name: string): { spaces: SpaceState[]; activeId: string } {
     id: rootId,
     name,
     actors: [human, system],
+    appearance: { accent: "blue" },
     spec: rootSpaceSpec(name),
   };
   const home: SpaceState = {

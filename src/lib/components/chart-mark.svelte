@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { toneFromName } from "$lib/app/color.ts";
+	import { toneFromAccent } from "$lib/app/color.ts";
 	import { session } from "$lib/app/session.svelte.ts";
 	import ChartFrame from "$lib/components/chart-frame.svelte";
 	import ChartPlot from "$lib/components/chart-plot.svelte";
@@ -40,7 +40,7 @@
 	let hidden = $state(new Set<string>());
 	let hover = $state<{ x: number; y: number; text: string } | null>(null);
 
-	const hue = $derived(toneFromName(session.snapshot?.app.name ?? "app").hue);
+	const hue = $derived(toneFromAccent(session.snapshot?.space.appearance?.accent).hue);
 	const grouped = $derived.by((): GroupedChart => {
 		if (!rows?.length || !category) return { categories: [], series: [] };
 		return groupChart(rows, {

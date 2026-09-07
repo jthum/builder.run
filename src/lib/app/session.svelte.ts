@@ -4,7 +4,13 @@ import {
   isStorageLocked,
   takeStorageLockReload,
 } from "$lib/runtime/storage-lock.ts";
-import { createWebMcpBridge, webmcpSupported } from "$lib/runtime/webmcp.ts";
+import {
+  createWebMcpBridge,
+  getWebMcpAppToolMode,
+  setWebMcpAppToolMode,
+  webmcpSupported,
+  type WebMcpAppToolMode,
+} from "$lib/runtime/webmcp.ts";
 
 export const session: {
   ready: boolean;
@@ -13,6 +19,7 @@ export const session: {
   error: string | null;
   revision: number;
   webmcp: boolean;
+  webmcpToolMode: WebMcpAppToolMode;
 } = $state({
   ready: false,
   host: null,
@@ -20,6 +27,7 @@ export const session: {
   error: null,
   revision: 0,
   webmcp: false,
+  webmcpToolMode: "compact",
 });
 
 type LiveRuntime = {
@@ -46,6 +54,7 @@ function publish(runtime: LiveRuntime) {
   session.host = runtime.host;
   session.snapshot = runtime.host.snapshot();
   session.webmcp = webmcpSupported();
+  session.webmcpToolMode = getWebMcpAppToolMode();
   session.ready = true;
   session.error = null;
   clearStorageLockReload();
@@ -91,6 +100,12 @@ export function boot(): Promise<void> {
 export function runtime(): Host {
   if (!session.host) throw new Error("builder.run runtime is not ready");
   return session.host;
+}
+
+export function configureWebMcpAppToolMode(mode: WebMcpAppToolMode): void {
+  setWebMcpAppToolMode(mode);
+  session.webmcpToolMode = mode;
+  session.revision += 1;
 }
 
 /** Dev tool: drop all local SQLite/OPFS/IndexedDB data and reload. */

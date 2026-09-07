@@ -34,7 +34,8 @@ These tools let an agent operate the app itself:
 
 When the application model changes, this capability surface can change with it.
 
-For example:
+In the default compact mode, changing a Type does not replace the registered CRUD schemas. Instead,
+the agent discovers the current contract when it needs it:
 
 ```text
 Agent adds `priority` to Project
@@ -43,7 +44,7 @@ Agent adds `priority` to Project
 Application spec changes
           │
           ├── UI now understands Project.priority
-          └── Project WebMCP tool schema now includes priority
+          └── describe_type({ type: "project" }) now includes priority
 ```
 
 The agent can then immediately use the capability it just created.
@@ -63,6 +64,47 @@ Page widgets follow the same rule. An agent can call `get_widgets` with a widget
 Structured flows are discoverable in the same way. `get_automation_primitives` returns the canonical composition shapes, registered condition and effect keys, their parameter contracts, and the active runtime capability profile. Agents should inspect it before `upsert_flow` rather than guessing a widget- or domain-specific workflow shape.
 
 WebMCP is therefore best understood as a **projection of the live spec**, not a second API.
+
+## Scalable application tool projection
+
+Generated per-Type CRUD tools are convenient for small applications: names such as
+`create_invoice` are immediately legible, and their input schemas can describe every field. They do
+not scale as the default, however, because the number and total schema size of registered tools grow
+with the application model.
+
+The default application surface is therefore a compact, stable set of generic operations:
+
+```text
+describe_type
+list_records
+get_record
+create_record
+update_record
+delete_record
+transition_record
+```
+
+`describe_type` supplies field constraints and lifecycle metadata on demand. The mutation tools pass
+their type key and values to the same runtime validation used by the human interface. Agent-exposed
+Flows remain individually named because they communicate business intent rather than repeating
+mechanical CRUD. If an application eventually exposes many Flows, action discovery can use the same
+list-and-invoke pattern.
+
+An optional **typed tools** runtime setting projects per-Type aliases for small applications or
+smaller models that benefit from explicit names and fully expanded schemas. This is a lightweight
+adapter over the generic operations, not another implementation:
+
+```text
+create_invoice(input)      → create_record({ type: "invoice", values: input })
+transition_invoice(input)  → transition_record({ type: "invoice", ...input })
+```
+
+Compact and typed modes replace one another rather than registering duplicate ways to perform the
+same operation. In the browser runtime, enable **Typed WebMCP tools** in Space settings; the choice is
+stored for that browser and applies across its apps. This setting belongs to the runtime or WebMCP
+host—not the portable application spec—because it changes how a capability is advertised, not what
+the application means. It should normally remain stable during an agent session to avoid unnecessary
+tool-change churn.
 
 ## Tool lifecycle
 
@@ -110,9 +152,11 @@ A useful end-to-end test is:
 2. Confirm **Inspect** reports that an agent connection is available.
 3. Ask the agent to inspect the current Space/app.
 4. Ask it to create or modify an application through the builder tools.
-5. Inspect the generated application tools.
+5. Inspect the application tools. Compact mode is the default; optionally enable typed tools in Space
+   settings for a small app.
 6. Ask the agent to populate the new application through those tools.
 7. Change the schema again (for example, add a choice field).
-8. Confirm the generated tool schema changes and the agent can immediately use the new field.
+8. Confirm `describe_type` reports the new field and the agent can immediately use it. In typed mode,
+   confirm the corresponding per-Type tool schema changes instead.
 
 That sequence exercises the distinctive part of the project rather than only proving that a static tool can be called.

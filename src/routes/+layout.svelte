@@ -2,7 +2,7 @@
 	import "./layout.css";
 	import { onMount } from "svelte";
 	import { ModeWatcher } from "mode-watcher";
-	import { toneFromName } from "$lib/app/color.ts";
+	import { applySpaceAccent } from "$lib/app/color.ts";
 	import { breadcrumbFor } from "$lib/app/labels.ts";
 	import { boot, session } from "$lib/app/session.svelte.ts";
 	import AppSidebar from "$lib/components/app-sidebar.svelte";
@@ -32,7 +32,9 @@
 			? `${session.snapshot?.app.name ?? "builder.run"}`
 			: `${crumbs.at(-1)?.label ?? "builder.run"} · ${session.snapshot?.app.name ?? "builder.run"}`,
 	);
-	const appTone = $derived(toneFromName(session.snapshot?.app.name ?? "builder.run"));
+	$effect(() => {
+		applySpaceAccent(session.snapshot?.space.appearance?.accent);
+	});
 </script>
 
 <svelte:head>
@@ -63,9 +65,7 @@
 		</Empty.Root>
 	</div>
 {:else}
-	<Sidebar.Provider
-		style="--app-gradient: {appTone.gradient}; --app-hue: {appTone.hue}; --app-accent: {appTone.accent}"
-	>
+	<Sidebar.Provider>
 		<AppSidebar />
 		<Sidebar.Inset>
 			<header class="flex h-16 shrink-0 items-center gap-2">

@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { page } from "$app/state";
-	import { initialsFromName, toneFromName } from "$lib/app/color.ts";
+	import { initialsFromName, toneFromAccent, toneFromName } from "$lib/app/color.ts";
 	import { collectionLabel, featuredViews, spaceLabel } from "$lib/app/labels.ts";
 	import { chrome, openNewApp, session, runtime } from "$lib/app/session.svelte.ts";
 	import { studioGroupOrder, studioItems } from "$lib/app/studio.ts";
@@ -73,7 +73,7 @@
 		"/diagnostics": SearchIcon,
 	};
 
-	const appTone = $derived(toneFromName(snap?.app.name ?? "App"));
+	const appTone = $derived(toneFromAccent(snap?.space.appearance?.accent));
 	const actorTone = $derived(toneFromName(snap?.actor.name ?? "You"));
 	const initial = $derived(initialsFromName(snap?.actor.name ?? "You"));
 </script>
@@ -109,7 +109,6 @@
 <Sidebar.Root
 	bind:ref
 	variant="inset"
-	style="--app-gradient: {appTone.gradient}; --app-hue: {appTone.hue}; --app-accent: {appTone.accent}"
 	{...restProps}
 >
 	<Sidebar.Header>

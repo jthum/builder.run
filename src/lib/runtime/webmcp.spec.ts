@@ -21,7 +21,7 @@ function mockRegistry() {
 }
 
 describe("webmcp bridge", () => {
-  it("exposes configured record lifecycles as named transition tools", async () => {
+  it("uses compact record tools and describes available lifecycle transitions", async () => {
     const host = await Host.open({ persist: false });
     await host.upsertType({
       key: "ticket",
@@ -34,16 +34,85 @@ describe("webmcp bridge", () => {
       },
     } as never);
     const tools = buildTools(host);
-    const create = tools.find((tool) => tool.name === "create_ticket");
-    const transition = tools.find((tool) => tool.name === "transition_ticket");
+    const create = tools.find((tool) => tool.name === "create_record");
+    const describe = tools.find((tool) => tool.name === "describe_type");
+    const transition = tools.find((tool) => tool.name === "transition_record");
     expect(transition).toBeTruthy();
-    expect(create?.inputSchema.required).toEqual([]);
-    expect(
-      (transition!.inputSchema.properties as Record<string, { enum?: string[] }>).transition.enum,
-    ).toEqual(["resolve"]);
-    const ticket = await host.create("ticket", {});
-    await transition?.execute({ id: ticket.id, transition: "resolve" });
+    expect(create?.inputSchema.required).toEqual(["type", "values"]);
+    const ticket = (await create?.execute({ type: "ticket", values: {} })) as { id: string };
+    const detail = await describe?.execute({ type: "ticket", id: ticket.id });
+    expect(detail).toMatchObject({
+      key: "ticket",
+      current_state: "new",
+      available_transitions: [{ key: "resolve", to: "resolved" }],
+    });
+    await transition?.execute({ type: "ticket", id: ticket.id, transition: "resolve" });
     expect((await host.getRecord("ticket", ticket.id))?.status).toBe("resolved");
+  });
+
+  it("offers typed record aliases as a schema-only adapter", async () => {
+    const host = await Host.open({ persist: false });
+    await host.upsertType({
+      key: "ticket",
+      fields: [
+        { key: "title", type: "text", required: true },
+        { key: "status", type: "enum", required: true, values: ["new", "resolved"] },
+      ],
+      lifecycle: {
+        field: "status",
+        initial: "new",
+        transitions: [{ key: "resolve", from: ["new"], to: "resolved" }],
+      },
+    } as never);
+    const tools = buildTools(host, { appTools: "typed" });
+    const create = tools.find((tool) => tool.name === "create_ticket")!;
+    const transition = tools.find((tool) => tool.name === "transition_ticket")!;
+    expect(tools.some((tool) => tool.name === "create_record")).toBe(false);
+    const properties = create.inputSchema.properties as Record<string, unknown>;
+    expect(properties.title).toBeTruthy();
+    expect(properties.status).toBeUndefined();
+    expect(create.inputSchema.required).toEqual(["title"]);
+    expect(
+      (transition.inputSchema.properties as Record<string, { enum?: string[] }>).transition.enum,
+    ).toEqual(["resolve"]);
+    const ticket = (await create.execute({ title: "Printer" })) as { id: string };
+    await transition.execute({ id: ticket.id, transition: "resolve" });
+    expect((await host.getRecord("ticket", ticket.id))?.status).toBe("resolved");
+  });
+
+  it("runs compact CRUD through the generic surface", async () => {
+    const host = await Host.open({ persist: false });
+    await host.upsertType({
+      key: "note",
+      fields: [{ key: "title", type: "text", required: true }],
+    });
+    const tools = new Map(buildTools(host).map((tool) => [tool.name, tool]));
+    expect(tools.has("create_note")).toBe(false);
+    const note = (await tools
+      .get("create_record")!
+      .execute({ type: "note", values: { title: "First" } })) as { id: string };
+    await tools
+      .get("update_record")!
+      .execute({ type: "note", id: note.id, values: { title: "Revised" } });
+    expect(await tools.get("get_record")!.execute({ type: "note", id: note.id })).toMatchObject({
+      title: "Revised",
+    });
+    expect(await tools.get("list_records")!.execute({ type: "note" })).toHaveLength(1);
+    await tools.get("delete_record")!.execute({ type: "note", id: note.id });
+    expect(await tools.get("list_records")!.execute({ type: "note" })).toEqual([]);
+  });
+
+  it("keeps the compact record tool schema stable as types are added", async () => {
+    const host = await Host.open({ persist: false });
+    const before = buildTools(host).filter((tool) => toolSurface(tool) === "app");
+    for (let index = 0; index < 25; index += 1) {
+      await host.upsertType({
+        key: `thing_${index}`,
+        fields: [{ key: "name", type: "text" }],
+      });
+    }
+    const after = buildTools(host).filter((tool) => toolSurface(tool) === "app");
+    expect(after.map((tool) => tool.name)).toEqual(before.map((tool) => tool.name));
   });
 
   it("does not abort or re-register tools after a record mutation", async () => {
@@ -57,7 +126,7 @@ describe("webmcp bridge", () => {
     const bridge = createWebMcpBridge(host, registry);
     await bridge.flush();
     const afterBoot = [...registry.events];
-    expect(afterBoot.some((event) => event === "register:create_note")).toBe(true);
+    expect(afterBoot.some((event) => event === "register:create_record")).toBe(true);
     await host.create("note", { title: "Hello" });
     await host.create("note", { title: "Again" });
     await bridge.flush();
@@ -65,7 +134,7 @@ describe("webmcp bridge", () => {
     bridge.stop();
   });
 
-  it("registers CRUD tools for a type added through upsert_type without aborting existing tools", async () => {
+  it("does not churn compact CRUD tools when a type is added", async () => {
     expect.hasAssertions();
     const host = await Host.open({ persist: false });
     const registry = mockRegistry();
@@ -81,9 +150,9 @@ describe("webmcp bridge", () => {
     expect(registry.events.slice(eventsBefore)).toEqual([]);
     await bridge.flush();
     expect(registry.events.filter((event) => event.startsWith("abort:")).length).toBe(abortsBefore);
-    expect(registry.events.some((event) => event === "register:create_client")).toBe(true);
-    expect(registry.events.some((event) => event === "register:list_client")).toBe(true);
-    expect(registry.tools.get("create_client")).toBeTruthy();
+    expect(registry.events.slice(eventsBefore)).toEqual([]);
+    expect(registry.tools.get("create_record")).toBeTruthy();
+    expect(registry.tools.get("create_client")).toBeUndefined();
     bridge.stop();
   });
 
@@ -111,7 +180,7 @@ describe("webmcp bridge", () => {
     };
     await upsert.execute({ key: "client", label: "Client" });
     await bridge.flush();
-    expect(registry.tools.get("create_client")).toBeTruthy();
+    expect(registry.tools.get("create_record")).toBeTruthy();
     bridge.stop();
   });
 
@@ -130,7 +199,7 @@ describe("webmcp bridge", () => {
       }
       return orig(tool, options);
     };
-    const bridge = createWebMcpBridge(host, registry);
+    const bridge = createWebMcpBridge(host, registry, { appTools: "typed" });
     await bridge.flush();
     failRemaining = 2;
     const before = calls;
@@ -146,7 +215,7 @@ describe("webmcp bridge", () => {
     expect.hasAssertions();
     const host = await Host.open({ persist: false });
     const registry = mockRegistry();
-    const bridge = createWebMcpBridge(host, registry);
+    const bridge = createWebMcpBridge(host, registry, { appTools: "typed" });
     await bridge.flush();
     const createApp = registry.tools.get("create_app")!;
     await createApp.execute({ name: "Practice" });
@@ -298,7 +367,7 @@ describe("webmcp bridge", () => {
     await bridge.flush();
     const after = JSON.parse(String(await registry.tools.get("get_space")!.execute({})));
     expect(after.exposed_types.some((type: { key: string }) => type.key === "client")).toBe(true);
-    expect(registry.tools.get("create_client")).toBeTruthy();
+    expect(registry.tools.get("create_record")).toBeTruthy();
     expect(host.space().spec.types.some((type) => type.key === "client" && type.expose)).toBe(true);
     expect(host.app().spec.types.some((type) => type.key === "client")).toBe(false);
     bridge.stop();
@@ -487,14 +556,15 @@ describe("webmcp bridge", () => {
     expect.hasAssertions();
     const host = await Host.open({ persist: false });
     await host.loadSample("freelance_crm");
-    const createProject = buildTools(host).find((tool) => tool.name === "create_project");
+    const typedTools = buildTools(host, { appTools: "typed" });
+    const createProject = typedTools.find((tool) => tool.name === "create_project");
     const properties = createProject?.inputSchema.properties as Record<
       string,
       { enum?: string[]; description?: string }
     >;
     expect(properties.status?.enum).toEqual(["planned", "active", "paused", "completed"]);
     expect(properties.client?.description).toMatch(/id of a organisation record/);
-    const invoke = buildTools(host).find((tool) => tool.name === "invoke_mark_invoice_paid");
+    const invoke = typedTools.find((tool) => tool.name === "invoke_mark_invoice_paid");
     expect(invoke).toBeTruthy();
     const invoice = (invoke!.inputSchema.properties as Record<string, { description?: string }>)
       .invoice;

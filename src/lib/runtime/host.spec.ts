@@ -528,6 +528,9 @@ types:
     expect(actor.email).toBe("ada@example.com");
     await host.renameSpace("Studio Space");
     expect(host.space().name).toBe("Studio Space");
+    expect(host.space().appearance?.accent).toBe("blue");
+    await host.updateSpaceAppearance("violet");
+    expect(host.space().appearance?.accent).toBe("violet");
     const app = await host.createApp("Pipeline", "freelance_crm");
     expect(app.name).toBe("Pipeline");
     expect(host.app().spec.types.some((type) => type.key === "invoice")).toBe(true);
