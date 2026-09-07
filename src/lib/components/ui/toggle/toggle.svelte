@@ -7,11 +7,13 @@
 			variant: {
 				default: "bg-transparent",
 				outline: "border border-input bg-transparent hover:bg-muted",
+				card: "border border-border bg-background shadow-xs hover:bg-muted/50 data-[state=on]:border-primary data-[state=on]:bg-primary/5 data-[state=on]:ring-1 data-[state=on]:ring-primary/20",
 			},
 			size: {
 				default: "h-9 min-w-9 px-3 has-data-[icon=inline-end]:pr-2.5 has-data-[icon=inline-start]:pl-2.5",
 				sm: "h-8 min-w-8 px-3 has-data-[icon=inline-end]:pr-2 has-data-[icon=inline-start]:pl-2",
 				lg: "h-10 min-w-10 px-4 has-data-[icon=inline-end]:pr-3 has-data-[icon=inline-start]:pl-3",
+				card: "h-auto w-full items-start justify-start whitespace-normal rounded-xl p-3 text-left",
 			},
 		},
 		defaultVariants: {

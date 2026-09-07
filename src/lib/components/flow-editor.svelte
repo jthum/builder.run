@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { goto } from "$app/navigation";
-	import { flowKind, flowSummary } from "$lib/app/relations.ts";
+	import { flowKind, humanCondition, humanStep, humanTrigger } from "$lib/app/relations.ts";
 	import { runtime, session } from "$lib/app/session.svelte.ts";
 	import AutomationPredicateEditor from "$lib/components/automation-predicate-editor.svelte";
 	import AutomationStepList from "$lib/components/automation-step-list.svelte";
@@ -17,13 +17,15 @@
 	import { Spinner } from "$lib/components/ui/spinner/index.js";
 	import { Switch } from "$lib/components/ui/switch/index.js";
 	import * as ToggleGroup from "$lib/components/ui/toggle-group/index.js";
+	import { cn } from "$lib/utils.ts";
 	import { BROWSER_LOCAL_AUTOMATION_PROFILE, checkAutomationCompatibility } from "$lib/runtime/automation/index.ts";
 	import type { AutomationPredicate, AutomationValue } from "$lib/runtime/automation/model.ts";
 	import { labelFromKey } from "$lib/runtime/ids.ts";
 	import { cloneData, type Exposure, type FlowDef, type FlowStep } from "$lib/runtime/model.ts";
 	import CircleAlertIcon from "@lucide/svelte/icons/circle-alert";
-	import MousePointerClickIcon from "@lucide/svelte/icons/mouse-pointer-click";
-	import ZapIcon from "@lucide/svelte/icons/zap";
+	import CircleCheckIcon from "@lucide/svelte/icons/circle-check";
+	import FilterIcon from "@lucide/svelte/icons/list-filter";
+	import MessageSquareTextIcon from "@lucide/svelte/icons/message-square-text";
 	import { toast } from "svelte-sonner";
 
 	let { flow }: { flow: FlowDef } = $props();
@@ -119,6 +121,19 @@
 	} as FlowDef);
 	const compatibility = $derived(checkAutomationCompatibility(draft, BROWSER_LOCAL_AUTOMATION_PROFILE));
 	const dirty = $derived(stableStringify(draft) !== stableStringify(flow));
+	const narrative = $derived.by(() => {
+		const trigger = kind === "button"
+			? `When it is run manually for ${inputTypeDef?.label?.toLowerCase() ?? "a record"}`
+			: compiledTrigger?.key
+				? `When ${humanTrigger(compiledTrigger.key, spec)}`
+				: "When a trigger is selected";
+		const condition = guardEnabled ? `, but only if ${humanCondition(guardPredicate)}` : "";
+		const summaries = steps.slice(0, 3).map((step) => lowerFirst(humanStep(step, spec)));
+		const actions = summaries.length
+			? `, ${summaries.map((summary, index) => `${index ? "then " : ""}${summary}`).join(", ")}${steps.length > 3 ? `, then ${steps.length - 3} more steps` : ""}`
+			: ", then add the first step";
+		return `${trigger}${condition}${actions}.`;
+	});
 
 	function stableStringify(value: unknown): string {
 		return JSON.stringify(value, (_key, item: unknown) =>
@@ -126,6 +141,9 @@
 				? Object.fromEntries(Object.entries(item as Record<string, unknown>).sort(([left], [right]) => left.localeCompare(right)))
 				: item,
 		);
+	}
+	function lowerFirst(value: string): string {
+		return value ? `${value[0].toLowerCase()}${value.slice(1)}` : value;
 	}
 
 	function simplePredicate(name: string, typeKey: string): AutomationPredicate {
@@ -204,40 +222,68 @@
 </script>
 
 <div class="flex flex-col gap-6">
-	<PageHeader title={label || flow.label} description={flowSummary(draft, spec)} />
+	<PageHeader title={label || flow.label} description="Configure when this workflow runs, what it checks, and what happens next." />
 
-	<Card.Root size="sm" class="sticky top-3 z-10 mx-auto w-full max-w-4xl shadow-sm">
-		<Card.Content class="flex items-center justify-between gap-3 py-2">
-			<p class="text-xs text-muted-foreground">{dirty ? "Unsaved workflow changes" : "Workflow is up to date"}</p>
-			<div class="flex items-center gap-2">
-				<Button size="sm" variant="ghost" onclick={() => (deleteOpen = true)}>Delete</Button>
-				<Button size="sm" onclick={save} disabled={!dirty || saving}>{#if saving}<Spinner data-icon="inline-start" />{/if} Save changes</Button>
-			</div>
-		</Card.Content>
-	</Card.Root>
+	<Alert.Root class={cn("mx-auto max-w-4xl transition-colors", enabled ? "border-primary/20 bg-primary/5" : "bg-muted/40 text-muted-foreground")}>
+		<MessageSquareTextIcon />
+		<Alert.Title>In plain English</Alert.Title>
+		<Alert.Description class={cn(enabled && "text-foreground")}>
+			<p>{narrative}</p>
+			{#if !enabled}<p>Paused — this workflow will not run until you enable it below.</p>{/if}
+		</Alert.Description>
+		<Alert.Action><Badge variant={enabled ? "default" : "secondary"}>{enabled ? "Active" : "Paused"}</Badge></Alert.Action>
+	</Alert.Root>
 
 	<div class="mx-auto flex w-full max-w-4xl flex-col gap-5 sm:gap-6">
+		<Card.Root>
+			<Card.Header class="gap-0">
+				<Card.Title>Workflow details</Card.Title>
+				<Card.Description>Give this workflow a clear name and choose whether it can run.</Card.Description>
+			</Card.Header>
+			<Card.Content>
+				<Field.Group>
+					<Field.Field><Field.Label>Name</Field.Label><Input bind:value={label} placeholder={kind === "button" ? "Mark invoice paid" : "Record paid date"} /></Field.Field>
+					<Field.Field><Field.Label>Description</Field.Label><Input bind:value={description} placeholder="What this workflow does" /></Field.Field>
+					<Field.Field orientation="horizontal" class="justify-between rounded-xl border bg-muted/30 p-3">
+						<div class="flex flex-col gap-0.5">
+							<Field.Label class="font-medium">This workflow is {enabled ? "on" : "off"}</Field.Label>
+							<Field.Description>{enabled ? "It will run whenever its trigger and conditions match." : "It stays saved, but nothing will run until you turn it on."}</Field.Description>
+						</div>
+						<Switch bind:checked={enabled} aria-label={enabled ? "Disable workflow" : "Enable workflow"} />
+					</Field.Field>
+				</Field.Group>
+			</Card.Content>
+		</Card.Root>
+
 		<div class="relative flex flex-col gap-5 sm:gap-6">
-			<div class="absolute bottom-0 left-5 top-10 hidden w-px bg-border sm:block"></div>
+			<div class="absolute bottom-0 left-5 top-10 hidden w-px bg-primary/20 sm:block"></div>
 
 			<section class="grid min-w-0 gap-3 sm:grid-cols-[2.5rem_minmax(0,1fr)] sm:gap-4">
-				<div class="relative hidden size-10 items-center justify-center rounded-full border bg-background text-sm font-semibold shadow-xs sm:flex">1</div>
+				<div class="relative hidden size-10 items-center justify-center rounded-full border border-primary bg-primary text-sm font-semibold text-primary-foreground sm:flex">1</div>
 			<Card.Root>
 				<Card.Header class="gap-0">
 					<Card.Title>When</Card.Title>
 					<Card.Description>{kind === "button" ? "Configure a workflow that runs on demand." : "Choose the trigger that starts this workflow."}</Card.Description>
 				</Card.Header>
 				<Card.Content>
-					<Field.Group class="grid gap-4 md:grid-cols-2">
-						<Field.Field class="md:col-span-2">
-							<ToggleGroup.Root type="single" bind:value={kind} variant="outline" size="sm" spacing={1}>
-								<ToggleGroup.Item value="rule"><ZapIcon data-icon="inline-start" /> Something happens</ToggleGroup.Item>
-								<ToggleGroup.Item value="button"><MousePointerClickIcon data-icon="inline-start" /> Run manually</ToggleGroup.Item>
+					<Field.Group class="gap-4">
+						<Field.FieldSet>
+							<Field.FieldLegend>How should this workflow start?</Field.FieldLegend>
+							<ToggleGroup.Root type="single" bind:value={kind} variant="card" size="card" spacing={2} class="grid w-full grid-cols-1 sm:grid-cols-2">
+								<ToggleGroup.Item value="rule">
+									<span class="mt-0.5 flex size-4 shrink-0 rounded-full border group-data-[state=on]/toggle:border-primary">
+										<span class="m-auto size-2 rounded-full bg-primary opacity-0 group-data-[state=on]/toggle:opacity-100"></span>
+									</span>
+									<span class="flex min-w-0 flex-col gap-0.5"><span>Something happens</span><span class="text-xs font-normal text-muted-foreground">An event, schedule, or webhook starts it.</span></span>
+								</ToggleGroup.Item>
+								<ToggleGroup.Item value="button">
+									<span class="mt-0.5 flex size-4 shrink-0 rounded-full border group-data-[state=on]/toggle:border-primary">
+										<span class="m-auto size-2 rounded-full bg-primary opacity-0 group-data-[state=on]/toggle:opacity-100"></span>
+									</span>
+									<span class="flex min-w-0 flex-col gap-0.5"><span>Run manually</span><span class="text-xs font-normal text-muted-foreground">A person, agent, or API starts it.</span></span>
+								</ToggleGroup.Item>
 							</ToggleGroup.Root>
-							<Field.Description>{kind === "button" ? "Started from a record button, agent, or API." : "Started by an event, schedule, webhook, or other trigger."}</Field.Description>
-						</Field.Field>
-						<Field.Field><Field.Label>Name</Field.Label><Input bind:value={label} placeholder={kind === "button" ? "Mark invoice paid" : "Record paid date"} /></Field.Field>
-						<Field.Field><Field.Label>Description</Field.Label><Input bind:value={description} placeholder="What this workflow does" /></Field.Field>
+						</Field.FieldSet>
 						<Field.Field>
 							<Field.Label>{kind === "button" ? "Show on" : "Watch"}</Field.Label>
 							<AppSelect value={inputType} onValueChange={setInputType} options={types.map((type) => ({ value: type.key, label: type.label }))} disabled={!inputEditable} />
@@ -260,8 +306,7 @@
 					</Field.Group>
 				</Card.Content>
 				<Card.Footer>
-					<Field.Group class="grid w-full gap-3 sm:grid-cols-[repeat(auto-fit,minmax(12rem,1fr))]">
-						<Field.Field orientation="horizontal"><Switch bind:checked={enabled} /><div><Field.Label class="font-normal">Enabled</Field.Label><Field.Description>Allow this workflow to run.</Field.Description></div></Field.Field>
+					<Field.Group class={cn("grid w-full gap-4", kind === "button" ? "sm:grid-cols-2" : "sm:grid-cols-1")}>
 						{#if kind === "button"}
 							<Field.Field orientation="horizontal"><Switch bind:checked={exposeUi} /><div><Field.Label class="font-normal">Record button</Field.Label><Field.Description>Show when a record is open.</Field.Description></div></Field.Field>
 						{/if}
@@ -272,7 +317,7 @@
 			</section>
 
 			<section class="grid min-w-0 gap-3 sm:grid-cols-[2.5rem_minmax(0,1fr)] sm:gap-4">
-				<div class="relative hidden size-10 items-center justify-center rounded-full border bg-background text-sm font-semibold shadow-xs sm:flex">2</div>
+				<div class="relative hidden size-10 items-center justify-center rounded-full border border-primary bg-primary text-sm font-semibold text-primary-foreground sm:flex">2</div>
 			<Card.Root>
 				<Card.Header class="gap-0">
 					<div class="flex items-center justify-between gap-3"><div class="flex flex-col gap-0"><Card.Title>If</Card.Title><Card.Description>Optionally limit when this workflow continues.</Card.Description></div><Switch bind:checked={guardEnabled} aria-label="Use entry condition" /></div>
@@ -280,13 +325,20 @@
 				{#if guardEnabled}
 					<Card.Content><AutomationPredicateEditor predicate={guardPredicate} onPredicateChange={(next) => (guardPredicate = next)} {inputName} type={inputTypeDef} /></Card.Content>
 				{:else}
-					<Card.Content><p class="text-sm text-muted-foreground">No conditions. Every matching event continues to the actions below.</p></Card.Content>
+					<Card.Content>
+						<Alert.Root class="border-primary/15 bg-primary/5">
+							<CircleCheckIcon />
+							<Alert.Title>No extra conditions</Alert.Title>
+							<Alert.Description>This workflow continues every time its trigger matches.</Alert.Description>
+							<Alert.Action><Button variant="outline" size="sm" onclick={() => (guardEnabled = true)}><FilterIcon data-icon="inline-start" /> Only run when…</Button></Alert.Action>
+						</Alert.Root>
+					</Card.Content>
 				{/if}
 			</Card.Root>
 			</section>
 
 			<section class="grid min-w-0 gap-3 sm:grid-cols-[2.5rem_minmax(0,1fr)] sm:gap-4">
-				<div class="relative hidden size-10 items-center justify-center rounded-full border bg-background text-sm font-semibold shadow-xs sm:flex">3</div>
+				<div class="relative hidden size-10 items-center justify-center rounded-full border border-primary bg-primary text-sm font-semibold text-primary-foreground sm:flex">3</div>
 			<Card.Root>
 				<Card.Header class="gap-0"><Card.Title>Then</Card.Title><Card.Description>Actions run from top to bottom. Conditions can branch into more steps.</Card.Description></Card.Header>
 				<Card.Content><AutomationStepList {steps} onStepsChange={(next) => (steps = next)} {inputName} {inputType} {types} flows={flows.filter((item) => item.key !== flow.key)} {spec} /></Card.Content>
@@ -308,8 +360,22 @@
 				</Alert.Root>
 			</div>
 		{/if}
+
+		<div class="flex items-center justify-between gap-3 sm:pl-14">
+			<Button variant="destructive-outline" size="sm" onclick={() => (deleteOpen = true)}>Delete workflow</Button>
+			<div class="flex items-center gap-3">
+				<p class="text-xs text-muted-foreground">{dirty ? "Unsaved changes" : "All changes saved"}</p>
+				<Button onclick={save} disabled={!dirty || saving}>{#if saving}<Spinner data-icon="inline-start" />{/if} Save changes</Button>
+			</div>
+		</div>
 	</div>
 </div>
+
+{#if dirty}
+	<div class="fixed bottom-4 right-4 z-20">
+		<Button onclick={save} disabled={saving}>{#if saving}<Spinner data-icon="inline-start" />{/if} Save changes</Button>
+	</div>
+{/if}
 
 <AlertDialog.Root bind:open={deleteOpen}>
 	<AlertDialog.Content>

@@ -6,7 +6,7 @@
 	import AppSelect from "$lib/components/app-select.svelte";
 	import { reorderAtVerticalTarget, startVerticalDrag, type VerticalDragSession, type VerticalDropTarget } from "$lib/app/drag.ts";
 	import * as Collapsible from "$lib/components/ui/collapsible/index.js";
-	import * as DropdownMenu from "$lib/components/ui/dropdown-menu/index.js";
+	import * as Command from "$lib/components/ui/command/index.js";
 	import { Button } from "$lib/components/ui/button/index.js";
 	import * as Card from "$lib/components/ui/card/index.js";
 	import * as Field from "$lib/components/ui/field/index.js";
@@ -48,6 +48,27 @@
 
 	const inputTypeDef = $derived(types.find((type) => type.key === inputType));
 	const registeredEffects = [...DEFAULT_AUTOMATION_REGISTRY.effects.values()];
+	type PickerCategory = "actions" | "conditions" | "wait" | "loops";
+	type StepChoice = { kind: string; label: string; description: string; category: PickerCategory; effectKey?: string };
+	const stepChoices: StepChoice[] = [
+		{ kind: "query", label: "Query records", description: "Find records from a type or view.", category: "actions" },
+		{ kind: "set", label: "Update current record", description: "Change one or more field values.", category: "actions" },
+		{ kind: "create", label: "Create a record", description: "Add a record to a type.", category: "actions" },
+		{ kind: "delete", label: "Delete current record", description: "Remove the current record.", category: "actions" },
+		{ kind: "compute", label: "Set variables", description: "Calculate values for later steps.", category: "actions" },
+		{ kind: "invoke", label: "Run another workflow", description: "Reuse another workflow.", category: "actions" },
+		{ kind: "gate", label: "Condition branch", description: "Continue only when a condition passes.", category: "conditions" },
+		{ kind: "parallel", label: "Parallel branches", description: "Run independent branches together.", category: "conditions" },
+		{ kind: "delay", label: "Wait for a duration", description: "Pause for a fixed amount of time.", category: "wait" },
+		{ kind: "wait", label: "Wait for signal", description: "Resume after a signal or timeout.", category: "wait" },
+		{ kind: "foreach", label: "For each item", description: "Run steps for every item in a list.", category: "loops" },
+		{ kind: "repeat", label: "Repeat steps", description: "Run steps a fixed number of times.", category: "loops" },
+		...registeredEffects
+			.filter((effect) => !["records.query", "records.set", "records.create", "records.delete"].includes(effect.key))
+			.map((effect) => ({ kind: "effect", effectKey: effect.key, label: effect.label, description: `Run the ${effect.label.toLowerCase()} effect.`, category: "actions" as const })),
+	];
+	let pickerOpen = $state(false);
+	let pickerCategory = $state<PickerCategory | "all">("all");
 	let stepList = $state<HTMLDivElement | null>(null);
 	let dragStep = $state<AutomationStep | null>(null);
 	let dragSession: VerticalDragSession | null = null;
@@ -146,7 +167,7 @@
 		onStepsChange(next);
 	}
 
-	function add(kind: string) {
+	function add(kind: string, effectKey?: string) {
 		let step: AutomationStep;
 		if (kind === "set") {
 			const field = inputTypeDef?.fields[0];
@@ -180,7 +201,7 @@
 		} else if (kind === "wait") {
 			step = { wait: { timeout: "5 minutes", on_timeout: [] } };
 		} else if (kind === "effect") {
-			step = { effect: { key: "null", params: {} } };
+			step = { effect: { key: effectKey ?? registeredEffects[0]?.key ?? "null", params: {} } };
 		} else {
 			step = {
 				gate: {
@@ -190,6 +211,16 @@
 			};
 		}
 		onStepsChange([...steps, step]);
+	}
+
+	function openPicker(category: PickerCategory | "all") {
+		pickerCategory = category;
+		pickerOpen = true;
+	}
+
+	function chooseStep(choice: StepChoice) {
+		add(choice.kind, choice.effectKey);
+		pickerOpen = false;
 	}
 
 	function createFieldsFor(step: AutomationStep): Record<string, AutomationValue> {
@@ -662,33 +693,47 @@
 	{#if steps.length > 0}
 		<div class="ml-[2.15rem] h-3 w-px bg-border" aria-hidden="true"></div>
 	{/if}
-	<DropdownMenu.Root>
-		<DropdownMenu.Trigger>
-			{#snippet child({ props })}
-				<Button {...props} variant="outline" size="sm" class="w-fit">
-					<PlusIcon data-icon="inline-start" /> Add step
+	{#if depth === 0}
+		<Card.Root size="sm">
+			<Card.Header class="gap-0">
+				<Card.Title>Add a step</Card.Title>
+				<Card.Description>Choose the kind of work this workflow should do next.</Card.Description>
+			</Card.Header>
+			<Card.Content class="grid grid-cols-1 gap-3 sm:grid-cols-2">
+				<Button variant="outline" class="h-auto min-h-20 flex-col items-start justify-start gap-0.5 whitespace-normal p-4 text-left" onclick={() => openPicker("actions")}>
+					<span>Do something</span><span class="text-xs font-normal text-muted-foreground">Records, effects, or workflows</span>
 				</Button>
-			{/snippet}
-		</DropdownMenu.Trigger>
-		<DropdownMenu.Content align="start" class="min-w-52">
-			<DropdownMenu.Group>
-				<DropdownMenu.Item onSelect={() => add("query")}>Query records</DropdownMenu.Item>
-				<DropdownMenu.Item onSelect={() => add("set")}>Update current record</DropdownMenu.Item>
-				<DropdownMenu.Item onSelect={() => add("create")}>Create a record</DropdownMenu.Item>
-				<DropdownMenu.Item onSelect={() => add("delete")}>Delete current record</DropdownMenu.Item>
-				<DropdownMenu.Item onSelect={() => add("effect")}>Registry effect</DropdownMenu.Item>
-			</DropdownMenu.Group>
-			<DropdownMenu.Separator />
-			<DropdownMenu.Group>
-				<DropdownMenu.Item onSelect={() => add("gate")}>Add condition branch</DropdownMenu.Item>
-				<DropdownMenu.Item onSelect={() => add("compute")}>Set variables</DropdownMenu.Item>
-				<DropdownMenu.Item onSelect={() => add("invoke")}>Run another workflow</DropdownMenu.Item>
-				<DropdownMenu.Item onSelect={() => add("delay")}>Wait for a duration</DropdownMenu.Item>
-				<DropdownMenu.Item onSelect={() => add("wait")}>Wait for signal or timeout</DropdownMenu.Item>
-				<DropdownMenu.Item onSelect={() => add("foreach")}>For each item</DropdownMenu.Item>
-				<DropdownMenu.Item onSelect={() => add("repeat")}>Repeat steps</DropdownMenu.Item>
-				<DropdownMenu.Item onSelect={() => add("parallel")}>Parallel branches</DropdownMenu.Item>
-			</DropdownMenu.Group>
-		</DropdownMenu.Content>
-	</DropdownMenu.Root>
+				<Button variant="outline" class="h-auto min-h-20 flex-col items-start justify-start gap-0.5 whitespace-normal p-4 text-left" onclick={() => openPicker("conditions")}>
+					<span>Add logic</span><span class="text-xs font-normal text-muted-foreground">Conditions or parallel paths</span>
+				</Button>
+				<Button variant="outline" class="h-auto min-h-20 flex-col items-start justify-start gap-0.5 whitespace-normal p-4 text-left" onclick={() => openPicker("wait")}>
+					<span>Wait</span><span class="text-xs font-normal text-muted-foreground">For time or a signal</span>
+				</Button>
+				<Button variant="outline" class="h-auto min-h-20 flex-col items-start justify-start gap-0.5 whitespace-normal p-4 text-left" onclick={() => openPicker("loops")}>
+					<span>Loop</span><span class="text-xs font-normal text-muted-foreground">For each item or repeat</span>
+				</Button>
+			</Card.Content>
+			<Card.Footer><Button variant="ghost" size="sm" onclick={() => openPicker("all")}><PlusIcon data-icon="inline-start" /> Browse all steps</Button></Card.Footer>
+		</Card.Root>
+	{:else}
+		<Button variant="outline" size="sm" class="w-fit" onclick={() => openPicker("all")}><PlusIcon data-icon="inline-start" /> Add step</Button>
+	{/if}
 </div>
+
+<Command.Dialog bind:open={pickerOpen} title="Add a workflow step" description="Search or choose the next step in this workflow." showCloseButton>
+	<Command.Input placeholder="Search steps…" />
+	<Command.List>
+		<Command.Empty>No matching steps.</Command.Empty>
+		{#each ["actions", "conditions", "wait", "loops"] as category (category)}
+			{#if pickerCategory === "all" || pickerCategory === category}
+				<Command.Group heading={{ actions: "Actions", conditions: "Logic", wait: "Wait", loops: "Loops" }[category]}>
+					{#each stepChoices.filter((choice) => choice.category === category) as choice (`${choice.kind}:${choice.effectKey ?? choice.label}`)}
+						<Command.Item value={`${choice.label} ${choice.description}`} onSelect={() => chooseStep(choice)}>
+							<div class="flex min-w-0 flex-col"><span>{choice.label}</span><span class="truncate text-xs text-muted-foreground">{choice.description}</span></div>
+						</Command.Item>
+					{/each}
+				</Command.Group>
+			{/if}
+		{/each}
+	</Command.List>
+</Command.Dialog>
