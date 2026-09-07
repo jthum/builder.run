@@ -26,14 +26,37 @@ describe("builder.run host", () => {
     await host.upsertFlow({
       key: "mark_paid",
       expose: ["ui", "agent"],
-      input: { invoice: "ref(invoice)" },
-      steps: [{ set: { "invoice.status": "paid" } }],
+      input: { invoice: { record: "invoice" } },
+      steps: [
+        {
+          effect: {
+            key: "records.set",
+            params: { record: { $ref: "vars.invoice" }, values: { status: "paid" } },
+          },
+        },
+      ],
     });
     await host.upsertFlow({
       key: "stamp_paid",
-      trigger: { when: "invoice.status.changed" },
-      when: "invoice.status == paid",
-      steps: [{ set: { "invoice.paid_at": "now" } }],
+      trigger: { key: "invoice.status.changed" },
+      steps: [
+        {
+          gate: {
+            predicate: { op: "context.equals", path: "vars.invoice.status", value: "paid" },
+            pass: [
+              {
+                effect: {
+                  key: "records.set",
+                  params: {
+                    record: { $ref: "vars.invoice" },
+                    values: { paid_at: { $ref: "meta.now" } },
+                  },
+                },
+              },
+            ],
+          },
+        },
+      ],
     });
     const created = await host.create("invoice", { number: "INV-1" });
     expect(created.status).toBe("draft");
@@ -44,6 +67,190 @@ describe("builder.run host", () => {
     const spec = host.resolvedSpec();
     expect(spec.views.some((view) => view.source === "invoice")).toBe(true);
     expect(spec.forms.some((form) => form.type === "invoice")).toBe(true);
+  });
+
+  it("runs structured results, gates, loops, and deterministic branches", async () => {
+    const host = await Host.open({ persist: false });
+    await host.upsertType({
+      key: "invoice",
+      fields: [
+        { id: "fld_number", key: "number", label: "Number", type: "text" },
+        {
+          id: "fld_status",
+          key: "status",
+          label: "Status",
+          type: "enum",
+          values: ["draft", "paid"],
+          default: "draft",
+        },
+      ] as never,
+    });
+    const first = await host.create("invoice", { number: "INV-1" });
+    const second = await host.create("invoice", { number: "INV-2" });
+    await host.upsertFlow({
+      key: "bulk_mark_paid",
+      input: { status: { value: "text" } },
+      steps: [
+        {
+          effect: {
+            key: "records.query",
+            params: { type: "invoice" },
+            as: "invoices",
+          },
+        },
+        {
+          compute: {
+            assign: {
+              invoices_copy: { $ref: "vars.invoices" },
+              marker: "before",
+            },
+          },
+        },
+        {
+          compute: {
+            assign: {
+              marker: "after",
+              observed_marker: { $ref: "vars.marker" },
+            },
+          },
+        },
+        {
+          foreach: {
+            source: { $ref: "vars.invoices_copy" },
+            as: "invoice",
+            steps: [
+              {
+                gate: {
+                  predicate: {
+                    op: "context.equals",
+                    path: "vars.invoice.status",
+                    value: "draft",
+                  },
+                  pass: [
+                    {
+                      effect: {
+                        key: "records.set",
+                        params: {
+                          record: { $ref: "vars.invoice" },
+                          values: { status: { $ref: "vars.status" } },
+                        },
+                      },
+                    },
+                  ],
+                },
+              },
+            ],
+          },
+        },
+        {
+          parallel: {
+            branches: [
+              { steps: [{ compute: { assign: { first_branch: true } } }] },
+              { steps: [{ compute: { assign: { second_branch: true } } }] },
+            ],
+          },
+        },
+      ],
+    });
+
+    const run = await host.invoke("bulk_mark_paid", { status: "paid" });
+    expect((await host.getRecord("invoice", first.id))?.status).toBe("paid");
+    expect((await host.getRecord("invoice", second.id))?.status).toBe("paid");
+    expect(run.output).toMatchObject({
+      first_branch: true,
+      second_branch: true,
+      marker: "after",
+      observed_marker: "before",
+    });
+  });
+
+  it("enforces type lifecycles and dispatches named transition triggers", async () => {
+    const host = await Host.open({ persist: false });
+    await host.upsertType({
+      key: "ticket",
+      fields: [
+        {
+          key: "status",
+          type: "enum",
+          required: true,
+          values: ["new", "active", "resolved"],
+        },
+        { key: "closed", type: "boolean" },
+      ],
+      lifecycle: {
+        field: "status",
+        initial: "new",
+        terminal: ["resolved"],
+        transitions: [
+          { key: "start", label: "Start", from: ["new"], to: "active" },
+          { key: "resolve", label: "Resolve", from: ["active"], to: "resolved" },
+        ],
+      },
+    } as never);
+    await host.upsertFlow({
+      key: "mark_closed",
+      input: { ticket: { record: "ticket" } },
+      trigger: { key: "ticket.resolve.transitioned" },
+      steps: [
+        {
+          effect: {
+            key: "records.set",
+            params: { record: { $ref: "vars.ticket" }, values: { closed: true } },
+          },
+        },
+      ],
+    });
+
+    const ticket = await host.create("ticket", {});
+    expect(ticket.status).toBe("new");
+    await expect(host.create("ticket", { status: "active" })).rejects.toThrow(
+      "must start in lifecycle state new",
+    );
+    const active = await host.transition("ticket", ticket.id, "start");
+    expect(active.status).toBe("active");
+    await expect(host.update("ticket", ticket.id, { status: "new" })).rejects.toThrow(
+      "Invalid Ticket lifecycle transition from active to new",
+    );
+    await host.transition("ticket", ticket.id, "resolve");
+    expect(await host.getRecord("ticket", ticket.id)).toMatchObject({
+      status: "resolved",
+      closed: true,
+    });
+    await expect(host.transition("ticket", ticket.id, "start")).rejects.toThrow(
+      "is not available from resolved",
+    );
+  });
+
+  it("compensates completed effects when a later step fails", async () => {
+    const host = await Host.open({ persist: false });
+    await host.upsertType({ key: "note", fields: { title: "text" } });
+    await host.upsertFlow({
+      key: "create_then_fail",
+      steps: [
+        {
+          effect: {
+            key: "records.create",
+            params: { type: "note", fields: { title: "Temporary" } },
+            as: "created",
+            compensate: {
+              key: "records.delete",
+              params: { record: { $ref: "vars.created" } },
+            },
+          },
+        },
+        {
+          effect: {
+            key: "records.set",
+            params: { record: { $ref: "vars.missing" }, values: { title: "Never" } },
+          },
+        },
+      ],
+    });
+
+    await expect(host.invoke("create_then_fail")).rejects.toThrow(
+      "records.set needs a record binding",
+    );
+    expect(await host.queryView("note_list")).toEqual([]);
   });
 
   it("parses a compact authored spec", () => {
@@ -355,7 +562,7 @@ types:
     );
     expect(host.app().spec.types.some((type) => type.key === "organisation")).toBe(false);
     expect(host.app().spec.types.some((type) => type.key === "invoice")).toBe(true);
-    const shared = await host.inspectStore("shared");
+    const shared = await host.inspectStore("space");
     const local = await host.inspectStore("local");
     expect(shared.database).toBe(`space-${host.space().id}`);
     expect(local.database).toBe(`space-${host.app().id}`);

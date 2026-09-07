@@ -1,8 +1,7 @@
 import { applyDefaults } from "./defaults.ts";
 import type { Actor, AppSpec } from "./model.ts";
-import { nowIso, normalizeSpec, repairLegacyFields } from "./model.ts";
+import { nowIso, normalizeSpec } from "./model.ts";
 import type { PlatformState, SpaceState } from "./platform.ts";
-import { sqlIdent } from "./sql.ts";
 import type { SqlConnection } from "./sql-gateway.ts";
 import { scalarString } from "./values.ts";
 
@@ -35,28 +34,7 @@ CREATE TABLE IF NOT EXISTS kv (
 );
 `;
 
-const REQUIRED_COLUMNS: Record<(typeof CATALOG_TABLES)[number], string[]> = {
-  space: ["id", "name", "created_by", "spec", "created_at", "updated_at"],
-  actor: ["id", "space_id", "name", "email", "kind", "roles"],
-  kv: ["key", "value"],
-};
-
-const LEGACY_TABLES = [
-  "br_environment",
-  "br_workspace",
-  "br_app",
-  "br_store",
-  "br_shared_types",
-  "br_space",
-  "br_actor",
-  "br_kv",
-  "space",
-  "actor",
-  "kv",
-];
-
 export async function ensureCatalog(conn: SqlConnection): Promise<void> {
-  await resetIncompatibleCatalog(conn);
   await conn.exec(CATALOG_SQL);
 }
 
@@ -65,36 +43,6 @@ export async function listCatalogTables(conn: SqlConnection): Promise<string[]> 
     `SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%' ORDER BY name`,
   );
   return rows.map((row) => String(row.name));
-}
-
-async function tableNames(conn: SqlConnection): Promise<Set<string>> {
-  return new Set(await listCatalogTables(conn));
-}
-
-async function columnNames(conn: SqlConnection, table: string): Promise<Set<string>> {
-  const rows = await conn.query(`PRAGMA table_info(${sqlIdent(table)})`);
-  return new Set(rows.map((row) => String(row.name)));
-}
-
-async function resetIncompatibleCatalog(conn: SqlConnection): Promise<void> {
-  const tables = await tableNames(conn);
-  if (!tables.size) return;
-  let compatible = ![...tables].some((table) => table.startsWith("br_"));
-  if (compatible) {
-    for (const table of CATALOG_TABLES) {
-      if (!tables.has(table)) continue;
-      const columns = await columnNames(conn, table);
-      if (!REQUIRED_COLUMNS[table].every((column) => columns.has(column))) {
-        compatible = false;
-        break;
-      }
-    }
-  }
-  if (compatible) return;
-  for (const table of new Set([...LEGACY_TABLES, ...tables])) {
-    if (table.startsWith("sqlite_")) continue;
-    await conn.exec(`DROP TABLE IF EXISTS ${sqlIdent(table)}`);
-  }
 }
 
 export async function loadPlatform(conn: SqlConnection): Promise<PlatformState | null> {
@@ -120,7 +68,7 @@ export async function loadPlatform(conn: SqlConnection): Promise<PlatformState |
     name: String(row.name),
     createdBy: row.created_by ? scalarString(row.created_by) : undefined,
     actors: actorsBySpace.get(String(row.id)) ?? [],
-    spec: applyDefaults(normalizeSpec(repairLegacyFields(JSON.parse(String(row.spec)) as AppSpec))),
+    spec: applyDefaults(normalizeSpec(JSON.parse(String(row.spec)) as AppSpec)),
   }));
   const active = await conn.query(`SELECT value FROM kv WHERE key = 'active_space_id'`);
   return {

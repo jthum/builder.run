@@ -48,6 +48,13 @@
 	const recordActions = $derived(
 		spec && type && record ? applicableFlows(spec, type.key, record) : [],
 	);
+	const lifecycleActions = $derived(
+		type?.lifecycle && record
+			? type.lifecycle.transitions.filter((transition) =>
+					transition.from.includes(String(record?.[type.lifecycle?.field ?? ""] ?? "")),
+				)
+			: [],
+	);
 
 	$effect(() => {
 		void session.revision;
@@ -138,6 +145,11 @@
 		toast.success(label);
 	}
 
+	async function applyTransition(transitionKey: string, label: string) {
+		await runtime().transition(typeKey, id, transitionKey);
+		toast.success(label);
+	}
+
 	async function remove() {
 		await runtime().remove(typeKey, id);
 		toast.success("Deleted");
@@ -179,6 +191,9 @@
 	<div class="flex flex-col gap-8">
 		<PageHeader {title} description={updated ? `Updated ${updated}` : undefined}>
 			{#snippet actions()}
+				{#each lifecycleActions as transition (transition.key)}
+					<Button onclick={() => applyTransition(transition.key, transition.label)}>{transition.label}</Button>
+				{/each}
 				{#each recordActions as flow (flow.id)}
 					<Button variant="outline" onclick={() => invoke(flow.key, flow.label)}>{flow.label}</Button>
 				{/each}

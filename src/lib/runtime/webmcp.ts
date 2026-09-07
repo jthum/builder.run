@@ -1,4 +1,6 @@
 import type { Host } from "./host.ts";
+import { BROWSER_LOCAL_AUTOMATION_PROFILE } from "./automation/capabilities.ts";
+import { DEFAULT_AUTOMATION_REGISTRY } from "./automation/registry.ts";
 import { cloneData, FIELD_KINDS, type FieldDef } from "./model.ts";
 import { sampleApps } from "./samples.ts";
 import { PAGE_ICON_KEYS } from "./page-icons.ts";
@@ -271,6 +273,32 @@ const fieldDraftSchema = {
   },
 };
 
+const lifecycleSchema = {
+  type: "object",
+  description: "Optional state machine attached to one enum field",
+  properties: {
+    field: { type: "string", description: "Enum field containing the current state" },
+    initial: { type: "string", description: "State assigned to every new record" },
+    terminal: { type: "array", items: { type: "string" } },
+    transitions: {
+      type: "array",
+      items: {
+        type: "object",
+        properties: {
+          key: { type: "string", minLength: 1 },
+          label: { type: "string" },
+          from: { type: "array", minItems: 1, items: { type: "string" } },
+          to: { type: "string" },
+        },
+        required: ["key", "from", "to"],
+        additionalProperties: false,
+      },
+    },
+  },
+  required: ["field", "initial", "transitions"],
+  additionalProperties: false,
+};
+
 const viewMeasuresSchema = {
   type: "object",
   description: "Named live aggregates for a grouped view",
@@ -382,6 +410,63 @@ export function buildTools(host: Host): ToolDefinition[] {
           };
         }
         return describeWidget(spec, key, viewKey ? { view: viewKey } : {});
+      },
+    },
+    {
+      name: "get_automation_primitives",
+      title: "Inspect automation primitives",
+      description:
+        "Discover the canonical structured-flow grammar, registered conditions and effects, and this runtime's capability profile. Call with a condition or effect key for its parameter contract before authoring a flow.",
+      inputSchema: {
+        type: "object",
+        properties: {
+          kind: { type: "string", enum: ["condition", "effect"] },
+          key: { type: "string" },
+        },
+        additionalProperties: false,
+      },
+      annotations: { readOnlyHint: true },
+      execute: ({ kind, key }) => {
+        const category = asText(kind);
+        const itemKey = asText(key);
+        const conditions = [...DEFAULT_AUTOMATION_REGISTRY.conditions.values()];
+        const effects = [...DEFAULT_AUTOMATION_REGISTRY.effects.values()];
+        if (itemKey) {
+          const item =
+            category === "condition"
+              ? DEFAULT_AUTOMATION_REGISTRY.conditions.get(itemKey)
+              : category === "effect"
+                ? DEFAULT_AUTOMATION_REGISTRY.effects.get(itemKey)
+                : (DEFAULT_AUTOMATION_REGISTRY.conditions.get(itemKey) ??
+                  DEFAULT_AUTOMATION_REGISTRY.effects.get(itemKey));
+          return item ?? { error: `Unknown automation primitive "${itemKey}"` };
+        }
+        return {
+          inputs: {
+            record: { record: "type_key", required: "boolean (default true)" },
+            scalar: {
+              value: "text | number | boolean | date | object | array",
+              required: "boolean (default true)",
+              default: "optional JSON value",
+            },
+          },
+          binding: { $ref: "vars.name or another context path" },
+          steps: {
+            effect: "{ effect: { key, params?, as?, retry?, compensate? } }",
+            gate: "{ gate: { predicate, pass?: steps, fail?: steps } }",
+            compute: "{ compute: { assign } }",
+            invoke: "{ invoke: { flow, input?, as? } }",
+            foreach: "{ foreach: { source: {$ref}, as?, max?, on_item_failure?, steps } }",
+            repeat: "{ repeat: { times, as?, max?, on_item_failure?, steps } }",
+            parallel: "{ parallel: { branches: [{key?, steps}], join?: all|any } }",
+            delay: "{ delay: { duration } }",
+            wait: "{ wait: { signal?, timeout?, as?, on_signal?, on_timeout? } }",
+          },
+          conditions,
+          effects,
+          runtime: BROWSER_LOCAL_AUTOMATION_PROFILE,
+          next: "Inspect any unfamiliar key, then call upsert_flow with the canonical nested structure.",
+        };
       },
     },
     {
@@ -501,7 +586,7 @@ export function buildTools(host: Host): ToolDefinition[] {
       name: "upsert_type",
       title: "Create or update a type",
       description:
-        'Create or update a type and its fields. Use a singular key and label for one record; optional collection_label overrides the automatically pluralized list name (for example label: "Person", collection_label: "People"). Providing fields replaces the type\'s field list; omitting fields leaves existing fields unchanged. Add or change one field with upsert_field. fields is an array of {key, type, label, ...} or a map of key → field. Enum fields can use presentation: "badge" and explicit value_semantics; number fields can use presentation: "rating". Reference fields need target. expose: true stores the type on the account space so every app shares its records. Omit expose (or false) for app-only types. Example: upsert_type({ key: "person", label: "Person", collection_label: "People", expose: true, fields: [{ key: "name", type: "text", required: true }] }).',
+        'Create or update a type and its fields. Use a singular key and label for one record; optional collection_label overrides the automatically pluralized list name. Providing fields replaces the type\'s field list; omitting fields leaves existing fields unchanged. lifecycle optionally turns one enum field into a validated state machine with an initial state, terminal states, and named transitions. Add or change one field with upsert_field. Enum fields can use presentation: "badge" and explicit value_semantics; number fields can use presentation: "rating". Reference fields need target. expose: true stores the type on the account space so every app shares its records. Example: upsert_type({ key: "task", fields: [{ key: "status", type: "enum", values: ["draft", "done"] }], lifecycle: { field: "status", initial: "draft", terminal: ["done"], transitions: [{ key: "complete", from: ["draft"], to: "done" }] } }).',
       inputSchema: {
         type: "object",
         properties: {
@@ -517,6 +602,10 @@ export function buildTools(host: Host): ToolDefinition[] {
             type: "boolean",
             description:
               "If true, the type lives on the account space and all apps share its records. If false or omitted, the type belongs only to this app.",
+          },
+          lifecycle: {
+            anyOf: [lifecycleSchema, { type: "null" }],
+            description: "State machine definition, or null to remove the existing lifecycle",
           },
           fields: {
             description:
@@ -682,17 +771,29 @@ export function buildTools(host: Host): ToolDefinition[] {
       name: "upsert_flow",
       title: "Create or update a flow",
       description:
-        'Create or update a flow. Steps may create, set, delete, query, branch, or invoke other flows. expose: ["agent"] registers invoke_<key>. Example: upsert_flow({ key: "mark_paid", expose: ["agent"], input: { invoice: "ref(invoice)" }, steps: [{ set: { "invoice.status": "paid" } }] }).',
+        'Create or update a structured flow. Call get_automation_primitives first. Use registered effects and {$ref:"vars.name"} bindings. Gates contain pass/fail steps; loops and parallel branches contain their own steps. expose: ["agent"] registers invoke_<key>. Example: upsert_flow({ key: "mark_paid", expose: ["agent"], input: { invoice: { record: "invoice" } }, steps: [{ effect: { key: "records.set", params: { record: {$ref:"vars.invoice"}, values: {status:"paid"} } } }] }).',
       inputSchema: {
         type: "object",
         properties: {
           key: { type: "string" },
           label: { type: "string" },
-          input: { type: "object" },
-          when: {},
-          trigger: { type: "object" },
-          expose: { type: "array", items: { type: "string" } },
-          steps: { type: "array" },
+          description: { type: "string" },
+          enabled: { type: "boolean" },
+          priority: { type: "integer" },
+          input: {
+            type: "object",
+            description:
+              'Named inputs. Each value is {record:"type_key"} or {value:"text|number|boolean|date|object|array"}.',
+          },
+          trigger: {
+            type: "object",
+            description: "Optional {key, config?}. Omit for a callable flow.",
+          },
+          expose: { type: "array", items: { type: "string", enum: ["ui", "agent"] } },
+          steps: {
+            type: "array",
+            description: "Canonical nested steps returned by get_automation_primitives.",
+          },
         },
         required: ["key"],
         additionalProperties: false,
@@ -843,13 +944,15 @@ export function buildTools(host: Host): ToolDefinition[] {
         surface: "app",
         name: `create_${key}`,
         title: `Create ${type.label}`,
-        description: `Create a ${type.label} record. id, created_at, updated_at, created_by, and updated_by are system-managed.`,
+        description: `Create a ${type.label} record. id, created_at, updated_at, created_by, updated_by${type.lifecycle ? `, and ${type.lifecycle.field}` : ""} are system-managed.`,
         inputSchema: {
           type: "object",
           properties: Object.fromEntries(
             type.fields.map((field) => [field.key, fieldInputSchema(field)]),
           ),
-          required: type.fields.filter((field) => field.required).map((field) => field.key),
+          required: type.fields
+            .filter((field) => field.required && field.key !== type.lifecycle?.field)
+            .map((field) => field.key),
           additionalProperties: false,
         },
         execute: (input) => host.create(key, input),
@@ -858,7 +961,7 @@ export function buildTools(host: Host): ToolDefinition[] {
         surface: "app",
         name: `update_${key}`,
         title: `Update ${type.label}`,
-        description: `Update a ${type.label} record. id, created_at, updated_at, created_by, and updated_by are system-managed.`,
+        description: `Update a ${type.label} record. id, created_at, updated_at, created_by, and updated_by are system-managed.${type.lifecycle ? ` Changes to ${type.lifecycle.field} must follow a configured transition; prefer transition_${key}.` : ""}`,
         inputSchema: {
           type: "object",
           properties: {
@@ -887,6 +990,33 @@ export function buildTools(host: Host): ToolDefinition[] {
         },
       },
     );
+    if (type.lifecycle) {
+      tools.push({
+        surface: "app",
+        name: `transition_${key}`,
+        title: `Transition ${type.label}`,
+        description: `Apply one named ${type.label} lifecycle transition. Availability depends on the record's current ${type.lifecycle.field} value.`,
+        inputSchema: {
+          type: "object",
+          properties: {
+            id: { type: "string" },
+            transition: {
+              type: "string",
+              enum: type.lifecycle.transitions.map((transition) => transition.key),
+              description: type.lifecycle.transitions
+                .map(
+                  (transition) =>
+                    `${transition.key}: ${transition.from.join(" | ")} → ${transition.to}`,
+                )
+                .join("; "),
+            },
+          },
+          required: ["id", "transition"],
+          additionalProperties: false,
+        },
+        execute: ({ id, transition }) => host.transition(key, String(id), String(transition)),
+      });
+    }
   }
 
   for (const flow of spec.flows) {
@@ -900,9 +1030,11 @@ export function buildTools(host: Host): ToolDefinition[] {
       inputSchema: {
         type: "object",
         properties: Object.fromEntries(
-          inputs.map(([name, expr]) => [name, flowInputProperty(expr)]),
+          inputs.map(([name, definition]) => [name, flowInputProperty(definition)]),
         ),
-        required: inputs.map(([name]) => name),
+        required: inputs
+          .filter(([, definition]) => definition.required !== false)
+          .map(([name]) => name),
         additionalProperties: false,
       },
       execute: (input) => host.invoke(flow.key, input),
@@ -969,13 +1101,16 @@ function fieldInputDescription(field: FieldDef): string {
   return field.label;
 }
 
-function flowInputProperty(expr: unknown): Record<string, unknown> {
-  const text = asText(expr);
-  const match = /^ref\(([^)]+)\)$/.exec(text.trim());
-  if (match) {
-    return { type: "string", description: `id of a ${match[1]} record` };
+function flowInputProperty(definition: unknown): Record<string, unknown> {
+  if (definition && typeof definition === "object" && "record" in definition) {
+    return { type: "string", description: `id of a ${String(definition.record)} record` };
   }
-  return { type: "string", description: text };
+  if (definition && typeof definition === "object" && "value" in definition) {
+    const kind = String(definition.value);
+    if (kind === "number" || kind === "boolean" || kind === "object" || kind === "array")
+      return { type: kind };
+  }
+  return { type: "string" };
 }
 
 function invokeFlowDescription(
@@ -984,9 +1119,12 @@ function invokeFlowDescription(
   inputs: Array<[string, unknown]>,
 ): string {
   const args = inputs
-    .map(([name, expr]) => {
-      const match = /^ref\(([^)]+)\)$/.exec(asText(expr).trim());
-      return match ? `${name}: <${match[1]} id>` : `${name}: <value>`;
+    .map(([name, definition]) => {
+      const record =
+        definition && typeof definition === "object" && "record" in definition
+          ? String(definition.record)
+          : "";
+      return record ? `${name}: <${record} id>` : `${name}: <value>`;
     })
     .join(", ");
   const example = args ? ` Example: invoke_${key}({ ${args} }).` : ` Example: invoke_${key}({}).`;

@@ -45,7 +45,10 @@
 		),
 	);
 	const visible = $derived(
-		keys.map((key) => type.fields.find((field) => field.key === key)).filter(Boolean) as FieldDef[],
+		keys
+			.filter((key) => key !== type.lifecycle?.field)
+			.map((key) => type.fields.find((field) => field.key === key))
+			.filter(Boolean) as FieldDef[],
 	);
 	const optionKeys = $derived(
 		visible
@@ -61,6 +64,7 @@
 	): Record<string, unknown> {
 		const next: Record<string, unknown> = {};
 		for (const field of current.fields) {
+			if (field.key === current.lifecycle?.field) continue;
 			const raw = row?.[field.key] ?? initial[field.key] ?? field.default;
 			if (field.type === "boolean") next[field.key] = Boolean(raw);
 			else next[field.key] = raw ?? "";

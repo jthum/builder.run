@@ -1,4 +1,6 @@
-import { createId, labelFromKey, slugify, uniqueKey } from "./ids.ts";
+import { createId, labelFromKey, slugify } from "./ids.ts";
+import type { AutomationDefinition, AutomationStep } from "./automation/model.ts";
+import { assertValidAutomation } from "./automation/validate.ts";
 
 export const SPEC_VERSION = 1 as const;
 
@@ -6,7 +8,7 @@ export type FieldKind = "text" | "number" | "date" | "boolean" | "enum" | "refer
 export type FieldPresentation = "rating" | "badge";
 export type FieldPresentationVariant = "segments";
 export type ValueSemantic = "neutral" | "info" | "success" | "warning" | "danger";
-export type StoreKind = "local" | "shared";
+export type StoreKind = "local";
 export type ActorKind = "human" | "agent" | "system";
 export type Exposure = "ui" | "agent";
 export type SortDirection = "asc" | "desc";
@@ -61,6 +63,21 @@ export interface TypeDef {
   /** Available to spaces this space’s users create. Whole type, all fields. */
   expose?: boolean;
   fields: FieldDef[];
+  lifecycle?: TypeLifecycleDef;
+}
+
+export interface TypeTransitionDef {
+  key: string;
+  label: string;
+  from: string[];
+  to: string;
+}
+
+export interface TypeLifecycleDef {
+  field: string;
+  initial: string;
+  terminal?: string[];
+  transitions: TypeTransitionDef[];
 }
 
 export interface ViewDef {
@@ -95,26 +112,8 @@ export interface FormDef {
   implicit?: boolean;
 }
 
-export type FlowStep =
-  | { create: { type: string; as?: string; fields: Record<string, unknown> } }
-  | { set: Record<string, unknown> }
-  | { delete: { ref: string } }
-  | { query: { view?: string; type?: string; as: string; where?: Record<string, unknown> } }
-  | { when: { condition: Condition; then: FlowStep[]; else?: FlowStep[] } }
-  | { invoke: { flow: string; input?: Record<string, unknown> } };
-
-export type Condition = string | Record<string, unknown>;
-
-export interface FlowDef {
-  id: string;
-  key: string;
-  label: string;
-  input?: Record<string, string>;
-  when?: Condition;
-  trigger?: { when: string };
-  expose?: Exposure[];
-  steps: FlowStep[];
-}
+export type FlowStep = AutomationStep;
+export type FlowDef = AutomationDefinition;
 
 export type PageRowHeight = "s" | "m" | "l" | "xl";
 
@@ -212,13 +211,10 @@ export function isExposed(type: Pick<TypeDef, "expose">): boolean {
   return Boolean(type.expose);
 }
 
-function isLegacySharedStore(value?: string): boolean {
-  return value === "shared" || value === "directory";
-}
-
 export type FieldDraft = FieldKind | (Partial<FieldDef> & { field_type?: string });
-export type TypeDraft = Partial<Omit<TypeDef, "fields">> & {
+export type TypeDraft = Partial<Omit<TypeDef, "fields" | "lifecycle">> & {
   fields?: Record<string, FieldDraft> | FieldDraft[];
+  lifecycle?: TypeLifecycleDef | null;
 };
 type ViewDraft = Partial<ViewDef> & {
   groupBy?: string;
@@ -325,6 +321,9 @@ export function normalizeField(key: string, draft: FieldDraft, existing?: FieldD
 }
 
 function normalizeType(key: string, draft: TypeDraft, existing?: TypeDef): TypeDef {
+  if (draft.store !== undefined && draft.store !== "local") {
+    throw new Error(`Unknown store "${String(draft.store)}" on ${key}`);
+  }
   const existingByKey = new Map((existing?.fields ?? []).map((field) => [field.key, field]));
   const fieldSource = draft.fields !== undefined ? draft.fields : existing?.fields;
   const seen = new Set<string>();
@@ -334,14 +333,11 @@ function normalizeType(key: string, draft: TypeDraft, existing?: TypeDef): TypeD
     seen.add(resolvedKey);
     return normalizeField(resolvedKey, fieldDraft as FieldDraft, existingByKey.get(resolvedKey));
   });
-  const expose =
-    draft.expose ??
-    existing?.expose ??
-    (isLegacySharedStore(draft.store) || isLegacySharedStore(existing?.store));
+  const expose = draft.expose ?? existing?.expose;
   const collectionLabel = Object.hasOwn(draft, "collection_label")
     ? String(draft.collection_label ?? "").trim()
     : existing?.collection_label;
-  return {
+  const type: TypeDef = {
     id: draft.id || existing?.id || createId("typ"),
     key,
     label: draft.label || existing?.label || labelFromKey(key),
@@ -349,6 +345,82 @@ function normalizeType(key: string, draft: TypeDraft, existing?: TypeDef): TypeD
     store: "local",
     ...(expose ? { expose: true as const } : {}),
     fields,
+  };
+  const lifecycle = Object.hasOwn(draft, "lifecycle") ? draft.lifecycle : existing?.lifecycle;
+  if (lifecycle) type.lifecycle = normalizeTypeLifecycle(type, lifecycle);
+  return type;
+}
+
+export function normalizeTypeLifecycle(
+  type: Pick<TypeDef, "key" | "fields">,
+  lifecycle: TypeLifecycleDef,
+): TypeLifecycleDef {
+  const field = type.fields.find((item) => item.key === lifecycle.field);
+  if (!field) throw new Error(`Lifecycle field "${lifecycle.field}" does not exist on ${type.key}`);
+  if (field.type !== "enum") {
+    throw new Error(`Lifecycle field "${lifecycle.field}" on ${type.key} must be an enum`);
+  }
+  const states = new Set(field.values ?? []);
+  if (!states.has(lifecycle.initial)) {
+    throw new Error(
+      `Lifecycle initial state "${lifecycle.initial}" is not a choice on ${type.key}.${field.key}`,
+    );
+  }
+  if (field.default !== undefined && field.default !== lifecycle.initial) {
+    throw new Error(
+      `Lifecycle field default on ${type.key}.${field.key} must match initial state "${lifecycle.initial}"`,
+    );
+  }
+  const terminal = [...new Set(lifecycle.terminal ?? [])];
+  for (const state of terminal) {
+    if (!states.has(state)) {
+      throw new Error(
+        `Lifecycle terminal state "${state}" is not a choice on ${type.key}.${field.key}`,
+      );
+    }
+  }
+  const keys = new Set<string>();
+  const pairs = new Set<string>();
+  const transitions = (lifecycle.transitions ?? []).map((transition) => {
+    const key = slugify(transition.key);
+    if (!key) throw new Error(`Lifecycle transition on ${type.key} needs a key`);
+    if (keys.has(key))
+      throw new Error(`Duplicate lifecycle transition key "${key}" on ${type.key}`);
+    keys.add(key);
+    const from = [...new Set(transition.from ?? [])];
+    if (!from.length)
+      throw new Error(`Lifecycle transition "${key}" needs at least one from state`);
+    if (!states.has(transition.to)) {
+      throw new Error(`Lifecycle transition "${key}" has unknown target state "${transition.to}"`);
+    }
+    for (const state of from) {
+      if (!states.has(state)) {
+        throw new Error(`Lifecycle transition "${key}" has unknown source state "${state}"`);
+      }
+      if (terminal.includes(state)) {
+        throw new Error(`Terminal lifecycle state "${state}" cannot have outgoing transitions`);
+      }
+      if (state === transition.to) {
+        throw new Error(`Lifecycle transition "${key}" must change state`);
+      }
+      const pair = `${state}\u0000${transition.to}`;
+      if (pairs.has(pair)) {
+        throw new Error(`Lifecycle transition from "${state}" to "${transition.to}" is ambiguous`);
+      }
+      pairs.add(pair);
+    }
+    return {
+      key,
+      label: String(transition.label ?? "").trim() || labelFromKey(key),
+      from,
+      to: transition.to,
+    };
+  });
+  return {
+    field: field.key,
+    initial: lifecycle.initial,
+    ...(terminal.length ? { terminal } : {}),
+    transitions,
   };
 }
 
@@ -419,14 +491,18 @@ export function normalizeView(view: ViewDraft & Pick<ViewDef, "id" | "key" | "la
 
 export function normalizeSpec(input: SpecDraft | AppSpec, existing?: AppSpec): AppSpec {
   const key = input.key || existing?.key || "app";
-  const stores = namedList(input.stores, "sto", existing?.stores)
-    .filter((store) => !isLegacySharedStore(store.key) && store.kind !== "shared")
-    .map((store) => ({
-      id: store.id || createId("sto"),
-      key: store.key || "local",
-      label: store.label || "App",
-      kind: "local" as const,
-    })) as StoreDef[];
+  const storeDrafts = namedList(input.stores, "sto", existing?.stores);
+  for (const store of storeDrafts) {
+    if ((store.key && store.key !== "local") || (store.kind && store.kind !== "local")) {
+      throw new Error(`Unknown store "${String(store.key || store.kind)}"`);
+    }
+  }
+  const stores = storeDrafts.map((store) => ({
+    id: store.id || createId("sto"),
+    key: store.key || "local",
+    label: store.label || "App",
+    kind: "local" as const,
+  })) as StoreDef[];
   if (!stores.some((store) => store.key === "local")) {
     stores.unshift(defaultLocalStore());
   }
@@ -446,7 +522,9 @@ export function normalizeSpec(input: SpecDraft | AppSpec, existing?: AppSpec): A
       normalizeView,
     ),
     forms: namedList(input.forms as never, "frm", existing?.forms as never) as FormDef[],
-    flows: namedList(input.flows as never, "flw", existing?.flows as never) as FlowDef[],
+    flows: (namedList(input.flows as never, "flw", existing?.flows as never) as FlowDef[]).map(
+      normalizeFlow,
+    ),
     pages: namedList(input.pages as never, "pg", existing?.pages as never) as PageDef[],
   };
   for (const view of spec.views) {
@@ -467,80 +545,15 @@ export function normalizeSpec(input: SpecDraft | AppSpec, existing?: AppSpec): A
   return spec;
 }
 
-function repairedFieldPath(path: string, replacements: Map<string, string>): string {
-  const [head, ...tail] = path.split(".");
-  const repaired = replacements.get(head) ?? head;
-  return tail.length ? [repaired, ...tail].join(".") : repaired;
-}
-
-/** Repairs field definitions written before field keys and labels were validated. */
-export function repairLegacyFields(input: AppSpec): AppSpec {
-  const spec = cloneData(input);
-  const replacements = new Map<string, Map<string, string>>();
-  for (const type of spec.types ?? []) {
-    const used = new Set(RESERVED_FIELD_KEYS);
-    const byOldKey = new Map<string, string>();
-    for (const field of type.fields ?? []) {
-      const oldKey = String(field.key ?? "");
-      const oldLabel = String(field.label ?? "").trim();
-      let base = slugify(oldKey) || slugify(oldLabel) || "field";
-      if (/^\d/.test(base)) base = `field_${base}`;
-      if (RESERVED_FIELD_KEYS.has(base)) base = `${base}_field`;
-      const key = uniqueKey(base, used, "field");
-      used.add(key);
-      if (!byOldKey.has(oldKey)) byOldKey.set(oldKey, key);
-      field.key = key;
-      field.label = oldLabel || labelFromKey(key);
-    }
-    replacements.set(type.key, byOldKey);
-  }
-  for (const form of spec.forms ?? []) {
-    const byOldKey = replacements.get(form.type);
-    if (byOldKey) form.fields = form.fields.map((field) => repairedFieldPath(field, byOldKey));
-  }
-  for (const view of spec.views ?? []) {
-    const byOldKey = replacements.get(view.source);
-    if (!byOldKey) continue;
-    view.fields = view.fields.map((field) => repairedFieldPath(field, byOldKey));
-    if (view.expose) view.expose = view.expose.map((field) => repairedFieldPath(field, byOldKey));
-    if (view.group_by) view.group_by = repairedFieldPath(view.group_by, byOldKey);
-    if (view.order_by) {
-      view.order_by = Object.fromEntries(
-        Object.entries(view.order_by).map(([field, direction]) => [
-          repairedFieldPath(field, byOldKey),
-          direction,
-        ]),
-      );
-    }
-    if (view.measures) {
-      view.measures = Object.fromEntries(
-        Object.entries(view.measures).map(([alias, measure]) => [
-          alias,
-          {
-            ...measure,
-            ...(measure.field ? { field: repairedFieldPath(measure.field, byOldKey) } : {}),
-            ...(measure.fields
-              ? { fields: measure.fields.map((field) => repairedFieldPath(field, byOldKey)) }
-              : {}),
-          },
-        ]),
-      );
-    }
-    if (Array.isArray(view.where)) {
-      view.where = view.where.map((clause) => ({
-        ...clause,
-        field: repairedFieldPath(clause.field, byOldKey),
-      }));
-    } else if (view.where) {
-      view.where = Object.fromEntries(
-        Object.entries(view.where).map(([field, value]) => [
-          repairedFieldPath(field, byOldKey),
-          value,
-        ]),
-      );
-    }
-  }
-  return spec;
+function normalizeFlow(flow: FlowDef): FlowDef {
+  const normalized = {
+    ...flow,
+    enabled: flow.enabled ?? true,
+    priority: flow.priority ?? 0,
+    steps: flow.steps ?? [],
+  };
+  assertValidAutomation(normalized);
+  return normalized;
 }
 
 /**

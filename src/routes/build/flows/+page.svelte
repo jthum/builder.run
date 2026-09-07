@@ -32,8 +32,8 @@
 		await runtime().upsertFlow({
 			key,
 			label: name,
-			input: typeKey ? { [typeKey]: `ref(${typeKey})` } : undefined,
-			trigger: createKind === "rule" && typeKey ? { when: `${typeKey}.changed` } : undefined,
+			input: typeKey ? { [typeKey]: { record: typeKey } } : undefined,
+			trigger: createKind === "rule" && typeKey ? { key: `${typeKey}.changed` } : undefined,
 			expose: createKind === "button" ? ["ui", "agent"] : undefined,
 			steps: [],
 		});

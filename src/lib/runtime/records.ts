@@ -17,6 +17,12 @@ export interface ChangeEvent {
   before?: RecordValue | null;
   after?: RecordValue | null;
   changed: string[];
+  transition?: {
+    key: string;
+    field: string;
+    from: string;
+    to: string;
+  };
 }
 
 export function validateRecord(
@@ -64,7 +70,12 @@ export function prepareValues(
 ): Record<string, unknown> {
   const prepared: Record<string, unknown> = {};
   for (const field of type.fields) {
-    if (field.key in values) {
+    if (
+      field.key === type.lifecycle?.field &&
+      (values[field.key] == null || values[field.key] === "")
+    ) {
+      prepared[field.key] = type.lifecycle.initial;
+    } else if (field.key in values) {
       prepared[field.key] = coerceFieldValue(field.type, values[field.key]);
     } else if (field.default !== undefined) {
       prepared[field.key] = coerceFieldValue(field.type, field.default);
@@ -80,6 +91,15 @@ export async function createRecord(
   exec: ExecutionContext,
 ): Promise<{ record: RecordValue; change: ChangeEvent }> {
   const type = requireType(ctx, typeKey);
+  const lifecycleValue = type.lifecycle ? values[type.lifecycle.field] : undefined;
+  if (
+    type.lifecycle &&
+    lifecycleValue != null &&
+    lifecycleValue !== "" &&
+    scalarString(lifecycleValue) !== type.lifecycle.initial
+  ) {
+    throw new Error(`${type.label} must start in lifecycle state ${type.lifecycle.initial}`);
+  }
   const prepared = prepareValues(type, values);
   const errors = validateRecord(type, prepared);
   if (errors.length) throw new Error(errors.join("; "));
@@ -122,6 +142,7 @@ export async function updateRecord(
   const errors = validateRecord(type, prepared, true);
   if (errors.length) throw new Error(errors.join("; "));
   const changed = changedFields(type.fields, before, prepared);
+  const transition = resolveLifecycleTransition(type, before, prepared);
   await engine.update(type.key, id, {
     ...prepared,
     updated_by: exec.actorId,
@@ -137,8 +158,27 @@ export async function updateRecord(
       before: decodeRecord(type, before),
       after: record,
       changed,
+      ...(transition ? { transition } : {}),
     },
   };
+}
+
+function resolveLifecycleTransition(
+  type: TypeDef,
+  before: RecordValue,
+  next: Record<string, unknown>,
+): ChangeEvent["transition"] {
+  const lifecycle = type.lifecycle;
+  if (!lifecycle || scalarEqual(before[lifecycle.field], next[lifecycle.field])) return undefined;
+  const from = scalarString(before[lifecycle.field]);
+  const to = scalarString(next[lifecycle.field]);
+  const transition = lifecycle.transitions.find(
+    (item) => item.from.includes(from) && item.to === to,
+  );
+  if (!transition) {
+    throw new Error(`Invalid ${type.label} lifecycle transition from ${from} to ${to}`);
+  }
+  return { key: transition.key, field: lifecycle.field, from, to };
 }
 
 export async function deleteRecord(

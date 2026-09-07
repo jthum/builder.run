@@ -215,7 +215,7 @@ describe("page widgets", () => {
     expect(normalizeBlockList(undefined)).toEqual([]);
   });
 
-  it("wraps legacy root widgets in editable grid rows", () => {
+  it("wraps root widgets in editable grid rows", () => {
     expect.hasAssertions();
     const heading = {
       kind: "widget" as const,

@@ -175,16 +175,46 @@ export const sampleApps: SampleApp[] = [
       },
       flows: {
         complete_project: {
-          input: { project: "ref(project)" },
-          when: "project.status != complete",
+          input: { project: { record: "project" } },
           expose: ["ui", "agent"],
-          steps: [{ set: { "project.status": "complete" } }],
+          steps: [
+            {
+              gate: {
+                predicate: {
+                  op: "context.not_equals",
+                  path: "vars.project.status",
+                  value: "complete",
+                },
+                pass: [
+                  {
+                    effect: {
+                      key: "records.set",
+                      params: { record: { $ref: "vars.project" }, values: { status: "complete" } },
+                    },
+                  },
+                ],
+              },
+            },
+          ],
         },
         complete_task: {
-          input: { task: "ref(task)" },
-          when: "task.status != done",
+          input: { task: { record: "task" } },
           expose: ["ui", "agent"],
-          steps: [{ set: { "task.status": "done" } }],
+          steps: [
+            {
+              gate: {
+                predicate: { op: "context.not_equals", path: "vars.task.status", value: "done" },
+                pass: [
+                  {
+                    effect: {
+                      key: "records.set",
+                      params: { record: { $ref: "vars.task" }, values: { status: "done" } },
+                    },
+                  },
+                ],
+              },
+            },
+          ],
         },
       },
       pages: {
@@ -570,32 +600,102 @@ export const sampleApps: SampleApp[] = [
       },
       flows: {
         submit_expense: {
-          input: { expense: "ref(expense)" },
-          when: "expense.status == draft",
+          input: { expense: { record: "expense" } },
           expose: ["ui", "agent"],
-          steps: [{ set: { "expense.status": "submitted" } }],
+          steps: [
+            {
+              gate: {
+                predicate: { op: "context.equals", path: "vars.expense.status", value: "draft" },
+                pass: [
+                  {
+                    effect: {
+                      key: "records.set",
+                      params: { record: { $ref: "vars.expense" }, values: { status: "submitted" } },
+                    },
+                  },
+                ],
+              },
+            },
+          ],
         },
         approve_expense: {
-          input: { expense: "ref(expense)" },
-          when: "expense.status == submitted",
+          input: { expense: { record: "expense" } },
           expose: ["ui", "agent"],
-          steps: [{ set: { "expense.status": "approved" } }],
+          steps: [
+            {
+              gate: {
+                predicate: {
+                  op: "context.equals",
+                  path: "vars.expense.status",
+                  value: "submitted",
+                },
+                pass: [
+                  {
+                    effect: {
+                      key: "records.set",
+                      params: { record: { $ref: "vars.expense" }, values: { status: "approved" } },
+                    },
+                  },
+                ],
+              },
+            },
+          ],
         },
         reject_expense: {
-          input: { expense: "ref(expense)" },
-          when: "expense.status == submitted",
+          input: { expense: { record: "expense" } },
           expose: ["ui", "agent"],
-          steps: [{ set: { "expense.status": "rejected" } }],
+          steps: [
+            {
+              gate: {
+                predicate: {
+                  op: "context.equals",
+                  path: "vars.expense.status",
+                  value: "submitted",
+                },
+                pass: [
+                  {
+                    effect: {
+                      key: "records.set",
+                      params: { record: { $ref: "vars.expense" }, values: { status: "rejected" } },
+                    },
+                  },
+                ],
+              },
+            },
+          ],
         },
         mark_paid: {
-          input: { expense: "ref(expense)" },
+          input: { expense: { record: "expense" } },
           expose: ["ui", "agent"],
-          steps: [{ set: { "expense.status": "paid" } }],
+          steps: [
+            {
+              effect: {
+                key: "records.set",
+                params: { record: { $ref: "vars.expense" }, values: { status: "paid" } },
+              },
+            },
+          ],
         },
         record_paid_date: {
-          trigger: { when: "expense.status.changed" },
-          when: "expense.status == paid",
-          steps: [{ set: { "expense.paid_at": "now" } }],
+          trigger: { key: "expense.status.changed" },
+          steps: [
+            {
+              gate: {
+                predicate: { op: "context.equals", path: "vars.expense.status", value: "paid" },
+                pass: [
+                  {
+                    effect: {
+                      key: "records.set",
+                      params: {
+                        record: { $ref: "vars.expense" },
+                        values: { paid_at: { $ref: "meta.now" } },
+                      },
+                    },
+                  },
+                ],
+              },
+            },
+          ],
         },
       },
       pages: {
@@ -937,14 +1037,37 @@ export const sampleApps: SampleApp[] = [
       },
       flows: {
         mark_invoice_paid: {
-          input: { invoice: "ref(invoice)" },
+          input: { invoice: { record: "invoice" } },
           expose: ["ui", "agent"],
-          steps: [{ set: { "invoice.status": "paid" } }],
+          steps: [
+            {
+              effect: {
+                key: "records.set",
+                params: { record: { $ref: "vars.invoice" }, values: { status: "paid" } },
+              },
+            },
+          ],
         },
         record_paid_date: {
-          trigger: { when: "invoice.status.changed" },
-          when: "invoice.status == paid",
-          steps: [{ set: { "invoice.paid_at": "now" } }],
+          trigger: { key: "invoice.status.changed" },
+          steps: [
+            {
+              gate: {
+                predicate: { op: "context.equals", path: "vars.invoice.status", value: "paid" },
+                pass: [
+                  {
+                    effect: {
+                      key: "records.set",
+                      params: {
+                        record: { $ref: "vars.invoice" },
+                        values: { paid_at: { $ref: "meta.now" } },
+                      },
+                    },
+                  },
+                ],
+              },
+            },
+          ],
         },
       },
       pages: {

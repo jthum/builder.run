@@ -1,89 +1,27 @@
 # Rules and flows
 
-The UI calls behavioural definitions **Rules**. In the application spec and runtime, the underlying primitive is a **Flow**.
+The UI calls behavioural definitions **Rules**. The application spec and runtime use a **Flow** as the shared primitive for actions and automations.
 
-A Flow is a composable sequence of application operations.
+There is one canonical structured format, documented in the [automation language](automations-spec.md). The browser runtime, visual editor, imported/exported spec, templates, and WebMCP tools all consume that same structure.
 
 ## Callable flows
 
-A callable Flow represents an explicit action.
-
-Examples:
-
-- Mark project complete
-- Approve expense
-- Archive submission
-
-A callable Flow can be exposed to:
-
-- the human UI;
-- agents through WebMCP;
-- or both.
-
-The same runtime execution path should be used regardless of who invoked it.
+A flow without a trigger is an explicit action such as “mark project complete” or “approve expense”. It can be exposed to the human UI, to agents through WebMCP, or both. Both surfaces invoke the same runtime path.
 
 ## Triggered flows
 
-A Flow can also run in response to an application event.
+Adding a trigger makes the flow respond to an application event. For example, an `invoice.status.changed` trigger can gate on the new value being `paid` and set `paid_at` to the run time.
 
-This turns the same primitive into an automation.
+## Composition
 
-Typical triggers include record creation, deletion, or changes to a record/field.
+Flows are ordered steps. A step may call a registered effect, compute variables, invoke another flow, gate nested branches, iterate, run parallel branches, delay, or wait. The structure is recursive, so a simple flow remains a short list while advanced behaviour pays complexity only where it uses it.
 
-For example:
+Registered effect and condition keys keep the document portable. A browser, Laravel application, or Convex-backed multiplayer host can implement a key with its own authorization and persistence adapter without changing the spec.
 
-```text
-invoice.status changes to paid
-        ↓
-triggered Flow
-        ↓
-set invoice.paid_at = now
-```
+## Workflows and record state
 
-## Steps
+Flows supply behaviour around a record's journey but are not the authority for allowed state transitions. A record lifecycle belongs to its type definition: the state field, initial and terminal states, and named transitions are declarative type metadata. Flows can respond to those transitions for notifications, assignments, audit work, or integrations.
 
-Flows are composed from small steps rather than domain-specific workflow code.
+The lifecycle shape and enforcement rules are documented in [Record lifecycles](lifecycles.md).
 
-The current model includes operations such as:
-
-| Step   | Purpose                          |
-| ------ | -------------------------------- |
-| Create | create a record                  |
-| Set    | change one or more values        |
-| Delete | remove a record                  |
-| Query  | retrieve records for later steps |
-| When   | conditionally run a branch       |
-| Invoke | run another Flow                 |
-
-Composition is intentional: larger behaviours should emerge from sequences of simple operations.
-
-## Inputs and references
-
-Callable Flows can accept inputs.
-
-References can point to records already in context, including records passed into the Flow or returned by earlier steps.
-
-This lets a Flow express behaviour such as:
-
-```text
-input: project
-
-when project.status != complete
-    set project.status = complete
-```
-
-without introducing a special "complete project" runtime primitive.
-
-## Why one primitive
-
-builder.run deliberately avoids separate engines for actions, automations, and workflows where one composable primitive can represent them.
-
-The semantics emerge from how a Flow is used:
-
-```text
-callable Flow       → action/capability
-Flow + trigger      → automation
-Flow + state/guards → workflow behaviour
-```
-
-This keeps the application spec smaller and more portable.
+Schema evolution is a third concern with its own migration lifecycle. Keeping these contracts separate lets the system describe an information system without turning automation into arbitrary schema mutation.

@@ -490,7 +490,7 @@ export function normalizePage(page: PageDef): PageDef {
   return { ...page, blocks: normalizePageRows(page.blocks) };
 }
 
-/** Page roots are rows; tolerate legacy/agent-authored root widgets by wrapping each in a grid. */
+/** Page roots render as rows, so a valid root widget receives a one-column row. */
 export function normalizePageRows(blocks: unknown): PageBlock[] {
   return normalizeBlockList(blocks).map((block) =>
     block.kind === "group" ? block : { kind: "group", columns: 1, blocks: [block] },

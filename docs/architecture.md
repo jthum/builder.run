@@ -109,3 +109,9 @@ This first runtime intentionally keeps several concerns narrow:
 - hosted multiplayer and cross-device persistence are future runtime concerns.
 
 These are runtime boundaries, not reasons to bake browser-specific assumptions into the portable spec.
+
+## Evolution policy
+
+Builder.run is still pre-user and its application format is allowed to change cleanly. A schema change updates the model, runtime, editors, agent contracts, templates, tests, and documentation together. Previous shapes are rejected; they are not carried through converters, dual readers, deprecated fields, or hidden compatibility branches.
+
+Add a migration only when real persisted user data creates a deliberate compatibility requirement. Until then, prefer one current representation and a lean implementation over speculative legacy support.

@@ -1,5 +1,7 @@
 import { evaluateCondition } from "$lib/runtime/flows.ts";
 import { labelFromKey } from "$lib/runtime/ids.ts";
+import type { AutomationCondition, AutomationPredicate } from "$lib/runtime/automation/model.ts";
+import { scalarString } from "$lib/runtime/values.ts";
 import {
   parseTypeRef,
   type AppSpec,
@@ -30,7 +32,7 @@ export function flowInputName(flow: FlowDef, typeKey?: string): string | undefin
   const entries = Object.entries(flow.input ?? {});
   if (typeKey) {
     const match = entries.find(
-      ([name, expr]) => name === typeKey || expr.includes(`ref(${typeKey})`),
+      ([name, input]) => name === typeKey || ("record" in input && input.record === typeKey),
     );
     return match?.[0];
   }
@@ -50,8 +52,8 @@ export function flowApplies(flow: FlowDef, typeKey: string, record: RecordValue)
   if (!flow.expose?.includes("ui")) return false;
   const name = flowInputName(flow, typeKey);
   if (!name) return false;
-  if (!flow.when) return true;
-  return evaluateCondition(flow.when, { [name]: record, [typeKey]: record });
+  const guard = entryGuard(flow);
+  return !guard || evaluateCondition(guard, { vars: { [name]: record, [typeKey]: record } });
 }
 
 export function applicableFlows(spec: AppSpec, typeKey: string, record: RecordValue): FlowDef[] {
@@ -76,49 +78,87 @@ export function humanTrigger(when: string, spec?: AppSpec): string {
   return when;
 }
 
-export function humanCondition(condition: FlowDef["when"]): string {
-  if (!condition) return "";
-  if (typeof condition !== "string") {
-    return Object.entries(condition)
-      .map(([path, value]) => `${leafLabel(path)} is ${labelFromKey(String(value))}`)
-      .join(" and ");
-  }
-  const match = condition.match(/^\s*(.+?)\s*(==|!=)\s*(.+?)\s*$/);
-  if (!match) return condition;
-  const op = match[2] === "!=" ? "is not" : "is";
-  return `${leafLabel(match[1])} ${op} ${labelFromKey(match[3].replace(/^['"]|['"]$/g, ""))}`;
+export function humanCondition(condition: AutomationPredicate): string {
+  const raw = condition as Record<string, unknown>;
+  if (Array.isArray(raw.all))
+    return raw.all.map((item) => humanCondition(item as AutomationPredicate)).join(" and ");
+  if (Array.isArray(raw.any))
+    return raw.any.map((item) => humanCondition(item as AutomationPredicate)).join(" or ");
+  if (raw.not && typeof raw.not === "object")
+    return `not ${humanCondition(raw.not as AutomationPredicate)}`;
+  const leaf = condition as AutomationCondition;
+  const op = leaf.op === "context.not_equals" ? "is not" : "is";
+  const path = typeof leaf.path === "string" ? leaf.path : "value";
+  const value =
+    typeof leaf.value === "string" ||
+    typeof leaf.value === "number" ||
+    typeof leaf.value === "boolean"
+      ? String(leaf.value)
+      : "value";
+  return `${leafLabel(path)} ${op} ${labelFromKey(value)}`;
 }
 
 export function humanStep(step: FlowStep, spec?: AppSpec): string {
-  if ("set" in step) {
-    return Object.entries(step.set)
-      .map(([path, value]) => {
-        const [typeKey, fieldKey] = path.split(".", 2);
-        const field = fieldKey ? fieldLabel(spec, typeKey, fieldKey) : leafLabel(path);
-        const display = value === "now" ? "today" : labelFromKey(String(value));
+  if ("effect" in step && step.effect.key === "records.set") {
+    const values = step.effect.params?.values;
+    const input = step.effect.params?.record;
+    const typeKey = isBinding(input) ? (input.$ref.split(".").at(-1) ?? "record") : "record";
+    return Object.entries(isObject(values) ? values : {})
+      .map(([fieldKey, value]) => {
+        const field = fieldLabel(spec, typeKey, fieldKey);
+        const display =
+          isBinding(value) && value.$ref === "meta.now"
+            ? "today"
+            : labelFromKey(scalarString(value));
         return `Set ${field.toLowerCase()} to ${display}`;
       })
       .join(", ");
   }
-  if ("create" in step) return `Create ${typeLabel(spec, step.create.type).toLowerCase()}`;
-  if ("delete" in step) return `Delete ${labelFromKey(step.delete.ref).toLowerCase()}`;
+  if ("effect" in step && step.effect.key === "records.create")
+    return `Create ${typeLabel(spec, typeof step.effect.params?.type === "string" ? step.effect.params.type : "record").toLowerCase()}`;
+  if ("effect" in step && step.effect.key === "records.delete") return "Delete record";
   if ("invoke" in step) return `Run ${labelFromKey(step.invoke.flow)}`;
-  if ("query" in step) return `Look up ${labelFromKey(step.query.as)}`;
-  if ("when" in step) return `If ${humanCondition(step.when.condition)}`;
+  if ("effect" in step && step.effect.key === "records.query")
+    return `Look up ${labelFromKey(step.effect.as ?? "records")}`;
+  if ("gate" in step) return `If ${humanCondition(step.gate.predicate)}`;
+  if ("compute" in step) return "Calculate values";
+  if ("foreach" in step) return "For each item";
+  if ("repeat" in step) return "Repeat steps";
+  if ("parallel" in step) return "Run branches together";
+  if ("delay" in step) return "Wait for a duration";
+  if ("wait" in step) return "Wait for a signal";
   return "Do something";
 }
 
 export function flowSummary(flow: FlowDef, spec?: AppSpec): string {
-  const steps = flow.steps.map((step) => humanStep(step, spec)).filter(Boolean);
-  if (flow.trigger?.when) {
-    const when = `When ${humanTrigger(flow.trigger.when, spec)}`;
-    const guard = flow.when ? `if ${humanCondition(flow.when)}` : "";
-    return [when, guard, steps[0]].filter(Boolean).join(" · ");
+  const guard = entryGuard(flow);
+  const steps = (
+    guard && flow.steps[0] && "gate" in flow.steps[0]
+      ? [...(flow.steps[0].gate.pass ?? []), ...flow.steps.slice(1)]
+      : flow.steps
+  )
+    .map((step) => humanStep(step, spec))
+    .filter(Boolean);
+  if (flow.trigger?.key) {
+    const when = `When ${humanTrigger(flow.trigger.key, spec)}`;
+    return [when, guard ? `if ${humanCondition(guard)}` : "", steps[0]].filter(Boolean).join(" · ");
   }
   const target = flowInputName(flow);
   const on = target ? `On ${typeLabel(spec, target)}` : "Button";
-  const guard = flow.when ? `if ${humanCondition(flow.when)}` : "";
-  return [on, guard, steps[0]].filter(Boolean).join(" · ");
+  return [on, guard ? `if ${humanCondition(guard)}` : "", steps[0]].filter(Boolean).join(" · ");
+}
+
+function entryGuard(flow: FlowDef) {
+  const first = flow.steps[0];
+  return first && "gate" in first && !first.gate.fail ? first.gate.predicate : undefined;
+}
+
+function isObject(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
+}
+
+function isBinding(value: unknown): value is { $ref: string } {
+  return isObject(value) && typeof value.$ref === "string";
 }
 
 function typeLabel(spec: AppSpec | undefined, key: string): string {

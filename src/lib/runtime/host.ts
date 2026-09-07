@@ -6,6 +6,7 @@ import {
   savePlatform,
 } from "./catalog.ts";
 import { applyDefaults, defaultViewFields, effectiveSpec } from "./defaults.ts";
+import { assertValidAutomation } from "./automation/validate.ts";
 import type { TableEngine } from "./engine.ts";
 import { invokeFlow, matchingTriggers, type FlowRun } from "./flows.ts";
 import { createId, labelFromKey, slugify } from "./ids.ts";
@@ -15,6 +16,7 @@ import {
   normalizeField,
   normalizeFieldKey,
   normalizeSpec,
+  normalizeTypeLifecycle,
   normalizeView,
   type Actor,
   type AppSpec,
@@ -314,6 +316,21 @@ export class Host {
     return result.record;
   }
 
+  async transition(typeKey: string, id: string, transitionKey: string): Promise<RecordValue> {
+    const type = findType(this.queryContext(), typeKey);
+    if (!type?.lifecycle) throw new Error(`${type?.label ?? typeKey} does not define a lifecycle`);
+    const record = await this.getRecord(typeKey, id);
+    if (!record) throw new Error(`${type.label} ${id} not found`);
+    const current = scalarString(record[type.lifecycle.field]);
+    const transition = type.lifecycle.transitions.find(
+      (item) => item.key === transitionKey && item.from.includes(current),
+    );
+    if (!transition) {
+      throw new Error(`Transition ${transitionKey} is not available from ${current}`);
+    }
+    return this.update(typeKey, id, { [type.lifecycle.field]: transition.to });
+  }
+
   async remove(typeKey: string, id: string): Promise<void> {
     const result = await deleteRecord(this.queryContext(), typeKey, id);
     await this.afterChanges([result.change]);
@@ -362,6 +379,7 @@ export class Host {
         const input: Record<string, unknown> = {
           [change.type]: change.after ?? change.before ?? change.id,
           id: change.id,
+          ...(change.transition ? { transition: change.transition } : {}),
         };
         const run = await invokeFlow(ctx, flow, input, this.context(), {
           getFlow: (key) => spec.flows.find((item) => item.key === key),
@@ -375,7 +393,7 @@ export class Host {
 
   async upsertType(draft: TypeDraft & { key: string }): Promise<TypeDef> {
     draft = cloneData(draft);
-    const expose = Boolean(draft.expose) || draft.store === "shared";
+    const expose = Boolean(draft.expose);
     const target = expose ? this.space() : this.app();
     const spec = target.spec;
     const next = normalizeSpec(
@@ -414,15 +432,36 @@ export class Host {
     if (type.fields.some((item) => item !== field && item.key === key)) {
       throw new Error(`Field key "${key}" already exists on ${typeKey}`);
     }
-    if (field.label === labelFromKey(from)) field.label = labelFromKey(key);
-    field.key = key;
+    const nextFields = type.fields.map((item) =>
+      item === field
+        ? {
+            ...item,
+            key,
+            label: item.label === labelFromKey(from) ? labelFromKey(key) : item.label,
+          }
+        : item,
+    );
+    const lifecycle = type.lifecycle
+      ? normalizeTypeLifecycle(
+          { ...type, fields: nextFields },
+          {
+            ...type.lifecycle,
+            field: type.lifecycle.field === from ? key : type.lifecycle.field,
+          },
+        )
+      : undefined;
+    type.fields = nextFields;
+    if (lifecycle) type.lifecycle = lifecycle;
     await this.reconcileAll();
     await this.persistAndEmit();
-    return field;
+    return nextFields.find((item) => item.key === key) as FieldDef;
   }
 
   async deleteField(typeKey: string, key: string): Promise<void> {
     const type = this.findWritableType(typeKey);
+    if (type.lifecycle?.field === key) {
+      throw new Error(`Cannot delete lifecycle field "${key}" while the lifecycle is configured`);
+    }
     type.fields = type.fields.filter((item) => item.key !== key);
     await this.reconcileAll();
     await this.persistAndEmit();
@@ -477,6 +516,7 @@ export class Host {
     const next = existing
       ? type.fields.map((item) => (item.key === key ? updated : item))
       : [...type.fields, updated];
+    if (type.lifecycle) normalizeTypeLifecycle({ ...type, fields: next }, type.lifecycle);
     type.fields = next;
     await this.reconcileAll();
     await this.persistAndEmit();
@@ -560,6 +600,7 @@ export class Host {
       steps: [],
       ...draft,
     });
+    assertValidAutomation(flows.find((item) => item.key === draft.key));
     this.app().spec = { ...spec, flows };
     await this.persistAndEmit();
     return flows.find((item) => item.key === draft.key) as FlowDef;
@@ -864,7 +905,8 @@ export class Host {
   async inspectStore(
     which: string,
   ): Promise<{ database: string; tables: Array<{ name: string; columns: string[] }> }> {
-    const id = which === "shared" || which === "space" ? this.space().id : this.app().id;
+    if (which !== "local" && which !== "space") throw new Error(`Unknown store ${which}`);
+    const id = which === "space" ? this.space().id : this.app().id;
     const engine = this.engines.get(id);
     if (!engine) throw new Error(`Store ${which} is not open`);
     const names = await engine.listTables();

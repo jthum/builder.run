@@ -9,6 +9,7 @@
 		verticalDropTarget,
 	} from "$lib/app/drag.ts";
 	import AppSelect from "$lib/components/app-select.svelte";
+	import LifecycleEditor from "$lib/components/lifecycle-editor.svelte";
 	import PageHeader from "$lib/components/page-header.svelte";
 	import StatusPill from "$lib/components/status-pill.svelte";
 	import * as AlertDialog from "$lib/components/ui/alert-dialog/index.js";
@@ -385,6 +386,8 @@
 			</Button>
 		</Card.Footer>
 	</Card.Root>
+
+	<LifecycleEditor {type} />
 
 	{#if type.fields.length === 0}
 		<Card.Root>

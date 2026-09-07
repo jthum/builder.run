@@ -32,6 +32,7 @@
 	let exposeUi = $state(true);
 	let exposeAgent = $state(true);
 	let steps = $state<Array<{ kind: string; field: string; value: string; type: string }>>([]);
+	let advanced = $state(false);
 	let deleteOpen = $state(false);
 
 	const inputTypeDef = $derived(types.find((type) => type.key === inputType));
@@ -40,23 +41,23 @@
 	$effect(() => {
 		label = flow.label;
 		kind = flowKind(flow);
-		const name = Object.keys(flow.input ?? [])[0] ?? flow.trigger?.when.split(".")[0] ?? types[0]?.key ?? "";
-		const expr = flow.input?.[name] ?? "";
-		const fromRef = /ref\((.+)\)/.exec(expr)?.[1];
-		inputType = fromRef ?? name ?? types[0]?.key ?? "";
-		const when = flow.trigger?.when ?? "";
+		const name = Object.keys(flow.input ?? [])[0] ?? flow.trigger?.key.split(".")[0] ?? types[0]?.key ?? "";
+		const definition = flow.input?.[name];
+		inputType = definition && "record" in definition ? definition.record : name;
+		const when = flow.trigger?.key ?? "";
 		if (when.endsWith(".created")) triggerEvent = "created";
 		else if (when.endsWith(".deleted")) triggerEvent = "deleted";
 		else if (/\.[^.]+\.changed$/.test(when)) {
 			triggerEvent = "field";
 			triggerField = when.split(".").at(-2) ?? "";
 		} else triggerEvent = "changed";
-		const guard = typeof flow.when === "string" ? flow.when : "";
-		const match = guard.match(/^\s*(.+?)\s*(==|!=)\s*(.+?)\s*$/);
-		if (match) {
-			guardField = match[1].split(".").at(-1) ?? "";
-			guardOp = match[2];
-			guardValue = match[3].replace(/^['"]|['"]$/g, "");
+		const first = flow.steps[0];
+		const guard = first && "gate" in first && !first.gate.fail ? first.gate : undefined;
+		const condition = guard?.predicate;
+		if (condition && "op" in condition && ["context.equals", "context.not_equals"].includes(condition.op)) {
+			guardField = String(condition.path ?? "").split(".").at(-1) ?? "";
+			guardOp = condition.op === "context.not_equals" ? "!=" : "==";
+			guardValue = String(condition.value ?? "");
 		} else {
 			guardField = "";
 			guardOp = "==";
@@ -64,19 +65,36 @@
 		}
 		exposeUi = flow.expose?.includes("ui") ?? kind === "button";
 		exposeAgent = flow.expose?.includes("agent") ?? true;
-		steps = flow.steps.length
-			? flow.steps.map((step) => {
-					if ("set" in step) {
-						const [path, value] = Object.entries(step.set)[0] ?? ["", ""];
+		const editableSteps = guard ? guard.pass ?? [] : flow.steps;
+		advanced = Boolean(
+			(flow.trigger?.config && Object.keys(flow.trigger.config).length) ||
+			(flow.trigger &&
+				![
+					`${inputType}.created`,
+					`${inputType}.changed`,
+					`${inputType}.deleted`,
+				].includes(flow.trigger.key) &&
+				!new RegExp(`^${inputType}\\.[^.]+\\.changed$`).test(flow.trigger.key)) ||
+			(name !== inputType) ||
+			(definition && (!("record" in definition) || definition.required === false)) ||
+			(flow.steps[0] && "gate" in flow.steps[0] && !guard) ||
+			(guard && (flow.steps.length > 1 || Boolean(flow.steps[0]?.id))) ||
+			(condition && !simpleCondition(condition)) ||
+			 editableSteps.some((step) => !simpleAction(step, inputType)),
+		);
+		steps = editableSteps.length
+			? editableSteps.map((step) => {
+					if ("effect" in step && step.effect.key === "records.set") {
+						const [field, value] = Object.entries((step.effect.params?.values as Record<string, unknown>) ?? {})[0] ?? ["", ""];
 						return {
 							kind: "set" as const,
-							field: path.split(".").at(-1) ?? "",
-							value: String(value ?? ""),
+							field,
+							value: value && typeof value === "object" && "$ref" in value && value.$ref === "meta.now" ? "now" : String(value ?? ""),
 							type: inputType,
 						};
 					}
-					if ("create" in step) {
-						return { kind: "create" as const, field: "", value: "", type: step.create.type };
+					if ("effect" in step && step.effect.key === "records.create") {
+						return { kind: "create" as const, field: "", value: "", type: String(step.effect.params?.type ?? "") };
 					}
 					return { kind: "set" as const, field: "", value: "", type: inputType };
 				})
@@ -85,6 +103,55 @@
 
 	function addStep() {
 		steps = [...steps, { kind: "set", field: "", value: "", type: inputType }];
+	}
+
+	function simpleCondition(condition: Record<string, unknown>): boolean {
+		return (
+			"op" in condition &&
+			["context.equals", "context.not_equals"].includes(String(condition.op)) &&
+			typeof condition.path === "string" &&
+			condition.path.startsWith(`vars.${inputType}.`) &&
+			["string", "number", "boolean"].includes(typeof condition.value) &&
+			Object.keys(condition).every((key) => ["op", "path", "value"].includes(key))
+		);
+	}
+
+	function simpleAction(step: FlowStep, variable: string): boolean {
+		if (step.id || !("effect" in step) || step.effect.as || step.effect.retry || step.effect.compensate) return false;
+		if (step.effect.key === "records.create") {
+			const fields = step.effect.params?.fields;
+			return (
+				typeof step.effect.params?.type === "string" &&
+				fields !== null &&
+				typeof fields === "object" &&
+				!Array.isArray(fields) &&
+				Object.keys(fields).length === 0 &&
+				Object.keys(step.effect.params ?? {}).every((key) => ["type", "fields"].includes(key))
+			);
+		}
+		if (step.effect.key !== "records.set") return false;
+		const record = step.effect.params?.record;
+		const values = step.effect.params?.values;
+		if (
+			!record ||
+			typeof record !== "object" ||
+			!("$ref" in record) ||
+			record.$ref !== `vars.${variable}` ||
+			!values ||
+			typeof values !== "object" ||
+			Array.isArray(values) ||
+			Object.keys(values).length !== 1 ||
+			!Object.keys(step.effect.params ?? {}).every((key) => ["record", "values"].includes(key))
+		) return false;
+		const value = Object.values(values)[0];
+		return (
+			["string", "number", "boolean"].includes(typeof value) ||
+			(Boolean(value) &&
+				typeof value === "object" &&
+				"$ref" in value &&
+				value.$ref === "meta.now" &&
+				Object.keys(value).length === 1)
+		);
 	}
 
 	function removeStep(index: number) {
@@ -99,26 +166,56 @@
 		return `${inputType}.changed`;
 	}
 
-	function guard(): string | undefined {
+	function guard() {
 		if (!guardField || guardValue === "") return undefined;
-		return `${inputType}.${guardField} ${guardOp} ${guardValue}`;
+		return {
+			op: guardOp === "!=" ? "context.not_equals" : "context.equals",
+			path: `vars.${inputType}.${guardField}`,
+			value: typedValue(guardValue, guardFieldDef?.type),
+		};
+	}
+
+	function typedValue(value: string, type?: string): string | number | boolean {
+		if (type === "boolean") return value === "true";
+		if (type === "number" && value.trim() !== "" && Number.isFinite(Number(value))) return Number(value);
+		return value;
 	}
 
 	function compiledSteps(): FlowStep[] {
-		return steps
+		const actions = steps
 			.map((step) => {
 				if (step.kind === "set" && step.field) {
-					return { set: { [`${inputType}.${step.field}`]: step.value } } as FlowStep;
+					const field = inputTypeDef?.fields.find((item) => item.key === step.field);
+					return {
+						effect: {
+							key: "records.set",
+							params: {
+								record: { $ref: `vars.${inputType}` },
+								values: {
+									[step.field]:
+										step.value === "now"
+											? { $ref: "meta.now" }
+											: typedValue(step.value, field?.type),
+								},
+							},
+						},
+					} as FlowStep;
 				}
 				if (step.kind === "create" && step.type) {
-					return { create: { type: step.type, fields: {} } } as FlowStep;
+					return { effect: { key: "records.create", params: { type: step.type, fields: {} } } } as FlowStep;
 				}
 				return null;
 			})
 			.filter(Boolean) as FlowStep[];
+		const predicate = guard();
+		return predicate ? [{ gate: { predicate, pass: actions } }] : actions;
 	}
 
 	async function save() {
+		if (advanced) {
+			toast.error("This flow uses advanced steps. Edit its spec to avoid losing them.");
+			return;
+		}
 		const expose: Exposure[] = [
 			...(exposeUi ? (["ui"] as const) : []),
 			...(exposeAgent ? (["agent"] as const) : []),
@@ -127,9 +224,8 @@
 			key: flow.key,
 			id: flow.id,
 			label,
-			input: inputType ? { [inputType]: `ref(${inputType})` } : undefined,
-			trigger: triggerWhen() ? { when: triggerWhen() as string } : undefined,
-			when: guard(),
+			input: inputType ? { [inputType]: { record: inputType } } : undefined,
+			trigger: triggerWhen() ? { key: triggerWhen() as string } : undefined,
 			expose: kind === "button" && expose.length ? expose : exposeAgent ? ["agent"] : undefined,
 			steps: compiledSteps(),
 		});
@@ -145,9 +241,8 @@
 	const draft = $derived({
 		...flow,
 		label,
-		input: inputType ? { [inputType]: `ref(${inputType})` } : undefined,
-		trigger: triggerWhen() ? { when: triggerWhen() as string } : undefined,
-		when: guard(),
+		input: inputType ? { [inputType]: { record: inputType } } : undefined,
+		trigger: triggerWhen() ? { key: triggerWhen() as string } : undefined,
 		steps: compiledSteps(),
 	} as FlowDef);
 </script>
@@ -155,7 +250,7 @@
 <div class="flex flex-col gap-6">
 	<PageHeader title={label || flow.label} description={flowSummary(draft, spec)}>
 		{#snippet actions()}
-			<Button onclick={save}>Save</Button>
+			<Button onclick={save} disabled={advanced}>Save</Button>
 			<Button variant="ghost" onclick={() => (deleteOpen = true)}>Delete</Button>
 		{/snippet}
 	</PageHeader>
@@ -286,13 +381,16 @@
 				<Card.Description>What happens, in order.</Card.Description>
 			</Card.Header>
 			<Card.Content class="flex flex-col gap-4">
+				{#if advanced}
+					<p class="text-sm text-muted-foreground">This flow uses advanced composition. It remains intact and must be edited in the app spec for now.</p>
+				{/if}
 				{#each steps as step, index (index)}
 					<div class="flex flex-col gap-3 rounded-xl border p-3">
 						<div class="flex items-center justify-between">
 							<Badge variant="secondary">{humanStep(
 								step.kind === "set"
-									? { set: { [`${inputType}.${step.field}`]: step.value } }
-									: { create: { type: step.type, fields: {} } },
+									? { effect: { key: "records.set", params: { record: { $ref: `vars.${inputType}` }, values: { [step.field]: step.value } } } }
+									: { effect: { key: "records.create", params: { type: step.type, fields: {} } } },
 								spec,
 							)}</Badge>
 							<Button size="xs" variant="ghost" onclick={() => removeStep(index)}>Remove</Button>

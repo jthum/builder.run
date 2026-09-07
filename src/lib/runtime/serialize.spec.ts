@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vite-plus/test";
 import { applyDefaults } from "./defaults.ts";
-import { normalizeSpec, repairLegacyFields } from "./model.ts";
+import { normalizeSpec } from "./model.ts";
 import { authoringSpec, sharedTypeDependencies } from "./serialize.ts";
 
 describe("authoring spec export", () => {
@@ -125,20 +125,5 @@ describe("authoring spec export", () => {
         },
       }),
     ).toThrow('Duplicate field key "overall_score"');
-  });
-
-  it("repairs malformed persisted fields and their generated references", () => {
-    expect.hasAssertions();
-    const legacy = applyDefaults(
-      normalizeSpec({ types: { review: { fields: { score: "number" } } } }),
-    );
-    legacy.types[0]!.fields[0]!.key = " ";
-    legacy.types[0]!.fields[0]!.label = " ";
-    for (const form of legacy.forms) form.fields = [" "];
-    for (const view of legacy.views) view.fields = [" "];
-    const repaired = repairLegacyFields(legacy);
-    expect(repaired.types[0]?.fields[0]).toMatchObject({ key: "field", label: "Field" });
-    expect(repaired.forms.every((form) => form.fields[0] === "field")).toBe(true);
-    expect(repaired.views.every((view) => view.fields[0] === "field")).toBe(true);
   });
 });

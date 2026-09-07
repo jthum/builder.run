@@ -21,12 +21,24 @@ export function sharedTypeDependencies(spec: AppSpec, sharedTypes: TypeDef[]): T
   const addPath = (path: string | undefined) => add(path?.split(".", 1)[0]);
   const visitSteps = (steps: FlowStep[]) => {
     for (const step of steps) {
-      if ("create" in step) add(step.create.type);
-      else if ("query" in step) add(step.query.type);
-      else if ("set" in step) Object.keys(step.set).forEach(addPath);
-      else if ("when" in step) {
-        visitSteps(step.when.then);
-        visitSteps(step.when.else ?? []);
+      if (
+        "effect" in step &&
+        step.effect.key === "records.create" &&
+        typeof step.effect.params?.type === "string"
+      )
+        add(step.effect.params.type);
+      else if ("effect" in step && step.effect.key === "records.query")
+        add(typeof step.effect.params?.type === "string" ? step.effect.params.type : undefined);
+      else if ("gate" in step) {
+        visitSteps(step.gate.pass ?? []);
+        visitSteps(step.gate.fail ?? []);
+      } else if ("foreach" in step) visitSteps(step.foreach.steps);
+      else if ("repeat" in step) visitSteps(step.repeat.steps);
+      else if ("parallel" in step)
+        step.parallel.branches.forEach((branch) => visitSteps(branch.steps));
+      else if ("wait" in step) {
+        visitSteps(step.wait.on_signal ?? []);
+        visitSteps(step.wait.on_timeout ?? []);
       }
     }
   };
@@ -37,10 +49,8 @@ export function sharedTypeDependencies(spec: AppSpec, sharedTypes: TypeDef[]): T
   for (const view of spec.views) add(view.source);
   for (const form of spec.forms) add(form.type);
   for (const flow of spec.flows) {
-    for (const expression of Object.values(flow.input ?? {})) {
-      for (const match of expression.matchAll(/ref\(([^)]+)\)/g)) add(match[1]);
-    }
-    addPath(flow.trigger?.when);
+    for (const input of Object.values(flow.input ?? {})) if ("record" in input) add(input.record);
+    addPath(flow.trigger?.key);
     visitSteps(flow.steps);
   }
   return sharedTypes.filter((type) => required.has(type.key));
@@ -87,6 +97,7 @@ export function authoringSpec(spec: AppSpec): Record<string, unknown> {
           ...(type.collection_label ? { collection_label: type.collection_label } : {}),
           store: type.store,
           ...(type.expose ? { expose: true } : {}),
+          ...(type.lifecycle ? { lifecycle: type.lifecycle } : {}),
           fields: Object.fromEntries(
             type.fields.map((field) => [
               field.key,
@@ -150,8 +161,10 @@ export function authoringSpec(spec: AppSpec): Record<string, unknown> {
         {
           id: flow.id,
           label: flow.label,
+          ...(flow.description ? { description: flow.description } : {}),
+          ...(flow.enabled === false ? { enabled: false } : {}),
+          ...(flow.priority ? { priority: flow.priority } : {}),
           ...(flow.input ? { input: flow.input } : {}),
-          ...(flow.when ? { when: flow.when } : {}),
           ...(flow.trigger ? { trigger: flow.trigger } : {}),
           ...(flow.expose ? { expose: flow.expose } : {}),
           steps: flow.steps,

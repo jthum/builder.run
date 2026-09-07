@@ -25,7 +25,7 @@ describe("sqlite materialisation", () => {
     expect(created.name).toBe("Acme site");
     expect(created.budget).toBe(8000);
     expect(created.active).toBe(true);
-    const shared = await host.inspectStore("shared");
+    const shared = await host.inspectStore("space");
     expect(shared.database).toBe(`space-${host.space().id}`);
     expect(shared.database).not.toContain("-shared");
     expect(shared.database).not.toContain("spc_");
@@ -35,7 +35,6 @@ describe("sqlite materialisation", () => {
     expect(shared.tables.some((table) => table.name === "_meta")).toBe(true);
     expect(shared.tables.some((table) => table.name === "organisation")).toBe(false);
     expect(info.tables.some((table) => table.name === "_meta")).toBe(true);
-    expect(info.tables.some((table) => table.name === "_br_meta")).toBe(false);
   });
 
   it("renames and drops columns without losing other values", async () => {

@@ -21,6 +21,31 @@ function mockRegistry() {
 }
 
 describe("webmcp bridge", () => {
+  it("exposes configured record lifecycles as named transition tools", async () => {
+    const host = await Host.open({ persist: false });
+    await host.upsertType({
+      key: "ticket",
+      fields: [{ key: "status", type: "enum", required: true, values: ["new", "resolved"] }],
+      lifecycle: {
+        field: "status",
+        initial: "new",
+        terminal: ["resolved"],
+        transitions: [{ key: "resolve", from: ["new"], to: "resolved" }],
+      },
+    } as never);
+    const tools = buildTools(host);
+    const create = tools.find((tool) => tool.name === "create_ticket");
+    const transition = tools.find((tool) => tool.name === "transition_ticket");
+    expect(transition).toBeTruthy();
+    expect(create?.inputSchema.required).toEqual([]);
+    expect(
+      (transition!.inputSchema.properties as Record<string, { enum?: string[] }>).transition.enum,
+    ).toEqual(["resolve"]);
+    const ticket = await host.create("ticket", {});
+    await transition?.execute({ id: ticket.id, transition: "resolve" });
+    expect((await host.getRecord("ticket", ticket.id))?.status).toBe("resolved");
+  });
+
   it("does not abort or re-register tools after a record mutation", async () => {
     expect.hasAssertions();
     const host = await Host.open({ persist: false });
@@ -388,6 +413,24 @@ describe("webmcp bridge", () => {
       'Widget "kanban" values.field cannot be "points". Valid options: status.',
     );
     bridge.stop();
+  });
+
+  it("publishes the structured automation grammar and effect contracts", async () => {
+    const host = await Host.open({ persist: false });
+    const catalogue = buildTools(host).find((tool) => tool.name === "get_automation_primitives");
+    expect(catalogue).toBeTruthy();
+
+    const summary = (await catalogue!.execute({})) as {
+      steps: Record<string, string>;
+      effects: Array<{ key: string }>;
+    };
+    expect(summary.steps).toHaveProperty("parallel");
+    expect(summary.effects.map((effect) => effect.key)).toContain("records.set");
+
+    const effect = (await catalogue!.execute({ kind: "effect", key: "records.set" })) as {
+      input: Record<string, string>;
+    };
+    expect(effect.input).toMatchObject({ record: "$ref to record" });
   });
 
   it("upsert_type creates fields from an inline array or map", async () => {

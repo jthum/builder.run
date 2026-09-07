@@ -1,7 +1,7 @@
 /**
  * Convert values crossing a dynamic record or tool boundary to deterministic text.
  * Record fields are expected to be scalar, but JSON is safer than silently producing
- * "[object Object]" when malformed or legacy data contains a structured value.
+ * "[object Object]" when malformed data contains a structured value.
  */
 export function scalarString(value: unknown): string {
   if (value == null) return "";

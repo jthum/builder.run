@@ -14,7 +14,9 @@ If you are using or building an app, start with:
 2. [Core concepts](concepts.md)
 3. [Building an app](building.md)
 4. [Rules and flows](flows.md)
-5. [Data and persistence](data-and-persistence.md)
+5. [Record lifecycles](lifecycles.md)
+6. [Automation language](automations-spec.md)
+7. [Data and persistence](data-and-persistence.md)
 
 The central idea throughout the project is simple:
 
