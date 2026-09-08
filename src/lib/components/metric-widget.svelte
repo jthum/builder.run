@@ -6,13 +6,14 @@
 	import { asNumber, cellValue, groupChart, sparkline } from "$lib/runtime/chart-data.ts";
 	import { areaPath, chartPalette, linear, polyline } from "$lib/runtime/chart-geometry.ts";
 	import ArrowUpRightIcon from "@lucide/svelte/icons/arrow-up-right";
-	import ChartNoAxesColumnIncreasingIcon from "@lucide/svelte/icons/chart-no-axes-column-increasing";
 
 	let {
 		title,
 		rows,
 		value = "",
 		date = "created_at",
+		description = "",
+		context = "",
 		ready = true,
 		href,
 	}: {
@@ -20,13 +21,14 @@
 		rows: Array<Record<string, unknown>> | null;
 		value?: string;
 		date?: string;
+		description?: string;
+		context?: string;
 		ready?: boolean;
 		href?: string;
 	} = $props();
 
 	const hue = $derived(toneFromAccent(session.snapshot?.space.appearance?.accent).hue);
 	const color = $derived(chartPalette(hue, 1)[0] ?? "currentColor");
-	const tone = $derived(toneFromAccent(session.snapshot?.space.appearance?.accent));
 	const total = $derived.by(() => {
 		if (!rows) return 0;
 		if (!value) return rows.length;
@@ -50,20 +52,12 @@
 	});
 	const points = $derived(polyline(plotted));
 	const area = $derived(areaPath(plotted, 40));
-	const count = $derived(rows?.length ?? 0);
+	const supportingText = $derived(description.trim() || context.trim());
 </script>
 
 <Card.Root class="h-full">
 	<Card.Header>
-		<div class="flex items-center gap-2.5">
-			<span
-				class="flex size-7 items-center justify-center rounded-lg"
-				style="background-color: color-mix(in oklab, {tone.accent} 12%, var(--background)); color: {tone.accent}"
-			>
-				<ChartNoAxesColumnIncreasingIcon />
-			</span>
-			<span class="text-sm font-medium text-muted-foreground">{title}</span>
-		</div>
+		<span class="text-sm font-medium text-muted-foreground">{title}</span>
 		{#if href}
 			<Card.Action>
 				<a href={href} aria-label={`Open ${title}`} class="rounded-sm text-muted-foreground outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring">
@@ -81,11 +75,7 @@
 				{:else}
 					<p class="text-2xl font-medium tracking-tight">{label}</p>
 				{/if}
-				{#if ready}
-					<p class="text-xs text-muted-foreground">
-						{count === 1 ? "1 record" : `${count} records`}{value ? ", summed" : ""}
-					</p>
-				{/if}
+				{#if ready && supportingText}<p class="text-xs text-muted-foreground">{supportingText}</p>{/if}
 		</div>
 		{#if ready && points}
 			<svg viewBox="0 0 120 40" class="h-12 w-28 shrink-0" aria-hidden="true">

@@ -326,7 +326,7 @@ export const sampleApps: SampleApp[] = [
             },
             {
               kind: "group",
-              columns: 2,
+              columns: 1,
               blocks: [
                 {
                   kind: "widget",
@@ -795,7 +795,7 @@ export const sampleApps: SampleApp[] = [
             },
             {
               kind: "group",
-              columns: 2,
+              columns: 1,
               blocks: [
                 {
                   kind: "widget",
@@ -1179,7 +1179,7 @@ export const sampleApps: SampleApp[] = [
             },
             {
               kind: "group",
-              columns: 2,
+              columns: 1,
               blocks: [
                 {
                   kind: "widget",

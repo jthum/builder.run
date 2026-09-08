@@ -2,6 +2,21 @@ import { describe, expect, it } from "vite-plus/test";
 import { Host } from "./host.ts";
 import { sampleApps } from "./samples.ts";
 import { configurePageRows } from "./widgets.ts";
+import type { PageBlock } from "./model.ts";
+
+function expectWideWidgetsUseOneColumn(blocks: PageBlock[]): void {
+  for (const block of blocks) {
+    if (block.kind !== "group") continue;
+    if (
+      block.blocks.some(
+        (child) => child.kind === "widget" && (child.widget === "table" || child.widget === "form"),
+      )
+    ) {
+      expect(block.columns).toBe(1);
+    }
+    expectWideWidgetsUseOneColumn(block.blocks);
+  }
+}
 
 describe("starter app templates", () => {
   for (const sample of sampleApps) {
@@ -21,6 +36,7 @@ describe("starter app templates", () => {
       }
       for (const page of sample.spec.pages) {
         expect(() => configurePageRows(spec, page.blocks)).not.toThrow();
+        expectWideWidgetsUseOneColumn(page.blocks);
       }
       expect(sample.spec.pages.some((page) => page.key === "home" && !page.implicit)).toBe(true);
     });

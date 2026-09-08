@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { listHref } from "$lib/app/labels.ts";
+	import { collectionLabel, listHref } from "$lib/app/labels.ts";
 	import { runtime, session } from "$lib/app/session.svelte.ts";
 	import RecordForm from "$lib/components/record-form.svelte";
 	import RecordTable from "$lib/components/record-table.svelte";
@@ -58,8 +58,8 @@
 	<StatCard
 		label={caption || view.label}
 		count={viewRows.length}
+		description={String(values.description ?? "").trim()}
 		href={listHref(view)}
-		source={view.source}
 		{ready}
 	/>
 {:else if widget === "table" && view}
@@ -100,6 +100,8 @@
 		rows={ready ? viewRows : null}
 		value={String(values.value ?? "")}
 		date={String(values.date ?? "created_at")}
+		description={String(values.description ?? "").trim()}
+		context={view.group_by || !type ? "" : `Across ${viewRows.length} ${(viewRows.length === 1 ? type.label : collectionLabel(type)).toLocaleLowerCase()}`}
 		href={listHref(view)}
 		{ready}
 	/>

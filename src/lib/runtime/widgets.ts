@@ -70,7 +70,15 @@ export const widgets: WidgetDef[] = [
     label: "Number card",
     description: "A count from a view.",
     category: "data",
-    inputs: [{ key: "view", label: "View", type: "view", required: true }],
+    inputs: [
+      { key: "view", label: "View", type: "view", required: true },
+      {
+        key: "description",
+        label: "Supporting text",
+        type: "text",
+        description: "Optional context shown below the value.",
+      },
+    ],
   },
   {
     key: "table",
@@ -141,6 +149,12 @@ export const widgets: WidgetDef[] = [
     category: "data",
     inputs: [
       { key: "view", label: "View", type: "view", required: true },
+      {
+        key: "description",
+        label: "Supporting text",
+        type: "text",
+        description: "Optional context shown below the value.",
+      },
       { key: "value", label: "Value field", type: "field", of: "number", source: "view" },
       { key: "date", label: "Date field", type: "field", of: "date", source: "view" },
     ],
