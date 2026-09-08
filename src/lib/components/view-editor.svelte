@@ -9,6 +9,7 @@
 	import { columnLabel, fieldKindLabel } from "$lib/app/labels.ts";
 	import { runtime, session } from "$lib/app/session.svelte.ts";
 	import AppSelect from "$lib/components/app-select.svelte";
+	import EditorActions from "$lib/components/editor-actions.svelte";
 	import PageHeader from "$lib/components/page-header.svelte";
 	import RecordTable from "$lib/components/record-table.svelte";
 	import * as AlertDialog from "$lib/components/ui/alert-dialog/index.js";
@@ -34,7 +35,7 @@
 		type ViewDef,
 		type ViewMeasure,
 	} from "$lib/runtime/model.ts";
-	import { cn } from "$lib/utils.js";
+	import { cn, stableStringify } from "$lib/utils.js";
 	import ArrowUpDownIcon from "@lucide/svelte/icons/arrow-up-down";
 	import CalendarIcon from "@lucide/svelte/icons/calendar";
 	import ChevronDownIcon from "@lucide/svelte/icons/chevron-down";
@@ -88,7 +89,8 @@
 	let measureRows = $state<MeasureRow[]>([]);
 	let featured = $state(true);
 	let deleteOpen = $state(false);
-	let section = $state("filters");
+	let section = $state("columns");
+	let queryMoreOpen = $state(false);
 	let previewOpen = $state(true);
 	let previewExpose = $state<Record<string, string>>({});
 	let dragField = $state<string | null>(null);
@@ -163,8 +165,15 @@
 				dir: dir === "desc" ? "desc" : "asc",
 			}));
 			featured = !view.implicit;
+			section = "columns";
+			queryMoreOpen = Boolean(view.group_by || view.limit);
 		});
 	});
+
+	function setQueryMoreOpen(open: boolean) {
+		queryMoreOpen = open;
+		if (!open && (section === "summaries" || section === "advanced")) section = "columns";
+	}
 
 	$effect(() => {
 		const choices = fieldChoices;
@@ -512,21 +521,27 @@
 		return { asc: "A to Z", desc: "Z to A" };
 	}
 
+	const draft = $derived.by((): ViewDef => ({
+		...view,
+		label,
+		source,
+		fields: [...selected],
+		where: builtWhere(),
+		expose: exposeOn && expose.length ? [...expose] : undefined,
+		limit: limitOn ? Number(limit) || undefined : undefined,
+		order_by: builtOrder(),
+		group_by: summarize ? groupBy || undefined : undefined,
+		measures: summarize && groupBy ? cloneData(measures) : undefined,
+		implicit: featured ? undefined : true,
+	}));
+	const savedView = $derived({
+		...view,
+		implicit: view.implicit ? true : undefined,
+	});
+	const dirty = $derived(stableStringify(draft) !== stableStringify(savedView));
+
 	async function save() {
-		await runtime().upsertView({
-			key: view.key,
-			id: view.id,
-			label,
-			source,
-			fields: [...selected],
-			where: builtWhere(),
-			expose: exposeOn && expose.length ? [...expose] : undefined,
-			limit: limitOn ? Number(limit) || undefined : undefined,
-			order_by: builtOrder(),
-			group_by: summarize ? groupBy || undefined : undefined,
-			measures: summarize && groupBy ? cloneData(measures) : undefined,
-			implicit: featured ? false : view.implicit,
-		});
+		await runtime().upsertView(cloneData(draft));
 		toast.success("View saved");
 	}
 
@@ -608,26 +623,15 @@
 	<PageHeader
 		title={label || view.label}
 		description="A saved list. Change filters and columns here — the preview updates as you go."
-	>
-		{#snippet actions()}
-			<Button variant="outline" onclick={duplicate}>
-				<CopyIcon data-icon="inline-start" />
-				Duplicate
-			</Button>
-			<Button onclick={save}>Save</Button>
-			{#if !view.implicit}
-				<Button variant="ghost" onclick={() => (deleteOpen = true)}>Delete</Button>
-			{/if}
-		{/snippet}
-	</PageHeader>
+	/>
 
 	<Card.Root class="h-auto">
 		<Card.Header class="gap-0">
-			<Card.Title>This list</Card.Title>
-			<Card.Description>What it is called, which records it uses, and whether it appears in the menu.</Card.Description>
+			<Card.Title>View setup</Card.Title>
+			<Card.Description>Name the view, choose its records, and decide where people can find it.</Card.Description>
 		</Card.Header>
 		<Card.Content>
-			<Field.Group>
+			<Field.Group class="grid gap-4 sm:grid-cols-2">
 				<Field.Field>
 					<Field.Label for="view-name">Name</Field.Label>
 					<Input id="view-name" bind:value={label} placeholder="Active projects" />
@@ -639,7 +643,7 @@
 						options={types.map((item) => ({ value: item.key, label: item.label }))}
 					/>
 				</Field.Field>
-				<Field.Field orientation="horizontal" class="justify-between rounded-xl border bg-muted/30 p-3">
+				<Field.Field orientation="horizontal" class="justify-between rounded-xl border bg-muted/30 p-3 sm:col-span-2">
 					<div class="flex flex-col gap-0.5">
 						<Field.Label for="featured">{featured ? "Shown in the app menu" : "Hidden from the app menu"}</Field.Label>
 						<Field.Description>{featured ? "People can open this view from the app navigation." : "The view remains available to widgets, rules, and agents."}</Field.Description>
@@ -653,43 +657,57 @@
 	<Card.Root class="h-auto">
 		<Card.Header class="gap-0">
 			<Card.Title>Query</Card.Title>
-			<Card.Description>Narrow the records, choose columns, set the order, and cap how many.</Card.Description>
+			<Card.Description>Choose what appears first, then narrow or order the results when needed.</Card.Description>
 		</Card.Header>
 		<Card.Content class="flex flex-col gap-5">
 			<Tabs.Root bind:value={section} class="gap-5">
-				<Tabs.List
-					class="h-auto w-full max-w-full justify-start gap-1 overflow-x-auto p-1 group-data-horizontal/tabs:h-auto"
-				>
-					<Tabs.Trigger value="filters" class="h-8 flex-none gap-2 px-3">
-						<ListFilterIcon data-icon="inline-start" class="hidden sm:block" />
-						Filters
-						{#if filters.length}
-							<span class="text-xs text-muted-foreground tabular-nums">{filters.length}</span>
+				<div class="flex flex-wrap items-center justify-between gap-2">
+					<Tabs.List class="h-auto max-w-full justify-start gap-1 overflow-x-auto p-1 group-data-horizontal/tabs:h-auto">
+						<Tabs.Trigger value="columns" class="h-8 flex-none gap-2 px-3">
+							<Columns3Icon data-icon="inline-start" class="hidden sm:block" />
+							Columns
+							<span class="text-xs text-muted-foreground tabular-nums">{selected.length}</span>
+						</Tabs.Trigger>
+						<Tabs.Trigger value="filters" class="h-8 flex-none gap-2 px-3">
+							<ListFilterIcon data-icon="inline-start" class="hidden sm:block" />
+							Filters
+							{#if filters.length}
+								<span class="text-xs text-muted-foreground tabular-nums">{filters.length}</span>
+							{/if}
+						</Tabs.Trigger>
+						<Tabs.Trigger value="sort" class="h-8 flex-none gap-2 px-3">
+							<ArrowUpDownIcon data-icon="inline-start" class="hidden sm:block" />
+							Sort
+							{#if sorts.length}
+								<span class="text-xs text-muted-foreground tabular-nums">{sorts.length}</span>
+							{/if}
+						</Tabs.Trigger>
+						{#if queryMoreOpen}
+							<Tabs.Trigger value="summaries" class="h-8 flex-none gap-2 px-3">
+								<SigmaIcon data-icon="inline-start" class="hidden sm:block" />
+								Summaries
+								{#if summarize && measureRows.length}
+									<span class="text-xs text-muted-foreground tabular-nums">{measureRows.length}</span>
+								{/if}
+							</Tabs.Trigger>
+							<Tabs.Trigger value="advanced" class="h-8 flex-none gap-2 px-3">
+								<Settings2Icon data-icon="inline-start" class="hidden sm:block" />
+								Results
+							</Tabs.Trigger>
 						{/if}
-					</Tabs.Trigger>
-					<Tabs.Trigger value="columns" class="h-8 flex-none gap-2 px-3">
-						<Columns3Icon data-icon="inline-start" class="hidden sm:block" />
-						Columns
-					</Tabs.Trigger>
-					<Tabs.Trigger value="summaries" class="h-8 flex-none gap-2 px-3">
-						<SigmaIcon data-icon="inline-start" class="hidden sm:block" />
-						Summaries
-						{#if summarize && measureRows.length}
-							<span class="text-xs text-muted-foreground tabular-nums">{measureRows.length}</span>
-						{/if}
-					</Tabs.Trigger>
-					<Tabs.Trigger value="sort" class="h-8 flex-none gap-2 px-3">
-						<ArrowUpDownIcon data-icon="inline-start" class="hidden sm:block" />
-						Sort
-						{#if sorts.length}
-							<span class="text-xs text-muted-foreground tabular-nums">{sorts.length}</span>
-						{/if}
-					</Tabs.Trigger>
-					<Tabs.Trigger value="advanced" class="h-8 flex-none gap-2 px-3">
-						<Settings2Icon data-icon="inline-start" class="hidden sm:block" />
-						Advanced
-					</Tabs.Trigger>
-				</Tabs.List>
+					</Tabs.List>
+					<Button
+						variant="ghost"
+						size="sm"
+						class="shrink-0 text-muted-foreground"
+						onclick={() => setQueryMoreOpen(!queryMoreOpen)}
+						aria-expanded={queryMoreOpen}
+					>
+						<Settings2Icon data-icon="inline-start" />
+						{queryMoreOpen ? "Fewer options" : "More options"}
+						<ChevronDownIcon class="size-4 transition-transform {queryMoreOpen ? 'rotate-180' : ''}" />
+					</Button>
+				</div>
 
 				<Tabs.Content value="filters" class="flex flex-col gap-5">
 					{#if !filters.length}
@@ -1133,6 +1151,16 @@
 				</Tabs.Content>
 			</Tabs.Root>
 		</Card.Content>
+		<Card.Footer class="flex-wrap justify-between gap-2">
+			<span class="text-xs text-muted-foreground">Current shape</span>
+			<div class="flex flex-wrap justify-end gap-1.5">
+				<Badge variant="outline">{selected.length} {selected.length === 1 ? "column" : "columns"}</Badge>
+				{#if filters.length}<Badge variant="outline">{filters.length} {filters.length === 1 ? "filter" : "filters"}</Badge>{/if}
+				{#if sorts.length}<Badge variant="outline">{sorts.length} {sorts.length === 1 ? "sort" : "sorts"}</Badge>{/if}
+				{#if summarize}<Badge variant="secondary">Grouped</Badge>{/if}
+				{#if limitOn}<Badge variant="secondary">Limited to {Number(limit) || "…"}</Badge>{/if}
+			</div>
+		</Card.Footer>
 	</Card.Root>
 
 	<Card.Root class="h-auto">
@@ -1142,7 +1170,7 @@
 					class="flex w-full items-start justify-between gap-3 px-4 py-2.5 text-start hover:bg-muted/40"
 				>
 					<span class="flex min-w-0 flex-col gap-1">
-						<span class="font-heading text-base font-medium">Preview</span>
+						<span class="font-heading text-base font-medium">Live preview</span>
 						<span class="text-sm text-muted-foreground">
 							Live results from the query above. Nothing is saved until you press Save.
 						</span>
@@ -1175,6 +1203,20 @@
 			</Collapsible.Content>
 		</Collapsible.Root>
 	</Card.Root>
+
+	<EditorActions {dirty} onSave={save}>
+		{#snippet left()}
+			{#if !view.implicit}
+				<Button variant="destructive-outline" size="sm" onclick={() => (deleteOpen = true)}>Delete view</Button>
+			{/if}
+		{/snippet}
+		{#snippet beforeSave()}
+			<Button variant="outline" onclick={duplicate}>
+				<CopyIcon data-icon="inline-start" />
+				Duplicate
+			</Button>
+		{/snippet}
+	</EditorActions>
 </div>
 
 <AlertDialog.Root bind:open={deleteOpen}>

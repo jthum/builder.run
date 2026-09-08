@@ -1,12 +1,14 @@
 <script lang="ts">
 	import { goto } from "$app/navigation";
-	import { flowKind, humanCondition, humanStep, humanTrigger } from "$lib/app/relations.ts";
+	import { flowKind } from "$lib/app/relations.ts";
 	import { runtime, session } from "$lib/app/session.svelte.ts";
 	import AutomationPredicateEditor from "$lib/components/automation-predicate-editor.svelte";
 	import AutomationStepList from "$lib/components/automation-step-list.svelte";
 	import AutomationValueMapEditor from "$lib/components/automation-value-map-editor.svelte";
 	import AppSelect from "$lib/components/app-select.svelte";
+	import EditorActions from "$lib/components/editor-actions.svelte";
 	import PageHeader from "$lib/components/page-header.svelte";
+	import StatusPill from "$lib/components/status-pill.svelte";
 	import * as AlertDialog from "$lib/components/ui/alert-dialog/index.js";
 	import * as Alert from "$lib/components/ui/alert/index.js";
 	import { Badge } from "$lib/components/ui/badge/index.js";
@@ -14,10 +16,9 @@
 	import * as Card from "$lib/components/ui/card/index.js";
 	import * as Field from "$lib/components/ui/field/index.js";
 	import { Input } from "$lib/components/ui/input/index.js";
-	import { Spinner } from "$lib/components/ui/spinner/index.js";
 	import { Switch } from "$lib/components/ui/switch/index.js";
 	import * as ToggleGroup from "$lib/components/ui/toggle-group/index.js";
-	import { cn } from "$lib/utils.ts";
+	import { cn, stableStringify } from "$lib/utils.ts";
 	import { BROWSER_LOCAL_AUTOMATION_PROFILE, checkAutomationCompatibility } from "$lib/runtime/automation/index.ts";
 	import type { AutomationPredicate, AutomationValue } from "$lib/runtime/automation/model.ts";
 	import { labelFromKey } from "$lib/runtime/ids.ts";
@@ -25,7 +26,6 @@
 	import CircleAlertIcon from "@lucide/svelte/icons/circle-alert";
 	import CircleCheckIcon from "@lucide/svelte/icons/circle-check";
 	import FilterIcon from "@lucide/svelte/icons/list-filter";
-	import MessageSquareTextIcon from "@lucide/svelte/icons/message-square-text";
 	import { toast } from "svelte-sonner";
 
 	let { flow }: { flow: FlowDef } = $props();
@@ -121,31 +121,6 @@
 	} as FlowDef);
 	const compatibility = $derived(checkAutomationCompatibility(draft, BROWSER_LOCAL_AUTOMATION_PROFILE));
 	const dirty = $derived(stableStringify(draft) !== stableStringify(flow));
-	const narrative = $derived.by(() => {
-		const trigger = kind === "button"
-			? `When it is run manually for ${inputTypeDef?.label?.toLowerCase() ?? "a record"}`
-			: compiledTrigger?.key
-				? `When ${humanTrigger(compiledTrigger.key, spec)}`
-				: "When a trigger is selected";
-		const condition = guardEnabled ? `, but only if ${humanCondition(guardPredicate)}` : "";
-		const summaries = steps.slice(0, 3).map((step) => lowerFirst(humanStep(step, spec)));
-		const actions = summaries.length
-			? `, ${summaries.map((summary, index) => `${index ? "then " : ""}${summary}`).join(", ")}${steps.length > 3 ? `, then ${steps.length - 3} more steps` : ""}`
-			: ", then add the first step";
-		return `${trigger}${condition}${actions}.`;
-	});
-
-	function stableStringify(value: unknown): string {
-		return JSON.stringify(value, (_key, item: unknown) =>
-			item && typeof item === "object" && !Array.isArray(item)
-				? Object.fromEntries(Object.entries(item as Record<string, unknown>).sort(([left], [right]) => left.localeCompare(right)))
-				: item,
-		);
-	}
-	function lowerFirst(value: string): string {
-		return value ? `${value[0].toLowerCase()}${value.slice(1)}` : value;
-	}
-
 	function simplePredicate(name: string, typeKey: string): AutomationPredicate {
 		const type = types.find((item) => item.key === typeKey);
 		return { op: "context.equals", path: `vars.${name || typeKey}.${type?.fields[0]?.key ?? "id"}`, value: "" };
@@ -224,21 +199,18 @@
 <div class="flex flex-col gap-6">
 	<PageHeader title={label || flow.label} description="Configure when this workflow runs, what it checks, and what happens next." />
 
-	<Alert.Root class={cn("mx-auto max-w-4xl transition-colors", enabled ? "border-primary/20 bg-primary/5" : "bg-muted/40 text-muted-foreground")}>
-		<MessageSquareTextIcon />
-		<Alert.Title>In plain English</Alert.Title>
-		<Alert.Description class={cn(enabled && "text-foreground")}>
-			<p>{narrative}</p>
-			{#if !enabled}<p>Paused — this workflow will not run until you enable it below.</p>{/if}
-		</Alert.Description>
-		<Alert.Action><Badge variant={enabled ? "default" : "secondary"}>{enabled ? "Active" : "Paused"}</Badge></Alert.Action>
-	</Alert.Root>
-
 	<div class="mx-auto flex w-full max-w-4xl flex-col gap-5 sm:gap-6">
 		<Card.Root>
 			<Card.Header class="gap-0">
 				<Card.Title>Workflow details</Card.Title>
 				<Card.Description>Give this workflow a clear name and choose whether it can run.</Card.Description>
+				<Card.Action>
+					{#if enabled}
+						<Badge>Active</Badge>
+					{:else}
+						<StatusPill path="status" value="Paused" tone="warning" />
+					{/if}
+				</Card.Action>
 			</Card.Header>
 			<Card.Content>
 				<Field.Group>
@@ -361,21 +333,15 @@
 			</div>
 		{/if}
 
-		<div class="flex items-center justify-between gap-3 sm:pl-14">
-			<Button variant="destructive-outline" size="sm" onclick={() => (deleteOpen = true)}>Delete workflow</Button>
-			<div class="flex items-center gap-3">
-				<p class="text-xs text-muted-foreground">{dirty ? "Unsaved changes" : "All changes saved"}</p>
-				<Button onclick={save} disabled={!dirty || saving}>{#if saving}<Spinner data-icon="inline-start" />{/if} Save changes</Button>
-			</div>
+		<div class="sm:pl-14">
+			<EditorActions {dirty} {saving} onSave={save}>
+				{#snippet left()}
+					<Button variant="destructive-outline" size="sm" onclick={() => (deleteOpen = true)}>Delete workflow</Button>
+				{/snippet}
+			</EditorActions>
 		</div>
 	</div>
 </div>
-
-{#if dirty}
-	<div class="fixed bottom-4 right-4 z-20">
-		<Button onclick={save} disabled={saving}>{#if saving}<Spinner data-icon="inline-start" />{/if} Save changes</Button>
-	</div>
-{/if}
 
 <AlertDialog.Root bind:open={deleteOpen}>
 	<AlertDialog.Content>

@@ -341,7 +341,7 @@
 	>
 		{#snippet actions()}
 			{#if !type.expose}
-				<Button variant="ghost" onclick={() => (deleteOpen = true)}>Delete</Button>
+				<Button variant="destructive-outline" onclick={() => (deleteOpen = true)}>Delete</Button>
 			{/if}
 		{/snippet}
 	</PageHeader>

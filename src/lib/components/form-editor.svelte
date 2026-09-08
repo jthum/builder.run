@@ -2,6 +2,7 @@
 	import { goto } from "$app/navigation";
 	import { runtime, session } from "$lib/app/session.svelte.ts";
 	import AppSelect from "$lib/components/app-select.svelte";
+	import EditorActions from "$lib/components/editor-actions.svelte";
 	import PageHeader from "$lib/components/page-header.svelte";
 	import RecordForm from "$lib/components/record-form.svelte";
 	import * as AlertDialog from "$lib/components/ui/alert-dialog/index.js";
@@ -10,6 +11,7 @@
 	import * as Field from "$lib/components/ui/field/index.js";
 	import { Input } from "$lib/components/ui/input/index.js";
 	import type { FormDef } from "$lib/runtime/model.ts";
+	import { stableStringify } from "$lib/utils.ts";
 	import { toast } from "svelte-sonner";
 
 	let { form }: { form: FormDef } = $props();
@@ -36,6 +38,15 @@
 	const sourceType = $derived(
 		types.find((item) => item.key === typeKey) ?? types.find((item) => item.key === form.type),
 	);
+	const draft = $derived({
+		...form,
+		label,
+		type: typeKey,
+		mode: mode as FormDef["mode"],
+		fields: selected.length ? selected : (sourceType?.fields.map((field) => field.key) ?? []),
+		submit: submitFlow ? { flow: submitFlow } : undefined,
+	});
+	const dirty = $derived(stableStringify(draft) !== stableStringify(form));
 
 	function toggle(field: string, on: boolean) {
 		selected = on
@@ -46,16 +57,7 @@
 	}
 
 	async function save() {
-		await runtime().upsertForm({
-			key: form.key,
-			id: form.id,
-			label,
-			type: typeKey,
-			mode: mode as FormDef["mode"],
-			fields: selected.length ? selected : (sourceType?.fields.map((field) => field.key) ?? []),
-			submit: submitFlow ? { flow: submitFlow } : undefined,
-			implicit: form.implicit,
-		});
+		await runtime().upsertForm(draft);
 		toast.success("Form saved");
 	}
 
@@ -70,14 +72,7 @@
 	<PageHeader
 		title={label || form.label}
 		description={mode === "create" ? "Shown when someone adds a record." : "Shown when someone edits a record."}
-	>
-		{#snippet actions()}
-			<Button onclick={save}>Save</Button>
-			{#if !form.implicit}
-				<Button variant="ghost" onclick={() => (deleteOpen = true)}>Delete</Button>
-			{/if}
-		{/snippet}
-	</PageHeader>
+	/>
 
 	<div class="grid gap-8 lg:grid-cols-[minmax(0,24rem)_1fr]">
 		<Field.Group>
@@ -139,6 +134,14 @@
 			{/if}
 		</div>
 	</div>
+
+	<EditorActions {dirty} onSave={save}>
+		{#snippet left()}
+			{#if !form.implicit}
+				<Button variant="destructive-outline" size="sm" onclick={() => (deleteOpen = true)}>Delete form</Button>
+			{/if}
+		{/snippet}
+	</EditorActions>
 </div>
 
 <AlertDialog.Root bind:open={deleteOpen}>
