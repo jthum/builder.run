@@ -534,6 +534,9 @@ types:
     const app = await host.createApp("Pipeline", "freelance_crm");
     expect(app.name).toBe("Pipeline");
     expect(host.app().spec.types.some((type) => type.key === "invoice")).toBe(true);
+    await host.renameApp("Client Pipeline");
+    expect(host.app().name).toBe("Client Pipeline");
+    expect(host.app().spec.label).toBe("Client Pipeline");
   });
 
   it("deletes an app and leaves a blank one if it was the last", async () => {

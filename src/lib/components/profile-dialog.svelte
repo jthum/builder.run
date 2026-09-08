@@ -1,9 +1,9 @@
 <script lang="ts">
 	import { initialsFromName, toneFromName } from "$lib/app/color.ts";
 	import { runtime, session } from "$lib/app/session.svelte.ts";
+	import SettingsDialogShell from "$lib/components/settings-dialog-shell.svelte";
 	import * as Avatar from "$lib/components/ui/avatar/index.js";
 	import { Button } from "$lib/components/ui/button/index.js";
-	import * as Dialog from "$lib/components/ui/dialog/index.js";
 	import * as Field from "$lib/components/ui/field/index.js";
 	import { Input } from "$lib/components/ui/input/index.js";
 	import { Spinner } from "$lib/components/ui/spinner/index.js";
@@ -27,6 +27,10 @@
 	let initialAppearance = $state<"system" | "light" | "dark">("system");
 	let initialized = $state(false);
 	let committed = $state(false);
+	const sections = [
+		{ value: "general", label: "General", icon: UserIcon },
+		{ value: "appearance", label: "Appearance", icon: PaletteIcon },
+	];
 
 	const initials = $derived(initialsFromName(name.trim() || "You"));
 	const tone = $derived(toneFromName(name.trim() || "You"));
@@ -72,33 +76,15 @@
 	}
 </script>
 
-<Dialog.Root {open} onOpenChange={setOpen}>
-	<Dialog.Content class="max-h-[calc(100vh-2rem)] sm:min-h-[34rem] sm:max-w-3xl">
-		<form onsubmit={submit}>
-			<Dialog.Header>
-				<Dialog.Title>Profile settings</Dialog.Title>
-				<Dialog.Description>Manage your profile and personal appearance.</Dialog.Description>
-			</Dialog.Header>
-			<Dialog.Body class="flex overflow-hidden p-0">
-				<Tabs.Root
-					bind:value={section}
-					orientation="vertical"
-					class="min-h-0 flex-1 flex-col gap-0 sm:grid sm:grid-cols-[11rem_minmax(0,1fr)]"
-				>
-					<Tabs.List
-						variant="rail"
-						class="h-auto w-full shrink-0 items-stretch justify-start gap-1 rounded-none border-b p-3 sm:h-full sm:border-r sm:border-b-0"
-					>
-						<Tabs.Trigger value="general" class="h-9 w-full flex-none justify-start px-3">
-							<UserIcon data-icon="inline-start" />
-							General
-						</Tabs.Trigger>
-						<Tabs.Trigger value="appearance" class="h-9 w-full flex-none justify-start px-3">
-							<PaletteIcon data-icon="inline-start" />
-							Appearance
-						</Tabs.Trigger>
-					</Tabs.List>
-
+<SettingsDialogShell
+	{open}
+	bind:section
+	title="Profile settings"
+	description="Manage your profile and personal appearance."
+	{sections}
+	onOpenChange={setOpen}
+	onSubmit={submit}
+>
 					<Tabs.Content value="general" class="min-w-0 overflow-y-auto p-6">
 						<Field.Set>
 							<div class="flex flex-col gap-1">
@@ -171,15 +157,11 @@
 							</Field.Group>
 						</Field.Set>
 					</Tabs.Content>
-				</Tabs.Root>
-			</Dialog.Body>
-			<Dialog.Footer>
-				<Button type="button" variant="outline" onclick={() => setOpen(false)}>Cancel</Button>
-				<Button type="submit" disabled={pending || !name.trim()}>
-					{#if pending}<Spinner data-icon="inline-start" />{/if}
-					Save
-				</Button>
-			</Dialog.Footer>
-		</form>
-	</Dialog.Content>
-</Dialog.Root>
+	{#snippet actions()}
+		<Button type="button" variant="outline" onclick={() => setOpen(false)}>Cancel</Button>
+		<Button type="submit" disabled={pending || !name.trim()}>
+			{#if pending}<Spinner data-icon="inline-start" />{/if}
+			Save
+		</Button>
+	{/snippet}
+</SettingsDialogShell>

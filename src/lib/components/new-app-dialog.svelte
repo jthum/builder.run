@@ -2,182 +2,196 @@
 	import { goto } from "$app/navigation";
 	import { spaceLabel } from "$lib/app/labels.ts";
 	import { runtime, session } from "$lib/app/session.svelte.ts";
+	import AppSelect from "$lib/components/app-select.svelte";
+	import TemplateLibraryDialog from "$lib/components/template-library-dialog.svelte";
+	import { Badge } from "$lib/components/ui/badge/index.js";
 	import { Button } from "$lib/components/ui/button/index.js";
-	import * as Dialog from "$lib/components/ui/dialog/index.js";
-	import * as Field from "$lib/components/ui/field/index.js";
 	import * as InputGroup from "$lib/components/ui/input-group/index.js";
-	import { Input } from "$lib/components/ui/input/index.js";
 	import { Spinner } from "$lib/components/ui/spinner/index.js";
 	import { sampleApps, templateCategories } from "$lib/runtime/samples.ts";
+	import { cn } from "$lib/utils.js";
 	import BriefcaseIcon from "@lucide/svelte/icons/briefcase";
-	import CheckIcon from "@lucide/svelte/icons/check";
-	import LayersIcon from "@lucide/svelte/icons/layers";
+	import CalendarDaysIcon from "@lucide/svelte/icons/calendar-days";
+	import GraduationCapIcon from "@lucide/svelte/icons/graduation-cap";
+	import HeadphonesIcon from "@lucide/svelte/icons/headphones";
+	import LayoutGridIcon from "@lucide/svelte/icons/layout-grid";
+	import MegaphoneIcon from "@lucide/svelte/icons/megaphone";
+	import PackageIcon from "@lucide/svelte/icons/package";
+	import Settings2Icon from "@lucide/svelte/icons/settings-2";
 	import SearchIcon from "@lucide/svelte/icons/search";
+	import ShoppingBagIcon from "@lucide/svelte/icons/shopping-bag";
+	import UserRoundIcon from "@lucide/svelte/icons/user-round";
 	import UsersIcon from "@lucide/svelte/icons/users";
 	import WalletIcon from "@lucide/svelte/icons/wallet";
 	import { toast } from "svelte-sonner";
-	import type { Component } from "svelte";
 
-	let {
-		open = $bindable(false),
-		preset = "",
-	}: {
-		open?: boolean;
-		preset?: string;
-	} = $props();
+	let { open = $bindable(false), preset = "" }: { open?: boolean; preset?: string } = $props();
 
-	const icons: Record<string, Component> = {
-		freelance_crm: UsersIcon,
-		project_tracker: BriefcaseIcon,
-		expense_approval: WalletIcon,
+	const pageSize = 6;
+	const categoryDetails = {
+		all: { label: "All templates", icon: LayoutGridIcon },
+		crm: { label: "CRM", icon: UsersIcon },
+		projects: { label: "Projects", icon: BriefcaseIcon },
+		sales: { label: "Sales", icon: ShoppingBagIcon },
+		marketing: { label: "Marketing", icon: MegaphoneIcon },
+		operations: { label: "Operations", icon: Settings2Icon },
+		finance: { label: "Finance", icon: WalletIcon },
+		people: { label: "People & HR", icon: UserRoundIcon },
+		support: { label: "Customer support", icon: HeadphonesIcon },
+		inventory: { label: "Inventory", icon: PackageIcon },
+		events: { label: "Events", icon: CalendarDaysIcon },
+		education: { label: "Education", icon: GraduationCapIcon },
+		personal: { label: "Personal", icon: UserRoundIcon },
 	};
+	const categoryTones = {
+		all: "bg-primary/10 text-primary",
+		crm: "bg-starter-crm/15 text-starter-crm",
+		projects: "bg-starter-projects/15 text-starter-projects",
+		sales: "bg-starter-content/15 text-starter-content",
+		marketing: "bg-starter-crm/15 text-starter-crm",
+		operations: "bg-starter-projects/15 text-starter-projects",
+		finance: "bg-starter-finance/15 text-starter-finance",
+		people: "bg-starter-content/15 text-starter-content",
+		support: "bg-primary/10 text-primary",
+		inventory: "bg-starter-projects/15 text-starter-projects",
+		events: "bg-starter-finance/15 text-starter-finance",
+		education: "bg-starter-crm/15 text-starter-crm",
+		personal: "bg-primary/10 text-primary",
+	};
+	const sortOptions = [
+		{ value: "recommended", label: "Recommended" },
+		{ value: "name", label: "Name A–Z" },
+	];
 
-	let name = $state("");
 	let query = $state("");
 	let category = $state("all");
+	let sort = $state("recommended");
 	let selected = $state("");
+	let pageIndex = $state(0);
 	let pending = $state(false);
 
 	const space = $derived(spaceLabel(session.snapshot?.space.name));
-
+	const chosen = $derived(sampleApps.find((sample) => sample.key === selected));
+	const categoryCounts = $derived(Object.fromEntries(templateCategories.map((item) => [item.key, sampleApps.filter((sample) => sample.category === item.key).length])));
 	const filtered = $derived.by(() => {
 		const needle = query.trim().toLowerCase();
-		return sampleApps.filter((sample) => {
+		const matches = sampleApps.filter((sample) => {
 			if (category !== "all" && sample.category !== category) return false;
 			if (!needle) return true;
 			return `${sample.label} ${sample.description} ${sample.category}`.toLowerCase().includes(needle);
 		});
+		return sort === "name" ? [...matches].sort((a, b) => a.label.localeCompare(b.label)) : matches;
 	});
+	const pageCount = $derived(Math.max(1, Math.ceil(filtered.length / pageSize)));
+	const currentPage = $derived(Math.min(pageIndex, pageCount - 1));
+	const visible = $derived(filtered.slice(currentPage * pageSize, (currentPage + 1) * pageSize));
+	const rangeStart = $derived(filtered.length ? currentPage * pageSize + 1 : 0);
+	const rangeEnd = $derived(Math.min((currentPage + 1) * pageSize, filtered.length));
 
 	$effect(() => {
 		if (!open) return;
-		selected = preset;
+		selected = preset || sampleApps[0]?.key || "";
 		query = "";
 		category = "all";
-		const sample = sampleApps.find((item) => item.key === preset);
-		name = sample?.label ?? "";
+		sort = "recommended";
+		pageIndex = 0;
 	});
 
-	function choose(key: string) {
-		selected = key;
-		if (!name.trim() || sampleApps.some((sample) => sample.label === name)) {
-			name = sampleApps.find((sample) => sample.key === key)?.label ?? name;
-		}
+	function selectCategory(key: string) {
+		category = key;
+		pageIndex = 0;
+		selected = sampleApps.find((sample) => key === "all" || sample.category === key)?.key ?? "";
 	}
 
-	async function submit(event: Event) {
-		event.preventDefault();
-		if (!name.trim()) return;
+	function search(value: string) {
+		query = value;
+		pageIndex = 0;
+		const needle = value.trim().toLowerCase();
+		selected = sampleApps.find((sample) => {
+			if (category !== "all" && sample.category !== category) return false;
+			return !needle || `${sample.label} ${sample.description} ${sample.category}`.toLowerCase().includes(needle);
+		})?.key ?? "";
+	}
+
+	async function create(templateKey: string) {
+		if (pending) return;
+		const template = sampleApps.find((sample) => sample.key === templateKey);
+		const name = template?.label ?? "Untitled app";
 		pending = true;
 		try {
-			await runtime().createApp(name.trim(), selected || null);
-			toast.success(`${name.trim()} is ready`);
+			await runtime().createApp(name, template?.key ?? null);
+			toast.success(`${name} is ready`, { description: "You can rename it in App settings." });
 			open = false;
 			await goto("/");
 		} finally {
 			pending = false;
 		}
 	}
+
+	async function submit(event: Event) {
+		event.preventDefault();
+		if (selected) await create(selected);
+	}
 </script>
 
-<Dialog.Root bind:open>
-	<Dialog.Content class="max-h-[min(44rem,calc(100vh-2rem))] overflow-hidden sm:max-w-3xl">
-		<form class="flex min-h-0 flex-1 flex-col" onsubmit={submit}>
-			<Dialog.Header>
-				<Dialog.Title>New app</Dialog.Title>
-				<Dialog.Description>
-					Create an app in {space}. Types this space exposes stay available.
-				</Dialog.Description>
-			</Dialog.Header>
-			<Dialog.Body class="flex min-h-0 flex-1 flex-col gap-4 overflow-hidden">
-			<Field.Field>
-				<Field.Label>Name</Field.Label>
-				<Input bind:value={name} placeholder="Freelance CRM" autofocus />
-			</Field.Field>
-			<div class="flex min-h-0 flex-1 flex-col gap-3">
-				<div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-					<p class="text-sm font-medium">Start from</p>
-					<InputGroup.Root class="sm:max-w-64">
-						<InputGroup.Addon>
-							<SearchIcon />
-						</InputGroup.Addon>
-						<InputGroup.Input bind:value={query} placeholder="Filter templates" />
-					</InputGroup.Root>
-				</div>
-				<div class="flex flex-wrap gap-1">
-					<Button size="xs" variant={category === "all" ? "default" : "outline"} onclick={() => (category = "all")}>
-						All
-					</Button>
-					{#each templateCategories as item (item.key)}
-						<Button
-							size="xs"
-							variant={category === item.key ? "default" : "outline"}
-							onclick={() => (category = item.key)}
-						>
-							{item.label}
+<TemplateLibraryDialog
+	bind:open
+	title="Starter library"
+	description="Choose a starting point for your app in {space}. You can rename and tailor it after creation."
+	total={filtered.length}
+	{rangeStart}
+	{rangeEnd}
+	selectedLabel={chosen?.label}
+	canGoBack={currentPage > 0}
+	canGoForward={currentPage < pageCount - 1}
+	onBack={() => (pageIndex = currentPage - 1)}
+	onForward={() => (pageIndex = currentPage + 1)}
+	onSubmit={submit}
+>
+	{#snippet categories()}
+					{#each ["all", ...templateCategories.map((item) => item.key)] as key (key)}
+						{@const detail = categoryDetails[key as keyof typeof categoryDetails]}
+						{@const Icon = detail.icon}
+						<Button type="button" variant={category === key ? "soft" : "ghost"} class="h-9 min-w-max justify-start gap-2.5 px-3 sm:w-full" onclick={() => selectCategory(key)}>
+							<span class={cn("flex size-6 shrink-0 items-center justify-center rounded-md", categoryTones[key as keyof typeof categoryTones])}><Icon class="size-3.5" /></span>
+							<span class="min-w-0 flex-1 truncate text-start">{detail.label}</span>
+							<span class="text-xs font-normal tabular-nums text-muted-foreground">{key === "all" ? sampleApps.length : categoryCounts[key] ?? 0}</span>
 						</Button>
 					{/each}
-				</div>
-				<div class="min-h-0 flex-1 overflow-y-auto pr-1">
-					<div class="grid gap-3 sm:grid-cols-2">
-						<button
-							type="button"
-							class="flex flex-col gap-2 rounded-2xl border p-4 text-start transition-colors hover:bg-muted/40 {selected === ''
-								? 'border-primary ring-2 ring-primary/20'
-								: 'border-border'}"
-							onclick={() => {
-								selected = "";
-								if (sampleApps.some((sample) => sample.label === name)) name = "";
-							}}
-						>
-							<div class="flex items-start justify-between gap-2">
-								<div class="flex size-9 items-center justify-center rounded-lg bg-muted text-muted-foreground">
-									<LayersIcon />
-								</div>
-								{#if selected === ""}
-									<CheckIcon class="size-4 text-primary" />
-								{/if}
-							</div>
-							<div class="font-medium">Blank app</div>
-							<p class="text-sm text-muted-foreground">Start from scratch. Add your own record types, views, and rules.</p>
-						</button>
-						{#each filtered as sample (sample.key)}
-							{@const Icon = icons[sample.key] ?? LayersIcon}
-							<button
-								type="button"
-								class="flex flex-col gap-2 rounded-2xl border p-4 text-start transition-colors hover:bg-muted/40 {selected ===
-								sample.key
-									? 'border-primary ring-2 ring-primary/20'
-									: 'border-border'}"
-								data-sample={sample.key}
-								onclick={() => choose(sample.key)}
-							>
-								<div class="flex items-start justify-between gap-2">
-									<div class="flex size-9 items-center justify-center rounded-lg bg-muted text-muted-foreground">
-										<Icon />
+	{/snippet}
+	{#snippet toolbar()}
+		<div class="flex items-center gap-2">
+						<InputGroup.Root class="min-w-0 flex-1 bg-card">
+							<InputGroup.Addon><SearchIcon /></InputGroup.Addon>
+							<InputGroup.Input value={query} oninput={(event) => search(event.currentTarget.value)} placeholder="Search templates…" autofocus />
+						</InputGroup.Root>
+						<AppSelect value={sort} onValueChange={(value) => { sort = value; pageIndex = 0; }} options={sortOptions} class="w-40 bg-card" />
+		</div>
+	{/snippet}
+						<div class="grid gap-3 md:grid-cols-2">
+							{#each visible as sample (sample.key)}
+								{@const detail = categoryDetails[sample.category]}
+								{@const Icon = detail.icon}
+								<button type="button" aria-pressed={selected === sample.key} class={cn("relative flex min-h-44 flex-col rounded-2xl border-2 bg-card p-4 text-start shadow-xs transition-colors", selected === sample.key ? "border-primary/25 bg-primary/[0.025]" : "border-border/70")} data-sample={sample.key} onclick={() => (selected = sample.key)}>
+									<div class="flex w-full items-start justify-between gap-3">
+										<span class={cn("flex size-10 items-center justify-center rounded-xl", categoryTones[sample.category])}><Icon class="size-5" /></span>
+										<span class={cn("flex size-5 items-center justify-center rounded-full border", selected === sample.key ? "border-primary bg-primary" : "border-input bg-background")}>{#if selected === sample.key}<span class="size-2 rounded-full bg-primary-foreground"></span>{/if}</span>
 									</div>
-									{#if selected === sample.key}
-										<CheckIcon class="size-4 text-primary" />
-									{/if}
-								</div>
-								<div class="font-medium">{sample.label}</div>
-								<p class="text-sm text-muted-foreground">{sample.description}</p>
-							</button>
-						{/each}
-					</div>
-					{#if !filtered.length}
-						<p class="py-8 text-center text-sm text-muted-foreground">No templates match that filter.</p>
-					{/if}
-				</div>
-			</div>
-			</Dialog.Body>
-			<Dialog.Footer>
-				<Button type="button" variant="outline" onclick={() => (open = false)}>Cancel</Button>
-				<Button type="submit" disabled={pending || !name.trim()} data-testid="create-app">
-					{#if pending}<Spinner data-icon="inline-start" />{/if}
-					Create app
-				</Button>
-			</Dialog.Footer>
-		</form>
-	</Dialog.Content>
-</Dialog.Root>
+									<div class="mt-4 flex min-w-0 flex-1 flex-col gap-1">
+										<span class="font-semibold">{sample.label}</span>
+										<span class="line-clamp-2 text-sm text-muted-foreground">{sample.description}</span>
+									</div>
+									<div class="mt-3 flex flex-wrap gap-1 border-t pt-3">
+										<Badge variant="surface">{detail.label}</Badge>
+										<Badge variant="surface">{sample.spec.types.length} types</Badge>
+										<Badge variant="surface">{sample.spec.views.length} views</Badge>
+									</div>
+								</button>
+							{/each}
+						</div>
+						{#if !filtered.length}<p class="py-12 text-center text-sm text-muted-foreground">No templates match your search.</p>{/if}
+	{#snippet actions()}
+		<Button type="button" variant="outline" disabled={pending} onclick={() => create("")}>Start blank</Button>
+		<Button type="submit" disabled={pending || !selected} data-testid="create-app">{#if pending}<Spinner data-icon="inline-start" />{/if}Use template</Button>
+	{/snippet}
+</TemplateLibraryDialog>

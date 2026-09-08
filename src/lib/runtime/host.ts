@@ -786,6 +786,15 @@ export class Host {
     await this.persistAndEmit();
   }
 
+  async renameApp(name: string): Promise<void> {
+    const trimmed = name.trim();
+    if (!trimmed) throw new Error("Name required");
+    const app = this.app();
+    app.name = trimmed;
+    app.spec = { ...app.spec, label: trimmed };
+    await this.persistAndEmit();
+  }
+
   async updateSpaceAppearance(accent: SpaceAccent): Promise<void> {
     if (!SPACE_ACCENT_KEYS.includes(accent)) throw new Error("Unknown accent colour");
     this.space().appearance = { accent };

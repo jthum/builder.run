@@ -10,6 +10,7 @@
 				default: "bg-primary text-primary-foreground shadow-sm hover:bg-primary/90",
 				outline: "border-border bg-background shadow-xs hover:bg-muted hover:text-foreground aria-expanded:bg-muted aria-expanded:text-foreground",
 				secondary: "bg-secondary text-secondary-foreground hover:bg-secondary/80 aria-expanded:bg-secondary aria-expanded:text-secondary-foreground",
+				soft: "bg-primary/10 text-primary hover:bg-primary/15 aria-expanded:bg-primary/15",
 				ghost: "hover:bg-muted hover:text-foreground aria-expanded:bg-muted aria-expanded:text-foreground dark:hover:bg-muted/50",
 				destructive: "bg-destructive text-destructive-foreground shadow-xs hover:bg-destructive/90 focus-visible:border-destructive/40 focus-visible:ring-destructive/20",
 				"destructive-outline":

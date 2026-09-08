@@ -7,7 +7,19 @@ export interface SampleRecord {
   values: Record<string, unknown>;
 }
 
-export type TemplateCategory = "crm" | "projects" | "finance";
+export type TemplateCategory =
+  | "crm"
+  | "projects"
+  | "sales"
+  | "marketing"
+  | "operations"
+  | "finance"
+  | "people"
+  | "support"
+  | "inventory"
+  | "events"
+  | "education"
+  | "personal";
 
 export interface SampleApp {
   key: string;
@@ -22,7 +34,16 @@ export interface SampleApp {
 export const templateCategories: Array<{ key: TemplateCategory; label: string }> = [
   { key: "crm", label: "CRM" },
   { key: "projects", label: "Projects" },
+  { key: "sales", label: "Sales" },
+  { key: "marketing", label: "Marketing" },
+  { key: "operations", label: "Operations" },
   { key: "finance", label: "Finance" },
+  { key: "people", label: "People & HR" },
+  { key: "support", label: "Customer support" },
+  { key: "inventory", label: "Inventory" },
+  { key: "events", label: "Events" },
+  { key: "education", label: "Education" },
+  { key: "personal", label: "Personal" },
 ];
 
 /** Template content — not kernel types. Installed on the root space with expose. */

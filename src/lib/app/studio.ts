@@ -37,6 +37,12 @@ export const studioItems = [
     group: "Space",
   },
   {
+    href: "/build/settings",
+    label: "App settings",
+    description: "Rename this app and manage its preferences.",
+    group: "Space",
+  },
+  {
     href: "/build/spec",
     label: "Export",
     description: "Download or paste the app definition.",

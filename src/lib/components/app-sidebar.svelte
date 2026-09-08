@@ -4,6 +4,7 @@
 	import { collectionLabel, featuredViews, spaceLabel } from "$lib/app/labels.ts";
 	import { chrome, openNewApp, session, runtime } from "$lib/app/session.svelte.ts";
 	import { studioGroupOrder, studioItems } from "$lib/app/studio.ts";
+	import AppSettingsDialog from "$lib/components/app-settings-dialog.svelte";
 	import SidebarNavGroup from "$lib/components/sidebar-nav-group.svelte";
 	import NameDialog from "$lib/components/name-dialog.svelte";
 	import NewAppDialog from "$lib/components/new-app-dialog.svelte";
@@ -11,6 +12,7 @@
 	import SpaceSettingsDialog from "$lib/components/space-settings-dialog.svelte";
 	import * as Avatar from "$lib/components/ui/avatar/index.js";
 	import { Button } from "$lib/components/ui/button/index.js";
+	import * as Command from "$lib/components/ui/command/index.js";
 	import * as DropdownMenu from "$lib/components/ui/dropdown-menu/index.js";
 	import * as Sidebar from "$lib/components/ui/sidebar/index.js";
 	import ArrowLeftIcon from "@lucide/svelte/icons/arrow-left";
@@ -50,6 +52,13 @@
 	const sharedTypes = $derived(types.filter((type) => type.expose));
 	const navPages = $derived(spec ? authoredNavPages(spec) : []);
 	const pageGroups = $derived(groupPagesByFolder(navPages));
+	const appChoices = $derived(
+		[...(snap?.apps ?? [])].sort((left, right) => {
+			if (left.id === snap?.app.id) return -1;
+			if (right.id === snap?.app.id) return 1;
+			return left.name.localeCompare(right.name);
+		}),
+	);
 	const studioSections = $derived(
 		studioGroupOrder.map((label) => ({
 			label,
@@ -60,6 +69,9 @@
 	let spaceOpen = $state(false);
 	let profileOpen = $state(false);
 	let settingsOpen = $state(false);
+	let appSettingsOpen = $state(false);
+	let appMenuOpen = $state(false);
+	let appSearch = $state("");
 
 
 	const studioIcons: Record<string, Component> = {
@@ -69,6 +81,7 @@
 		"/build/flows": WorkflowIcon,
 		"/build/pages": LayersIcon,
 		"/build/actors": UsersIcon,
+		"/build/settings": SettingsIcon,
 		"/build/spec": FileTextIcon,
 		"/diagnostics": SearchIcon,
 	};
@@ -76,6 +89,27 @@
 	const appTone = $derived(toneFromAccent(snap?.space.appearance?.accent));
 	const actorTone = $derived(toneFromName(snap?.actor.name ?? "You"));
 	const initial = $derived(initialsFromName(snap?.actor.name ?? "You"));
+
+	function setAppMenuOpen(value: boolean) {
+		appMenuOpen = value;
+		if (value) appSearch = "";
+	}
+
+	async function switchApp(id: string) {
+		appMenuOpen = false;
+		if (id === snap?.app.id) return;
+		await runtime().switchApp(id);
+	}
+
+	function createApp() {
+		appMenuOpen = false;
+		openNewApp();
+	}
+
+	function editAppSettings() {
+		appMenuOpen = false;
+		appSettingsOpen = true;
+	}
 </script>
 
 {#snippet recordLink(type: TypeDef)}
@@ -114,7 +148,7 @@
 	<Sidebar.Header>
 		<Sidebar.Menu>
 			<Sidebar.MenuItem>
-				<DropdownMenu.Root>
+				<DropdownMenu.Root open={appMenuOpen} onOpenChange={setAppMenuOpen}>
 					<DropdownMenu.Trigger>
 						{#snippet child({ props })}
 							<Sidebar.MenuButton
@@ -137,23 +171,27 @@
 							</Sidebar.MenuButton>
 						{/snippet}
 					</DropdownMenu.Trigger>
-					<DropdownMenu.Content class="min-w-56 rounded-lg" align="start">
-						<DropdownMenu.Group>
-							<DropdownMenu.Label>Apps</DropdownMenu.Label>
-							{#each snap?.apps ?? [] as app (app.id)}
-								<DropdownMenu.Item onSelect={() => runtime().switchApp(app.id)}>
-									<span class="truncate">{app.name}</span>
-									{#if app.id === snap?.app.id}
-										<CheckIcon class="ms-auto" />
-									{/if}
-								</DropdownMenu.Item>
-							{/each}
-						</DropdownMenu.Group>
-						<DropdownMenu.Separator />
-						<DropdownMenu.Item onSelect={() => openNewApp()}>
-							<PlusIcon />
-							New app
-						</DropdownMenu.Item>
+					<DropdownMenu.Content class="w-72 rounded-xl p-0" align="start">
+						<Command.Root class="h-auto rounded-xl" shouldFilter>
+							<Command.Input bind:value={appSearch} placeholder="Search apps…" />
+							<Command.List class="max-h-72">
+								<Command.Empty>No apps found.</Command.Empty>
+								<Command.Group heading="Apps">
+									{#each appChoices as app (app.id)}
+										<Command.Item value={`${app.name} ${app.id}`} onSelect={() => switchApp(app.id)} class="[&>.cn-command-item-indicator]:hidden">
+											<div class="flex size-7 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary"><LayersIcon /></div>
+											<span class="truncate">{app.name}</span>
+											{#if app.id === snap?.app.id}<CheckIcon class="ms-auto" />{/if}
+										</Command.Item>
+									{/each}
+								</Command.Group>
+							</Command.List>
+							<Command.Separator />
+							<div class="grid gap-0.5 p-1">
+								<Button type="button" variant="ghost" class="justify-start" onclick={createApp}><PlusIcon data-icon="inline-start" />New app</Button>
+								<Button type="button" variant="ghost" class="justify-start" onclick={editAppSettings}><SettingsIcon data-icon="inline-start" />App settings</Button>
+							</div>
+						</Command.Root>
 					</DropdownMenu.Content>
 				</DropdownMenu.Root>
 			</Sidebar.MenuItem>
@@ -359,6 +397,7 @@
 </Sidebar.Root>
 
 <NewAppDialog bind:open={chrome.newAppOpen} preset={chrome.newAppPreset} />
+<AppSettingsDialog bind:open={appSettingsOpen} />
 <ProfileDialog bind:open={profileOpen} />
 <SpaceSettingsDialog bind:open={settingsOpen} />
 <NameDialog

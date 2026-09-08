@@ -6,8 +6,8 @@
 		runtime,
 		session,
 	} from "$lib/app/session.svelte.ts";
+	import SettingsDialogShell from "$lib/components/settings-dialog-shell.svelte";
 	import { Button } from "$lib/components/ui/button/index.js";
-	import * as Dialog from "$lib/components/ui/dialog/index.js";
 	import * as Field from "$lib/components/ui/field/index.js";
 	import { Input } from "$lib/components/ui/input/index.js";
 	import { Spinner } from "$lib/components/ui/spinner/index.js";
@@ -30,6 +30,11 @@
 	let initialAccent = $state<SpaceAccent>("blue");
 	let initialized = $state(false);
 	let committed = $state(false);
+	const sections = [
+		{ value: "general", label: "General", icon: Settings2Icon },
+		{ value: "agents", label: "Agent tools", icon: BotIcon },
+		{ value: "appearance", label: "Appearance", icon: PaletteIcon },
+	];
 
 	$effect(() => {
 		if (!open) {
@@ -75,39 +80,15 @@
 	}
 </script>
 
-<Dialog.Root {open} onOpenChange={setOpen}>
-	<Dialog.Content class="max-h-[calc(100vh-2rem)] sm:min-h-[36rem] sm:max-w-4xl">
-		<form onsubmit={submit}>
-			<Dialog.Header>
-				<Dialog.Title>Space settings</Dialog.Title>
-				<Dialog.Description>
-					Manage this space and how browser agents interact with its apps.
-				</Dialog.Description>
-			</Dialog.Header>
-			<Dialog.Body class="flex overflow-hidden p-0">
-				<Tabs.Root
-					bind:value={section}
-					orientation="vertical"
-					class="min-h-0 flex-1 flex-col gap-0 sm:grid sm:grid-cols-[11rem_minmax(0,1fr)]"
-				>
-					<Tabs.List
-						variant="rail"
-						class="h-auto w-full shrink-0 items-stretch justify-start gap-1 rounded-none border-b p-3 sm:h-full sm:border-r sm:border-b-0"
-					>
-						<Tabs.Trigger value="general" class="h-9 w-full flex-none justify-start px-3">
-							<Settings2Icon data-icon="inline-start" />
-							General
-						</Tabs.Trigger>
-						<Tabs.Trigger value="agents" class="h-9 w-full flex-none justify-start px-3">
-							<BotIcon data-icon="inline-start" />
-							Agent tools
-						</Tabs.Trigger>
-						<Tabs.Trigger value="appearance" class="h-9 w-full flex-none justify-start px-3">
-							<PaletteIcon data-icon="inline-start" />
-							Appearance
-						</Tabs.Trigger>
-					</Tabs.List>
-
+<SettingsDialogShell
+	{open}
+	bind:section
+	title="Space settings"
+	description="Manage this space and how browser agents interact with its apps."
+	{sections}
+	onOpenChange={setOpen}
+	onSubmit={submit}
+>
 					<Tabs.Content value="general" class="min-w-0 overflow-y-auto p-6">
 						<Field.Set>
 							<div class="flex flex-col gap-1">
@@ -194,15 +175,11 @@
 							</Field.Group>
 						</Field.Set>
 					</Tabs.Content>
-				</Tabs.Root>
-			</Dialog.Body>
-			<Dialog.Footer>
-				<Button type="button" variant="outline" onclick={() => setOpen(false)}>Cancel</Button>
-				<Button type="submit" disabled={pending || !name.trim()}>
-					{#if pending}<Spinner data-icon="inline-start" />{/if}
-					Save
-				</Button>
-			</Dialog.Footer>
-		</form>
-	</Dialog.Content>
-</Dialog.Root>
+	{#snippet actions()}
+		<Button type="button" variant="outline" onclick={() => setOpen(false)}>Cancel</Button>
+		<Button type="submit" disabled={pending || !name.trim()}>
+			{#if pending}<Spinner data-icon="inline-start" />{/if}
+			Save
+		</Button>
+	{/snippet}
+</SettingsDialogShell>
