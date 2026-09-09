@@ -17,7 +17,7 @@ export function isSpecId(value: string): boolean {
   return /^[0-9A-Za-z]{16}$/.test(value);
 }
 
-export type IdKind = "spc" | "act" | "rec" | "run";
+export type IdKind = "spc" | "act" | "run";
 
 export function createId(kind: IdKind): string {
   const id = idAlphabet();
@@ -27,7 +27,7 @@ export function createId(kind: IdKind): string {
 
 export function isId(value: string, kind?: IdKind): boolean {
   if (kind) return value.startsWith(`${kind}_`);
-  return /^(act|rec|run)_/.test(value);
+  return /^(act|run)_/.test(value);
 }
 
 export function labelFromKey(key: string): string {

@@ -1,6 +1,6 @@
 import type { FilterClause, RecordValue } from "./model.ts";
 import { matchFilters, normalizeFilters } from "./filters.ts";
-import { scalarEqual } from "./values.ts";
+import { scalarEqual, scalarString } from "./values.ts";
 
 export interface ColumnInfo {
   name: string;
@@ -23,7 +23,7 @@ export interface TableEngine {
   dropColumn(table: string, name: string): Promise<void>;
   renameTable(from: string, to: string): Promise<void>;
   dropTable(table: string): Promise<void>;
-  insert(table: string, row: Record<string, unknown>): Promise<void>;
+  insert(table: string, row: Record<string, unknown>): Promise<RecordValue>;
   update(table: string, id: string, patch: Record<string, unknown>): Promise<void>;
   delete(table: string, id: string): Promise<void>;
   get(table: string, id: string): Promise<RecordValue | null>;
@@ -41,8 +41,10 @@ const META_COLUMNS: ColumnInfo[] = [
   { name: "updated_by", sqlType: "TEXT" },
 ];
 
-export function systemColumns(): ColumnInfo[] {
-  return META_COLUMNS.map((column) => ({ ...column }));
+export function systemColumns(idSqlType = "TEXT"): ColumnInfo[] {
+  return META_COLUMNS.map((column) =>
+    column.name === "id" ? { ...column, sqlType: idSqlType } : { ...column },
+  );
 }
 
 export function matchesWhere(
@@ -70,6 +72,8 @@ export function coerceFieldValue(type: string, value: unknown): unknown {
       if (value === "true" || value === 1 || value === "1") return true;
       if (value === "false" || value === 0 || value === "0") return false;
       return Boolean(value);
+    case "reference":
+      return scalarString(value);
     default:
       return value;
   }

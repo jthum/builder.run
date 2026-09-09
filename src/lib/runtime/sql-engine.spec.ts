@@ -12,6 +12,13 @@ describe("sqlite materialisation", () => {
         { key: "name", type: "text", label: "Name", id: "A000000000000009" },
         { key: "budget", type: "number", label: "Budget", id: "A000000000000005" },
         { key: "active", type: "boolean", label: "Active", id: "A000000000000004" },
+        {
+          key: "parent",
+          type: "reference",
+          target: "project",
+          label: "Parent",
+          id: "A000000000000003",
+        },
       ] as never,
     });
     const info = await host.inspectStore("local");
@@ -20,8 +27,15 @@ describe("sqlite materialisation", () => {
     expect(project?.columns.some((column) => column.startsWith("name "))).toBe(true);
     expect(project?.columns.some((column) => column.startsWith("budget REAL"))).toBe(true);
     expect(project?.columns.some((column) => column.startsWith("active INTEGER"))).toBe(true);
-    expect(project?.columns.some((column) => column.startsWith("id TEXT"))).toBe(true);
+    expect(project?.columns.some((column) => column.startsWith("parent INTEGER"))).toBe(true);
+    expect(project?.columns.some((column) => column.startsWith("id INTEGER"))).toBe(true);
     const created = await host.create("project", { name: "Acme site", budget: 8000, active: true });
+    const next = await host.create("project", { name: "Next site", budget: 4000, active: false });
+    expect(created.id).toBe("1");
+    expect(next.id).toBe("2");
+    await host.remove("project", next.id);
+    const afterDelete = await host.create("project", { name: "Later site" });
+    expect(afterDelete.id).toBe("3");
     expect(created.name).toBe("Acme site");
     expect(created.budget).toBe(8000);
     expect(created.active).toBe(true);
@@ -35,6 +49,11 @@ describe("sqlite materialisation", () => {
     expect(shared.tables.some((table) => table.name === "_meta")).toBe(true);
     expect(shared.tables.some((table) => table.name === "organisation")).toBe(false);
     expect(info.tables.some((table) => table.name === "_meta")).toBe(true);
+    expect(
+      info.tables
+        .find((table) => table.name === "_meta")
+        ?.columns.some((column) => column.startsWith("id TEXT")),
+    ).toBe(true);
   });
 
   it("renames and drops columns without losing other values", async () => {
@@ -77,7 +96,7 @@ describe("sqlite materialisation", () => {
       { name: "budget", sqlType: "REAL" },
     ]);
     expect(sql).toContain('CREATE TABLE IF NOT EXISTS "project"');
-    expect(sql).toContain('"id" TEXT PRIMARY KEY');
+    expect(sql).toContain('"id" INTEGER PRIMARY KEY AUTOINCREMENT');
     expect(sql).toContain('"budget" REAL');
     expect(sql).toContain("STRICT");
   });

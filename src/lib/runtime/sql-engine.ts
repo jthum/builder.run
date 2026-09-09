@@ -1,4 +1,3 @@
-import { createId } from "./ids.ts";
 import { nowIso, type RecordValue } from "./model.ts";
 import { type ColumnInfo, type SelectOptions, type TableEngine, systemColumns } from "./engine.ts";
 import type { SqlConnection } from "./sql-gateway.ts";
@@ -75,10 +74,9 @@ export class SqliteEngine implements TableEngine {
     await this.conn.exec(`DROP TABLE IF EXISTS ${sqlIdent(table)}`);
   }
 
-  async insert(table: string, row: Record<string, unknown>): Promise<void> {
+  async insert(table: string, row: Record<string, unknown>): Promise<RecordValue> {
     const columns = await this.writableColumns(table);
     const payload: Record<string, unknown> = {
-      id: row.id ?? createId("rec"),
       created_at: row.created_at ?? nowIso(),
       updated_at: row.updated_at ?? nowIso(),
       created_by: row.created_by ?? "",
@@ -87,10 +85,12 @@ export class SqliteEngine implements TableEngine {
     };
     const names = columns.map((column) => column.name);
     const values = names.map((name) => bindValue(payload[name] ?? null));
-    await this.conn.exec(
-      `INSERT INTO ${sqlIdent(table)} (${quoteList(names)}) VALUES (${placeholders(names.length)})`,
+    const rows = await this.conn.query(
+      `INSERT INTO ${sqlIdent(table)} (${quoteList(names)}) VALUES (${placeholders(names.length)}) RETURNING *`,
       values,
     );
+    if (!rows[0]) throw new Error(`SQLite did not return the inserted ${table} record`);
+    return asRecord(rows[0]);
   }
 
   async update(table: string, id: string, patch: Record<string, unknown>): Promise<void> {
@@ -193,7 +193,7 @@ export class SqliteEngine implements TableEngine {
   private async writableColumns(table: string): Promise<ColumnInfo[]> {
     const columns = await this.tableInfo(table);
     if (columns.length) return columns;
-    return systemColumns();
+    return systemColumns("INTEGER");
   }
 }
 

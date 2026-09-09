@@ -17,6 +17,7 @@ export async function ensureMeta(engine: TableEngine): Promise<void> {
   const tables = await engine.listTables();
   if (!tables.includes(META_TABLE)) {
     await engine.createTable(META_TABLE, [
+      { name: "id", sqlType: "TEXT" },
       { name: "kind", sqlType: "TEXT" },
       { name: "key", sqlType: "TEXT" },
       { name: "parent", sqlType: "TEXT" },

@@ -1,6 +1,5 @@
 import { coerceFieldValue, type TableEngine } from "./engine.ts";
 import { resolveFieldState } from "./field-state.ts";
-import { createId } from "./ids.ts";
 import {
   nowIso,
   type ExecutionContext,
@@ -149,16 +148,14 @@ export async function createRecord(
   if (errors.length) throw new Error(errors.join("; "));
   const engine = ctx.engineFor(type);
   const stamp = nowIso();
-  const record: RecordValue = {
-    id: createId("rec"),
+  const record = {
     created_at: stamp,
     updated_at: stamp,
     created_by: exec.actorId,
     updated_by: exec.actorId,
     ...prepared,
   };
-  await engine.insert(type.key, record);
-  const stored = decodeRecord(type, (await engine.get(type.key, record.id)) ?? record);
+  const stored = decodeRecord(type, await engine.insert(type.key, record));
   return {
     record: stored,
     change: {

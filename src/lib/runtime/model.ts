@@ -1011,6 +1011,7 @@ export function sqlTypeFor(field: FieldDef): string {
     case "number":
       return "REAL";
     case "boolean":
+    case "reference":
       return "INTEGER";
     default:
       return "TEXT";

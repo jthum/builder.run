@@ -20,7 +20,12 @@ export function createTableSql(table: string, columns: ColumnInfo[], strict = tr
   const cols = mergeColumns(columns);
   const body = cols
     .map((column) => {
-      const extra = column.name === "id" ? " PRIMARY KEY" : "";
+      const extra =
+        column.name === "id"
+          ? column.sqlType.toUpperCase() === "INTEGER"
+            ? " PRIMARY KEY AUTOINCREMENT"
+            : " PRIMARY KEY"
+          : "";
       const required = ["created_at", "updated_at", "created_by", "updated_by"].includes(
         column.name,
       )
@@ -33,7 +38,8 @@ export function createTableSql(table: string, columns: ColumnInfo[], strict = tr
 }
 
 export function mergeColumns(columns: ColumnInfo[]): ColumnInfo[] {
-  const cols = [...systemColumns()];
+  const overrides = new Map(columns.map((column) => [column.name, column]));
+  const cols = systemColumns("INTEGER").map((column) => overrides.get(column.name) ?? column);
   for (const column of columns) {
     if (!cols.some((existing) => existing.name === column.name)) cols.push(column);
   }

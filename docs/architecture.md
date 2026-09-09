@@ -84,6 +84,10 @@ Types become real SQLite tables. Fields become columns. Views become runtime que
 
 When the spec evolves, the runtime reconciles its materialised state.
 
+Record identity is allocated by the persistence engine when a record is inserted. The current SQLite engine uses its native integer primary keys and exposes them to the rest of the runtime as opaque strings. Other runtimes may use their own native identity strategy without changing the app spec or record service.
+
+The runtime's `_meta` table is intentionally different: its text primary keys are the stable IDs of portable spec definitions used during schema reconciliation.
+
 ## Two WebMCP projections
 
 builder.run exposes two categories of WebMCP tools.
