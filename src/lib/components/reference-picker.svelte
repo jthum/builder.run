@@ -10,11 +10,13 @@
 		options,
 		placeholder = "Select",
 		disabled = false,
+		required = false,
 	}: {
 		value?: string;
 		options: Array<{ id: string; label: string }>;
 		placeholder?: string;
 		disabled?: boolean;
+		required?: boolean;
 	} = $props();
 
 	let open = $state(false);
@@ -53,6 +55,7 @@
 				class="w-full justify-between font-normal"
 				role="combobox"
 				aria-expanded={open}
+				aria-required={required}
 				{disabled}
 			>
 				<span

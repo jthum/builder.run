@@ -180,7 +180,7 @@ export async function updateRecord(
   const before = await engine.get(type.key, id);
   if (!before) throw new Error(`${type.label} ${id} not found`);
   const prepared = prepareValues(type, { ...before, ...values });
-  const errors = validateRecord(type, prepared, true);
+  const errors = validateRecord(type, prepared);
   if (errors.length) throw new Error(errors.join("; "));
   const changed = changedFields(type.fields, before, prepared);
   const transition = resolveLifecycleTransition(type, before, prepared);

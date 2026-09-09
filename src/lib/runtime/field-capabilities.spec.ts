@@ -56,6 +56,29 @@ describe("field capabilities", () => {
     ).toThrow('Unknown field property "field_type"');
   });
 
+  it("ignores empty validation controls for other field kinds", () => {
+    const spec = normalizeSpec({
+      types: {
+        task: {
+          fields: {
+            title: {
+              type: "text",
+              validation: {
+                min: undefined,
+                max: undefined,
+                min_length: undefined,
+                max_length: undefined,
+                pattern: undefined,
+                message: undefined,
+              },
+            },
+          },
+        },
+      },
+    });
+    expect(spec.types[0]?.fields[0]?.validation).toBeUndefined();
+  });
+
   it("rejects malformed and circular field conditions", () => {
     expect(() =>
       normalizeSpec({

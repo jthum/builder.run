@@ -1,7 +1,12 @@
 import { applyDefaults } from "./defaults.ts";
 import type { Actor, AppSpec } from "./model.ts";
 import { nowIso, normalizeSpec } from "./model.ts";
-import type { PlatformState, SpaceState } from "./platform.ts";
+import {
+  SPACE_ACCENT_KEYS,
+  type PlatformState,
+  type SpaceAccent,
+  type SpaceState,
+} from "./platform.ts";
 import type { SqlConnection } from "./sql-gateway.ts";
 import { scalarString } from "./values.ts";
 
@@ -10,6 +15,7 @@ export const CATALOG_DATABASE = "catalog";
 
 /** Catalog tables. No `_` prefix — this file is already separate from record stores. */
 export const CATALOG_TABLES = ["space", "actor", "kv"] as const;
+const SPACE_APPEARANCE_PREFIX = "space_appearance:";
 
 const CATALOG_SQL = `
 CREATE TABLE IF NOT EXISTS space (
@@ -50,6 +56,21 @@ export async function loadPlatform(conn: SqlConnection): Promise<PlatformState |
   const rows = await conn.query(`SELECT * FROM space ORDER BY created_at`);
   if (!rows.length) return null;
   const actors = await conn.query(`SELECT * FROM actor`);
+  const appearanceRows = await conn.query(
+    `SELECT key, value FROM kv WHERE key LIKE '${SPACE_APPEARANCE_PREFIX}%'`,
+  );
+  const appearanceBySpace = new Map<string, { accent: SpaceAccent }>();
+  for (const row of appearanceRows) {
+    const id = scalarString(row.key).slice(SPACE_APPEARANCE_PREFIX.length);
+    try {
+      const value = JSON.parse(scalarString(row.value)) as { accent?: unknown };
+      if (SPACE_ACCENT_KEYS.includes(value.accent as SpaceAccent)) {
+        appearanceBySpace.set(id, { accent: value.accent as SpaceAccent });
+      }
+    } catch {
+      // Ignore malformed runtime preferences and retain the default appearance.
+    }
+  }
   const actorsBySpace = new Map<string, Actor[]>();
   for (const row of actors) {
     const spaceId = String(row.space_id);
@@ -68,6 +89,7 @@ export async function loadPlatform(conn: SqlConnection): Promise<PlatformState |
     name: String(row.name),
     createdBy: row.created_by ? scalarString(row.created_by) : undefined,
     actors: actorsBySpace.get(String(row.id)) ?? [],
+    appearance: appearanceBySpace.get(String(row.id)),
     spec: applyDefaults(normalizeSpec(JSON.parse(String(row.spec)) as AppSpec)),
   }));
   const active = await conn.query(`SELECT value FROM kv WHERE key = 'active_space_id'`);
@@ -97,6 +119,16 @@ export async function savePlatform(conn: SqlConnection, platform: PlatformState)
            updated_at = excluded.updated_at`,
         [space.id, space.name, space.createdBy ?? null, JSON.stringify(space.spec), stamp, stamp],
       );
+      const appearanceKey = `${SPACE_APPEARANCE_PREFIX}${space.id}`;
+      if (space.appearance) {
+        await conn.exec(
+          `INSERT INTO kv (key, value) VALUES (?, ?)
+           ON CONFLICT(key) DO UPDATE SET value = excluded.value`,
+          [appearanceKey, JSON.stringify(space.appearance)],
+        );
+      } else {
+        await conn.exec(`DELETE FROM kv WHERE key = ?`, [appearanceKey]);
+      }
       for (const actor of space.actors) {
         await conn.exec(
           `INSERT INTO actor (id, space_id, name, email, kind, roles) VALUES (?, ?, ?, ?, ?, ?)
@@ -136,6 +168,12 @@ export async function savePlatform(conn: SqlConnection, platform: PlatformState)
           );
         }
       }
+      const appearanceKeys = spaceIds.map((id) => `${SPACE_APPEARANCE_PREFIX}${id}`);
+      await conn.exec(
+        `DELETE FROM kv WHERE key LIKE '${SPACE_APPEARANCE_PREFIX}%'
+         AND key NOT IN (${appearanceKeys.map(() => "?").join(",")})`,
+        appearanceKeys,
+      );
     }
     await conn.exec(
       `INSERT INTO kv (key, value) VALUES ('active_space_id', ?)

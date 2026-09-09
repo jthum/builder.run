@@ -3,6 +3,7 @@ import { Host } from "./host.ts";
 import { groupChart } from "./chart-data.ts";
 import { specFromText } from "./serialize.ts";
 import { createNodeGateway } from "./sql-node.ts";
+import { CATALOG_DATABASE } from "./catalog.ts";
 
 describe("builder.run host", () => {
   it("materialises a type into records, views, and a triggered workflow", async () => {
@@ -60,6 +61,9 @@ describe("builder.run host", () => {
     });
     const created = await host.create("invoice", { number: "INV-1" });
     expect(created.status).toBe("draft");
+    await expect(host.update("invoice", created.id, { number: "" })).rejects.toThrow(
+      "Number is required",
+    );
     await host.invoke("mark_paid", { invoice: created.id });
     const paid = await host.getRecord("invoice", created.id);
     expect(paid?.status).toBe("paid");
@@ -586,6 +590,41 @@ types:
     expect(host.app().spec.label).toBe("Client Pipeline");
   });
 
+  it("persists space appearance across runtime instances", async () => {
+    const gateway = createNodeGateway();
+    const host = await Host.open({ gateway, persist: false });
+    await host.updateSpaceAppearance("violet");
+    const reloaded = await Host.open({ gateway, persist: false });
+    expect(reloaded.space().appearance?.accent).toBe("violet");
+  });
+
+  it("rejects and does not publish a mutation when catalog persistence fails", async () => {
+    const base = createNodeGateway();
+    let rejectWrites = false;
+    const gateway = {
+      backend: base.backend,
+      async open(name: string) {
+        const connection = await base.open(name);
+        if (name !== CATALOG_DATABASE) return connection;
+        return {
+          exec(sql: string, params?: unknown[]) {
+            if (rejectWrites && sql === "BEGIN") throw new Error("catalog unavailable");
+            return connection.exec(sql, params);
+          },
+          query: connection.query.bind(connection),
+          close: connection.close.bind(connection),
+        };
+      },
+      wipe: () => base.wipe(),
+    };
+    const host = await Host.open({ gateway, persist: false });
+    let published = 0;
+    host.subscribe(() => published++);
+    rejectWrites = true;
+    await expect(host.renameSpace("Unsaved name")).rejects.toThrow("catalog unavailable");
+    expect(published).toBe(0);
+  });
+
   it("deletes an app and leaves a blank one if it was the last", async () => {
     expect.hasAssertions();
     const host = await Host.open({ persist: false });
@@ -969,6 +1008,23 @@ types:
     ).toEqual(expectedNumbers);
     const empty = await host.queryView("project_invoices");
     expect(empty).toEqual([]);
+  });
+
+  it("applies related filters before limiting view results", async () => {
+    const host = await Host.open({ persist: false });
+    await host.loadSample("freelance_crm");
+    await host.upsertView({
+      key: "website_invoices",
+      source: "invoice",
+      fields: ["number", "project.name"],
+      where: [{ field: "project.name", op: "eq", value: "Website redesign" }],
+      order_by: { number: "asc" },
+      limit: 1,
+      implicit: false,
+    });
+    const rows = await host.queryView("website_invoices");
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({ number: "INV-101", "project.name": "Website redesign" });
   });
 
   it("previews a draft view without saving it", async () => {

@@ -24,7 +24,7 @@
 	import * as Sheet from "$lib/components/ui/sheet/index.js";
 	import { Spinner } from "$lib/components/ui/spinner/index.js";
 	import { Switch } from "$lib/components/ui/switch/index.js";
-	import { slugify } from "$lib/runtime/ids.ts";
+	import { slugify, uniqueKey } from "$lib/runtime/ids.ts";
 	import {
 		FIELD_KINDS,
 		VALUE_SEMANTICS,
@@ -95,6 +95,7 @@
 	let typeLabel = $state("");
 	let collectionName = $state("");
 	let namingPending = $state(false);
+	let fieldPending = $state(false);
 	let editing = $state<FieldDef | null>(null);
 	let fieldKey = $state("");
 	let fieldLabel = $state("");
@@ -302,7 +303,13 @@
 	}
 
 	async function saveField() {
-		const key = fieldKey.trim() || slugify(fieldLabel);
+		if (fieldPending) return;
+		const enteredKey = fieldKey.trim();
+		const baseKey = enteredKey || slugify(fieldLabel);
+		const key =
+			editing || enteredKey
+				? baseKey
+				: uniqueKey(baseKey, type.fields.map((field) => field.key), "field");
 		if (!key) return;
 		if (fieldType === "reference" && !fieldTarget) {
 			toast.error("Pick a record type to link to");
@@ -312,61 +319,73 @@
 			toast.error("Add at least one choice");
 			return;
 		}
-		if (editing && editing.key !== key) {
-			await runtime().renameField(type.key, editing.key, key);
-		}
-		await runtime().upsertField(type.key, {
-			key,
-			label: fieldLabel || undefined,
-			type: fieldType as FieldKind,
-			description: fieldDescription.trim() || undefined,
-			placeholder: fieldPlaceholder.trim() || undefined,
-			required: fieldRequired,
-			values: fieldType === "enum" ? fieldChoices : undefined,
-			target: fieldType === "reference" ? fieldTarget : undefined,
-			format:
-				(fieldType === "text" || (fieldType === "number" && fieldPresentation !== "rating")) &&
-				fieldFormat
-					? fieldFormat
-					: undefined,
-			currency:
-				fieldType === "number" && fieldPresentation !== "rating" && fieldFormat === "currency"
-					? fieldCurrency.trim().toUpperCase()
-					: undefined,
-			presentation:
-				fieldType === "text" && fieldPresentation === "textarea"
-					? "textarea"
-					: fieldType === "number" && fieldPresentation === "rating"
-					? "rating"
-					: fieldType === "enum" && fieldPresentation === "badge"
-						? "badge"
+		fieldPending = true;
+		try {
+			if (editing && editing.key !== key) {
+				await runtime().renameField(type.key, editing.key, key);
+			}
+			const fieldDraft: Partial<FieldDef> & { key: string } = {
+				key,
+				label: fieldLabel || undefined,
+				type: fieldType as FieldKind,
+				description: fieldDescription.trim() || undefined,
+				placeholder: fieldPlaceholder.trim() || undefined,
+				required: fieldRequired,
+				values: fieldType === "enum" ? fieldChoices : undefined,
+				target: fieldType === "reference" ? fieldTarget : undefined,
+				format:
+					(fieldType === "text" ||
+						(fieldType === "number" && fieldPresentation !== "rating")) &&
+					fieldFormat
+						? fieldFormat
 						: undefined,
-			variant: fieldType === "number" && fieldPresentation === "rating" ? fieldRatingVariant : undefined,
-			max:
-				fieldType === "number" && fieldPresentation === "rating"
-					? Math.min(10, Math.max(2, Math.round(Number(fieldRatingMax) || 10)))
-					: undefined,
-			value_semantics:
-				fieldType === "enum" && fieldPresentation === "badge"
-					? Object.fromEntries(
-							fieldChoices.map((value) => [value, fieldValueSemantics[value] ?? "neutral"]),
-						)
-					: undefined,
-			validation: {
-				min: supportsNumberRange ? optionalNumber(fieldValidationMin) : undefined,
-				max: supportsNumberRange ? optionalNumber(fieldValidationMax) : undefined,
-				min_length: supportsTextRules ? optionalNumber(fieldValidationMinLength) : undefined,
-				max_length: supportsTextRules ? optionalNumber(fieldValidationMaxLength) : undefined,
-				pattern: supportsTextRules ? fieldValidationPattern.trim() || undefined : undefined,
-				message: fieldValidationMessage.trim() || undefined,
-			},
-			visible_when: fieldVisibleWhen,
-			enabled_when: fieldEnabledWhen,
-			required_when: fieldRequiredWhen,
-			hidden_value: fieldVisibleWhen && fieldHiddenValue === "clear" ? "clear" : undefined,
-		});
-		sheetOpen = false;
-		toast.success(editing ? "Field saved" : "Field added");
+				currency:
+					fieldType === "number" && fieldPresentation !== "rating" && fieldFormat === "currency"
+						? fieldCurrency.trim().toUpperCase()
+						: undefined,
+				presentation:
+					fieldType === "text" && fieldPresentation === "textarea"
+						? "textarea"
+						: fieldType === "number" && fieldPresentation === "rating"
+							? "rating"
+							: fieldType === "enum" && fieldPresentation === "badge"
+								? "badge"
+								: undefined,
+				variant:
+					fieldType === "number" && fieldPresentation === "rating"
+						? fieldRatingVariant
+						: undefined,
+				max:
+					fieldType === "number" && fieldPresentation === "rating"
+						? Math.min(10, Math.max(2, Math.round(Number(fieldRatingMax) || 10)))
+						: undefined,
+				value_semantics:
+					fieldType === "enum" && fieldPresentation === "badge"
+						? Object.fromEntries(
+								fieldChoices.map((value) => [value, fieldValueSemantics[value] ?? "neutral"]),
+							)
+						: undefined,
+				validation: {
+					min: supportsNumberRange ? optionalNumber(fieldValidationMin) : undefined,
+					max: supportsNumberRange ? optionalNumber(fieldValidationMax) : undefined,
+					min_length: supportsTextRules ? optionalNumber(fieldValidationMinLength) : undefined,
+					max_length: supportsTextRules ? optionalNumber(fieldValidationMaxLength) : undefined,
+					pattern: supportsTextRules ? fieldValidationPattern.trim() || undefined : undefined,
+					message: fieldValidationMessage.trim() || undefined,
+				},
+				visible_when: fieldVisibleWhen,
+				enabled_when: fieldEnabledWhen,
+				required_when: fieldRequiredWhen,
+				hidden_value: fieldVisibleWhen && fieldHiddenValue === "clear" ? "clear" : undefined,
+			};
+			await runtime().upsertField(type.key, fieldDraft);
+			sheetOpen = false;
+			toast.success(editing ? "Field saved" : "Field added");
+		} catch (error) {
+			toast.error(error instanceof Error ? error.message : "Could not save field");
+		} finally {
+			fieldPending = false;
+		}
 	}
 
 	async function move(index: number, delta: number) {
@@ -426,8 +445,15 @@
 	}
 
 	const removing = $derived(type.fields.find((field) => field.key === removeKey));
+	const fieldKeyConflict = $derived(
+		Boolean(fieldKey.trim()) &&
+			type.fields.some(
+				(field) => field.key === slugify(fieldKey) && field.id !== editing?.id,
+			),
+	);
 	const canSave = $derived(
 		Boolean(fieldLabel.trim()) &&
+			!fieldKeyConflict &&
 			(fieldType !== "reference" || Boolean(fieldTarget)) &&
 			(fieldType !== "enum" || fieldChoices.length > 0) &&
 			(fieldPresentation === "rating" ||
@@ -856,7 +882,10 @@
 					Remove
 				</Button>
 			{/if}
-			<Button onclick={saveField} disabled={!canSave}>{editing ? "Save field" : "Add field"}</Button>
+			<Button onclick={saveField} disabled={!canSave || fieldPending}>
+				{#if fieldPending}<Spinner data-icon="inline-start" />{/if}
+				{editing ? "Save field" : "Add field"}
+			</Button>
 		</Sheet.Footer>
 	</Sheet.Content>
 </Sheet.Root>

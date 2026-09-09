@@ -56,6 +56,7 @@ export function inValues(value: unknown): unknown[] {
 }
 
 function cell(row: Record<string, unknown>, field: string): unknown {
+  if (Object.hasOwn(row, field)) return row[field];
   if (!field.includes(".")) return row[field];
   return field.split(".").reduce<unknown>((current, part) => {
     if (!current || typeof current !== "object") return undefined;

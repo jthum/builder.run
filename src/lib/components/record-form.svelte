@@ -172,6 +172,7 @@
 						bind:value={values[field.key] as string}
 						options={refOptions[field.key] ?? []}
 						placeholder={`Select ${field.label.toLowerCase()}`}
+						required={state.required}
 						disabled={!state.enabled}
 					/>
 				{:else if widget === "select"}
@@ -182,6 +183,7 @@
 							label: option.label,
 						}))}
 						placeholder={`Select ${field.label.toLowerCase()}`}
+						required={state.required}
 						disabled={!state.enabled}
 					/>
 				{:else if widget === "rating"}
@@ -189,7 +191,7 @@
 						bind:value={values[field.key]}
 						max={field.max ?? 10}
 						label={field.label}
-						required={field.required}
+						required={state.required}
 						disabled={!state.enabled}
 					/>
 				{:else if widget === "textarea"}

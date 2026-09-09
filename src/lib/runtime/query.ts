@@ -2,16 +2,6 @@ import type { TableEngine } from "./engine.ts";
 import { matchesWhere } from "./engine.ts";
 import { exposeFilters, matchFilters, normalizeFilters, type FilterClause } from "./filters.ts";
 import { scalarString } from "./values.ts";
-
-function mergeExpose(base: FilterClause[], extra: FilterClause[]): FilterClause[] {
-  const next = [...base];
-  for (const clause of extra) {
-    const index = next.findIndex((item) => item.field === clause.field);
-    if (index >= 0) next[index] = clause;
-    else next.push(clause);
-  }
-  return next;
-}
 import {
   fieldWidgetFor,
   parseTypeRef,
@@ -23,6 +13,16 @@ import {
   type ViewDef,
   type ViewMeasure,
 } from "./model.ts";
+
+function mergeExpose(base: FilterClause[], extra: FilterClause[]): FilterClause[] {
+  const next = [...base];
+  for (const clause of extra) {
+    const index = next.findIndex((item) => item.field === clause.field);
+    if (index >= 0) next[index] = clause;
+    else next.push(clause);
+  }
+  return next;
+}
 
 export interface QueryContext {
   spec: AppSpec;
@@ -131,18 +131,51 @@ export async function executeView(
     const grouped = await aggregateRows(ctx, type, filtered, view);
     return grouped.slice(0, view.limit ?? grouped.length);
   }
+  const order = Object.entries(view.order_by ?? {});
+  const hasRelatedOrder = order.some(([field]) => field.includes("."));
+  const needsMemoryPass = memClauses.length > 0 || hasRelatedOrder;
   const rows = await engine.select(type.key, {
     where: sqlClauses,
-    orderBy: view.order_by,
-    limit: view.limit,
+    orderBy: hasRelatedOrder ? undefined : view.order_by,
+    limit: needsMemoryPass ? undefined : view.limit,
   });
-  const projected = [];
+  const evaluationPaths = [
+    ...view.fields,
+    ...memClauses.map((clause) => clause.field),
+    ...(hasRelatedOrder ? order.map(([field]) => field) : []),
+  ];
+  const projected: Array<Record<string, unknown>> = [];
   for (const row of rows) {
-    const next = await projectRow(ctx, type, row, view.fields);
+    const next = await projectRow(ctx, type, row, [...new Set(evaluationPaths)]);
     if (memClauses.length && !matchFilters(next, memClauses)) continue;
     projected.push(next);
   }
-  return projected;
+  if (hasRelatedOrder) sortRows(projected, order);
+  return projected
+    .slice(0, view.limit ?? projected.length)
+    .map((row) => selectViewFields(row, view.fields));
+}
+
+function sortRows(
+  rows: Array<Record<string, unknown>>,
+  order: Array<[string, "asc" | "desc"]>,
+): void {
+  rows.sort((left, right) => {
+    for (const [field, direction] of order) {
+      const compared = compareValues(left[field], right[field]);
+      if (compared) return direction === "desc" ? -compared : compared;
+    }
+    return 0;
+  });
+}
+
+function selectViewFields(row: Record<string, unknown>, fields: string[]): Record<string, unknown> {
+  return {
+    id: row.id,
+    ...Object.fromEntries(fields.map((field) => [field, row[field]])),
+    created_at: row.created_at,
+    updated_at: row.updated_at,
+  };
 }
 
 async function aggregateRows(
@@ -173,15 +206,7 @@ async function aggregateRows(
     }),
   );
   const order = Object.entries(view.order_by ?? {});
-  if (order.length) {
-    result.sort((left, right) => {
-      for (const [field, direction] of order) {
-        const compared = compareValues(left[field], right[field]);
-        if (compared) return direction === "desc" ? -compared : compared;
-      }
-      return 0;
-    });
-  }
+  if (order.length) sortRows(result, order);
   return result;
 }
 

@@ -10,6 +10,7 @@
 		placeholder = "Select",
 		class: className,
 		disabled = false,
+		required = false,
 		onValueChange,
 	}: {
 		value?: string;
@@ -17,6 +18,7 @@
 		placeholder?: string;
 		class?: string;
 		disabled?: boolean;
+		required?: boolean;
 		onValueChange?: (value: string) => void;
 	} = $props();
 
@@ -40,7 +42,7 @@
 	allowDeselect={false}
 	{items}
 >
-	<Select.Trigger class={cn("w-full", className)}>
+	<Select.Trigger class={cn("w-full", className)} aria-required={required}>
 		<span class={selected ? "" : "text-muted-foreground"}>{selected?.label ?? placeholder}</span>
 	</Select.Trigger>
 	<Select.Content>

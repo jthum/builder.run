@@ -511,13 +511,17 @@ function normalizeFieldValidation(
   const known = new Set(["min", "max", "min_length", "max_length", "pattern", "message"]);
   for (const key of Object.keys(draft)) {
     if (!known.has(key)) throw new Error(`Unknown validation rule "${key}" on ${fieldKey}`);
-    if (key !== "message" && !capability.validation.includes(key as never)) {
+    const value = draft[key as keyof FieldValidation];
+    const supplied = value !== undefined && value !== null && value !== "";
+    if (supplied && key !== "message" && !capability.validation.includes(key as never)) {
       throw new Error(`Validation rule "${key}" is not supported by ${type} fields`);
     }
   }
   const validation: FieldValidation = {};
   for (const key of ["min", "max", "min_length", "max_length"] as const) {
-    const value = Number(draft[key]);
+    const raw: unknown = draft[key];
+    if (raw === undefined || raw === null || raw === "") continue;
+    const value = Number(raw);
     if (Number.isFinite(value)) validation[key] = value;
   }
   const pattern = String(draft.pattern ?? "").trim();

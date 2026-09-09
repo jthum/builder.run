@@ -120,11 +120,7 @@ export class Host {
 
   private async persistAndEmit(): Promise<void> {
     if (this.silent) return;
-    try {
-      await this.saveCatalog();
-    } catch (error) {
-      console.warn("builder.run persist failed", error);
-    }
+    await this.saveCatalog();
     for (const listener of this.listeners) listener();
   }
 
