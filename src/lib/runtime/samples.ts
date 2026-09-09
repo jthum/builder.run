@@ -194,7 +194,7 @@ export const sampleApps: SampleApp[] = [
           mode: "create",
         },
       },
-      flows: {
+      workflows: {
         complete_project: {
           input: { project: { record: "project" } },
           expose: ["ui", "agent"],
@@ -619,7 +619,7 @@ export const sampleApps: SampleApp[] = [
           mode: "create",
         },
       },
-      flows: {
+      workflows: {
         submit_expense: {
           input: { expense: { record: "expense" } },
           expose: ["ui", "agent"],
@@ -1056,7 +1056,7 @@ export const sampleApps: SampleApp[] = [
           mode: "create",
         },
       },
-      flows: {
+      workflows: {
         mark_invoice_paid: {
           input: { invoice: { record: "invoice" } },
           expose: ["ui", "agent"],

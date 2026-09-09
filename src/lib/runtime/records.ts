@@ -1,4 +1,5 @@
 import { coerceFieldValue, type TableEngine } from "./engine.ts";
+import { resolveFieldState } from "./field-state.ts";
 import { createId } from "./ids.ts";
 import {
   nowIso,
@@ -34,22 +35,19 @@ export function validateRecord(
   for (const field of type.fields) {
     const value = values[field.key];
     const missing = value == null || value === "";
-    if (!partial && field.required && missing) {
-      errors.push(`${field.label} is required`);
+    const state = resolveFieldState(field, values);
+    const addError = (fallback: string) => errors.push(field.validation?.message || fallback);
+    if (!partial && state.required && missing) {
+      addError(`${field.label} is required`);
+    }
+    if (!state.visible || missing) continue;
+    if (field.type === "enum" && field.values && !field.values.includes(scalarString(value))) {
+      addError(`${field.label} must be one of: ${field.values.join(", ")}`);
+    }
+    if (field.type === "number" && Number.isNaN(Number(value))) {
+      addError(`${field.label} must be a number`);
     }
     if (
-      !missing &&
-      field.type === "enum" &&
-      field.values &&
-      !field.values.includes(scalarString(value))
-    ) {
-      errors.push(`${field.label} must be one of: ${field.values.join(", ")}`);
-    }
-    if (!missing && field.type === "number" && Number.isNaN(Number(value))) {
-      errors.push(`${field.label} must be a number`);
-    }
-    if (
-      !missing &&
       field.type === "number" &&
       field.presentation === "rating" &&
       !Number.isNaN(Number(value))
@@ -57,7 +55,48 @@ export function validateRecord(
       const numeric = Number(value);
       const max = field.max ?? 10;
       if (!Number.isInteger(numeric) || numeric < 1 || numeric > max) {
-        errors.push(`${field.label} must be a whole number from 1 to ${max}`);
+        addError(`${field.label} must be a whole number from 1 to ${max}`);
+      }
+    }
+    const validation = field.validation;
+    if (validation && field.type === "number" && !Number.isNaN(Number(value))) {
+      const numeric = Number(value);
+      if (validation.min !== undefined && numeric < validation.min) {
+        addError(`${field.label} must be at least ${validation.min}`);
+      }
+      if (validation.max !== undefined && numeric > validation.max) {
+        addError(`${field.label} must be at most ${validation.max}`);
+      }
+    }
+    if (validation && typeof value === "string") {
+      if (validation.min_length !== undefined && value.length < validation.min_length) {
+        addError(`${field.label} must have at least ${validation.min_length} characters`);
+      }
+      if (validation.max_length !== undefined && value.length > validation.max_length) {
+        addError(`${field.label} must have at most ${validation.max_length} characters`);
+      }
+      if (validation.pattern) {
+        try {
+          if (!new RegExp(validation.pattern).test(value)) {
+            addError(`${field.label} has an invalid format`);
+          }
+        } catch {
+          addError(`${field.label} has an invalid validation pattern`);
+        }
+      }
+    }
+    if (
+      field.type === "text" &&
+      field.format === "email" &&
+      !/^\S+@\S+\.\S+$/.test(scalarString(value))
+    ) {
+      addError(`${field.label} must be an email address`);
+    }
+    if (field.type === "text" && field.format === "url") {
+      try {
+        new URL(scalarString(value));
+      } catch {
+        addError(`${field.label} must be a valid URL`);
       }
     }
   }
@@ -79,6 +118,11 @@ export function prepareValues(
       prepared[field.key] = coerceFieldValue(field.type, values[field.key]);
     } else if (field.default !== undefined) {
       prepared[field.key] = coerceFieldValue(field.type, field.default);
+    }
+  }
+  for (const field of type.fields) {
+    if (field.hidden_value === "clear" && !resolveFieldState(field, prepared).visible) {
+      prepared[field.key] = null;
     }
   }
   return prepared;

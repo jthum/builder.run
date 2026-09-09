@@ -21,6 +21,26 @@ Application spec
 
 A future hosted or native runtime should be able to consume the same semantic model while choosing different UI and persistence technologies.
 
+## Portable identity
+
+Durable spec definitions use opaque, stable 16-character base-62 IDs. The ID remains fixed when a human-readable key or label changes, which lets a runtime reconcile schema renames without treating the definition as deleted and recreated.
+
+IDs are globally unique across the portable definition rather than carrying redundant type prefixes. The containing collection and schema already distinguish a type from a field, view, form, workflow, or page.
+
+This convention applies only to spec nodes. Record, actor, run, database, and other operational identities belong to the runtime and are deliberately not prescribed by the portable spec.
+
+## Optional metadata
+
+The app spec and each durable spec definition may carry an optional `meta` JSON object. The core preserves this data without interpreting it. Runtimes may read and write their own optional information there using conventions that suit them:
+
+```yaml
+meta:
+  wordpress:
+    post_type: invoice
+```
+
+Metadata remains JSON-compatible so the complete spec can be exported and round-tripped. Runtime-specific metadata can supplement the portable definition without expanding the core vocabulary.
+
 ## Runtime layers
 
 At a high level:
@@ -60,7 +80,7 @@ No server is required for application data in this runtime.
 
 The spec does not merely describe a mock UI.
 
-Types become real SQLite tables. Fields become columns. Views become runtime queries. Pages compose widgets. Flows execute application behaviour.
+Types become real SQLite tables. Fields become columns. Views become runtime queries. Pages compose widgets. Workflows execute application behaviour.
 
 When the spec evolves, the runtime reconciles its materialised state.
 

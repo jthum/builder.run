@@ -8,8 +8,9 @@ import {
 import { applyDefaults, defaultViewFields, effectiveSpec } from "./defaults.ts";
 import { assertValidAutomation } from "./automation/validate.ts";
 import type { TableEngine } from "./engine.ts";
-import { invokeFlow, matchingTriggers, type FlowRun } from "./flows.ts";
-import { createId, labelFromKey, slugify } from "./ids.ts";
+import { invokeWorkflow, matchingTriggers, type WorkflowRun } from "./workflows.ts";
+import { conditionFieldKeys, renameConditionField } from "./field-state.ts";
+import { createId, createSpecId, labelFromKey, slugify } from "./ids.ts";
 import {
   cloneData,
   cloneSpec,
@@ -18,11 +19,12 @@ import {
   normalizeSpec,
   normalizeTypeLifecycle,
   normalizeView,
+  validateFieldCapabilities,
   type Actor,
   type AppSpec,
   type ExecutionContext,
   type FieldDef,
-  type FlowDef,
+  type WorkflowDef,
   type FormDef,
   type PageDef,
   type RecordValue,
@@ -357,13 +359,13 @@ export class Host {
     );
   }
 
-  async invoke(flowKey: string, input: Record<string, unknown> = {}): Promise<FlowRun> {
+  async invoke(flowKey: string, input: Record<string, unknown> = {}): Promise<WorkflowRun> {
     const spec = this.resolvedSpec();
-    const flow = spec.flows.find((item) => item.key === flowKey);
-    if (!flow) throw new Error(`Unknown flow ${flowKey}`);
+    const workflow = spec.workflows.find((item) => item.key === flowKey);
+    if (!workflow) throw new Error(`Unknown workflow ${flowKey}`);
     const ctx = this.queryContext();
-    const run = await invokeFlow(ctx, flow, cloneData(input), this.context(), {
-      getFlow: (key) => spec.flows.find((item) => item.key === key),
+    const run = await invokeWorkflow(ctx, workflow, cloneData(input), this.context(), {
+      getWorkflow: (key) => spec.workflows.find((item) => item.key === key),
       guard: new Set(),
     });
     await this.afterChanges(run.changes);
@@ -377,8 +379,8 @@ export class Host {
     const queue = [...changes];
     while (queue.length) {
       const change = queue.shift() as ChangeEvent;
-      for (const flow of matchingTriggers(spec.flows, change)) {
-        const token = `${flow.key}:${change.id}`;
+      for (const workflow of matchingTriggers(spec.workflows, change)) {
+        const token = `${workflow.key}:${change.id}`;
         if (guard.has(token)) continue;
         guard.add(token);
         const input: Record<string, unknown> = {
@@ -386,8 +388,8 @@ export class Host {
           id: change.id,
           ...(change.transition ? { transition: change.transition } : {}),
         };
-        const run = await invokeFlow(ctx, flow, input, this.context(), {
-          getFlow: (key) => spec.flows.find((item) => item.key === key),
+        const run = await invokeWorkflow(ctx, workflow, input, this.context(), {
+          getWorkflow: (key) => spec.workflows.find((item) => item.key === key),
           guard,
         });
         queue.push(...run.changes);
@@ -437,15 +439,21 @@ export class Host {
     if (type.fields.some((item) => item !== field && item.key === key)) {
       throw new Error(`Field key "${key}" already exists on ${typeKey}`);
     }
-    const nextFields = type.fields.map((item) =>
-      item === field
-        ? {
-            ...item,
-            key,
-            label: item.label === labelFromKey(from) ? labelFromKey(key) : item.label,
-          }
-        : item,
-    );
+    const nextFields = type.fields.map((item) => {
+      const renamed =
+        item === field
+          ? {
+              ...item,
+              key,
+              label: item.label === labelFromKey(from) ? labelFromKey(key) : item.label,
+            }
+          : { ...item };
+      for (const property of ["visible_when", "enabled_when", "required_when"] as const) {
+        if (renamed[property])
+          renamed[property] = renameConditionField(renamed[property], from, key);
+      }
+      return renamed;
+    });
     const lifecycle = type.lifecycle
       ? normalizeTypeLifecycle(
           { ...type, fields: nextFields },
@@ -467,7 +475,18 @@ export class Host {
     if (type.lifecycle?.field === key) {
       throw new Error(`Cannot delete lifecycle field "${key}" while the lifecycle is configured`);
     }
-    type.fields = type.fields.filter((item) => item.key !== key);
+    type.fields = type.fields
+      .filter((item) => item.key !== key)
+      .map((item) => {
+        const next = { ...item };
+        for (const property of ["visible_when", "enabled_when", "required_when"] as const) {
+          if (next[property] && conditionFieldKeys(next[property]).includes(key)) {
+            delete next[property];
+          }
+        }
+        if (!next.visible_when) delete next.hidden_value;
+        return next;
+      });
     await this.reconcileAll();
     await this.persistAndEmit();
   }
@@ -483,11 +502,11 @@ export class Host {
     let record: RecordValue | null = null;
     if (recordId) {
       record = await this.update(form.type, recordId, values);
-    } else if (form.mode !== "custom" || !form.submit?.flow) {
+    } else if (form.mode !== "custom" || !form.submit?.workflow) {
       record = await this.create(form.type, values);
     }
-    if (form.submit?.flow) {
-      await this.invoke(form.submit.flow, {
+    if (form.submit?.workflow) {
+      await this.invoke(form.submit.workflow, {
         ...(record ? { [form.type]: record.id } : {}),
         ...values,
       });
@@ -509,7 +528,7 @@ export class Host {
     const updated = normalizeField(
       key,
       {
-        id: existing?.id ?? createId("fld"),
+        id: existing?.id ?? createSpecId(),
         type: "text",
         ...existing,
         ...field,
@@ -521,6 +540,7 @@ export class Host {
     const next = existing
       ? type.fields.map((item) => (item.key === key ? updated : item))
       : [...type.fields, updated];
+    validateFieldCapabilities(type.key, next);
     if (type.lifecycle) normalizeTypeLifecycle({ ...type, fields: next }, type.lifecycle);
     type.fields = next;
     await this.reconcileAll();
@@ -562,7 +582,7 @@ export class Host {
     const views = upsertNamed(
       spec.views,
       normalizeView({
-        id: existing?.id || createId("vw"),
+        id: existing?.id || createSpecId(),
         label: labelFromKey(draft.key),
         source: "",
         fields: [],
@@ -572,9 +592,9 @@ export class Host {
         implicit: false,
       }),
     );
-    this.app().spec = applyDefaults({ ...spec, views });
+    this.app().spec = applyDefaults(normalizeSpec({ ...spec, views }, spec));
     await this.persistAndEmit();
-    return views.find((item) => item.key === draft.key) as ViewDef;
+    return this.app().spec.views.find((item) => item.key === draft.key) as ViewDef;
   }
 
   async upsertForm(draft: Partial<FormDef> & { key: string }): Promise<FormDef> {
@@ -582,7 +602,7 @@ export class Host {
     const spec = this.app().spec;
     const existing = spec.forms.find((form) => form.key === draft.key);
     const forms = upsertNamed(spec.forms, {
-      id: existing?.id || createId("frm"),
+      id: existing?.id || createSpecId(),
       label: labelFromKey(draft.key),
       type: "",
       fields: [],
@@ -591,24 +611,26 @@ export class Host {
       ...draft,
       implicit: false,
     } as FormDef);
-    this.app().spec = applyDefaults({ ...spec, forms });
+    this.app().spec = applyDefaults(normalizeSpec({ ...spec, forms }, spec));
     await this.persistAndEmit();
-    return forms.find((item) => item.key === draft.key) as FormDef;
+    return this.app().spec.forms.find((item) => item.key === draft.key) as FormDef;
   }
 
-  async upsertFlow(draft: Partial<FlowDef> & { key: string }): Promise<FlowDef> {
+  async upsertWorkflow(draft: Partial<WorkflowDef> & { key: string }): Promise<WorkflowDef> {
     draft = cloneData(draft);
     const spec = this.app().spec;
-    const flows = upsertNamed(spec.flows, {
-      id: createId("flw"),
+    const existing = spec.workflows.find((workflow) => workflow.key === draft.key);
+    const workflows = upsertNamed(spec.workflows, {
       label: labelFromKey(draft.key),
       steps: [],
+      ...existing,
       ...draft,
+      id: existing?.id || draft.id || createSpecId(),
     });
-    assertValidAutomation(flows.find((item) => item.key === draft.key));
-    this.app().spec = { ...spec, flows };
+    assertValidAutomation(workflows.find((item) => item.key === draft.key));
+    this.app().spec = normalizeSpec({ ...spec, workflows }, spec);
     await this.persistAndEmit();
-    return flows.find((item) => item.key === draft.key) as FlowDef;
+    return this.app().spec.workflows.find((item) => item.key === draft.key) as WorkflowDef;
   }
 
   async upsertPage(draft: Partial<PageDef> & { key: string }): Promise<PageDef> {
@@ -628,7 +650,7 @@ export class Host {
       icon = guessPageIcon(blocks);
     }
     const pages = upsertNamed(spec.pages, {
-      id: existing?.id || createId("pg"),
+      id: existing?.id || createSpecId(),
       label: labelFromKey(draft.key),
       ...existing,
       ...draft,
@@ -637,9 +659,9 @@ export class Host {
       implicit: false,
       blocks,
     });
-    this.app().spec = applyDefaults({ ...spec, pages });
+    this.app().spec = applyDefaults(normalizeSpec({ ...spec, pages }, spec));
     await this.persistAndEmit();
-    return pages.find((item) => item.key === draft.key) as PageDef;
+    return this.app().spec.pages.find((item) => item.key === draft.key) as PageDef;
   }
 
   async deleteView(key: string): Promise<void> {
@@ -660,9 +682,12 @@ export class Host {
     await this.persistAndEmit();
   }
 
-  async deleteFlow(key: string): Promise<void> {
+  async deleteWorkflow(key: string): Promise<void> {
     const spec = this.app().spec;
-    this.app().spec = { ...spec, flows: spec.flows.filter((flow) => flow.key !== key) };
+    this.app().spec = {
+      ...spec,
+      workflows: spec.workflows.filter((workflow) => workflow.key !== key),
+    };
     await this.persistAndEmit();
   }
 

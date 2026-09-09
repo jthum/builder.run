@@ -1,4 +1,4 @@
-import { createId, labelFromKey } from "./ids.ts";
+import { createSpecId, labelFromKey } from "./ids.ts";
 import {
   cloneData,
   type AppSpec,
@@ -39,7 +39,7 @@ function guessLabelField(target: string): string {
 
 export function defaultViewFor(type: TypeDef): ViewDef {
   return {
-    id: createId("vw"),
+    id: createSpecId(),
     key: implicitViewKey(type.key),
     label: labelFromKey(type.key),
     source: type.key,
@@ -53,7 +53,7 @@ export function defaultFormsFor(type: TypeDef): FormDef[] {
   const fields = type.fields.map((field) => field.key);
   return [
     {
-      id: createId("frm"),
+      id: createSpecId(),
       key: implicitCreateFormKey(type.key),
       label: `New ${type.label}`,
       type: type.key,
@@ -62,7 +62,7 @@ export function defaultFormsFor(type: TypeDef): FormDef[] {
       implicit: true,
     },
     {
-      id: createId("frm"),
+      id: createSpecId(),
       key: implicitEditFormKey(type.key),
       label: `Edit ${type.label}`,
       type: type.key,
@@ -75,7 +75,7 @@ export function defaultFormsFor(type: TypeDef): FormDef[] {
 
 export function defaultPageFor(type: TypeDef): PageDef {
   return {
-    id: createId("pg"),
+    id: createSpecId(),
     key: implicitPageKey(type.key),
     label: type.label,
     path: `/t/${type.key}`,

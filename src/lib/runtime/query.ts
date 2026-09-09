@@ -13,9 +13,11 @@ function mergeExpose(base: FilterClause[], extra: FilterClause[]): FilterClause[
   return next;
 }
 import {
+  fieldWidgetFor,
   parseTypeRef,
   type AppSpec,
   type FieldDef,
+  type FieldInputWidget,
   type RecordValue,
   type TypeDef,
   type ViewDef,
@@ -254,14 +256,6 @@ export function filterRows(
   return rows.filter((row) => matchesWhere(row, where));
 }
 
-export function fieldWidget(
-  field: FieldDef,
-): "text" | "number" | "date" | "checkbox" | "select" | "reference" | "rating" {
-  if (field.type === "number" && field.presentation === "rating") return "rating";
-  if (field.type === "boolean") return "checkbox";
-  if (field.type === "enum") return "select";
-  if (field.type === "reference") return "reference";
-  if (field.type === "number") return "number";
-  if (field.type === "date") return "date";
-  return "text";
+export function fieldWidget(field: FieldDef): FieldInputWidget {
+  return fieldWidgetFor(field.type, field.presentation);
 }

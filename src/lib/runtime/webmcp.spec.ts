@@ -252,7 +252,7 @@ describe("webmcp bridge", () => {
     await tools.get("upsert_field")!.execute({
       type: "submission",
       key: "stage",
-      field_type: "enum",
+      kind: "enum",
       values: ["submitted", "winner", "rejected"],
       presentation: "badge",
       value_semantics: {
@@ -265,6 +265,16 @@ describe("webmcp bridge", () => {
       presentation: "badge",
       value_semantics: { submitted: "neutral", winner: "success", rejected: "danger" },
     });
+  });
+
+  it("publishes one canonical single-field tool contract", async () => {
+    const host = await Host.open({ persist: false });
+    const tool = buildTools(host).find((item) => item.name === "upsert_field");
+    const properties = (tool?.inputSchema.properties ?? {}) as Record<string, unknown>;
+    expect(Object.keys(properties)).toContain("kind");
+    expect(Object.keys(properties)).not.toContain("field_type");
+    expect(Object.keys(properties)).not.toContain("type_key");
+    expect(tool?.inputSchema.required).toEqual(["type", "key"]);
   });
 
   it("returns grouped view measures through the shared query_view tool", async () => {

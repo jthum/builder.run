@@ -33,13 +33,13 @@ describe("cell formatting", () => {
 
 describe("aggregate rating formatting", () => {
   const type: TypeDef = {
-    id: "typ_review",
+    id: "B000000000000001",
     key: "review",
     label: "Review",
     store: "local",
     fields: [
       {
-        id: "fld_quality",
+        id: "A000000000000007",
         key: "quality",
         label: "Quality",
         type: "number",
@@ -47,14 +47,14 @@ describe("aggregate rating formatting", () => {
         max: 5,
       },
       {
-        id: "fld_impact",
+        id: "A000000000000006",
         key: "impact",
         label: "Impact",
         type: "number",
         presentation: "rating",
         max: 5,
       },
-      { id: "fld_budget", key: "budget", label: "Budget", type: "number" },
+      { id: "A000000000000005", key: "budget", label: "Budget", type: "number" },
     ],
   };
   const view: ViewDef = {
@@ -120,7 +120,14 @@ describe("home copy", () => {
 
 describe("collection labels", () => {
   const type = (label: string, collection_label?: string) =>
-    ({ id: "typ_1", key: "item", label, collection_label, store: "local", fields: [] }) as TypeDef;
+    ({
+      id: "B000000000000004",
+      key: "item",
+      label,
+      collection_label,
+      store: "local",
+      fields: [],
+    }) as TypeDef;
 
   it("infers regular, irregular, already-plural, and uncountable English names", () => {
     expect(collectionLabel(type("Project"))).toBe("Projects");

@@ -88,7 +88,7 @@
 			<Card.Title>Tools</Card.Title>
 			<Card.Description>
 				Builder tools shape the spec. App tools use the selected compact or typed record surface,
-				plus exposed views and agent flows. They register when an agent connection is present.
+				plus exposed views and agent workflows. They register when an agent connection is present.
 			</Card.Description>
 		</Card.Header>
 		<Card.Content>
@@ -126,7 +126,7 @@
 							<Empty.Header>
 								<Empty.Title>No app tools yet</Empty.Title>
 								<Empty.Description>
-									Record tools appear when you add a type. Flow tools appear when a flow is exposed
+									Record tools appear when you add a type. Workflow tools appear when a workflow is exposed
 									to the agent.
 								</Empty.Description>
 							</Empty.Header>

@@ -28,6 +28,7 @@ export function validateAutomation(
     if (
       ![
         "id",
+        "meta",
         "key",
         "label",
         "description",
@@ -215,9 +216,14 @@ function validateSteps(
           "Compute assign must be an object",
         );
     } else if ("invoke" in step) {
-      reportUnknown(step.invoke, ["flow", "input", "as"], `${at}.invoke`, report);
-      if (!text(step.invoke?.flow))
-        report("error", "invoke.flow", `${at}.invoke.flow`, "Invoked flow key is required");
+      reportUnknown(step.invoke, ["workflow", "input", "as"], `${at}.invoke`, report);
+      if (!text(step.invoke?.workflow))
+        report(
+          "error",
+          "invoke.workflow",
+          `${at}.invoke.workflow`,
+          "Invoked workflow key is required",
+        );
       if (step.invoke.input !== undefined && !isObject(step.invoke.input))
         report("error", "invoke.input", `${at}.invoke.input`, "Invoke input must be an object");
     } else if ("delay" in step) {

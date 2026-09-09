@@ -9,9 +9,9 @@ describe("sqlite materialisation", () => {
     await host.upsertType({
       key: "project",
       fields: [
-        { key: "name", type: "text", label: "Name", id: "fld_name" },
-        { key: "budget", type: "number", label: "Budget", id: "fld_budget" },
-        { key: "active", type: "boolean", label: "Active", id: "fld_active" },
+        { key: "name", type: "text", label: "Name", id: "A000000000000009" },
+        { key: "budget", type: "number", label: "Budget", id: "A000000000000005" },
+        { key: "active", type: "boolean", label: "Active", id: "A000000000000004" },
       ] as never,
     });
     const info = await host.inspectStore("local");
@@ -43,8 +43,8 @@ describe("sqlite materialisation", () => {
     await host.upsertType({
       key: "project",
       fields: [
-        { key: "name", type: "text", label: "Name", id: "fld_name" },
-        { key: "note", type: "text", label: "Note", id: "fld_note" },
+        { key: "name", type: "text", label: "Name", id: "A000000000000009" },
+        { key: "note", type: "text", label: "Note", id: "A00000000000000A" },
       ] as never,
     });
     const created = await host.create("project", { name: "Acme", note: "keep me" });

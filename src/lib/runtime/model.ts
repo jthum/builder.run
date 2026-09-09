@@ -1,13 +1,41 @@
-import { createId, labelFromKey, slugify } from "./ids.ts";
+import { createSpecId, isSpecId, labelFromKey, slugify } from "./ids.ts";
+import { normalizeSpecMeta, type SpecMeta, type SpecNode } from "./spec-node.ts";
 import type { AutomationDefinition, AutomationStep } from "./automation/model.ts";
 import { assertValidAutomation } from "./automation/validate.ts";
+import {
+  FIELD_KINDS,
+  fieldCapability,
+  supportsFieldFormat,
+  supportsFieldPresentation,
+  type FieldFormat,
+  type FieldKind,
+  type FieldPresentation,
+  type FieldPresentationVariant,
+} from "./field-capabilities.ts";
+
+export {
+  FIELD_CAPABILITIES,
+  FIELD_FORMATS,
+  FIELD_KINDS,
+  FIELD_PRESENTATIONS,
+  fieldCapability,
+  fieldWidgetFor,
+} from "./field-capabilities.ts";
+export type {
+  FieldCapability,
+  FieldConfiguration,
+  FieldFormat,
+  FieldInputWidget,
+  FieldKind,
+  FieldPresentation,
+  FieldPresentationVariant,
+  FieldValidationRule,
+} from "./field-capabilities.ts";
 
 export const SPEC_VERSION = 1 as const;
 
-export type FieldKind = "text" | "number" | "date" | "boolean" | "enum" | "reference";
-export type FieldPresentation = "rating" | "badge";
-export type FieldPresentationVariant = "segments";
-export type ValueSemantic = "neutral" | "info" | "success" | "warning" | "danger";
+export const VALUE_SEMANTICS = ["neutral", "info", "success", "warning", "danger"] as const;
+export type ValueSemantic = (typeof VALUE_SEMANTICS)[number];
 export type StoreKind = "local";
 export type ActorKind = "human" | "agent" | "system";
 export type Exposure = "ui" | "agent";
@@ -25,36 +53,70 @@ export type FilterOp =
   | "lt"
   | "lte";
 
+export const FILTER_OPERATORS: readonly FilterOp[] = [
+  "eq",
+  "neq",
+  "contains",
+  "empty",
+  "not_empty",
+  "in",
+  "gt",
+  "gte",
+  "lt",
+  "lte",
+];
+
 export interface FilterClause {
   field: string;
   op?: FilterOp;
   value?: unknown;
 }
 
-export interface StoreDef {
-  id: string;
+export type FieldCondition =
+  | { all: FieldCondition[] }
+  | { any: FieldCondition[] }
+  | { not: FieldCondition }
+  | FilterClause;
+
+export interface FieldValidation {
+  min?: number;
+  max?: number;
+  min_length?: number;
+  max_length?: number;
+  pattern?: string;
+  message?: string;
+}
+
+export interface StoreDef extends SpecNode {
   key: string;
   label: string;
   kind: StoreKind;
 }
 
-export interface FieldDef {
-  id: string;
+export interface FieldDef extends SpecNode {
   key: string;
   label: string;
   type: FieldKind;
+  description?: string;
+  placeholder?: string;
   required?: boolean;
   default?: unknown;
   values?: string[];
   target?: string;
+  format?: FieldFormat;
+  currency?: string;
   presentation?: FieldPresentation;
   variant?: FieldPresentationVariant;
   max?: number;
   value_semantics?: Record<string, ValueSemantic>;
+  validation?: FieldValidation;
+  visible_when?: FieldCondition;
+  enabled_when?: FieldCondition;
+  required_when?: FieldCondition;
+  hidden_value?: "preserve" | "clear";
 }
 
-export interface TypeDef {
-  id: string;
+export interface TypeDef extends SpecNode {
   key: string;
   label: string;
   /** Optional plural name used for lists and navigation. */
@@ -80,8 +142,7 @@ export interface TypeLifecycleDef {
   transitions: TypeTransitionDef[];
 }
 
-export interface ViewDef {
-  id: string;
+export interface ViewDef extends SpecNode {
   key: string;
   label: string;
   source: string;
@@ -101,19 +162,18 @@ export interface ViewMeasure {
   fields?: string[];
 }
 
-export interface FormDef {
-  id: string;
+export interface FormDef extends SpecNode {
   key: string;
   label: string;
   type: string;
   fields: string[];
   mode: "create" | "edit" | "custom";
-  submit?: { flow?: string };
+  submit?: { workflow?: string };
   implicit?: boolean;
 }
 
-export type FlowStep = AutomationStep;
-export type FlowDef = AutomationDefinition;
+export type WorkflowStep = AutomationStep;
+export type WorkflowDef = AutomationDefinition;
 
 export type PageRowHeight = "s" | "m" | "l" | "xl";
 
@@ -121,8 +181,7 @@ export type PageBlock =
   | { kind: "widget"; widget: string; values?: Record<string, unknown> }
   | { kind: "group"; columns?: number; min_height?: PageRowHeight; blocks: PageBlock[] };
 
-export interface PageDef {
-  id: string;
+export interface PageDef extends SpecNode {
   key: string;
   label: string;
   path?: string;
@@ -136,11 +195,12 @@ export interface AppSpec {
   version: typeof SPEC_VERSION;
   key: string;
   label: string;
+  meta?: SpecMeta;
   stores: StoreDef[];
   types: TypeDef[];
   views: ViewDef[];
   forms: FormDef[];
-  flows: FlowDef[];
+  workflows: WorkflowDef[];
   pages: PageDef[];
 }
 
@@ -167,8 +227,30 @@ export interface RecordValue {
   [key: string]: unknown;
 }
 
-export const FIELD_KINDS: FieldKind[] = ["text", "number", "date", "boolean", "enum", "reference"];
-export const VALUE_SEMANTICS: ValueSemantic[] = ["neutral", "info", "success", "warning", "danger"];
+const FIELD_PROPERTIES = new Set([
+  "id",
+  "meta",
+  "key",
+  "label",
+  "type",
+  "description",
+  "placeholder",
+  "required",
+  "default",
+  "values",
+  "target",
+  "format",
+  "currency",
+  "presentation",
+  "variant",
+  "max",
+  "value_semantics",
+  "validation",
+  "visible_when",
+  "enabled_when",
+  "required_when",
+  "hidden_value",
+]);
 export const RESERVED_FIELD_KEYS = new Set([
   "id",
   "created_at",
@@ -184,7 +266,7 @@ export function emptySpec(key = "app", label = "App"): AppSpec {
     label,
     stores: [
       {
-        id: createId("sto"),
+        id: createSpecId(),
         key: "local",
         label: "App",
         kind: "local",
@@ -193,14 +275,14 @@ export function emptySpec(key = "app", label = "App"): AppSpec {
     types: [],
     views: [],
     forms: [],
-    flows: [],
+    workflows: [],
     pages: [],
   };
 }
 
 export function defaultLocalStore(): StoreDef {
   return {
-    id: createId("sto"),
+    id: createSpecId(),
     key: "local",
     label: "App",
     kind: "local",
@@ -211,7 +293,7 @@ export function isExposed(type: Pick<TypeDef, "expose">): boolean {
   return Boolean(type.expose);
 }
 
-export type FieldDraft = FieldKind | (Partial<FieldDef> & { field_type?: string });
+export type FieldDraft = FieldKind | Partial<FieldDef>;
 export type TypeDraft = Partial<Omit<TypeDef, "fields" | "lifecycle">> & {
   fields?: Record<string, FieldDraft> | FieldDraft[];
   lifecycle?: TypeLifecycleDef | null;
@@ -221,28 +303,33 @@ type ViewDraft = Partial<ViewDef> & {
   sort?: Array<{ field: string; direction?: SortDirection }>;
 };
 type SpecDraft = Partial<
-  Omit<AppSpec, "types" | "views" | "forms" | "flows" | "pages" | "stores">
+  Omit<AppSpec, "types" | "views" | "forms" | "workflows" | "pages" | "stores">
 > & {
   types?: Record<string, TypeDraft> | TypeDef[];
   views?: Record<string, ViewDraft> | ViewDraft[];
   forms?: Record<string, Partial<FormDef>> | FormDef[];
-  flows?: Record<string, Partial<FlowDef>> | FlowDef[];
+  workflows?: Record<string, Partial<WorkflowDef>> | WorkflowDef[];
   pages?: Record<string, Partial<PageDef>> | PageDef[];
   stores?: Record<string, Partial<StoreDef>> | StoreDef[];
 };
+
+const SPEC_PROPERTIES = new Set([
+  "version",
+  "key",
+  "label",
+  "meta",
+  "stores",
+  "types",
+  "views",
+  "forms",
+  "workflows",
+  "pages",
+]);
 
 function asEntries<T>(value: Record<string, T> | T[] | undefined): Array<[string | undefined, T]> {
   if (!value) return [];
   if (Array.isArray(value)) return value.map((item) => [undefined, item]);
   return Object.entries(value);
-}
-
-function fieldKindFrom(
-  draft: Partial<FieldDef> & { field_type?: string },
-  existing?: FieldDef,
-): FieldKind {
-  const raw = draft.type || draft.field_type || existing?.type || "text";
-  return raw as FieldKind;
 }
 
 export function normalizeFieldKey(value: unknown): string {
@@ -267,14 +354,19 @@ function fieldKeyFrom(mapKey: string | undefined, draft: FieldDraft): string {
 }
 
 export function normalizeField(key: string, draft: FieldDraft, existing?: FieldDef): FieldDef {
-  const objectDraft: Partial<FieldDef> & { field_type?: string } =
+  const objectDraft: Partial<FieldDef> =
     typeof draft === "string" ? { type: draft as FieldKind } : { ...draft };
-  const type = fieldKindFrom(objectDraft, existing);
+  for (const property of Object.keys(objectDraft)) {
+    if (!FIELD_PROPERTIES.has(property)) {
+      throw new Error(`Unknown field property "${property}" on ${key}`);
+    }
+  }
+  const type = (objectDraft.type || existing?.type || "text") as FieldKind;
   if (!FIELD_KINDS.includes(type)) {
     throw new Error(`Unknown field type "${String(type)}" on ${key}`);
   }
   const field: FieldDef = {
-    id: objectDraft.id || existing?.id || createId("fld"),
+    ...normalizeSpecNode(objectDraft, existing, `Field ${key}`),
     key,
     label:
       String(objectDraft.label ?? "").trim() ||
@@ -282,6 +374,18 @@ export function normalizeField(key: string, draft: FieldDraft, existing?: FieldD
       labelFromKey(key),
     type,
   };
+  const description = String(
+    Object.hasOwn(objectDraft, "description")
+      ? (objectDraft.description ?? "")
+      : (existing?.description ?? ""),
+  ).trim();
+  const placeholder = String(
+    Object.hasOwn(objectDraft, "placeholder")
+      ? (objectDraft.placeholder ?? "")
+      : (existing?.placeholder ?? ""),
+  ).trim();
+  if (description) field.description = description;
+  if (placeholder) field.placeholder = placeholder;
   if (objectDraft.required ?? existing?.required) field.required = true;
   if (objectDraft.default !== undefined) field.default = objectDraft.default;
   else if (existing?.default !== undefined) field.default = existing.default;
@@ -296,7 +400,13 @@ export function normalizeField(key: string, draft: FieldDraft, existing?: FieldD
   const presentation = Object.hasOwn(objectDraft, "presentation")
     ? objectDraft.presentation
     : existing?.presentation;
-  if (type === "number" && presentation === "rating") {
+  if (presentation && !supportsFieldPresentation(type, presentation)) {
+    throw new Error(`Presentation "${String(presentation)}" is not supported by ${type} fields`);
+  }
+  assertFieldConfiguration(type, key, objectDraft, presentation);
+  if (type === "text" && presentation === "textarea") {
+    field.presentation = "textarea";
+  } else if (type === "number" && presentation === "rating") {
     const requestedMax = Number(objectDraft.max ?? existing?.max ?? 10);
     field.presentation = "rating";
     field.variant = "segments";
@@ -317,7 +427,104 @@ export function normalizeField(key: string, draft: FieldDraft, existing?: FieldD
     }
     if (Object.keys(semantics).length) field.value_semantics = { ...semantics };
   }
+  const format = Object.hasOwn(objectDraft, "format") ? objectDraft.format : existing?.format;
+  if (format && field.presentation === "rating") {
+    throw new Error(`Rating field "${key}" cannot also use a number format`);
+  }
+  if (format && !supportsFieldFormat(type, format)) {
+    throw new Error(`Format "${String(format)}" is not supported by ${type} fields`);
+  }
+  if (format) field.format = format;
+  if (field.format === "currency") {
+    const currency = String(
+      Object.hasOwn(objectDraft, "currency")
+        ? (objectDraft.currency ?? "")
+        : (existing?.currency ?? ""),
+    )
+      .trim()
+      .toUpperCase();
+    if (!/^[A-Z]{3}$/.test(currency)) {
+      throw new Error(`Currency field "${key}" needs a three-letter currency code`);
+    }
+    field.currency = currency;
+  }
+  const validation = normalizeFieldValidation(
+    Object.hasOwn(objectDraft, "validation") ? objectDraft.validation : existing?.validation,
+    type,
+    key,
+  );
+  if (validation) field.validation = validation;
+  for (const property of ["visible_when", "enabled_when", "required_when"] as const) {
+    const condition = Object.hasOwn(objectDraft, property)
+      ? objectDraft[property]
+      : existing?.[property];
+    if (condition) field[property] = cloneData(condition);
+  }
+  const hiddenValue = Object.hasOwn(objectDraft, "hidden_value")
+    ? objectDraft.hidden_value
+    : existing?.hidden_value;
+  if (hiddenValue === "clear") field.hidden_value = "clear";
+  if (field.hidden_value === "clear" && !field.visible_when) {
+    throw new Error(`Field "${key}" can only clear hidden values when visible_when is configured`);
+  }
   return field;
+}
+
+function assertFieldConfiguration(
+  type: FieldKind,
+  key: string,
+  draft: Partial<FieldDef>,
+  presentation: FieldPresentation | undefined,
+): void {
+  const supplied = (property: keyof FieldDef) =>
+    Object.hasOwn(draft, property) && draft[property] !== undefined && draft[property] !== null;
+  const clearingPresentation = Object.hasOwn(draft, "presentation") && draft.presentation == null;
+  const clearingFormat = Object.hasOwn(draft, "format") && draft.format == null;
+  if (supplied("values") && type !== "enum") {
+    throw new Error(`Field "${key}" can only declare values when its type is enum`);
+  }
+  if (supplied("target") && type !== "reference") {
+    throw new Error(`Field "${key}" can only declare target when its type is reference`);
+  }
+  if (supplied("currency") && draft.format !== "currency" && !clearingFormat) {
+    throw new Error(`Field "${key}" can only declare currency when its format is currency`);
+  }
+  if (
+    (supplied("variant") || supplied("max")) &&
+    presentation !== "rating" &&
+    !clearingPresentation
+  ) {
+    throw new Error(`Field "${key}" can only declare rating options with rating presentation`);
+  }
+  if (supplied("value_semantics") && presentation !== "badge" && !clearingPresentation) {
+    throw new Error(`Field "${key}" can only declare value semantics with badge presentation`);
+  }
+}
+
+function normalizeFieldValidation(
+  draft: FieldValidation | undefined,
+  type: FieldKind,
+  fieldKey: string,
+): FieldValidation | undefined {
+  if (!draft) return undefined;
+  const capability = fieldCapability(type);
+  const known = new Set(["min", "max", "min_length", "max_length", "pattern", "message"]);
+  for (const key of Object.keys(draft)) {
+    if (!known.has(key)) throw new Error(`Unknown validation rule "${key}" on ${fieldKey}`);
+    if (key !== "message" && !capability.validation.includes(key as never)) {
+      throw new Error(`Validation rule "${key}" is not supported by ${type} fields`);
+    }
+  }
+  const validation: FieldValidation = {};
+  for (const key of ["min", "max", "min_length", "max_length"] as const) {
+    const value = Number(draft[key]);
+    if (Number.isFinite(value)) validation[key] = value;
+  }
+  const pattern = String(draft.pattern ?? "").trim();
+  const message = String(draft.message ?? "").trim();
+  if (pattern) validation.pattern = pattern;
+  if (message) validation.message = message;
+  return Object.keys(validation).length ? validation : undefined;
 }
 
 function normalizeType(key: string, draft: TypeDraft, existing?: TypeDef): TypeDef {
@@ -325,20 +532,30 @@ function normalizeType(key: string, draft: TypeDraft, existing?: TypeDef): TypeD
     throw new Error(`Unknown store "${String(draft.store)}" on ${key}`);
   }
   const existingByKey = new Map((existing?.fields ?? []).map((field) => [field.key, field]));
+  const existingById = new Map((existing?.fields ?? []).map((field) => [field.id, field]));
   const fieldSource = draft.fields !== undefined ? draft.fields : existing?.fields;
   const seen = new Set<string>();
   const fields = asEntries(fieldSource as TypeDraft["fields"]).map(([fieldKey, fieldDraft]) => {
     const resolvedKey = fieldKeyFrom(fieldKey, fieldDraft as FieldDraft);
     if (seen.has(resolvedKey)) throw new Error(`Duplicate field key "${resolvedKey}" on ${key}`);
     seen.add(resolvedKey);
-    return normalizeField(resolvedKey, fieldDraft as FieldDraft, existingByKey.get(resolvedKey));
+    const draftId =
+      typeof fieldDraft === "object" && fieldDraft && "id" in fieldDraft
+        ? String(fieldDraft.id ?? "")
+        : "";
+    return normalizeField(
+      resolvedKey,
+      fieldDraft as FieldDraft,
+      (draftId ? existingById.get(draftId) : undefined) ?? existingByKey.get(resolvedKey),
+    );
   });
+  validateFieldCapabilities(key, fields);
   const expose = draft.expose ?? existing?.expose;
   const collectionLabel = Object.hasOwn(draft, "collection_label")
     ? String(draft.collection_label ?? "").trim()
     : existing?.collection_label;
   const type: TypeDef = {
-    id: draft.id || existing?.id || createId("typ"),
+    ...normalizeSpecNode(draft, existing, `Type ${key}`),
     key,
     label: draft.label || existing?.label || labelFromKey(key),
     ...(collectionLabel ? { collection_label: collectionLabel } : {}),
@@ -349,6 +566,108 @@ function normalizeType(key: string, draft: TypeDraft, existing?: TypeDef): TypeD
   const lifecycle = Object.hasOwn(draft, "lifecycle") ? draft.lifecycle : existing?.lifecycle;
   if (lifecycle) type.lifecycle = normalizeTypeLifecycle(type, lifecycle);
   return type;
+}
+
+export function validateFieldCapabilities(typeKey: string, fields: FieldDef[]): void {
+  const keys = new Set(fields.map((field) => field.key));
+  const dependencies = new Map<string, Set<string>>();
+  for (const field of fields) {
+    const validation = field.validation;
+    if (
+      validation?.min !== undefined &&
+      validation.max !== undefined &&
+      validation.min > validation.max
+    ) {
+      throw new Error(`Validation minimum exceeds maximum on ${typeKey}.${field.key}`);
+    }
+    if (
+      validation?.min_length !== undefined &&
+      validation.max_length !== undefined &&
+      validation.min_length > validation.max_length
+    ) {
+      throw new Error(
+        `Validation minimum length exceeds maximum length on ${typeKey}.${field.key}`,
+      );
+    }
+    if (validation?.pattern) {
+      try {
+        new RegExp(validation.pattern);
+      } catch {
+        throw new Error(`Invalid validation pattern on ${typeKey}.${field.key}`);
+      }
+    }
+    for (const property of ["visible_when", "enabled_when", "required_when"] as const) {
+      const condition = field[property];
+      if (!condition) continue;
+      validateFieldCondition(condition, `${typeKey}.${field.key}.${property}`);
+      for (const dependency of fieldConditionKeys(condition)) {
+        if (!keys.has(dependency)) {
+          throw new Error(`Unknown condition field "${dependency}" on ${typeKey}.${field.key}`);
+        }
+        if (dependency === field.key) {
+          throw new Error(`Field ${typeKey}.${field.key} cannot depend on itself`);
+        }
+        const current = dependencies.get(field.key) ?? new Set<string>();
+        current.add(dependency);
+        dependencies.set(field.key, current);
+      }
+    }
+  }
+  assertNoFieldConditionCycles(typeKey, dependencies);
+}
+
+function validateFieldCondition(condition: FieldCondition, path: string): void {
+  if ("all" in condition || "any" in condition) {
+    const group = "all" in condition ? condition.all : condition.any;
+    if (!Array.isArray(group) || !group.length) {
+      throw new Error(`Field condition group on ${path} cannot be empty`);
+    }
+    group.forEach((item, index) => validateFieldCondition(item, `${path}.${index}`));
+    return;
+  }
+  if ("not" in condition) {
+    if (!condition.not || typeof condition.not !== "object") {
+      throw new Error(`Field condition on ${path}.not needs a condition`);
+    }
+    validateFieldCondition(condition.not, `${path}.not`);
+    return;
+  }
+  if (!String(condition.field ?? "").trim()) {
+    throw new Error(`Field condition on ${path} needs a field`);
+  }
+  const op = condition.op ?? "eq";
+  if (!FILTER_OPERATORS.includes(op)) {
+    throw new Error(`Unknown field condition operator "${String(op)}" on ${path}`);
+  }
+  if (op === "in" && !Array.isArray(condition.value)) {
+    throw new Error(`Field condition operator "in" on ${path} needs an array value`);
+  }
+}
+
+function assertNoFieldConditionCycles(
+  typeKey: string,
+  dependencies: Map<string, Set<string>>,
+): void {
+  const visiting = new Set<string>();
+  const visited = new Set<string>();
+  const visit = (field: string) => {
+    if (visiting.has(field)) {
+      throw new Error(`Conditional fields on ${typeKey} contain a cycle involving "${field}"`);
+    }
+    if (visited.has(field)) return;
+    visiting.add(field);
+    for (const dependency of dependencies.get(field) ?? []) visit(dependency);
+    visiting.delete(field);
+    visited.add(field);
+  };
+  for (const field of dependencies.keys()) visit(field);
+}
+
+function fieldConditionKeys(condition: FieldCondition): string[] {
+  if ("all" in condition) return condition.all.flatMap(fieldConditionKeys);
+  if ("any" in condition) return condition.any.flatMap(fieldConditionKeys);
+  if ("not" in condition) return fieldConditionKeys(condition.not);
+  return [condition.field];
 }
 
 export function normalizeTypeLifecycle(
@@ -424,23 +743,35 @@ export function normalizeTypeLifecycle(
   };
 }
 
-function namedList<T extends { id?: string; key?: string; label?: string }>(
+function namedList<T extends { id?: string; key?: string; label?: string; meta?: SpecMeta }>(
   value: Record<string, T> | T[] | undefined,
-  kind: Parameters<typeof createId>[0],
   existing: T[] = [],
 ): T[] {
   const existingByKey = new Map(existing.map((item) => [item.key, item]));
+  const existingById = new Map(existing.map((item) => [item.id, item]));
   return asEntries(value).map(([mapKey, draft]) => {
     const key = mapKey || draft.key || slugify(draft.label || "item");
-    const previous = existingByKey.get(key);
+    const previous = (draft.id ? existingById.get(draft.id) : undefined) ?? existingByKey.get(key);
     return {
       ...previous,
       ...draft,
-      id: draft.id || previous?.id || createId(kind),
+      ...normalizeSpecNode(draft, previous, `Spec item ${key}`),
       key,
       label: draft.label || previous?.label || labelFromKey(key),
     };
   });
+}
+
+function normalizeSpecNode(
+  draft: { id?: string; meta?: SpecMeta },
+  existing: { id?: string; meta?: SpecMeta } | undefined,
+  owner: string,
+): SpecNode {
+  const id = draft.id || existing?.id || createSpecId();
+  if (!isSpecId(id)) throw new Error(`${owner} needs a 16-character base-62 id`);
+  const metaSource = Object.hasOwn(draft, "meta") ? draft.meta : existing?.meta;
+  const meta = normalizeSpecMeta(metaSource, owner);
+  return { id, ...(meta ? { meta } : {}) };
 }
 
 const AGGREGATE_OPS = new Set<AggregateOp>(["count", "sum", "avg", "min", "max"]);
@@ -490,15 +821,23 @@ export function normalizeView(view: ViewDraft & Pick<ViewDef, "id" | "key" | "la
 }
 
 export function normalizeSpec(input: SpecDraft | AppSpec, existing?: AppSpec): AppSpec {
+  for (const property of Object.keys(input)) {
+    if (!SPEC_PROPERTIES.has(property)) throw new Error(`Unknown spec property "${property}"`);
+  }
   const key = input.key || existing?.key || "app";
-  const storeDrafts = namedList(input.stores, "sto", existing?.stores);
+  const meta = normalizeSpecMeta(
+    Object.hasOwn(input, "meta") ? input.meta : existing?.meta,
+    `App ${key}`,
+  );
+  const storeDrafts = namedList(input.stores, existing?.stores);
   for (const store of storeDrafts) {
     if ((store.key && store.key !== "local") || (store.kind && store.kind !== "local")) {
       throw new Error(`Unknown store "${String(store.key || store.kind)}"`);
     }
   }
   const stores = storeDrafts.map((store) => ({
-    id: store.id || createId("sto"),
+    id: store.id || createSpecId(),
+    ...(store.meta ? { meta: store.meta } : {}),
     key: store.key || "local",
     label: store.label || "App",
     kind: "local" as const,
@@ -507,25 +846,32 @@ export function normalizeSpec(input: SpecDraft | AppSpec, existing?: AppSpec): A
     stores.unshift(defaultLocalStore());
   }
   const existingTypes = new Map((existing?.types ?? []).map((type) => [type.key, type]));
+  const existingTypesById = new Map((existing?.types ?? []).map((type) => [type.id, type]));
   const types = asEntries(input.types).map(([typeKey, draft]) => {
     const resolvedKey =
       typeKey || (draft as TypeDef).key || slugify((draft as TypeDef).label || "type");
-    return normalizeType(resolvedKey, draft as TypeDraft, existingTypes.get(resolvedKey));
+    const draftId = String((draft as TypeDef).id ?? "");
+    return normalizeType(
+      resolvedKey,
+      draft as TypeDraft,
+      (draftId ? existingTypesById.get(draftId) : undefined) ?? existingTypes.get(resolvedKey),
+    );
   });
   const spec: AppSpec = {
     version: SPEC_VERSION,
     key,
     label: input.label || existing?.label || labelFromKey(key),
+    ...(meta ? { meta } : {}),
     stores,
     types,
-    views: (namedList(input.views as never, "vw", existing?.views as never) as ViewDef[]).map(
+    views: (namedList(input.views as never, existing?.views as never) as ViewDef[]).map(
       normalizeView,
     ),
-    forms: namedList(input.forms as never, "frm", existing?.forms as never) as FormDef[],
-    flows: (namedList(input.flows as never, "flw", existing?.flows as never) as FlowDef[]).map(
-      normalizeFlow,
-    ),
-    pages: namedList(input.pages as never, "pg", existing?.pages as never) as PageDef[],
+    forms: namedList(input.forms as never, existing?.forms as never) as FormDef[],
+    workflows: (
+      namedList(input.workflows as never, existing?.workflows as never) as WorkflowDef[]
+    ).map(normalizeWorkflow),
+    pages: namedList(input.pages as never, existing?.pages as never) as PageDef[],
   };
   for (const view of spec.views) {
     view.source = view.source || spec.types[0]?.key || "";
@@ -536,21 +882,40 @@ export function normalizeSpec(input: SpecDraft | AppSpec, existing?: AppSpec): A
     form.fields = form.fields || [];
     form.mode = form.mode || "custom";
   }
-  for (const flow of spec.flows) {
-    flow.steps = flow.steps || [];
+  for (const workflow of spec.workflows) {
+    workflow.steps = workflow.steps || [];
   }
   for (const page of spec.pages) {
     page.blocks = page.blocks || [];
   }
+  assertUniqueSpecIds(spec);
   return spec;
 }
 
-function normalizeFlow(flow: FlowDef): FlowDef {
+function assertUniqueSpecIds(spec: AppSpec): void {
+  const seen = new Map<string, string>();
+  const add = (node: SpecNode, owner: string) => {
+    const previous = seen.get(node.id);
+    if (previous) throw new Error(`Duplicate spec id "${node.id}" on ${previous} and ${owner}`);
+    seen.set(node.id, owner);
+  };
+  for (const store of spec.stores) add(store, `store ${store.key}`);
+  for (const type of spec.types) {
+    add(type, `type ${type.key}`);
+    for (const field of type.fields) add(field, `field ${type.key}.${field.key}`);
+  }
+  for (const view of spec.views) add(view, `view ${view.key}`);
+  for (const form of spec.forms) add(form, `form ${form.key}`);
+  for (const workflow of spec.workflows) add(workflow, `workflow ${workflow.key}`);
+  for (const page of spec.pages) add(page, `page ${page.key}`);
+}
+
+function normalizeWorkflow(workflow: WorkflowDef): WorkflowDef {
   const normalized = {
-    ...flow,
-    enabled: flow.enabled ?? true,
-    priority: flow.priority ?? 0,
-    steps: flow.steps ?? [],
+    ...workflow,
+    enabled: workflow.enabled ?? true,
+    priority: workflow.priority ?? 0,
+    steps: workflow.steps ?? [],
   };
   assertValidAutomation(normalized);
   return normalized;

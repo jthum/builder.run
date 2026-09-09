@@ -1,4 +1,4 @@
-import { evaluateCondition } from "$lib/runtime/flows.ts";
+import { evaluateCondition } from "$lib/runtime/workflows.ts";
 import { labelFromKey } from "$lib/runtime/ids.ts";
 import type { AutomationCondition, AutomationPredicate } from "$lib/runtime/automation/model.ts";
 import { scalarString } from "$lib/runtime/values.ts";
@@ -6,8 +6,8 @@ import {
   parseTypeRef,
   type AppSpec,
   type FieldDef,
-  type FlowDef,
-  type FlowStep,
+  type WorkflowDef,
+  type WorkflowStep,
   type RecordValue,
   type TypeDef,
 } from "$lib/runtime/model.ts";
@@ -28,8 +28,8 @@ export function reverseRelations(
   return related;
 }
 
-export function flowInputName(flow: FlowDef, typeKey?: string): string | undefined {
-  const entries = Object.entries(flow.input ?? {});
+export function workflowInputName(workflow: WorkflowDef, typeKey?: string): string | undefined {
+  const entries = Object.entries(workflow.input ?? {});
   if (typeKey) {
     const match = entries.find(
       ([name, input]) => name === typeKey || ("record" in input && input.record === typeKey),
@@ -39,29 +39,39 @@ export function flowInputName(flow: FlowDef, typeKey?: string): string | undefin
   return entries[0]?.[0];
 }
 
-export function callableFlowsFor(spec: AppSpec, typeKey: string): FlowDef[] {
-  return spec.flows.filter((flow) => {
-    if (flow.trigger) return false;
-    if (!flow.expose?.includes("ui")) return false;
-    return Boolean(flowInputName(flow, typeKey));
+export function callableWorkflowsFor(spec: AppSpec, typeKey: string): WorkflowDef[] {
+  return spec.workflows.filter((workflow) => {
+    if (workflow.trigger) return false;
+    if (!workflow.expose?.includes("ui")) return false;
+    return Boolean(workflowInputName(workflow, typeKey));
   });
 }
 
-export function flowApplies(flow: FlowDef, typeKey: string, record: RecordValue): boolean {
-  if (flow.trigger) return false;
-  if (!flow.expose?.includes("ui")) return false;
-  const name = flowInputName(flow, typeKey);
+export function workflowApplies(
+  workflow: WorkflowDef,
+  typeKey: string,
+  record: RecordValue,
+): boolean {
+  if (workflow.trigger) return false;
+  if (!workflow.expose?.includes("ui")) return false;
+  const name = workflowInputName(workflow, typeKey);
   if (!name) return false;
-  const guard = entryGuard(flow);
+  const guard = entryGuard(workflow);
   return !guard || evaluateCondition(guard, { vars: { [name]: record, [typeKey]: record } });
 }
 
-export function applicableFlows(spec: AppSpec, typeKey: string, record: RecordValue): FlowDef[] {
-  return callableFlowsFor(spec, typeKey).filter((flow) => flowApplies(flow, typeKey, record));
+export function applicableWorkflows(
+  spec: AppSpec,
+  typeKey: string,
+  record: RecordValue,
+): WorkflowDef[] {
+  return callableWorkflowsFor(spec, typeKey).filter((workflow) =>
+    workflowApplies(workflow, typeKey, record),
+  );
 }
 
-export function flowKind(flow: FlowDef): "button" | "rule" {
-  return flow.trigger ? "rule" : "button";
+export function workflowKind(workflow: WorkflowDef): "manual" | "automatic" {
+  return workflow.trigger ? "automatic" : "manual";
 }
 
 export function humanTrigger(when: string, spec?: AppSpec): string {
@@ -98,7 +108,7 @@ export function humanCondition(condition: AutomationPredicate): string {
   return `${leafLabel(path)} ${op} ${labelFromKey(value)}`;
 }
 
-export function humanStep(step: FlowStep, spec?: AppSpec): string {
+export function humanStep(step: WorkflowStep, spec?: AppSpec): string {
   if ("effect" in step && step.effect.key === "records.set") {
     const values = step.effect.params?.values;
     const input = step.effect.params?.record;
@@ -117,7 +127,7 @@ export function humanStep(step: FlowStep, spec?: AppSpec): string {
   if ("effect" in step && step.effect.key === "records.create")
     return `Create ${typeLabel(spec, typeof step.effect.params?.type === "string" ? step.effect.params.type : "record").toLowerCase()}`;
   if ("effect" in step && step.effect.key === "records.delete") return "Delete record";
-  if ("invoke" in step) return `Run ${labelFromKey(step.invoke.flow)}`;
+  if ("invoke" in step) return `Run ${labelFromKey(step.invoke.workflow)}`;
   if ("effect" in step && step.effect.key === "records.query")
     return `Look up ${labelFromKey(step.effect.as ?? "records")}`;
   if ("gate" in step) return `If ${humanCondition(step.gate.predicate)}`;
@@ -130,26 +140,26 @@ export function humanStep(step: FlowStep, spec?: AppSpec): string {
   return "Do something";
 }
 
-export function flowSummary(flow: FlowDef, spec?: AppSpec): string {
-  const guard = entryGuard(flow);
+export function workflowSummary(workflow: WorkflowDef, spec?: AppSpec): string {
+  const guard = entryGuard(workflow);
   const steps = (
-    guard && flow.steps[0] && "gate" in flow.steps[0]
-      ? [...(flow.steps[0].gate.pass ?? []), ...flow.steps.slice(1)]
-      : flow.steps
+    guard && workflow.steps[0] && "gate" in workflow.steps[0]
+      ? [...(workflow.steps[0].gate.pass ?? []), ...workflow.steps.slice(1)]
+      : workflow.steps
   )
     .map((step) => humanStep(step, spec))
     .filter(Boolean);
-  if (flow.trigger?.key) {
-    const when = `When ${humanTrigger(flow.trigger.key, spec)}`;
+  if (workflow.trigger?.key) {
+    const when = `When ${humanTrigger(workflow.trigger.key, spec)}`;
     return [when, guard ? `if ${humanCondition(guard)}` : "", steps[0]].filter(Boolean).join(" · ");
   }
-  const target = flowInputName(flow);
+  const target = workflowInputName(workflow);
   const on = target ? `On ${typeLabel(spec, target)}` : "Button";
   return [on, guard ? `if ${humanCondition(guard)}` : "", steps[0]].filter(Boolean).join(" · ");
 }
 
-function entryGuard(flow: FlowDef) {
-  const first = flow.steps[0];
+function entryGuard(workflow: WorkflowDef) {
+  const first = workflow.steps[0];
   return first && "gate" in first && !first.gate.fail ? first.gate.predicate : undefined;
 }
 

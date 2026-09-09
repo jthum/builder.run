@@ -16,7 +16,7 @@ They let an agent inspect and mould the application model, including operations 
 - add or update Types and fields;
 - add or update Views;
 - compose Pages and widgets;
-- create or change Forms and Rules.
+- create or change Forms and Workflows.
 
 The exact tool set follows the implementation, but the important distinction is that these tools operate on **the application definition**.
 
@@ -30,7 +30,7 @@ These tools let an agent operate the app itself:
 - create/update/delete records for exposed Types;
 - apply the named lifecycle transitions currently available to a record;
 - use exposed Views;
-- invoke exposed callable Flows.
+- invoke exposed callable Workflows.
 
 When the application model changes, this capability surface can change with it.
 
@@ -57,11 +57,11 @@ This recursive loop is the main WebMCP idea behind builder.run:
 
 The human UI and WebMCP tools should not implement separate business logic.
 
-Both call into the same application runtime services, so validation, persistence, references, and Flow execution behave consistently whichever surface initiated the operation.
+Both call into the same application runtime services, so validation, persistence, references, and Workflow execution behave consistently whichever surface initiated the operation.
 
 Page widgets follow the same rule. An agent can call `get_widgets` with a widget key and optional View key to discover required inputs and compatible fields. The same widget registry drives the human editor, agent discovery, safe defaults, and `upsert_page` validation, so adding a widget does not require a separate agent-specific contract.
 
-Structured flows are discoverable in the same way. `get_automation_primitives` returns the canonical composition shapes, registered condition and effect keys, their parameter contracts, and the active runtime capability profile. Agents should inspect it before `upsert_flow` rather than guessing a widget- or domain-specific workflow shape.
+Structured workflows are discoverable in the same way. `get_automation_primitives` returns the canonical composition shapes, registered condition and effect keys, their parameter contracts, and the active runtime capability profile. Agents should inspect it before `upsert_workflow` rather than guessing a widget- or domain-specific workflow shape.
 
 WebMCP is therefore best understood as a **projection of the live spec**, not a second API.
 
@@ -86,8 +86,8 @@ transition_record
 
 `describe_type` supplies field constraints and lifecycle metadata on demand. The mutation tools pass
 their type key and values to the same runtime validation used by the human interface. Agent-exposed
-Flows remain individually named because they communicate business intent rather than repeating
-mechanical CRUD. If an application eventually exposes many Flows, action discovery can use the same
+Workflows remain individually named because they communicate business intent rather than repeating
+mechanical CRUD. If an application eventually exposes many Workflows, action discovery can use the same
 list-and-invoke pattern.
 
 An optional **typed tools** runtime setting projects per-Type aliases for small applications or
@@ -116,7 +116,7 @@ That gives the runtime an important invariant:
 record created/updated/deleted
     → no tool-registry change
 
-type/field/view/flow exposure changes
+type/field/view/workflow exposure changes
     → registry may change
 ```
 

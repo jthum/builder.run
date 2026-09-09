@@ -9,6 +9,7 @@
 		verticalDropTarget,
 	} from "$lib/app/drag.ts";
 	import AppSelect from "$lib/components/app-select.svelte";
+	import FieldConditionControl from "$lib/components/field-condition-control.svelte";
 	import LifecycleEditor from "$lib/components/lifecycle-editor.svelte";
 	import PageHeader from "$lib/components/page-header.svelte";
 	import StatusPill from "$lib/components/status-pill.svelte";
@@ -26,13 +27,19 @@
 	import { slugify } from "$lib/runtime/ids.ts";
 	import {
 		FIELD_KINDS,
+		VALUE_SEMANTICS,
+		fieldCapability,
 		type FieldDef,
+		type FieldCondition,
+		type FieldFormat,
 		type FieldKind,
+		type FieldPresentation,
 		type TypeDef,
 		type ValueSemantic,
 	} from "$lib/runtime/model.ts";
 	import { cn } from "$lib/utils.js";
 	import CalendarIcon from "@lucide/svelte/icons/calendar";
+	import ClockIcon from "@lucide/svelte/icons/clock";
 	import ChevronDownIcon from "@lucide/svelte/icons/chevron-down";
 	import ChevronUpIcon from "@lucide/svelte/icons/chevron-up";
 	import GripVerticalIcon from "@lucide/svelte/icons/grip-vertical";
@@ -53,25 +60,17 @@
 		text: TypeIcon,
 		number: HashIcon,
 		date: CalendarIcon,
+		datetime: ClockIcon,
 		boolean: ToggleLeftIcon,
 		enum: ListIcon,
 		reference: LinkIcon,
 	};
-	const numberPresentationOptions = [
-		{ value: "", label: "Standard number" },
-		{ value: "rating", label: "Rating" },
-	];
-	const enumPresentationOptions = [
-		{ value: "", label: "Standard text" },
-		{ value: "badge", label: "Badge" },
-	];
-	const semanticOptions: Array<{ value: ValueSemantic; label: string }> = [
-		{ value: "neutral", label: "Normal" },
-		{ value: "info", label: "Info" },
-		{ value: "success", label: "Success" },
-		{ value: "warning", label: "Warning" },
-		{ value: "danger", label: "Danger" },
-	];
+	const semanticOptions: Array<{ value: ValueSemantic; label: string }> = VALUE_SEMANTICS.map(
+		(value) => ({
+			value,
+			label: value === "neutral" ? "Normal" : value[0].toUpperCase() + value.slice(1),
+		}),
+	);
 
 	const spec = $derived(session.snapshot?.spec);
 	const targets = $derived(spec?.types ?? []);
@@ -101,13 +100,27 @@
 	let fieldLabel = $state("");
 	let fieldType = $state<string>("text");
 	let fieldRequired = $state(false);
+	let fieldDescription = $state("");
+	let fieldPlaceholder = $state("");
+	let fieldFormat = $state<"" | FieldFormat>("");
+	let fieldCurrency = $state("USD");
 	let fieldChoices = $state<string[]>([]);
 	let fieldValueSemantics = $state<Record<string, ValueSemantic>>({});
 	let choiceDraft = $state("");
 	let fieldTarget = $state("");
-	let fieldPresentation = $state<"" | "rating" | "badge">("");
+	let fieldPresentation = $state<"" | FieldPresentation>("");
 	let fieldRatingVariant = $state<"segments">("segments");
 	let fieldRatingMax = $state("10");
+	let fieldValidationMin = $state("");
+	let fieldValidationMax = $state("");
+	let fieldValidationMinLength = $state("");
+	let fieldValidationMaxLength = $state("");
+	let fieldValidationPattern = $state("");
+	let fieldValidationMessage = $state("");
+	let fieldVisibleWhen = $state<FieldCondition | undefined>();
+	let fieldEnabledWhen = $state<FieldCondition | undefined>();
+	let fieldRequiredWhen = $state<FieldCondition | undefined>();
+	let fieldHiddenValue = $state<"preserve" | "clear">("preserve");
 	let advanced = $state(false);
 	let schemaAdvanced = $state(false);
 	let removeKey = $state<string | null>(null);
@@ -163,6 +176,26 @@
 	}
 
 	const selectedKind = $derived((FIELD_KINDS.includes(fieldType as FieldKind) ? fieldType : "text") as FieldKind);
+	const selectedCapability = $derived(fieldCapability(selectedKind));
+	const presentationOptions = $derived([
+		{ value: "", label: selectedCapability.defaultPresentationLabel },
+		...selectedCapability.presentations.map((option) => ({ value: option.value, label: option.label })),
+	]);
+	const formatOptions = $derived([
+		{ value: "", label: selectedCapability.defaultFormatLabel },
+		...selectedCapability.formats.map((option) => ({ value: option.value, label: option.label })),
+	]);
+	const supportsNumberRange = $derived(selectedCapability.validation.includes("min" as never));
+	const supportsTextRules = $derived(selectedCapability.validation.includes("min_length" as never));
+	const presentationCapability = $derived(
+		selectedCapability.presentations.find((option) => option.value === fieldPresentation),
+	);
+	const presentationVariantOptions = $derived(
+		(presentationCapability?.variants ?? []).map((variant) => ({
+			value: variant.value,
+			label: variant.label,
+		})),
+	);
 
 	function openAdd(kind: FieldKind = "text") {
 		editing = null;
@@ -170,6 +203,10 @@
 		fieldLabel = "";
 		fieldType = kind;
 		fieldRequired = false;
+		fieldDescription = "";
+		fieldPlaceholder = "";
+		fieldFormat = "";
+		fieldCurrency = "USD";
 		fieldChoices = kind === "enum" ? ["draft", "active"] : [];
 		fieldValueSemantics = {};
 		choiceDraft = "";
@@ -177,6 +214,16 @@
 		fieldPresentation = "";
 		fieldRatingVariant = "segments";
 		fieldRatingMax = "10";
+		fieldValidationMin = "";
+		fieldValidationMax = "";
+		fieldValidationMinLength = "";
+		fieldValidationMaxLength = "";
+		fieldValidationPattern = "";
+		fieldValidationMessage = "";
+		fieldVisibleWhen = undefined;
+		fieldEnabledWhen = undefined;
+		fieldRequiredWhen = undefined;
+		fieldHiddenValue = "preserve";
 		advanced = false;
 		sheetOpen = true;
 	}
@@ -187,6 +234,10 @@
 		fieldLabel = field.label;
 		fieldType = field.type;
 		fieldRequired = Boolean(field.required);
+		fieldDescription = field.description ?? "";
+		fieldPlaceholder = field.placeholder ?? "";
+		fieldFormat = field.format ?? "";
+		fieldCurrency = field.currency ?? "USD";
 		fieldChoices = [...(field.values ?? [])];
 		fieldValueSemantics = field.value_semantics ? { ...field.value_semantics } : {};
 		choiceDraft = "";
@@ -194,7 +245,19 @@
 		fieldPresentation = field.presentation ?? "";
 		fieldRatingVariant = field.variant ?? "segments";
 		fieldRatingMax = String(field.max ?? 10);
-		advanced = false;
+		fieldValidationMin = valueString(field.validation?.min);
+		fieldValidationMax = valueString(field.validation?.max);
+		fieldValidationMinLength = valueString(field.validation?.min_length);
+		fieldValidationMaxLength = valueString(field.validation?.max_length);
+		fieldValidationPattern = field.validation?.pattern ?? "";
+		fieldValidationMessage = field.validation?.message ?? "";
+		fieldVisibleWhen = field.visible_when ? structuredClone(field.visible_when) : undefined;
+		fieldEnabledWhen = field.enabled_when ? structuredClone(field.enabled_when) : undefined;
+		fieldRequiredWhen = field.required_when ? structuredClone(field.required_when) : undefined;
+		fieldHiddenValue = field.hidden_value ?? "preserve";
+		advanced = Boolean(
+			field.description || field.placeholder || field.validation || field.visible_when || field.enabled_when || field.required_when,
+		);
 		sheetOpen = true;
 	}
 
@@ -221,8 +284,21 @@
 	}
 
 	function setFieldType(kind: FieldKind) {
-		if (fieldType !== kind) fieldPresentation = "";
+		if (fieldType !== kind) {
+			fieldPresentation = "";
+			fieldFormat = "";
+		}
 		fieldType = kind;
+	}
+
+	function valueString(value: number | undefined) {
+		return value === undefined ? "" : String(value);
+	}
+
+	function optionalNumber(value: string): number | undefined {
+		if (!value.trim()) return undefined;
+		const number = Number(value);
+		return Number.isFinite(number) ? number : undefined;
 	}
 
 	async function saveField() {
@@ -243,11 +319,24 @@
 			key,
 			label: fieldLabel || undefined,
 			type: fieldType as FieldKind,
+			description: fieldDescription.trim() || undefined,
+			placeholder: fieldPlaceholder.trim() || undefined,
 			required: fieldRequired,
 			values: fieldType === "enum" ? fieldChoices : undefined,
 			target: fieldType === "reference" ? fieldTarget : undefined,
+			format:
+				(fieldType === "text" || (fieldType === "number" && fieldPresentation !== "rating")) &&
+				fieldFormat
+					? fieldFormat
+					: undefined,
+			currency:
+				fieldType === "number" && fieldPresentation !== "rating" && fieldFormat === "currency"
+					? fieldCurrency.trim().toUpperCase()
+					: undefined,
 			presentation:
-				fieldType === "number" && fieldPresentation === "rating"
+				fieldType === "text" && fieldPresentation === "textarea"
+					? "textarea"
+					: fieldType === "number" && fieldPresentation === "rating"
 					? "rating"
 					: fieldType === "enum" && fieldPresentation === "badge"
 						? "badge"
@@ -263,6 +352,18 @@
 							fieldChoices.map((value) => [value, fieldValueSemantics[value] ?? "neutral"]),
 						)
 					: undefined,
+			validation: {
+				min: supportsNumberRange ? optionalNumber(fieldValidationMin) : undefined,
+				max: supportsNumberRange ? optionalNumber(fieldValidationMax) : undefined,
+				min_length: supportsTextRules ? optionalNumber(fieldValidationMinLength) : undefined,
+				max_length: supportsTextRules ? optionalNumber(fieldValidationMaxLength) : undefined,
+				pattern: supportsTextRules ? fieldValidationPattern.trim() || undefined : undefined,
+				message: fieldValidationMessage.trim() || undefined,
+			},
+			visible_when: fieldVisibleWhen,
+			enabled_when: fieldEnabledWhen,
+			required_when: fieldRequiredWhen,
+			hidden_value: fieldVisibleWhen && fieldHiddenValue === "clear" ? "clear" : undefined,
 		});
 		sheetOpen = false;
 		toast.success(editing ? "Field saved" : "Field added");
@@ -328,7 +429,10 @@
 	const canSave = $derived(
 		Boolean(fieldLabel.trim()) &&
 			(fieldType !== "reference" || Boolean(fieldTarget)) &&
-			(fieldType !== "enum" || fieldChoices.length > 0),
+			(fieldType !== "enum" || fieldChoices.length > 0) &&
+			(fieldPresentation === "rating" ||
+				fieldFormat !== "currency" ||
+				/^[A-Za-z]{3}$/.test(fieldCurrency.trim())),
 	);
 </script>
 
@@ -463,12 +567,22 @@
 								{#if field.type === "number" && field.presentation === "rating"}
 									· Rating · {field.max ?? 10} points
 								{/if}
+								{#if field.type === "text" && field.presentation === "textarea"}
+									· Long answer
+								{/if}
+								{#if field.format}
+									· {field.format === "currency" && field.currency ? field.currency : field.format.replaceAll("_", " ")}
+								{/if}
 							</div>
 						</div>
 					</button>
 					<div class="flex shrink-0 items-center gap-1">
 						{#if field.required}
 							<Badge variant="secondary">Required</Badge>
+						{/if}
+						{#if field.validation}<Badge variant="outline">Validated</Badge>{/if}
+						{#if field.visible_when || field.enabled_when || field.required_when}
+							<Badge variant="outline">Conditional</Badge>
 						{/if}
 						<Button size="icon-sm" variant="ghost" disabled={index === 0} onclick={() => move(index, -1)}>
 							<ChevronUpIcon />
@@ -579,37 +693,6 @@
 						</div>
 						<Field.Description>People pick one. Click a choice to remove it.</Field.Description>
 					</Field.Field>
-					<Field.Field>
-						<Field.Label>Presentation</Field.Label>
-						<AppSelect bind:value={fieldPresentation} options={enumPresentationOptions} />
-						<Field.Description>Show choices as plain text or compact badges.</Field.Description>
-					</Field.Field>
-					{#if fieldPresentation === "badge"}
-						<Field.Field>
-							<Field.Label>Badge meaning</Field.Label>
-							<div class="flex flex-col gap-2">
-								{#each fieldChoices as value (value)}
-									<div class="grid grid-cols-[minmax(0,1fr)_9rem] items-center gap-3 rounded-xl border bg-background p-2">
-										<div class="min-w-0">
-											<StatusPill
-												path={fieldKey || slugify(fieldLabel) || "choice"}
-												{value}
-												tone={fieldValueSemantics[value] ?? "neutral"}
-											/>
-										</div>
-										<AppSelect
-											value={fieldValueSemantics[value] ?? "neutral"}
-											options={semanticOptions}
-											onValueChange={(semantic) => setChoiceSemantic(value, semantic)}
-										/>
-									</div>
-								{/each}
-							</div>
-							<Field.Description>
-								Use meaning consistently. Leave ordinary workflow stages as normal or informational.
-							</Field.Description>
-						</Field.Field>
-					{/if}
 				{/if}
 				{#if fieldType === "reference"}
 					<Field.Field>
@@ -624,21 +707,53 @@
 						</Field.Description>
 					</Field.Field>
 				{/if}
-				{#if fieldType === "number"}
+				{#if selectedCapability.presentations.length || selectedCapability.formats.length}
+					{#if selectedCapability.presentations.length}
+						<Field.Field>
+							<Field.Label>Presentation</Field.Label>
+							<AppSelect bind:value={fieldPresentation} options={presentationOptions} />
+							<Field.Description>{presentationCapability?.description ?? "Choose how people enter and see this value."}</Field.Description>
+						</Field.Field>
+					{/if}
+					{#if selectedCapability.formats.length}
+						<Field.Field>
+							<Field.Label>Format</Field.Label>
+							<AppSelect bind:value={fieldFormat} options={formatOptions} />
+							<Field.Description>Give the stored value additional meaning.</Field.Description>
+						</Field.Field>
+					{/if}
+				{/if}
+				{#if fieldPresentation === "badge"}
 					<Field.Field>
-						<Field.Label>Presentation</Field.Label>
-						<AppSelect bind:value={fieldPresentation} options={numberPresentationOptions} />
-						<Field.Description>Choose how people enter and see this number.</Field.Description>
+						<Field.Label>Badge meaning</Field.Label>
+						<div class="flex flex-col gap-2">
+							{#each fieldChoices as value (value)}
+								<div class="grid grid-cols-[minmax(0,1fr)_9rem] items-center gap-3 rounded-xl border bg-background p-2">
+									<div class="min-w-0">
+										<StatusPill path={fieldKey || slugify(fieldLabel) || "choice"} {value} tone={fieldValueSemantics[value] ?? "neutral"} />
+									</div>
+									<AppSelect value={fieldValueSemantics[value] ?? "neutral"} options={semanticOptions} onValueChange={(semantic) => setChoiceSemantic(value, semantic)} />
+								</div>
+							{/each}
+						</div>
+						<Field.Description>Use meaning consistently. Leave ordinary workflow stages as normal or informational.</Field.Description>
 					</Field.Field>
-					{#if fieldPresentation === "rating"}
+				{/if}
+				{#if fieldFormat === "currency"}
+					<Field.Field>
+						<Field.Label>Currency code</Field.Label>
+						<Input class="uppercase" maxlength={3} bind:value={fieldCurrency} placeholder="USD" />
+						<Field.Description>Use a three-letter ISO code such as USD, EUR, GBP, or INR.</Field.Description>
+					</Field.Field>
+				{/if}
+				{#if fieldPresentation === "rating"}
+					{#if presentationVariantOptions.length}
 						<Field.Field>
 							<Field.Label>Style</Field.Label>
-							<AppSelect
-								bind:value={fieldRatingVariant}
-								options={[{ value: "segments", label: "Numbered segments" }]}
-							/>
-							<Field.Description>More rating styles, such as stars, can be added here later.</Field.Description>
+							<AppSelect bind:value={fieldRatingVariant} options={presentationVariantOptions} />
+							<Field.Description>{presentationCapability?.variants?.find((variant) => variant.value === fieldRatingVariant)?.description}</Field.Description>
 						</Field.Field>
+					{/if}
 						<Field.Field>
 							<Field.Label for="rating-maximum">Highest rating</Field.Label>
 							<Input
@@ -651,7 +766,6 @@
 							/>
 							<Field.Description>Use a scale from 2 to 10. New ratings start at 1.</Field.Description>
 						</Field.Field>
-					{/if}
 				{/if}
 				<Field.Field orientation="horizontal">
 					<Switch bind:checked={fieldRequired} id="required" />
@@ -666,12 +780,67 @@
 					Advanced
 					<ChevronDownIcon class="size-4 transition-transform {advanced ? 'rotate-180' : ''}" />
 				</Collapsible.Trigger>
-				<Collapsible.Content class="pt-3">
-					<Field.Field>
-						<Field.Label>Key</Field.Label>
-						<Input bind:value={fieldKey} placeholder={slugify(fieldLabel) || "due_date"} />
-						<Field.Description>Used in the spec. Leave blank to generate from the name.</Field.Description>
-					</Field.Field>
+				<Collapsible.Content class="pt-4">
+					<Field.Group>
+						<div class="grid gap-3 sm:grid-cols-2">
+							<Field.Field>
+								<Field.Label>Help text</Field.Label>
+								<Input bind:value={fieldDescription} placeholder="Explain what to enter" />
+							</Field.Field>
+							<Field.Field>
+								<Field.Label>Placeholder</Field.Label>
+								<Input bind:value={fieldPlaceholder} placeholder="Example value" />
+							</Field.Field>
+						</div>
+
+						<div class="flex flex-col gap-3">
+							<div>
+								<p class="text-sm font-medium">Validation</p>
+								<p class="text-xs text-muted-foreground">Optional limits are enforced in forms, imports, and agent calls.</p>
+							</div>
+							{#if supportsNumberRange}
+								<div class="grid gap-3 sm:grid-cols-2">
+									<Field.Field><Field.Label>Minimum</Field.Label><Input type="number" bind:value={fieldValidationMin} /></Field.Field>
+									<Field.Field><Field.Label>Maximum</Field.Label><Input type="number" bind:value={fieldValidationMax} /></Field.Field>
+								</div>
+							{:else if supportsTextRules}
+								<div class="grid gap-3 sm:grid-cols-2">
+									<Field.Field><Field.Label>Minimum length</Field.Label><Input type="number" min="0" bind:value={fieldValidationMinLength} /></Field.Field>
+									<Field.Field><Field.Label>Maximum length</Field.Label><Input type="number" min="1" bind:value={fieldValidationMaxLength} /></Field.Field>
+								</div>
+								<Field.Field>
+									<Field.Label>Pattern</Field.Label>
+									<Input bind:value={fieldValidationPattern} placeholder="Optional regular expression" />
+								</Field.Field>
+							{/if}
+							<Field.Field>
+								<Field.Label>Custom error</Field.Label>
+								<Input bind:value={fieldValidationMessage} placeholder="Use the generated message" />
+							</Field.Field>
+						</div>
+
+						<div class="flex flex-col gap-3">
+							<div>
+								<p class="text-sm font-medium">Conditional behavior</p>
+								<p class="text-xs text-muted-foreground">React to answers elsewhere in the same form.</p>
+							</div>
+							<FieldConditionControl bind:value={fieldVisibleWhen} fields={type.fields} currentKey={editing?.key ?? fieldKey} title="Show conditionally" description="Hide this field until another answer matches." />
+							{#if fieldVisibleWhen}
+								<Field.Field orientation="horizontal">
+									<Switch checked={fieldHiddenValue === "clear"} onCheckedChange={(checked) => (fieldHiddenValue = checked ? "clear" : "preserve")} />
+									<div><Field.Label>Clear hidden answers</Field.Label><Field.Description>Otherwise a hidden answer is preserved.</Field.Description></div>
+								</Field.Field>
+							{/if}
+							<FieldConditionControl bind:value={fieldEnabledWhen} fields={type.fields} currentKey={editing?.key ?? fieldKey} title="Enable conditionally" description="Show the field read-only until another answer matches." />
+							<FieldConditionControl bind:value={fieldRequiredWhen} fields={type.fields} currentKey={editing?.key ?? fieldKey} title="Require conditionally" description="Make an answer mandatory only when another answer matches." />
+						</div>
+
+						<Field.Field>
+							<Field.Label>Key</Field.Label>
+							<Input bind:value={fieldKey} placeholder={slugify(fieldLabel) || "due_date"} />
+							<Field.Description>Used in the spec. Leave blank to generate from the name.</Field.Description>
+						</Field.Field>
+					</Field.Group>
 				</Collapsible.Content>
 			</Collapsible.Root>
 		</div>

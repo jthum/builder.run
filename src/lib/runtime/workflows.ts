@@ -9,15 +9,15 @@ import type {
   AutomationPredicate,
 } from "./automation/model.ts";
 import { validateAutomation } from "./automation/validate.ts";
-import type { ExecutionContext, FlowDef, FlowStep, RecordValue } from "./model.ts";
+import type { ExecutionContext, WorkflowDef, WorkflowStep, RecordValue } from "./model.ts";
 import { nowIso } from "./model.ts";
 import { executeView, findType, type QueryContext } from "./query.ts";
 import { createRecord, deleteRecord, updateRecord, type ChangeEvent } from "./records.ts";
 import { scalarString } from "./values.ts";
 
-export interface FlowRun {
+export interface WorkflowRun {
   id: string;
-  flow: string;
+  workflow: string;
   actorId: string;
   input: Record<string, unknown>;
   output: Record<string, unknown>;
@@ -30,7 +30,7 @@ interface RunState {
   compensations: AutomationEffectCall[];
 }
 interface RunOptions {
-  getFlow: (key: string) => FlowDef | undefined;
+  getWorkflow: (key: string) => WorkflowDef | undefined;
   depth?: number;
   guard?: Set<string>;
   budget?: { remaining: number };
@@ -39,31 +39,31 @@ interface RunOptions {
 
 const DEFAULT_STEP_BUDGET = 2_000;
 
-export async function invokeFlow(
+export async function invokeWorkflow(
   ctx: QueryContext,
-  flow: FlowDef,
+  workflow: WorkflowDef,
   input: Record<string, unknown>,
   exec: ExecutionContext,
   options: RunOptions,
-): Promise<FlowRun> {
-  if ((options.depth ?? 0) > 8) throw new Error("Flow composition is too deep");
-  if (flow.enabled === false) throw new Error(`Flow ${flow.key} is disabled`);
-  assertExecutable(flow);
+): Promise<WorkflowRun> {
+  if ((options.depth ?? 0) > 8) throw new Error("Workflow composition is too deep");
+  if (workflow.enabled === false) throw new Error(`Workflow ${workflow.key} is disabled`);
+  assertExecutable(workflow);
   options.budget ??= { remaining: DEFAULT_STEP_BUDGET };
   const variables: Scope = { ...input };
   const scope: Scope = {
     vars: variables,
     meta: { now: nowIso(), record_types: {} },
     actor: { id: exec.actorId },
-    trigger: { key: flow.trigger?.key ?? null, payload: { ...input } },
+    trigger: { key: workflow.trigger?.key ?? null, payload: { ...input } },
   };
-  await hydrateInputs(ctx, flow, variables);
-  for (const [name, definition] of Object.entries(flow.input ?? {})) {
+  await hydrateInputs(ctx, workflow, variables);
+  for (const [name, definition] of Object.entries(workflow.input ?? {})) {
     if ("record" in definition) recordTypes(scope)[name] = definition.record;
   }
   const state: RunState = { changes: [], compensations: [] };
   try {
-    await runSteps(ctx, flow.steps, scope, exec, state, options);
+    await runSteps(ctx, workflow.steps, scope, exec, state, options);
   } catch (error) {
     await compensate(ctx, state, scope, exec);
     throw error;
@@ -71,7 +71,7 @@ export async function invokeFlow(
   options.collectCompensations?.(state.compensations);
   return {
     id: createId("run"),
-    flow: flow.key,
+    workflow: workflow.key,
     actorId: exec.actorId,
     input,
     output: variables,
@@ -79,28 +79,32 @@ export async function invokeFlow(
   };
 }
 
-function assertExecutable(flow: FlowDef): void {
-  const language = validateAutomation(flow);
+function assertExecutable(workflow: WorkflowDef): void {
+  const language = validateAutomation(workflow);
   const blockers = language.diagnostics.filter(
     (item) => item.severity === "error" || item.code.endsWith(".unresolved"),
   );
   if (blockers.length) throw new Error(blockers.map((item) => item.message).join("; "));
-  const compatibility = checkAutomationCompatibility(flow, BROWSER_LOCAL_AUTOMATION_PROFILE);
+  const compatibility = checkAutomationCompatibility(workflow, BROWSER_LOCAL_AUTOMATION_PROFILE);
   const unsupported = compatibility.diagnostics.filter((item) => item.support === "unsupported");
   if (unsupported.length) throw new Error(unsupported.map((item) => item.message).join("; "));
 }
 
-async function hydrateInputs(ctx: QueryContext, flow: FlowDef, scope: Scope): Promise<void> {
-  for (const [name, definition] of Object.entries(flow.input ?? {})) {
+async function hydrateInputs(
+  ctx: QueryContext,
+  workflow: WorkflowDef,
+  scope: Scope,
+): Promise<void> {
+  for (const [name, definition] of Object.entries(workflow.input ?? {})) {
     if (scope[name] === undefined && "default" in definition) scope[name] = definition.default;
     const value = scope[name];
     if (value == null || value === "") {
-      if (definition.required !== false) throw new Error(`Flow input ${name} is required`);
+      if (definition.required !== false) throw new Error(`Workflow input ${name} is required`);
       continue;
     }
     if (!("record" in definition) || (typeof value === "object" && "id" in (value as object))) {
       if ("value" in definition && !matchesInputType(value, definition.value)) {
-        throw new Error(`Flow input ${name} must be ${definition.value}`);
+        throw new Error(`Workflow input ${name} must be ${definition.value}`);
       }
       continue;
     }
@@ -114,7 +118,7 @@ async function hydrateInputs(ctx: QueryContext, flow: FlowDef, scope: Scope): Pr
 
 async function runSteps(
   ctx: QueryContext,
-  steps: FlowStep[],
+  steps: WorkflowStep[],
   scope: Scope,
   exec: ExecutionContext,
   state: RunState,
@@ -158,9 +162,9 @@ async function runSteps(
         });
       }
     } else if ("invoke" in step) {
-      const nested = options.getFlow(step.invoke.flow);
-      if (!nested) throw new Error(`Unknown flow ${step.invoke.flow}`);
-      const result = await invokeFlow(
+      const nested = options.getWorkflow(step.invoke.workflow);
+      if (!nested) throw new Error(`Unknown workflow ${step.invoke.workflow}`);
+      const result = await invokeWorkflow(
         ctx,
         nested,
         resolveObject(step.invoke.input ?? {}, scope),
@@ -245,7 +249,7 @@ async function runSteps(
       await waitMilliseconds(parseDuration(step.delay.duration));
     } else if ("wait" in step) {
       if (step.wait.signal) {
-        throw new Error("This runtime cannot resume flows from signals");
+        throw new Error("This runtime cannot resume workflows from signals");
       }
       if (step.wait.timeout === undefined) throw new Error("Wait needs a signal or timeout");
       await waitMilliseconds(parseDuration(step.wait.timeout));
@@ -467,7 +471,8 @@ function waitMilliseconds(duration: number): Promise<void> {
 function consumeBudget(options: RunOptions): void {
   const budget = options.budget as { remaining: number };
   budget.remaining -= 1;
-  if (budget.remaining < 0) throw new Error(`Flow exceeded its ${DEFAULT_STEP_BUDGET}-step budget`);
+  if (budget.remaining < 0)
+    throw new Error(`Workflow exceeded its ${DEFAULT_STEP_BUDGET}-step budget`);
 }
 
 function matchesInputType(value: unknown, type: string): boolean {
@@ -548,11 +553,11 @@ function mergeState(target: RunState, source: RunState): void {
   target.compensations.push(...source.compensations);
 }
 
-export function matchingTriggers(flows: FlowDef[], change: ChangeEvent): FlowDef[] {
-  return flows
-    .filter((flow) => flow.enabled !== false)
-    .filter((flow) => {
-      const key = flow.trigger?.key;
+export function matchingTriggers(workflows: WorkflowDef[], change: ChangeEvent): WorkflowDef[] {
+  return workflows
+    .filter((workflow) => workflow.enabled !== false)
+    .filter((workflow) => {
+      const key = workflow.trigger?.key;
       if (!key) return false;
       if (key === `${change.type}.created`) return change.kind === "created";
       if (key === `${change.type}.deleted`) return change.kind === "deleted";

@@ -5,25 +5,25 @@ import { specFromText } from "./serialize.ts";
 import { createNodeGateway } from "./sql-node.ts";
 
 describe("builder.run host", () => {
-  it("materialises a type into records, views, and a triggered flow", async () => {
+  it("materialises a type into records, views, and a triggered workflow", async () => {
     expect.hasAssertions();
     const host = await Host.open({ persist: false });
     await host.upsertType({
       key: "invoice",
       fields: [
-        { id: "fld_n", key: "number", label: "Number", type: "text", required: true },
+        { id: "A00000000000000B", key: "number", label: "Number", type: "text", required: true },
         {
-          id: "fld_s",
+          id: "A00000000000000D",
           key: "status",
           label: "Status",
           type: "enum",
           values: ["draft", "paid"],
           default: "draft",
         },
-        { id: "fld_p", key: "paid_at", label: "Paid at", type: "date" },
+        { id: "A00000000000000C", key: "paid_at", label: "Paid at", type: "date" },
       ] as never,
     });
-    await host.upsertFlow({
+    await host.upsertWorkflow({
       key: "mark_paid",
       expose: ["ui", "agent"],
       input: { invoice: { record: "invoice" } },
@@ -36,7 +36,7 @@ describe("builder.run host", () => {
         },
       ],
     });
-    await host.upsertFlow({
+    await host.upsertWorkflow({
       key: "stamp_paid",
       trigger: { key: "invoice.status.changed" },
       steps: [
@@ -74,9 +74,9 @@ describe("builder.run host", () => {
     await host.upsertType({
       key: "invoice",
       fields: [
-        { id: "fld_number", key: "number", label: "Number", type: "text" },
+        { id: "A000000000000001", key: "number", label: "Number", type: "text" },
         {
-          id: "fld_status",
+          id: "A000000000000002",
           key: "status",
           label: "Status",
           type: "enum",
@@ -87,7 +87,7 @@ describe("builder.run host", () => {
     });
     const first = await host.create("invoice", { number: "INV-1" });
     const second = await host.create("invoice", { number: "INV-2" });
-    await host.upsertFlow({
+    await host.upsertWorkflow({
       key: "bulk_mark_paid",
       input: { status: { value: "text" } },
       steps: [
@@ -187,7 +187,7 @@ describe("builder.run host", () => {
         ],
       },
     } as never);
-    await host.upsertFlow({
+    await host.upsertWorkflow({
       key: "mark_closed",
       input: { ticket: { record: "ticket" } },
       trigger: { key: "ticket.resolve.transitioned" },
@@ -224,7 +224,7 @@ describe("builder.run host", () => {
   it("compensates completed effects when a later step fails", async () => {
     const host = await Host.open({ persist: false });
     await host.upsertType({ key: "note", fields: { title: "text" } });
-    await host.upsertFlow({
+    await host.upsertWorkflow({
       key: "create_then_fail",
       steps: [
         {
@@ -283,7 +283,7 @@ types:
       key: "review",
       fields: [
         {
-          id: "fld_score",
+          id: "A000000000000003",
           key: "score",
           label: "Score",
           type: "number",
@@ -309,6 +309,53 @@ types:
     expect(host.resolvedSpec().types[0]?.fields[0]).not.toHaveProperty("presentation");
     expect(host.resolvedSpec().types[0]?.fields[0]).not.toHaveProperty("variant");
     expect(host.resolvedSpec().types[0]?.fields[0]).not.toHaveProperty("max");
+  });
+
+  it("enforces reusable field validation and conditional requirements", async () => {
+    expect.hasAssertions();
+    const host = await Host.open({ persist: false });
+    await host.upsertType({
+      key: "contact",
+      fields: [
+        { key: "country", type: "enum", values: ["us", "ca"], required: true },
+        {
+          key: "email",
+          type: "text",
+          format: "email",
+          validation: { max_length: 40 },
+        },
+        {
+          key: "state",
+          type: "text",
+          visible_when: { field: "country", op: "eq", value: "us" },
+          required_when: { field: "country", op: "eq", value: "us" },
+          hidden_value: "clear",
+        },
+      ] as never,
+    });
+
+    await expect(host.create("contact", { country: "us" })).rejects.toThrow("State is required");
+    await expect(host.create("contact", { country: "ca", email: "not-an-email" })).rejects.toThrow(
+      "Email must be an email address",
+    );
+    const contact = await host.create("contact", {
+      country: "ca",
+      email: "person@example.com",
+      state: "Should be cleared",
+    });
+    expect(contact.state).toBeNull();
+
+    await host.renameField("contact", "country", "nation");
+    expect(
+      host.resolvedSpec().types[0]?.fields.find((field) => field.key === "state"),
+    ).toMatchObject({
+      visible_when: { field: "nation", op: "eq", value: "us" },
+      required_when: { field: "nation", op: "eq", value: "us" },
+    });
+    await host.deleteField("contact", "nation");
+    expect(
+      host.resolvedSpec().types[0]?.fields.find((field) => field.key === "state"),
+    ).not.toHaveProperty("visible_when");
   });
 
   it("stores explicit badge semantics for enum values", async () => {
@@ -466,7 +513,7 @@ types:
     });
     expect(await host.getRecord("submission", submissionA.id)).toEqual(beforeA);
     expect(await host.getRecord("submission", submissionB.id)).toEqual(beforeB);
-    expect(host.resolvedSpec().flows).toEqual([]);
+    expect(host.resolvedSpec().workflows).toEqual([]);
   });
 
   it("walks the freelance CRM mould-and-use loop", async () => {
@@ -514,7 +561,7 @@ types:
     expect(actor.roles).toContain("admin");
     await host.upsertType({
       key: "note",
-      fields: [{ id: "fld_n", key: "title", label: "Title", type: "text" }] as never,
+      fields: [{ id: "A00000000000000B", key: "title", label: "Title", type: "text" }] as never,
     });
     const record = await host.create("note", { title: "Hello" });
     expect(record.created_by).toBe(actor.id);

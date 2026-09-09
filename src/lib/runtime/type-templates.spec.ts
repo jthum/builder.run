@@ -5,7 +5,7 @@ import type { TypeDef } from "./model.ts";
 
 describe("type templates", () => {
   const organisation = {
-    id: "typ_org",
+    id: "B000000000000002",
     key: "organisation",
     label: "Organisation",
     store: "local",
@@ -13,7 +13,7 @@ describe("type templates", () => {
     fields: [],
   } as TypeDef;
   const project = {
-    id: "typ_p",
+    id: "B000000000000003",
     key: "project",
     label: "Project",
     store: "local",

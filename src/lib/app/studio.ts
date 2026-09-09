@@ -25,8 +25,8 @@ export const studioItems = [
     group: "Build",
   },
   {
-    href: "/build/flows",
-    label: "Rules",
+    href: "/build/automations",
+    label: "Automations",
     description: "Buttons people tap, and automations that run when something changes.",
     group: "Behaviour",
   },

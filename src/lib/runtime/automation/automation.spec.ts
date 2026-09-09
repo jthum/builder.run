@@ -32,7 +32,7 @@ describe("automation language", () => {
   });
 
   it("separates validity from runtime compatibility", () => {
-    const flow = {
+    const workflow = {
       key: "approval",
       label: "Approval",
       steps: [
@@ -46,9 +46,9 @@ describe("automation language", () => {
       ],
     };
 
-    expect(validateAutomation(flow).valid).toBe(true);
+    expect(validateAutomation(workflow).valid).toBe(true);
     const compatibility = checkAutomationCompatibility(
-      flow as never,
+      workflow as never,
       BROWSER_LOCAL_AUTOMATION_PROFILE,
     );
     expect(compatibility.compatible).toBe(false);
@@ -81,7 +81,7 @@ describe("automation language", () => {
     );
   });
 
-  it("rejects the removed flow shape instead of carrying a compatibility path", () => {
+  it("rejects the removed workflow shape instead of carrying a compatibility path", () => {
     const result = validateAutomation({
       key: "old",
       label: "Old",

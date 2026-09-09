@@ -12,7 +12,7 @@ export type WidgetInputType =
   | "boolean"
   | "view"
   | "form"
-  | "flow"
+  | "workflow"
   | "field"
   | "select";
 
@@ -117,7 +117,7 @@ export const widgets: WidgetDef[] = [
     description: "Runs a button rule.",
     category: "actions",
     inputs: [
-      { key: "flow", label: "Rule", type: "flow", required: true },
+      { key: "workflow", label: "Workflow", type: "workflow", required: true },
       { key: "label", label: "Label", type: "text", default: "Run" },
     ],
   },
@@ -322,10 +322,10 @@ export function widgetInputOptions(
   if (input.type === "form") {
     return spec.forms.map((form) => ({ value: form.key, label: form.label }));
   }
-  if (input.type === "flow") {
-    return spec.flows
-      .filter((flow) => flow.expose?.includes("ui") && !flow.trigger)
-      .map((flow) => ({ value: flow.key, label: flow.label }));
+  if (input.type === "workflow") {
+    return spec.workflows
+      .filter((workflow) => workflow.expose?.includes("ui") && !workflow.trigger)
+      .map((workflow) => ({ value: workflow.key, label: workflow.label }));
   }
   if (input.type === "select") return input.options ?? [];
   if (input.type !== "field") return [];
@@ -360,7 +360,7 @@ export function describeWidget(
       ...(input.default !== undefined ? { default: input.default } : {}),
       ...(input.of ? { accepts: input.of } : {}),
       ...(input.source ? { source: input.source } : {}),
-      ...(["view", "form", "flow", "field", "select"].includes(input.type)
+      ...(["view", "form", "workflow", "field", "select"].includes(input.type)
         ? { options: widgetInputOptions(spec, input, values) }
         : {}),
     })),
@@ -417,7 +417,7 @@ export function configureWidgetValues(
     if (input.type === "boolean" && typeof value !== "boolean") {
       throw new Error(`Widget "${widget.key}" values.${input.key} must be true or false`);
     }
-    if (["view", "form", "flow", "field", "select"].includes(input.type)) {
+    if (["view", "form", "workflow", "field", "select"].includes(input.type)) {
       const selected = configuredText(value);
       if (!options.some((option) => option.value === selected)) {
         throw new Error(
@@ -684,13 +684,14 @@ export function defaultWidgetValues(widget: WidgetDef, spec: AppSpec): Record<st
   const firstView = homeViews(spec)[0]?.key ?? spec.views[0]?.key ?? "";
   const firstForm =
     spec.forms.find((form) => form.mode === "create")?.key ?? spec.forms[0]?.key ?? "";
-  const firstFlow =
-    spec.flows.find((flow) => flow.expose?.includes("ui") && !flow.trigger)?.key ?? "";
+  const firstWorkflow =
+    spec.workflows.find((workflow) => workflow.expose?.includes("ui") && !workflow.trigger)?.key ??
+    "";
   const fields = fieldsForView(spec, firstView);
   for (const input of widget.inputs) {
     if (input.type === "view") values[input.key] = firstView;
     else if (input.type === "form") values[input.key] = firstForm;
-    else if (input.type === "flow") values[input.key] = firstFlow;
+    else if (input.type === "workflow") values[input.key] = firstWorkflow;
     else if (input.type === "boolean") values[input.key] = Boolean(input.default);
     else if (input.type === "field") {
       values[input.key] = fieldsMatching(fields, input.of)[0]?.key ?? "";

@@ -4,19 +4,20 @@ const idAlphabet = customAlphabet(
   "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz",
   12,
 );
+const specIdAlphabet = customAlphabet(
+  "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz",
+  16,
+);
 
-export type IdKind =
-  | "spc"
-  | "act"
-  | "sto"
-  | "typ"
-  | "fld"
-  | "vw"
-  | "frm"
-  | "flw"
-  | "pg"
-  | "rec"
-  | "run";
+export function createSpecId(): string {
+  return specIdAlphabet();
+}
+
+export function isSpecId(value: string): boolean {
+  return /^[0-9A-Za-z]{16}$/.test(value);
+}
+
+export type IdKind = "spc" | "act" | "rec" | "run";
 
 export function createId(kind: IdKind): string {
   const id = idAlphabet();
@@ -26,7 +27,7 @@ export function createId(kind: IdKind): string {
 
 export function isId(value: string, kind?: IdKind): boolean {
   if (kind) return value.startsWith(`${kind}_`);
-  return /^(spc|act|sto|typ|fld|vw|frm|flw|pg|rec|run)_/.test(value);
+  return /^(act|rec|run)_/.test(value);
 }
 
 export function labelFromKey(key: string): string {

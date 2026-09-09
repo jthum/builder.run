@@ -45,14 +45,14 @@ export const BROWSER_LOCAL_AUTOMATION_PROFILE: AutomationRuntimeProfile = {
 };
 
 export function requiredAutomationCapabilities(
-  flow: Pick<AutomationDefinition, "trigger" | "steps">,
+  workflow: Pick<AutomationDefinition, "trigger" | "steps">,
   registry: AutomationRegistry = DEFAULT_AUTOMATION_REGISTRY,
 ): AutomationCapability[] {
   const required = new Set<AutomationCapability>();
-  const trigger = flow.trigger?.key ?? "";
+  const trigger = workflow.trigger?.key ?? "";
   if (trigger.startsWith("schedule.")) required.add("schedules");
   if (trigger.startsWith("webhook.")) required.add("webhooks");
-  collect(flow.steps, required, registry);
+  collect(workflow.steps, required, registry);
   return [...required];
 }
 
@@ -90,11 +90,11 @@ function collect(
 }
 
 export function checkAutomationCompatibility(
-  flow: Pick<AutomationDefinition, "trigger" | "steps">,
+  workflow: Pick<AutomationDefinition, "trigger" | "steps">,
   profile: AutomationRuntimeProfile,
   registry: AutomationRegistry = DEFAULT_AUTOMATION_REGISTRY,
 ): AutomationCompatibilityResult {
-  const required = requiredAutomationCapabilities(flow, registry);
+  const required = requiredAutomationCapabilities(workflow, registry);
   const diagnostics = required
     .filter((capability) => profile.capabilities[capability] !== "supported")
     .map((capability) => ({

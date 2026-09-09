@@ -42,7 +42,7 @@ The useful sequence is:
 2. Add fields and relationships.
 3. Create useful **Views** over those records.
 4. Compose **Pages** from widgets backed by those views.
-5. Add **Rules (Flows)** when the app needs explicit behaviour.
+5. Add **Automations** when the app needs explicit behaviour.
 6. Use the app immediately; there is no separate code-generation or rebuild step.
 
 Types provide strong defaults, so a small spec becomes useful quickly. A type can immediately produce storage, CRUD, basic forms, and navigation.

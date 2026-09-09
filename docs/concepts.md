@@ -12,7 +12,7 @@ It describes things such as:
 - Views
 - Forms
 - Pages and widgets
-- Rules (Flows)
+- Automations (Workflows)
 - exposure to humans and agents
 
 The runtime reads the spec and materialises a working application from it.
@@ -65,11 +65,12 @@ The current field vocabulary includes:
 | Text      | names, titles, notes, URLs     |
 | Number    | amounts, counts, scores        |
 | Date      | deadlines and dates            |
+| Date/time | appointments and timestamps    |
 | Boolean   | yes/no state                   |
 | Choice    | one value from a fixed set     |
 | Reference | a relationship to another type |
 
-Fields can carry constraints and configuration such as required/default values, choice options, and reference targets.
+Fields can carry optional formats, presentation hints, validation constraints, and conditional visible/enabled/required behavior. These capabilities are shared by the runtime's form and record input paths. See [Fields](fields.md).
 
 ## Views
 
@@ -106,15 +107,15 @@ Widgets reuse other primitives instead of inventing their own data model. A tabl
 
 Pages can be organised into folders when an app needs navigation hierarchy.
 
-## Rules (Flows)
+## Automations
 
-A **Flow** is builder.run's behaviour-composition primitive.
+A **Workflow** is builder.run's behaviour-composition primitive.
 
-A callable flow can become an action a person or agent invokes. A flow with a trigger behaves like an automation.
+A callable workflow can become an action a person or agent invokes. A workflow with a trigger behaves like an automation.
 
 This means "actions", "abilities", and "automations" can emerge from one primitive rather than requiring independent engines.
 
-See [Rules and flows](flows.md).
+See [Automations and workflows](workflows.md).
 
 ## Actors
 
@@ -147,7 +148,7 @@ Views
 Pages
 
 + Forms where defaults are not enough
-+ Flows where explicit behaviour is needed
++ Workflows where explicit behaviour is needed
 ```
 
 The result is still captured as one portable spec.

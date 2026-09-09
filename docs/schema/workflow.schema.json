@@ -1,13 +1,14 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://builder.run/schema/automation.json",
-  "title": "Builder.run automation",
+  "$id": "https://builder.run/schema/workflow.json",
+  "title": "Builder.run workflow",
   "type": "object",
   "required": ["key", "label", "steps"],
   "properties": {
-    "id": { "type": "string", "minLength": 1 },
+    "id": { "type": "string", "pattern": "^[0-9A-Za-z]{16}$" },
     "key": { "type": "string", "minLength": 1 },
     "label": { "type": "string", "minLength": 1 },
+    "meta": { "type": "object" },
     "description": { "type": "string" },
     "enabled": { "type": "boolean", "default": true },
     "priority": { "type": "integer", "default": 0 },
@@ -132,9 +133,9 @@
     },
     "invoke": {
       "type": "object",
-      "required": ["flow"],
+      "required": ["workflow"],
       "properties": {
-        "flow": { "type": "string", "minLength": 1 },
+        "workflow": { "type": "string", "minLength": 1 },
         "input": { "type": "object" },
         "as": { "type": "string", "minLength": 1 }
       },

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vite-plus/test";
 import { Host } from "$lib/runtime/host.ts";
-import { applicableFlows } from "./relations.ts";
+import { applicableWorkflows } from "./relations.ts";
 
 describe("record actions", () => {
   it("seeds template records and keeps buttons on the matching type", async () => {
@@ -15,10 +15,10 @@ describe("record actions", () => {
     expect(projects.some((row) => row.name === "Website redesign")).toBe(true);
     const sent = invoices.find((row) => row.status === "sent");
     expect(sent).toBeTruthy();
-    expect(applicableFlows(spec, "project", projects[0]!).map((flow) => flow.key)).not.toContain(
-      "mark_invoice_paid",
-    );
-    expect(applicableFlows(spec, "invoice", sent!).map((flow) => flow.key)).toContain(
+    expect(
+      applicableWorkflows(spec, "project", projects[0]!).map((workflow) => workflow.key),
+    ).not.toContain("mark_invoice_paid");
+    expect(applicableWorkflows(spec, "invoice", sent!).map((workflow) => workflow.key)).toContain(
       "mark_invoice_paid",
     );
   });

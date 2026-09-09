@@ -1,6 +1,6 @@
 # Automation language
 
-Builder.run automations are portable application configuration. The browser is one consumer of the language, not the limit of what the language may express. The normative TypeScript contract is in `src/lib/runtime/automation/model.ts`; the JSON Schema is in `docs/schema/automation-rule.schema.json`.
+Builder.run automations are portable application configuration. The browser is one consumer of the language, not the limit of what the language may express. The normative TypeScript contract is in `src/lib/runtime/automation/model.ts`; the JSON Schema is in `docs/schema/workflow.schema.json`.
 
 There is one canonical representation. Editors author this representation directly and must preserve constructs they cannot edit. There is no shorthand document, graph IR, legacy reader, or conversion layer.
 
@@ -107,17 +107,17 @@ Equality is typed JSON equality: `1` is not equal to `"1"`; arrays compare in or
 All assignments in one `compute` step resolve against the variables as they existed before that
 step. They are then committed together, so sibling assignments do not depend on document order.
 
-`invoke` composes another flow through the same runtime and may capture its output:
+`invoke` composes another workflow through the same runtime and may capture its output:
 
 ```yaml
 - invoke:
-    flow: notify_owner
+    workflow: notify_owner
     input:
       owner: { $ref: vars.invoice.owner }
     as: notification
 ```
 
-Invocation depth is bounded by the host. Builder.run permits eight nested invocations and shares a 2,000-step budget across the whole call tree. Every visited step and retry attempt consumes one unit; exhausting the budget fails the run. Successful child-flow compensations join the parent run's compensation stack, so a later parent failure unwinds the composed work in reverse completion order.
+Invocation depth is bounded by the host. Builder.run permits eight nested invocations and shares a 2,000-step budget across the whole call tree. Every visited step and retry attempt consumes one unit; exhausting the budget fails the run. Successful child-workflow compensations join the parent run's compensation stack, so a later parent failure unwinds the composed work in reverse completion order.
 
 ## Effects, retries, and compensation
 
@@ -142,7 +142,7 @@ A published registry key identifies an immutable semantic contract. Breaking inp
         charge: { $ref: vars.charge.id }
 ```
 
-`retry.max` counts the initial attempt. Backoff values are seconds before subsequent attempts. Successful compensatable effects are unwound in reverse completion order if later execution fails. Durable hosts should record idempotency and compensation receipts using the flow key, run ID, stable step ID, and loop instance. Step IDs are optional for simple authoring but should be supplied when durable identity matters.
+`retry.max` counts the initial attempt. Backoff values are seconds before subsequent attempts. Successful compensatable effects are unwound in reverse completion order if later execution fails. Durable hosts should record idempotency and compensation receipts using the workflow key, run ID, stable step ID, and loop instance. Step IDs are optional for simple authoring but should be supplied when durable identity matters.
 
 ## Loops
 
@@ -154,7 +154,7 @@ A published registry key identifies an immutable semantic contract. Breaking inp
     on_item_failure: continue
     steps:
       - invoke:
-          flow: reconcile_invoice
+          workflow: reconcile_invoice
           input: { invoice: { $ref: vars.invoice } }
 ```
 
@@ -168,7 +168,7 @@ A published registry key identifies an immutable semantic contract. Breaking inp
     branches:
       - key: email
         steps:
-          - { invoke: { flow: send_email } }
+          - { invoke: { workflow: send_email } }
       - key: audit
         steps:
           - { effect: { key: audit.record } }
@@ -188,9 +188,9 @@ succeeds. Failed branches run their own compensation and do not contribute varia
     timeout: 2 days
     as: approval
     on_signal:
-      - { invoke: { flow: publish } }
+      - { invoke: { workflow: publish } }
     on_timeout:
-      - { invoke: { flow: expire } }
+      - { invoke: { workflow: expire } }
 ```
 
 Durations are seconds or an integer followed by `seconds`, `minutes`, `hours`, or `days`. A durable host persists the definition snapshot, cursor, context, timer, and signal subscription. The local browser can emulate delays and timeout-only waits while its tab remains open; it cannot resume signals, schedules, or webhooks.
@@ -203,7 +203,7 @@ Runtime compatibility separately reports whether required capabilities are suppo
 
 ## Editor contract
 
-The Rules editor directly edits the simple record-trigger, gate, create, and update subset. When it encounters advanced composition it cannot represent, saving is disabled and the canonical spec remains intact. A future node editor may project the same nested structure, but it must constrain connections to legal composition instead of introducing an independent graph format.
+The Automations editor directly edits the simple record-trigger, gate, create, and update subset. When it encounters advanced composition it cannot represent, saving is disabled and the canonical spec remains intact. A future node editor may project the same nested structure, but it must constrain connections to legal composition instead of introducing an independent graph format.
 
 ## State lifecycles and schema migrations
 

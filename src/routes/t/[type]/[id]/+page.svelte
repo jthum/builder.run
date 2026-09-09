@@ -2,7 +2,7 @@
 	import { goto } from "$app/navigation";
 	import { page } from "$app/state";
 	import { addLabel, collectionLabel, recordTitle } from "$lib/app/labels.ts";
-	import { applicableFlows, reverseRelations } from "$lib/app/relations.ts";
+	import { applicableWorkflows, reverseRelations } from "$lib/app/relations.ts";
 	import { runtime, session } from "$lib/app/session.svelte.ts";
 	import FormattedValue from "$lib/components/formatted-value.svelte";
 	import PageHeader from "$lib/components/page-header.svelte";
@@ -46,7 +46,7 @@
 
 	const title = $derived(recordTitle(record, type));
 	const recordActions = $derived(
-		spec && type && record ? applicableFlows(spec, type.key, record) : [],
+		spec && type && record ? applicableWorkflows(spec, type.key, record) : [],
 	);
 	const lifecycleActions = $derived(
 		type?.lifecycle && record
@@ -194,8 +194,8 @@
 				{#each lifecycleActions as transition (transition.key)}
 					<Button onclick={() => applyTransition(transition.key, transition.label)}>{transition.label}</Button>
 				{/each}
-				{#each recordActions as flow (flow.id)}
-					<Button variant="outline" onclick={() => invoke(flow.key, flow.label)}>{flow.label}</Button>
+				{#each recordActions as workflow (workflow.id)}
+					<Button variant="outline" onclick={() => invoke(workflow.key, workflow.label)}>{workflow.label}</Button>
 				{/each}
 				{#if !editing}
 					<Button variant="outline" onclick={() => (editing = true)}>

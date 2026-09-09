@@ -5,7 +5,7 @@ import {
   normalizeSpec,
   parseTypeRef,
   type AppSpec,
-  type FlowStep,
+  type WorkflowStep,
   type TypeDef,
 } from "./model.ts";
 
@@ -19,7 +19,7 @@ export function sharedTypeDependencies(spec: AppSpec, sharedTypes: TypeDef[]): T
     if (!local.has(key) && shared.has(key)) required.add(key);
   };
   const addPath = (path: string | undefined) => add(path?.split(".", 1)[0]);
-  const visitSteps = (steps: FlowStep[]) => {
+  const visitSteps = (steps: WorkflowStep[]) => {
     for (const step of steps) {
       if (
         "effect" in step &&
@@ -48,10 +48,11 @@ export function sharedTypeDependencies(spec: AppSpec, sharedTypes: TypeDef[]): T
   }
   for (const view of spec.views) add(view.source);
   for (const form of spec.forms) add(form.type);
-  for (const flow of spec.flows) {
-    for (const input of Object.values(flow.input ?? {})) if ("record" in input) add(input.record);
-    addPath(flow.trigger?.key);
-    visitSteps(flow.steps);
+  for (const workflow of spec.workflows) {
+    for (const input of Object.values(workflow.input ?? {}))
+      if ("record" in input) add(input.record);
+    addPath(workflow.trigger?.key);
+    visitSteps(workflow.steps);
   }
   return sharedTypes.filter((type) => required.has(type.key));
 }
@@ -78,6 +79,7 @@ export function authoringSpec(spec: AppSpec): Record<string, unknown> {
     version: copy.version,
     key: copy.key,
     label: copy.label,
+    ...(copy.meta ? { meta: copy.meta } : {}),
     stores: Object.fromEntries(
       copy.stores.map((store) => [
         store.key,
@@ -85,6 +87,7 @@ export function authoringSpec(spec: AppSpec): Record<string, unknown> {
           id: store.id,
           label: store.label,
           kind: store.kind,
+          ...(store.meta ? { meta: store.meta } : {}),
         },
       ]),
     ),
@@ -94,6 +97,7 @@ export function authoringSpec(spec: AppSpec): Record<string, unknown> {
         {
           id: type.id,
           label: type.label,
+          ...(type.meta ? { meta: type.meta } : {}),
           ...(type.collection_label ? { collection_label: type.collection_label } : {}),
           store: type.store,
           ...(type.expose ? { expose: true } : {}),
@@ -105,14 +109,24 @@ export function authoringSpec(spec: AppSpec): Record<string, unknown> {
                 id: field.id,
                 label: field.label,
                 type: field.type,
+                ...(field.meta ? { meta: field.meta } : {}),
+                ...(field.description ? { description: field.description } : {}),
+                ...(field.placeholder ? { placeholder: field.placeholder } : {}),
                 ...(field.required ? { required: true } : {}),
                 ...(field.default !== undefined ? { default: field.default } : {}),
                 ...(field.values ? { values: field.values } : {}),
                 ...(field.target ? { target: field.target } : {}),
+                ...(field.format ? { format: field.format } : {}),
+                ...(field.currency ? { currency: field.currency } : {}),
                 ...(field.presentation ? { presentation: field.presentation } : {}),
                 ...(field.variant ? { variant: field.variant } : {}),
                 ...(field.max ? { max: field.max } : {}),
                 ...(field.value_semantics ? { value_semantics: field.value_semantics } : {}),
+                ...(field.validation ? { validation: field.validation } : {}),
+                ...(field.visible_when ? { visible_when: field.visible_when } : {}),
+                ...(field.enabled_when ? { enabled_when: field.enabled_when } : {}),
+                ...(field.required_when ? { required_when: field.required_when } : {}),
+                ...(field.hidden_value === "clear" ? { hidden_value: "clear" } : {}),
               },
             ]),
           ),
@@ -127,6 +141,7 @@ export function authoringSpec(spec: AppSpec): Record<string, unknown> {
           {
             id: view.id,
             label: view.label,
+            ...(view.meta ? { meta: view.meta } : {}),
             source: view.source,
             fields: view.fields,
             ...(view.where
@@ -148,6 +163,7 @@ export function authoringSpec(spec: AppSpec): Record<string, unknown> {
           {
             id: form.id,
             label: form.label,
+            ...(form.meta ? { meta: form.meta } : {}),
             type: form.type,
             fields: form.fields,
             mode: form.mode,
@@ -155,19 +171,20 @@ export function authoringSpec(spec: AppSpec): Record<string, unknown> {
           },
         ]),
     ),
-    flows: Object.fromEntries(
-      copy.flows.map((flow) => [
-        flow.key,
+    workflows: Object.fromEntries(
+      copy.workflows.map((workflow) => [
+        workflow.key,
         {
-          id: flow.id,
-          label: flow.label,
-          ...(flow.description ? { description: flow.description } : {}),
-          ...(flow.enabled === false ? { enabled: false } : {}),
-          ...(flow.priority ? { priority: flow.priority } : {}),
-          ...(flow.input ? { input: flow.input } : {}),
-          ...(flow.trigger ? { trigger: flow.trigger } : {}),
-          ...(flow.expose ? { expose: flow.expose } : {}),
-          steps: flow.steps,
+          id: workflow.id,
+          label: workflow.label,
+          ...(workflow.meta ? { meta: workflow.meta } : {}),
+          ...(workflow.description ? { description: workflow.description } : {}),
+          ...(workflow.enabled === false ? { enabled: false } : {}),
+          ...(workflow.priority ? { priority: workflow.priority } : {}),
+          ...(workflow.input ? { input: workflow.input } : {}),
+          ...(workflow.trigger ? { trigger: workflow.trigger } : {}),
+          ...(workflow.expose ? { expose: workflow.expose } : {}),
+          steps: workflow.steps,
         },
       ]),
     ),
@@ -179,6 +196,7 @@ export function authoringSpec(spec: AppSpec): Record<string, unknown> {
           {
             id: page.id,
             label: page.label,
+            ...(page.meta ? { meta: page.meta } : {}),
             ...(page.path ? { path: page.path } : {}),
             ...(page.folder ? { folder: page.folder } : {}),
             ...(page.icon ? { icon: page.icon } : {}),

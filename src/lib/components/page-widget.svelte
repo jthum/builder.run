@@ -37,10 +37,10 @@
 	const viewRows = $derived(viewKey ? (rows[viewKey] ?? []) : []);
 	const caption = $derived(String(values.title || view?.label || ""));
 
-	async function runFlow() {
-		const flow = String(values.flow ?? "");
-		if (!flow) return;
-		await runtime().invoke(flow, {});
+	async function runWorkflow() {
+		const workflow = String(values.workflow ?? "");
+		if (!workflow) return;
+		await runtime().invoke(workflow, {});
 		toast.success(String(values.label || "Done"));
 	}
 </script>
@@ -87,7 +87,7 @@
 		</Card.Content>
 	</Card.Root>
 {:else if widget === "action"}
-	<Button onclick={runFlow}>{String(values.label || "Run")}</Button>
+	<Button onclick={runWorkflow}>{String(values.label || "Run")}</Button>
 {:else if widget === "callout"}
 	<CalloutWidget
 		title={String(values.title ?? "Note")}

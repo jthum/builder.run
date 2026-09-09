@@ -6,11 +6,13 @@
 		max = 10,
 		label = "Rating",
 		required = false,
+		disabled = false,
 	}: {
 		value: unknown;
 		max?: number;
 		label?: string;
 		required?: boolean;
+		disabled?: boolean;
 	} = $props();
 
 	const limit = $derived(Math.min(10, Math.max(2, Math.round(max))));
@@ -31,6 +33,7 @@
 	onValueChange={select}
 	aria-label={label}
 	aria-required={required}
+	{disabled}
 >
 	{#each options as option (option)}
 		<ToggleGroup.Item

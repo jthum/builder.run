@@ -78,7 +78,7 @@
 		"/build/types": BoxIcon,
 		"/build/views": TableIcon,
 		"/build/forms": FormInputIcon,
-		"/build/flows": WorkflowIcon,
+		"/build/automations": WorkflowIcon,
 		"/build/pages": LayersIcon,
 		"/build/actors": UsersIcon,
 		"/build/settings": SettingsIcon,

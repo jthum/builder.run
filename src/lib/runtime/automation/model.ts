@@ -1,3 +1,5 @@
+import type { SpecNode } from "../spec-node.ts";
+
 export interface AutomationBinding {
   $ref: string;
 }
@@ -67,7 +69,7 @@ export type AutomationStep =
   | (StepIdentity & { compute: { assign: Record<string, AutomationValue> } })
   | (StepIdentity & { effect: AutomationEffect })
   | (StepIdentity & {
-      invoke: { flow: string; input?: Record<string, AutomationValue>; as?: string };
+      invoke: { workflow: string; input?: Record<string, AutomationValue>; as?: string };
     })
   | (StepIdentity & { delay: { duration: number | string } })
   | (StepIdentity & {
@@ -104,8 +106,7 @@ export type AutomationStep =
       };
     });
 
-export interface AutomationDefinition {
-  id: string;
+export interface AutomationDefinition extends SpecNode {
   key: string;
   label: string;
   description?: string;

@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { goto } from "$app/navigation";
-	import { flowKind } from "$lib/app/relations.ts";
+	import { workflowKind } from "$lib/app/relations.ts";
 	import { runtime, session } from "$lib/app/session.svelte.ts";
 	import AutomationPredicateEditor from "$lib/components/automation-predicate-editor.svelte";
 	import AutomationStepList from "$lib/components/automation-step-list.svelte";
@@ -22,22 +22,22 @@
 	import { BROWSER_LOCAL_AUTOMATION_PROFILE, checkAutomationCompatibility } from "$lib/runtime/automation/index.ts";
 	import type { AutomationPredicate, AutomationValue } from "$lib/runtime/automation/model.ts";
 	import { labelFromKey } from "$lib/runtime/ids.ts";
-	import { cloneData, type Exposure, type FlowDef, type FlowStep } from "$lib/runtime/model.ts";
+	import { cloneData, type Exposure, type WorkflowDef, type WorkflowStep } from "$lib/runtime/model.ts";
 	import CircleAlertIcon from "@lucide/svelte/icons/circle-alert";
 	import CircleCheckIcon from "@lucide/svelte/icons/circle-check";
 	import FilterIcon from "@lucide/svelte/icons/list-filter";
 	import { toast } from "svelte-sonner";
 
-	let { flow }: { flow: FlowDef } = $props();
+	let { workflow }: { workflow: WorkflowDef } = $props();
 	const spec = $derived(session.snapshot?.spec);
 	const types = $derived(spec?.types ?? []);
-	const flows = $derived(spec?.flows ?? []);
+	const workflows = $derived(spec?.workflows ?? []);
 
-	let initializedFlow = $state("");
+	let initializedWorkflow = $state("");
 	let label = $state("");
 	let description = $state("");
 	let enabled = $state(true);
-	let kind = $state<"button" | "rule">("rule");
+	let kind = $state<"manual" | "automatic">("automatic");
 	let inputName = $state("");
 	let inputType = $state("");
 	let inputEditable = $state(true);
@@ -49,7 +49,7 @@
 	let triggerConfig = $state<Record<string, AutomationValue>>({});
 	let guardEnabled = $state(false);
 	let guardPredicate = $state<AutomationPredicate>({ op: "always" });
-	let steps = $state<FlowStep[]>([]);
+	let steps = $state<WorkflowStep[]>([]);
 	let exposeUi = $state(true);
 	let exposeAgent = $state(true);
 	let deleteOpen = $state(false);
@@ -58,74 +58,74 @@
 	const inputTypeDef = $derived(types.find((type) => type.key === inputType));
 
 	$effect(() => {
-		const identity = `${flow.id}:${flow.key}`;
-		if (initializedFlow === identity) return;
-		initializedFlow = identity;
-		label = flow.label;
-		description = flow.description ?? "";
-		enabled = flow.enabled ?? true;
-		kind = flowKind(flow);
-		const inputs = Object.entries(flow.input ?? {});
+		const identity = `${workflow.id}:${workflow.key}`;
+		if (initializedWorkflow === identity) return;
+		initializedWorkflow = identity;
+		label = workflow.label;
+		description = workflow.description ?? "";
+		enabled = workflow.enabled ?? true;
+		kind = workflowKind(workflow);
+		const inputs = Object.entries(workflow.input ?? {});
 		const [name, definition] = inputs[0] ?? [];
 		inputEditable = inputs.length <= 1 && (!definition || ("record" in definition && definition.required !== false));
-		const triggerType = types.find((type) => flow.trigger?.key.startsWith(`${type.key}.`))?.key;
+		const triggerType = types.find((type) => workflow.trigger?.key.startsWith(`${type.key}.`))?.key;
 		inputName = name ?? triggerType ?? types[0]?.key ?? "record";
 		inputType = definition && "record" in definition ? definition.record : inputName;
-		const parsedTrigger = parseTrigger(flow.trigger?.key ?? "", inputType);
-		triggerCustom = Boolean(flow.trigger && !parsedTrigger);
+		const parsedTrigger = parseTrigger(workflow.trigger?.key ?? "", inputType);
+		triggerCustom = Boolean(workflow.trigger && !parsedTrigger);
 		preserveMissingInput = inputs.length === 0 && triggerCustom;
-		triggerKey = flow.trigger?.key ?? "";
-		triggerConfig = cloneData(flow.trigger?.config ?? {});
+		triggerKey = workflow.trigger?.key ?? "";
+		triggerConfig = cloneData(workflow.trigger?.config ?? {});
 		if (parsedTrigger) {
 			triggerEvent = parsedTrigger.event;
 			triggerField = parsedTrigger.field ?? "";
 		}
-		const entryGate = extractEntryGate(flow.steps);
+		const entryGate = extractEntryGate(workflow.steps);
 		guardEnabled = Boolean(entryGate);
 		guardPredicate = cloneData(entryGate?.predicate ?? simplePredicate(inputName, inputType));
-		steps = cloneData(entryGate?.steps ?? flow.steps);
-		exposeUi = flow.expose?.includes("ui") ?? kind === "button";
-		exposeAgent = flow.expose?.includes("agent") ?? true;
+		steps = cloneData(entryGate?.steps ?? workflow.steps);
+		exposeUi = workflow.expose?.includes("ui") ?? kind === "manual";
+		exposeAgent = workflow.expose?.includes("agent") ?? true;
 	});
 
-	const compiledSteps = $derived.by((): FlowStep[] => {
+	const compiledSteps = $derived.by((): WorkflowStep[] => {
 		const actions = cloneData(steps);
 		return guardEnabled ? [{ gate: { predicate: cloneData(guardPredicate), pass: actions } }] : actions;
 	});
 	const compiledTrigger = $derived.by(() => {
-		if (kind !== "rule") return undefined;
+		if (kind !== "automatic") return undefined;
 		if (triggerCustom) return triggerKey ? { key: triggerKey, ...(Object.keys(triggerConfig).length ? { config: triggerConfig } : {}) } : undefined;
 		const key = standardTriggerKey();
 		return key ? { key } : undefined;
 	});
 	const compiledExpose = $derived.by((): Exposure[] | undefined => {
 		const expose: Exposure[] = [
-			...(kind === "button" && exposeUi ? (["ui"] as const) : []),
+			...(kind === "manual" && exposeUi ? (["ui"] as const) : []),
 			...(exposeAgent ? (["agent"] as const) : []),
 		];
 		return expose.length ? expose : undefined;
 	});
 	const draft = $derived({
-		...flow,
+		...workflow,
 		label,
 		description: description || undefined,
 		enabled,
 		input: preserveMissingInput
-			? flow.input
+			? workflow.input
 			: inputEditable && inputType
 				? { [inputName || inputType]: { record: inputType } }
-				: flow.input,
+				: workflow.input,
 		trigger: compiledTrigger,
 		expose: compiledExpose,
 		steps: compiledSteps,
-	} as FlowDef);
+	} as WorkflowDef);
 	const compatibility = $derived(checkAutomationCompatibility(draft, BROWSER_LOCAL_AUTOMATION_PROFILE));
-	const dirty = $derived(stableStringify(draft) !== stableStringify(flow));
+	const dirty = $derived(stableStringify(draft) !== stableStringify(workflow));
 	function simplePredicate(name: string, typeKey: string): AutomationPredicate {
 		const type = types.find((item) => item.key === typeKey);
 		return { op: "context.equals", path: `vars.${name || typeKey}.${type?.fields[0]?.key ?? "id"}`, value: "" };
 	}
-	function extractEntryGate(source: FlowStep[]): { predicate: AutomationPredicate; steps: FlowStep[] } | undefined {
+	function extractEntryGate(source: WorkflowStep[]): { predicate: AutomationPredicate; steps: WorkflowStep[] } | undefined {
 		const first = source[0];
 		if (source.length !== 1 || !first || !("gate" in first) || first.id || first.gate.fail !== undefined) return undefined;
 		return { predicate: first.gate.predicate, steps: first.gate.pass ?? [] };
@@ -181,7 +181,7 @@
 		if (saving) return;
 		saving = true;
 		try {
-			await runtime().upsertFlow(draft);
+			await runtime().upsertWorkflow(draft);
 			toast.success("Saved");
 		} catch (error) {
 			toast.error(error instanceof Error ? error.message : "Could not save workflow");
@@ -190,14 +190,14 @@
 		}
 	}
 	async function remove() {
-		await runtime().deleteFlow(flow.key);
+		await runtime().deleteWorkflow(workflow.key);
 		toast.success("Deleted");
-		await goto("/build/flows");
+		await goto("/build/automations");
 	}
 </script>
 
 <div class="flex flex-col gap-6">
-	<PageHeader title={label || flow.label} description="Configure when this workflow runs, what it checks, and what happens next." />
+	<PageHeader title={label || workflow.label} description="Configure when this workflow runs, what it checks, and what happens next." />
 
 	<div class="mx-auto flex w-full max-w-4xl flex-col gap-5 sm:gap-6">
 		<Card.Root>
@@ -214,7 +214,7 @@
 			</Card.Header>
 			<Card.Content>
 				<Field.Group>
-					<Field.Field><Field.Label>Name</Field.Label><Input bind:value={label} placeholder={kind === "button" ? "Mark invoice paid" : "Record paid date"} /></Field.Field>
+					<Field.Field><Field.Label>Name</Field.Label><Input bind:value={label} placeholder={kind === "manual" ? "Mark invoice paid" : "Record paid date"} /></Field.Field>
 					<Field.Field><Field.Label>Description</Field.Label><Input bind:value={description} placeholder="What this workflow does" /></Field.Field>
 					<Field.Field orientation="horizontal" class="justify-between rounded-xl border bg-muted/30 p-3">
 						<div class="flex flex-col gap-0.5">
@@ -235,20 +235,20 @@
 			<Card.Root>
 				<Card.Header class="gap-0">
 					<Card.Title>When</Card.Title>
-					<Card.Description>{kind === "button" ? "Configure a workflow that runs on demand." : "Choose the trigger that starts this workflow."}</Card.Description>
+					<Card.Description>{kind === "manual" ? "Configure a workflow that runs on demand." : "Choose the trigger that starts this workflow."}</Card.Description>
 				</Card.Header>
 				<Card.Content>
 					<Field.Group class="gap-4">
 						<Field.FieldSet>
 							<Field.FieldLegend>How should this workflow start?</Field.FieldLegend>
 							<ToggleGroup.Root type="single" bind:value={kind} variant="card" size="card" spacing={2} class="grid w-full grid-cols-1 sm:grid-cols-2">
-								<ToggleGroup.Item value="rule">
+								<ToggleGroup.Item value="automatic">
 									<span class="mt-0.5 flex size-4 shrink-0 rounded-full border group-data-[state=on]/toggle:border-primary">
 										<span class="m-auto size-2 rounded-full bg-primary opacity-0 group-data-[state=on]/toggle:opacity-100"></span>
 									</span>
 									<span class="flex min-w-0 flex-col gap-0.5"><span>Something happens</span><span class="text-xs font-normal text-muted-foreground">An event, schedule, or webhook starts it.</span></span>
 								</ToggleGroup.Item>
-								<ToggleGroup.Item value="button">
+								<ToggleGroup.Item value="manual">
 									<span class="mt-0.5 flex size-4 shrink-0 rounded-full border group-data-[state=on]/toggle:border-primary">
 										<span class="m-auto size-2 rounded-full bg-primary opacity-0 group-data-[state=on]/toggle:opacity-100"></span>
 									</span>
@@ -257,11 +257,11 @@
 							</ToggleGroup.Root>
 						</Field.FieldSet>
 						<Field.Field>
-							<Field.Label>{kind === "button" ? "Show on" : "Watch"}</Field.Label>
+							<Field.Label>{kind === "manual" ? "Show on" : "Watch"}</Field.Label>
 							<AppSelect value={inputType} onValueChange={setInputType} options={types.map((type) => ({ value: type.key, label: type.label }))} disabled={!inputEditable} />
 							{#if !inputEditable}<Field.Description>Structured inputs are preserved from the spec.</Field.Description>{/if}
 						</Field.Field>
-						{#if kind === "rule"}
+						{#if kind === "automatic"}
 							{#if triggerCustom}
 								<Field.Field><Field.Label>Trigger key</Field.Label><Input bind:value={triggerKey} /><Field.Description>Portable registry key, such as schedule.cron or webhook.received.</Field.Description></Field.Field>
 								<Field.Field><Field.Label>Trigger configuration</Field.Label><AutomationValueMapEditor values={triggerConfig} onValuesChange={(config) => (triggerConfig = config)} keyPlaceholder="Setting" /></Field.Field>
@@ -278,8 +278,8 @@
 					</Field.Group>
 				</Card.Content>
 				<Card.Footer>
-					<Field.Group class={cn("grid w-full gap-4", kind === "button" ? "sm:grid-cols-2" : "sm:grid-cols-1")}>
-						{#if kind === "button"}
+					<Field.Group class={cn("grid w-full gap-4", kind === "manual" ? "sm:grid-cols-2" : "sm:grid-cols-1")}>
+						{#if kind === "manual"}
 							<Field.Field orientation="horizontal"><Switch bind:checked={exposeUi} /><div><Field.Label class="font-normal">Record button</Field.Label><Field.Description>Show when a record is open.</Field.Description></div></Field.Field>
 						{/if}
 						<Field.Field orientation="horizontal"><Switch bind:checked={exposeAgent} /><div><Field.Label class="font-normal">Agent tool</Field.Label><Field.Description>Allow agent invocation.</Field.Description></div></Field.Field>
@@ -313,7 +313,7 @@
 				<div class="relative hidden size-10 items-center justify-center rounded-full border border-primary bg-primary text-sm font-semibold text-primary-foreground sm:flex">3</div>
 			<Card.Root>
 				<Card.Header class="gap-0"><Card.Title>Then</Card.Title><Card.Description>Actions run from top to bottom. Conditions can branch into more steps.</Card.Description></Card.Header>
-				<Card.Content><AutomationStepList {steps} onStepsChange={(next) => (steps = next)} {inputName} {inputType} {types} flows={flows.filter((item) => item.key !== flow.key)} {spec} /></Card.Content>
+				<Card.Content><AutomationStepList {steps} onStepsChange={(next) => (steps = next)} {inputName} {inputType} {types} workflows={workflows.filter((item) => item.key !== workflow.key)} {spec} /></Card.Content>
 				</Card.Root>
 			</section>
 		</div>
@@ -345,7 +345,7 @@
 
 <AlertDialog.Root bind:open={deleteOpen}>
 	<AlertDialog.Content>
-		<AlertDialog.Header><AlertDialog.Title>Delete {flow.label}?</AlertDialog.Title><AlertDialog.Description>The button or automation is removed. Records stay.</AlertDialog.Description></AlertDialog.Header>
+		<AlertDialog.Header><AlertDialog.Title>Delete {workflow.label}?</AlertDialog.Title><AlertDialog.Description>The button or automation is removed. Records stay.</AlertDialog.Description></AlertDialog.Header>
 		<AlertDialog.Footer><AlertDialog.Cancel>Cancel</AlertDialog.Cancel><AlertDialog.Action variant="destructive" onclick={remove}>Delete</AlertDialog.Action></AlertDialog.Footer>
 	</AlertDialog.Content>
 </AlertDialog.Root>

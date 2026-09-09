@@ -103,9 +103,9 @@ Every Type already has useful create/edit behaviour.
 
 Add or customise Forms when the default generated form is not the right product experience.
 
-## 6. Add Rules when the app needs behaviour
+## 6. Add Automations when the app needs behaviour
 
-Use Rules (Flows) for meaningful actions or automation.
+Use workflows for meaningful actions and automations.
 
 Examples:
 
@@ -114,9 +114,9 @@ Examples:
 - Move an item into a new state.
 - Stamp a timestamp when a status changes.
 
-Avoid turning ordinary CRUD into bespoke flows. Types already provide that capability.
+Avoid turning ordinary CRUD into bespoke workflows. Types already provide that capability.
 
-See [Rules and flows](flows.md).
+See [Automations and workflows](workflows.md).
 
 ## 7. Test both human and agent surfaces
 

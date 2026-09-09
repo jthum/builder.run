@@ -8,10 +8,12 @@
 	import { Button } from "$lib/components/ui/button/index.js";
 	import * as Field from "$lib/components/ui/field/index.js";
 	import { Input } from "$lib/components/ui/input/index.js";
+	import { Textarea } from "$lib/components/ui/textarea/index.js";
 	import { Spinner } from "$lib/components/ui/spinner/index.js";
 	import { Switch } from "$lib/components/ui/switch/index.js";
 	import { labelFromKey } from "$lib/runtime/ids.ts";
 	import type { FieldDef, FormDef, RecordValue, TypeDef } from "$lib/runtime/model.ts";
+	import { resolveFieldState } from "$lib/runtime/field-state.ts";
 	import { fieldWidget, findType } from "$lib/runtime/query.ts";
 	import { cn } from "$lib/utils.ts";
 
@@ -44,12 +46,14 @@
 			(key) => !omit.includes(key),
 		),
 	);
-	const visible = $derived(
+	const configuredFields = $derived(
 		keys
 			.filter((key) => key !== type.lifecycle?.field)
 			.map((key) => type.fields.find((field) => field.key === key))
 			.filter(Boolean) as FieldDef[],
 	);
+	let values = $state<Record<string, unknown>>({});
+	const visible = $derived(configuredFields.filter((field) => resolveFieldState(field, values).visible));
 	const optionKeys = $derived(
 		visible
 			.filter((field) => field.type === "reference" || field.type === "enum")
@@ -72,7 +76,6 @@
 		return next;
 	}
 
-	let values = $state<Record<string, unknown>>({});
 	let error = $state<string | null>(null);
 	let pending = $state(false);
 	const defaultsKey = $derived(JSON.stringify(defaults));
@@ -82,6 +85,18 @@
 		void recordId;
 		const initial = JSON.parse(defaultsKey) as Record<string, unknown>;
 		values = formValues(type, record, initial);
+	});
+
+	$effect(() => {
+		const clear = configuredFields.filter(
+			(field) =>
+				field.hidden_value === "clear" &&
+				!resolveFieldState(field, values).visible &&
+				values[field.key] !== null &&
+				values[field.key] !== "",
+		);
+		if (!clear.length) return;
+		values = { ...values, ...Object.fromEntries(clear.map((field) => [field.key, null])) };
 	});
 
 	async function optionsFor(field: FieldDef) {
@@ -144,11 +159,12 @@
 	<Field.Group>
 		{#each visible as field (field.id)}
 			{@const widget = fieldWidget(field)}
+			{@const state = resolveFieldState(field, values)}
 			<Field.Field>
 				<Field.Label>{field.label}</Field.Label>
 				{#if widget === "checkbox"}
 					<Field.Field orientation="horizontal">
-						<Switch bind:checked={values[field.key] as boolean} />
+						<Switch bind:checked={values[field.key] as boolean} disabled={!state.enabled} />
 						<Field.Description>{values[field.key] ? "Yes" : "No"}</Field.Description>
 					</Field.Field>
 				{:else if widget === "reference"}
@@ -156,6 +172,7 @@
 						bind:value={values[field.key] as string}
 						options={refOptions[field.key] ?? []}
 						placeholder={`Select ${field.label.toLowerCase()}`}
+						disabled={!state.enabled}
 					/>
 				{:else if widget === "select"}
 					<AppSelect
@@ -165,6 +182,7 @@
 							label: option.label,
 						}))}
 						placeholder={`Select ${field.label.toLowerCase()}`}
+						disabled={!state.enabled}
 					/>
 				{:else if widget === "rating"}
 					<RatingInput
@@ -172,15 +190,46 @@
 						max={field.max ?? 10}
 						label={field.label}
 						required={field.required}
+						disabled={!state.enabled}
+					/>
+				{:else if widget === "textarea"}
+					<Textarea
+						class="min-h-24 w-full"
+						placeholder={field.placeholder}
+						required={state.required}
+						disabled={!state.enabled}
+						minlength={field.validation?.min_length}
+						maxlength={field.validation?.max_length}
+						bind:value={values[field.key] as string}
 					/>
 				{:else}
 					<Input
 						class="w-full"
-						type={widget === "number" ? "number" : widget === "date" ? "date" : "text"}
-						required={field.required}
+						type={widget === "number"
+							? "number"
+							: widget === "date"
+								? "date"
+								: widget === "datetime"
+									? "datetime-local"
+								: field.format === "email"
+									? "email"
+									: field.format === "url"
+										? "url"
+										: field.format === "phone"
+											? "tel"
+											: "text"}
+						placeholder={field.placeholder}
+						required={state.required}
+						disabled={!state.enabled}
+						min={field.validation?.min}
+						max={field.validation?.max}
+						minlength={field.validation?.min_length}
+						maxlength={field.validation?.max_length}
+						pattern={field.validation?.pattern}
 						bind:value={values[field.key] as string}
 					/>
 				{/if}
+				{#if field.description}<Field.Description>{field.description}</Field.Description>{/if}
 			</Field.Field>
 		{/each}
 	</Field.Group>

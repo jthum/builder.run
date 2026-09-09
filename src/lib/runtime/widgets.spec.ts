@@ -93,7 +93,7 @@ describe("page widgets", () => {
         },
       ],
       forms: [],
-      flows: [],
+      workflows: [],
     } as never;
     const bar = widgetByKey("bar");
     expect(bar).toBeTruthy();
@@ -126,7 +126,7 @@ describe("page widgets", () => {
         },
       ],
       forms: [],
-      flows: [],
+      workflows: [],
     } as never;
     expect(fieldsForView(spec, "leaderboard").map((field) => [field.key, field.type])).toEqual([
       ["submission", "reference"],
@@ -176,7 +176,7 @@ describe("page widgets", () => {
         },
       ],
       forms: [],
-      flows: [],
+      workflows: [],
     } as never;
     expect(
       configurePageRows(spec, [{ kind: "widget", widget: "kanban", values: { view: "tasks" } }]),
@@ -223,7 +223,12 @@ describe("page widgets", () => {
       values: { title: "Overview", description: "At a glance" },
     };
     expect(
-      normalizePage({ id: "pg_1", key: "overview", label: "Overview", blocks: [heading] }).blocks,
+      normalizePage({
+        id: "C000000000000001",
+        key: "overview",
+        label: "Overview",
+        blocks: [heading],
+      }).blocks,
     ).toEqual([
       {
         kind: "group",

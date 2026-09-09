@@ -35,7 +35,7 @@
 
 	const spec = $derived(session.snapshot?.spec);
 	const types = $derived(spec?.types ?? []);
-	const flows = $derived(spec?.flows ?? []);
+	const workflows = $derived(spec?.workflows ?? []);
 
 	type FormFieldRow = { field: string; on: boolean };
 
@@ -44,7 +44,7 @@
 	let typeKey = $state("");
 	let mode = $state<FormDef["mode"]>("create");
 	let fieldRows = $state<FormFieldRow[]>([]);
-	let submitFlow = $state("");
+	let submitWorkflow = $state("");
 	let deleteOpen = $state(false);
 	let advancedOpen = $state(false);
 	let dragField = $state<string | null>(null);
@@ -61,8 +61,8 @@
 			label = form.label;
 			typeKey = form.type;
 			mode = form.mode;
-			submitFlow = form.submit?.flow ?? "";
-			advancedOpen = Boolean(form.submit?.flow);
+			submitWorkflow = form.submit?.workflow ?? "";
+			advancedOpen = Boolean(form.submit?.workflow);
 			fieldRows = mergeFields([], type.fields.map((field) => field.key), form.fields);
 		});
 	});
@@ -91,7 +91,7 @@
 		type: typeKey,
 		mode,
 		fields: selected,
-		submit: submitFlow ? { flow: submitFlow } : undefined,
+		submit: submitWorkflow ? { workflow: submitWorkflow } : undefined,
 	});
 	const dirty = $derived(stableStringify(draft) !== stableStringify(form));
 
@@ -292,7 +292,7 @@
 				<span class="text-sm">Optionally run a workflow after the record is saved.</span>
 			</span>
 			<span class="flex shrink-0 items-center gap-2">
-				{#if submitFlow}<Badge variant="secondary">Workflow connected</Badge>{/if}
+				{#if submitWorkflow}<Badge variant="secondary">Workflow connected</Badge>{/if}
 				<ChevronDownIcon class="size-4 transition-transform {advancedOpen ? 'rotate-180' : ''}" />
 			</span>
 		</Collapsible.Trigger>
@@ -306,10 +306,10 @@
 					<Field.Field>
 						<Field.Label>Next step</Field.Label>
 						<AppSelect
-							bind:value={submitFlow}
+							bind:value={submitWorkflow}
 							options={[
 								{ value: "", label: "Just save the record" },
-								...flows.map((item) => ({ value: item.key, label: item.label })),
+								...workflows.map((item) => ({ value: item.key, label: item.label })),
 							]}
 						/>
 						<Field.Description>Only workflows available in this app are listed.</Field.Description>

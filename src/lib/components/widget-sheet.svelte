@@ -76,7 +76,7 @@
 										options={spec ? widgetInputOptions(spec, input, values) : []}
 										placeholder="Select a form"
 									/>
-								{:else if input.type === "flow"}
+								{:else if input.type === "workflow"}
 									<AppSelect
 										bind:value={values[input.key] as string}
 										options={spec ? widgetInputOptions(spec, input, values) : []}

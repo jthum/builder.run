@@ -7,26 +7,17 @@ import type {
   ValueSemantic,
   ViewDef,
 } from "$lib/runtime/model.ts";
+import { FIELD_CAPABILITIES, FIELD_KINDS } from "$lib/runtime/model.ts";
 import { scalarString } from "$lib/runtime/values.ts";
 import pluralize from "pluralize";
 
-export const fieldKindLabel: Record<FieldKind, string> = {
-  text: "Text",
-  number: "Number",
-  date: "Date",
-  boolean: "Yes / no",
-  enum: "Choice",
-  reference: "Link",
-};
+export const fieldKindLabel = Object.fromEntries(
+  FIELD_KINDS.map((kind) => [kind, FIELD_CAPABILITIES[kind].label]),
+) as Record<FieldKind, string>;
 
-export const fieldKindHint: Record<FieldKind, string> = {
-  text: "Names, emails, notes",
-  number: "Amounts, counts, scores",
-  date: "Days and deadlines",
-  boolean: "Yes or no",
-  enum: "A fixed list of choices",
-  reference: "A link to another record",
-};
+export const fieldKindHint = Object.fromEntries(
+  FIELD_KINDS.map((kind) => [kind, FIELD_CAPABILITIES[kind].hint]),
+) as Record<FieldKind, string>;
 
 export function spaceLabel(name: string | undefined): string {
   if (!name || name === "Personal") return "Personal Space";
@@ -242,7 +233,7 @@ export function breadcrumbFor(path: string, spec?: AppSpec): Crumb[] {
       types: "Data",
       views: "Views",
       forms: "Forms",
-      flows: "Rules",
+      automations: "Automations",
       pages: "Pages",
       spec: "Export",
       actors: "People",

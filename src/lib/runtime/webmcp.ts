@@ -1,7 +1,15 @@
 import type { Host } from "./host.ts";
 import { BROWSER_LOCAL_AUTOMATION_PROFILE } from "./automation/capabilities.ts";
 import { DEFAULT_AUTOMATION_REGISTRY } from "./automation/registry.ts";
-import { cloneData, FIELD_KINDS, type FieldDef, type TypeDef } from "./model.ts";
+import {
+  cloneData,
+  FIELD_FORMATS,
+  FIELD_KINDS,
+  FIELD_PRESENTATIONS,
+  VALUE_SEMANTICS,
+  type FieldDef,
+  type TypeDef,
+} from "./model.ts";
 import { sampleApps } from "./samples.ts";
 import { PAGE_ICON_KEYS } from "./page-icons.ts";
 import { specFromText } from "./serialize.ts";
@@ -309,22 +317,31 @@ const fieldDraftSchema = {
   properties: {
     key: { type: "string", minLength: 1, pattern: "\\S" },
     label: { type: "string" },
+    meta: { type: "object", additionalProperties: true },
+    description: { type: "string" },
+    placeholder: { type: "string" },
     type: { type: "string", enum: [...FIELD_KINDS] },
-    field_type: { type: "string", description: "Alias for type" },
     required: { type: "boolean" },
     values: { type: "array", items: { type: "string" } },
     target: { type: "string", description: "Referenced type key (reference fields)" },
-    presentation: { type: "string", enum: ["rating", "badge"] },
+    format: { type: "string", enum: [...FIELD_FORMATS] },
+    currency: { type: "string", pattern: "^[A-Za-z]{3}$" },
+    presentation: { type: "string", enum: [...FIELD_PRESENTATIONS] },
     variant: { type: "string", enum: ["segments"] },
     max: { type: "number", minimum: 2, maximum: 10 },
     value_semantics: {
       type: "object",
       additionalProperties: {
         type: "string",
-        enum: ["neutral", "info", "success", "warning", "danger"],
+        enum: [...VALUE_SEMANTICS],
       },
     },
     default: {},
+    validation: { type: "object", additionalProperties: true },
+    visible_when: { type: "object", additionalProperties: true },
+    enabled_when: { type: "object", additionalProperties: true },
+    required_when: { type: "object", additionalProperties: true },
+    hidden_value: { type: "string", enum: ["preserve", "clear"] },
   },
 };
 
@@ -342,6 +359,8 @@ const lifecycleSchema = {
         properties: {
           key: { type: "string", minLength: 1 },
           label: { type: "string" },
+          description: { type: "string" },
+          placeholder: { type: "string" },
           from: { type: "array", minItems: 1, items: { type: "string" } },
           to: { type: "string" },
         },
@@ -475,7 +494,7 @@ export function buildTools(host: Host, options: BuildToolsOptions = {}): ToolDef
       name: "get_automation_primitives",
       title: "Inspect automation primitives",
       description:
-        "Discover the canonical structured-flow grammar, registered conditions and effects, and this runtime's capability profile. Call with a condition or effect key for its parameter contract before authoring a flow.",
+        "Discover the canonical structured-workflow grammar, registered conditions and effects, and this runtime's capability profile. Call with a condition or effect key for its parameter contract before authoring a workflow.",
       inputSchema: {
         type: "object",
         properties: {
@@ -514,7 +533,7 @@ export function buildTools(host: Host, options: BuildToolsOptions = {}): ToolDef
             effect: "{ effect: { key, params?, as?, retry?, compensate? } }",
             gate: "{ gate: { predicate, pass?: steps, fail?: steps } }",
             compute: "{ compute: { assign } }",
-            invoke: "{ invoke: { flow, input?, as? } }",
+            invoke: "{ invoke: { workflow, input?, as? } }",
             foreach: "{ foreach: { source: {$ref}, as?, max?, on_item_failure?, steps } }",
             repeat: "{ repeat: { times, as?, max?, on_item_failure?, steps } }",
             parallel: "{ parallel: { branches: [{key?, steps}], join?: all|any } }",
@@ -524,7 +543,7 @@ export function buildTools(host: Host, options: BuildToolsOptions = {}): ToolDef
           conditions,
           effects,
           runtime: BROWSER_LOCAL_AUTOMATION_PROFILE,
-          next: "Inspect any unfamiliar key, then call upsert_flow with the canonical nested structure.",
+          next: "Inspect any unfamiliar key, then call upsert_workflow with the canonical nested structure.",
         };
       },
     },
@@ -596,7 +615,7 @@ export function buildTools(host: Host, options: BuildToolsOptions = {}): ToolDef
       name: "apply_spec",
       title: "Apply spec",
       description:
-        'Replace the entire active app spec with a YAML or JSON document. Not a merge: types, views, forms, flows, and pages missing from the document are deleted. Generated defaults are recreated from types. Requires confirm: true. A document with no types is refused unless wipe: true — { key: "foo" } is not a full spec. Example: apply_spec({ spec: "<full yaml or json>", confirm: true }).',
+        'Replace the entire active app spec with a YAML or JSON document. Not a merge: types, views, forms, workflows, and pages missing from the document are deleted. Generated defaults are recreated from types. Requires confirm: true. A document with no types is refused unless wipe: true — { key: "foo" } is not a full spec. Example: apply_spec({ spec: "<full yaml or json>", confirm: true }).',
       inputSchema: {
         type: "object",
         properties: {
@@ -635,7 +654,7 @@ export function buildTools(host: Host, options: BuildToolsOptions = {}): ToolDef
         if (!incoming.types.length && current.types.length && wipe !== true) {
           return {
             error:
-              "This spec has no types. Applying it would delete all types, views, forms, flows, and pages. Pass wipe: true if that is intended.",
+              "This spec has no types. Applying it would delete all types, views, forms, workflows, and pages. Pass wipe: true if that is intended.",
             current: summary,
           };
         }
@@ -646,12 +665,13 @@ export function buildTools(host: Host, options: BuildToolsOptions = {}): ToolDef
       name: "upsert_type",
       title: "Create or update a type",
       description:
-        'Create or update a type and its fields. Use a singular key and label for one record; optional collection_label overrides the automatically pluralized list name. Providing fields replaces the type\'s field list; omitting fields leaves existing fields unchanged. lifecycle optionally turns one enum field into a validated state machine with an initial state, terminal states, and named transitions. Add or change one field with upsert_field. Enum fields can use presentation: "badge" and explicit value_semantics; number fields can use presentation: "rating". Reference fields need target. expose: true stores the type on the account space so every app shares its records. Example: upsert_type({ key: "task", fields: [{ key: "status", type: "enum", values: ["draft", "done"] }], lifecycle: { field: "status", initial: "draft", terminal: ["done"], transitions: [{ key: "complete", from: ["draft"], to: "done" }] } }).',
+        'Create or update a type and its fields. Use a singular key and label for one record; optional collection_label overrides the automatically pluralized list name. Providing fields replaces the type\'s field list; omitting fields leaves existing fields unchanged. Field type is canonical; compatible format, presentation, validation, and conditional behavior are optional. lifecycle turns one enum field into a validated state machine. Add or change one field with upsert_field. expose: true stores the type on the account space so every app shares its records. Example: upsert_type({ key: "task", fields: [{ key: "status", type: "enum", values: ["draft", "done"] }], lifecycle: { field: "status", initial: "draft", terminal: ["done"], transitions: [{ key: "complete", from: ["draft"], to: "done" }] } }).',
       inputSchema: {
         type: "object",
         properties: {
           key: { type: "string", minLength: 1, pattern: "\\S" },
           label: { type: "string" },
+          meta: { type: "object", additionalProperties: true },
           collection_label: {
             type: "string",
             description:
@@ -693,15 +713,15 @@ export function buildTools(host: Host, options: BuildToolsOptions = {}): ToolDef
       name: "upsert_field",
       title: "Add or update a field",
       description:
-        'Add or update one field on a type without removing the others. type is the type key; field_type is the field kind: text, number, date, boolean, enum, reference. Enum fields need values and can use presentation: "badge" with explicit value_semantics of neutral, info, success, warning, or danger; use neutral when meaning is unclear. Reference fields need target. A number field can use presentation: "rating", variant: "segments", and max from 2 to 10. Example: upsert_field({ type: "submission", key: "stage", field_type: "enum", values: ["submitted", "winner", "rejected"], presentation: "badge", value_semantics: { submitted: "neutral", winner: "success", rejected: "danger" } }).',
+        'Add or update one field without replacing the type\'s other fields. type identifies the record type; kind is the field kind. Formats, presentations, and validation must be compatible with that kind. Enum fields need values, reference fields need target, currency fields need currency, and rating fields use max from 2 to 10. Example: upsert_field({ type: "submission", key: "stage", kind: "enum", values: ["submitted", "winner", "rejected"], presentation: "badge", value_semantics: { submitted: "neutral", winner: "success", rejected: "danger" } }).',
       inputSchema: {
         type: "object",
         properties: {
           type: { type: "string", description: "Type key (not the field kind)" },
-          type_key: { type: "string", description: "Alias for type" },
           key: { type: "string", minLength: 1, pattern: "\\S" },
           label: { type: "string" },
-          field_type: {
+          meta: { type: "object", additionalProperties: true },
+          kind: {
             type: "string",
             enum: [...FIELD_KINDS],
             description: "Field kind",
@@ -709,28 +729,44 @@ export function buildTools(host: Host, options: BuildToolsOptions = {}): ToolDef
           required: { type: "boolean" },
           values: { type: "array", items: { type: "string" } },
           target: { type: "string", description: "Referenced type key (reference fields)" },
-          presentation: { type: "string", enum: ["rating", "badge"] },
+          format: { type: "string", enum: [...FIELD_FORMATS] },
+          currency: { type: "string", pattern: "^[A-Za-z]{3}$" },
+          presentation: { type: "string", enum: [...FIELD_PRESENTATIONS] },
           variant: { type: "string", enum: ["segments"] },
           max: { type: "number", minimum: 2, maximum: 10 },
           value_semantics: {
             type: "object",
             additionalProperties: {
               type: "string",
-              enum: ["neutral", "info", "success", "warning", "danger"],
+              enum: [...VALUE_SEMANTICS],
             },
           },
+          validation: { type: "object", additionalProperties: true },
+          visible_when: { type: "object", additionalProperties: true },
+          enabled_when: { type: "object", additionalProperties: true },
+          required_when: { type: "object", additionalProperties: true },
+          hidden_value: { type: "string", enum: ["preserve", "clear"] },
         },
-        required: ["key"],
+        required: ["type", "key"],
         additionalProperties: false,
       },
       execute: async (input) =>
-        host.upsertField(String(input.type_key ?? input.type), {
+        host.upsertField(String(input.type), {
           key: String(input.key),
-          label: input.label as string | undefined,
-          type: (input.field_type as never) || "text",
-          required: Boolean(input.required),
-          values: input.values as string[] | undefined,
-          target: input.target as string | undefined,
+          ...(Object.hasOwn(input, "label") ? { label: input.label as string } : {}),
+          ...(Object.hasOwn(input, "meta") ? { meta: input.meta as FieldDef["meta"] } : {}),
+          ...(Object.hasOwn(input, "description")
+            ? { description: input.description as string }
+            : {}),
+          ...(Object.hasOwn(input, "placeholder")
+            ? { placeholder: input.placeholder as string }
+            : {}),
+          ...(Object.hasOwn(input, "kind") ? { type: input.kind as never } : {}),
+          ...(Object.hasOwn(input, "required") ? { required: Boolean(input.required) } : {}),
+          ...(Object.hasOwn(input, "values") ? { values: input.values as string[] } : {}),
+          ...(Object.hasOwn(input, "target") ? { target: input.target as string } : {}),
+          ...(Object.hasOwn(input, "format") ? { format: input.format as FieldDef["format"] } : {}),
+          ...(Object.hasOwn(input, "currency") ? { currency: input.currency as string } : {}),
           ...(Object.hasOwn(input, "presentation")
             ? { presentation: input.presentation as FieldDef["presentation"] }
             : {}),
@@ -740,6 +776,21 @@ export function buildTools(host: Host, options: BuildToolsOptions = {}): ToolDef
           ...(Object.hasOwn(input, "max") ? { max: input.max as number } : {}),
           ...(Object.hasOwn(input, "value_semantics")
             ? { value_semantics: input.value_semantics as FieldDef["value_semantics"] }
+            : {}),
+          ...(Object.hasOwn(input, "validation")
+            ? { validation: input.validation as FieldDef["validation"] }
+            : {}),
+          ...(Object.hasOwn(input, "visible_when")
+            ? { visible_when: input.visible_when as FieldDef["visible_when"] }
+            : {}),
+          ...(Object.hasOwn(input, "enabled_when")
+            ? { enabled_when: input.enabled_when as FieldDef["enabled_when"] }
+            : {}),
+          ...(Object.hasOwn(input, "required_when")
+            ? { required_when: input.required_when as FieldDef["required_when"] }
+            : {}),
+          ...(Object.hasOwn(input, "hidden_value")
+            ? { hidden_value: input.hidden_value as FieldDef["hidden_value"] }
             : {}),
         }),
     },
@@ -788,6 +839,7 @@ export function buildTools(host: Host, options: BuildToolsOptions = {}): ToolDef
         properties: {
           key: { type: "string" },
           label: { type: "string" },
+          meta: { type: "object", additionalProperties: true },
           source: { type: "string" },
           fields: {
             type: "array",
@@ -818,6 +870,7 @@ export function buildTools(host: Host, options: BuildToolsOptions = {}): ToolDef
         properties: {
           key: { type: "string" },
           label: { type: "string" },
+          meta: { type: "object", additionalProperties: true },
           type: { type: "string" },
           fields: { type: "array", items: { type: "string" } },
           mode: { type: "string", enum: ["create", "edit", "custom"] },
@@ -828,15 +881,16 @@ export function buildTools(host: Host, options: BuildToolsOptions = {}): ToolDef
       execute: async (input) => host.upsertForm(input as never),
     },
     {
-      name: "upsert_flow",
-      title: "Create or update a flow",
+      name: "upsert_workflow",
+      title: "Create or update a workflow",
       description:
-        'Create or update a structured flow. Call get_automation_primitives first. Use registered effects and {$ref:"vars.name"} bindings. Gates contain pass/fail steps; loops and parallel branches contain their own steps. expose: ["agent"] registers invoke_<key>. Example: upsert_flow({ key: "mark_paid", expose: ["agent"], input: { invoice: { record: "invoice" } }, steps: [{ effect: { key: "records.set", params: { record: {$ref:"vars.invoice"}, values: {status:"paid"} } } }] }).',
+        'Create or update a structured workflow. Call get_automation_primitives first. Use registered effects and {$ref:"vars.name"} bindings. Gates contain pass/fail steps; loops and parallel branches contain their own steps. expose: ["agent"] registers invoke_<key>. Example: upsert_workflow({ key: "mark_paid", expose: ["agent"], input: { invoice: { record: "invoice" } }, steps: [{ effect: { key: "records.set", params: { record: {$ref:"vars.invoice"}, values: {status:"paid"} } } }] }).',
       inputSchema: {
         type: "object",
         properties: {
           key: { type: "string" },
           label: { type: "string" },
+          meta: { type: "object", additionalProperties: true },
           description: { type: "string" },
           enabled: { type: "boolean" },
           priority: { type: "integer" },
@@ -847,7 +901,7 @@ export function buildTools(host: Host, options: BuildToolsOptions = {}): ToolDef
           },
           trigger: {
             type: "object",
-            description: "Optional {key, config?}. Omit for a callable flow.",
+            description: "Optional {key, config?}. Omit for a callable workflow.",
           },
           expose: { type: "array", items: { type: "string", enum: ["ui", "agent"] } },
           steps: {
@@ -858,7 +912,7 @@ export function buildTools(host: Host, options: BuildToolsOptions = {}): ToolDef
         required: ["key"],
         additionalProperties: false,
       },
-      execute: async (input) => host.upsertFlow(input as never),
+      execute: async (input) => host.upsertWorkflow(input as never),
     },
     {
       name: "upsert_page",
@@ -870,6 +924,7 @@ export function buildTools(host: Host, options: BuildToolsOptions = {}): ToolDef
         properties: {
           key: { type: "string" },
           label: { type: "string" },
+          meta: { type: "object", additionalProperties: true },
           path: { type: "string" },
           folder: { type: "string" },
           icon: {
@@ -976,14 +1031,14 @@ export function buildTools(host: Host, options: BuildToolsOptions = {}): ToolDef
 
   tools.push(...(options.appTools === "typed" ? typedRecordTools(host) : compactRecordTools(host)));
 
-  for (const flow of spec.flows) {
-    if (!flow.expose?.includes("agent")) continue;
-    const inputs = Object.entries(flow.input ?? {});
+  for (const workflow of spec.workflows) {
+    if (!workflow.expose?.includes("agent")) continue;
+    const inputs = Object.entries(workflow.input ?? {});
     tools.push({
       surface: "app",
-      name: `invoke_${flow.key}`,
-      title: flow.label,
-      description: invokeFlowDescription(flow.key, flow.label, inputs),
+      name: `invoke_${workflow.key}`,
+      title: workflow.label,
+      description: invokeWorkflowDescription(workflow.key, workflow.label, inputs),
       inputSchema: {
         type: "object",
         properties: Object.fromEntries(
@@ -994,7 +1049,7 @@ export function buildTools(host: Host, options: BuildToolsOptions = {}): ToolDef
           .map(([name]) => name),
         additionalProperties: false,
       },
-      execute: (input) => host.invoke(flow.key, input),
+      execute: (input) => host.invoke(workflow.key, input),
     });
   }
 
@@ -1050,13 +1105,22 @@ function recordOperations(host: Host): RecordOperations {
           label: field.label,
           type: field.type,
           ...(field.required ? { required: true } : {}),
+          ...(field.description ? { description: field.description } : {}),
+          ...(field.placeholder ? { placeholder: field.placeholder } : {}),
           ...(field.default !== undefined ? { default: cloneData(field.default) } : {}),
           ...(field.values ? { values: [...field.values] } : {}),
           ...(field.target ? { target: field.target } : {}),
+          ...(field.format ? { format: field.format } : {}),
+          ...(field.currency ? { currency: field.currency } : {}),
           ...(field.presentation ? { presentation: field.presentation } : {}),
           ...(field.variant ? { variant: field.variant } : {}),
           ...(field.max ? { max: field.max } : {}),
           ...(field.value_semantics ? { value_semantics: cloneData(field.value_semantics) } : {}),
+          ...(field.validation ? { validation: cloneData(field.validation) } : {}),
+          ...(field.visible_when ? { visible_when: cloneData(field.visible_when) } : {}),
+          ...(field.enabled_when ? { enabled_when: cloneData(field.enabled_when) } : {}),
+          ...(field.required_when ? { required_when: cloneData(field.required_when) } : {}),
+          ...(field.hidden_value === "clear" ? { hidden_value: "clear" } : {}),
         })),
         ...(type.lifecycle ? { lifecycle: cloneData(type.lifecycle) } : {}),
         ...(record
@@ -1375,6 +1439,13 @@ function fieldInputSchema(field: FieldDef): Record<string, unknown> {
     description: fieldInputDescription(field),
   };
   if (field.type === "enum" && field.values?.length) schema.enum = field.values;
+  if (field.format === "email") schema.format = "email";
+  if (field.format === "url") schema.format = "uri";
+  if (field.validation?.min !== undefined) schema.minimum = field.validation.min;
+  if (field.validation?.max !== undefined) schema.maximum = field.validation.max;
+  if (field.validation?.min_length !== undefined) schema.minLength = field.validation.min_length;
+  if (field.validation?.max_length !== undefined) schema.maxLength = field.validation.max_length;
+  if (field.validation?.pattern) schema.pattern = field.validation.pattern;
   if (field.type === "number" && field.presentation === "rating") {
     schema.minimum = 1;
     schema.maximum = field.max ?? 10;
@@ -1394,7 +1465,7 @@ function fieldInputDescription(field: FieldDef): string {
   if (field.type === "number" && field.presentation === "rating") {
     return `${field.label}. A whole-number rating from 1 to ${field.max ?? 10}`;
   }
-  return field.label;
+  return field.description ? `${field.label} — ${field.description}` : field.label;
 }
 
 function flowInputProperty(definition: unknown): Record<string, unknown> {
@@ -1409,7 +1480,7 @@ function flowInputProperty(definition: unknown): Record<string, unknown> {
   return { type: "string" };
 }
 
-function invokeFlowDescription(
+function invokeWorkflowDescription(
   key: string,
   label: string,
   inputs: Array<[string, unknown]>,
@@ -1424,5 +1495,5 @@ function invokeFlowDescription(
     })
     .join(", ");
   const example = args ? ` Example: invoke_${key}({ ${args} }).` : ` Example: invoke_${key}({}).`;
-  return `Invoke the ${label} flow (${key}).${example}`;
+  return `Invoke the ${label} workflow (${key}).${example}`;
 }

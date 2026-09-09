@@ -38,6 +38,7 @@
 	import { cn, stableStringify } from "$lib/utils.js";
 	import ArrowUpDownIcon from "@lucide/svelte/icons/arrow-up-down";
 	import CalendarIcon from "@lucide/svelte/icons/calendar";
+	import ClockIcon from "@lucide/svelte/icons/clock";
 	import ChevronDownIcon from "@lucide/svelte/icons/chevron-down";
 	import ChevronUpIcon from "@lucide/svelte/icons/chevron-up";
 	import Columns3Icon from "@lucide/svelte/icons/columns-3";
@@ -63,6 +64,7 @@
 		text: TypeIcon,
 		number: HashIcon,
 		date: CalendarIcon,
+		datetime: ClockIcon,
 		boolean: ToggleLeftIcon,
 		enum: ListIcon,
 		reference: LinkIcon,
