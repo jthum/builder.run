@@ -11,6 +11,7 @@
 	import AppSelect from "$lib/components/app-select.svelte";
 	import EditorActions from "$lib/components/editor-actions.svelte";
 	import FormInputSheet from "$lib/components/form-input-sheet.svelte";
+	import FormPurposePicker from "$lib/components/form-purpose-picker.svelte";
 	import PageHeader from "$lib/components/page-header.svelte";
 	import RecordForm from "$lib/components/record-form.svelte";
 	import * as AlertDialog from "$lib/components/ui/alert-dialog/index.js";
@@ -22,7 +23,6 @@
 	import { Input } from "$lib/components/ui/input/index.js";
 	import { Separator } from "$lib/components/ui/separator/index.js";
 	import { Switch } from "$lib/components/ui/switch/index.js";
-	import * as ToggleGroup from "$lib/components/ui/toggle-group/index.js";
 	import { conditionFieldKeys, renameConditionField } from "$lib/runtime/field-state.ts";
 	import { normalizeField, type FieldDef, type FormDef } from "$lib/runtime/model.ts";
 	import { cn, stableStringify } from "$lib/utils.ts";
@@ -249,46 +249,7 @@
 		</Card.Header>
 		<Card.Content>
 			<Field.Group>
-				<Field.FieldSet>
-					<Field.FieldLegend>What is this form for?</Field.FieldLegend>
-					<ToggleGroup.Root
-						type="single"
-						value={mode}
-						onValueChange={(value) => value && (mode = value as FormDef["mode"])}
-						variant="card"
-						size="card"
-						spacing={2}
-						class="grid w-full grid-cols-1 md:grid-cols-3"
-					>
-						<ToggleGroup.Item value="create">
-							<span class="mt-0.5 flex size-4 shrink-0 rounded-full border group-data-[state=on]/toggle:border-primary">
-								<span class="m-auto size-2 rounded-full bg-primary opacity-0 group-data-[state=on]/toggle:opacity-100"></span>
-							</span>
-							<span class="flex min-w-0 flex-col gap-0.5">
-								<span>Add records</span>
-								<span class="text-xs font-normal text-muted-foreground">Shown when someone creates a new record.</span>
-							</span>
-						</ToggleGroup.Item>
-						<ToggleGroup.Item value="edit">
-							<span class="mt-0.5 flex size-4 shrink-0 rounded-full border group-data-[state=on]/toggle:border-primary">
-								<span class="m-auto size-2 rounded-full bg-primary opacity-0 group-data-[state=on]/toggle:opacity-100"></span>
-							</span>
-							<span class="flex min-w-0 flex-col gap-0.5">
-								<span>Edit records</span>
-								<span class="text-xs font-normal text-muted-foreground">Shown when someone changes an existing record.</span>
-							</span>
-						</ToggleGroup.Item>
-						<ToggleGroup.Item value="standalone">
-							<span class="mt-0.5 flex size-4 shrink-0 rounded-full border group-data-[state=on]/toggle:border-primary">
-								<span class="m-auto size-2 rounded-full bg-primary opacity-0 group-data-[state=on]/toggle:opacity-100"></span>
-							</span>
-							<span class="flex min-w-0 flex-col gap-0.5">
-								<span>Custom form</span>
-								<span class="text-xs font-normal text-muted-foreground">Collect information and use workflows to take action.</span>
-							</span>
-						</ToggleGroup.Item>
-					</ToggleGroup.Root>
-				</Field.FieldSet>
+				<FormPurposePicker bind:value={mode} />
 				{#if mode !== "standalone"}
 					<Field.Field>
 						<Field.Label>Record type</Field.Label>
