@@ -5,7 +5,7 @@ import {
   loadPlatform,
   savePlatform,
 } from "./catalog.ts";
-import { applyDefaults, defaultViewFields, effectiveSpec } from "./defaults.ts";
+import { authoredSpec, defaultViewFields, effectiveSpec } from "./defaults.ts";
 import { assertValidAutomation } from "./automation/validate.ts";
 import type { TableEngine } from "./engine.ts";
 import { invokeWorkflow, matchingTriggers, type WorkflowRun } from "./workflows.ts";
@@ -56,6 +56,13 @@ import { configurePageRows, normalizePageRows } from "./widgets.ts";
 import { SqliteEngine } from "./sql-engine.ts";
 import { scalarString } from "./values.ts";
 import { openSqlGateway, type SqlConnection, type SqlGateway } from "./sql-gateway.ts";
+import {
+  findFieldReferences,
+  findTypeReferences,
+  rewriteFieldReferences,
+  rewriteTypeReferences,
+  type SpecReference,
+} from "./spec-references.ts";
 
 export type { PlatformState, SpaceState } from "./platform.ts";
 
@@ -144,19 +151,66 @@ export class Host {
   }
 
   private async reconcileAll(): Promise<void> {
-    const space = this.space();
-    const app = this.app();
-    const spaceEngine = this.engines.get(space.id);
-    if (spaceEngine) {
-      await reconcileStore(spaceEngine, space.spec.types);
-      this.storeTables.set(space.id, await spaceEngine.listTables());
+    const tables = await this.reconcileSpecs(
+      this.platform,
+      new Set([this.space().id, this.app().id]),
+    );
+    for (const [id, names] of tables) this.storeTables.set(id, names);
+  }
+
+  private async reconcileSpecs(
+    platform: PlatformState,
+    ids: ReadonlySet<string>,
+  ): Promise<Map<string, string[]>> {
+    const tables = new Map<string, string[]>();
+    for (const id of ids) {
+      const engine = this.engines.get(id);
+      const target = platform.spaces.find((item) => item.id === id);
+      if (!engine || !target) continue;
+      await engine.transaction(() => reconcileStore(engine, target.spec.types));
+      tables.set(id, await engine.listTables());
     }
-    if (app.id !== space.id) {
-      const appEngine = this.engines.get(app.id);
-      if (appEngine) {
-        await reconcileStore(appEngine, app.spec.types);
-        this.storeTables.set(app.id, await appEngine.listTables());
+    return tables;
+  }
+
+  /**
+   * Commit authored spec changes as one staged unit. The catalog and record stores
+   * are updated before the new platform snapshot becomes observable to callers.
+   */
+  private async commitSpecs(changes: Array<{ id: string; spec: AppSpec }>): Promise<void> {
+    if (!changes.length) return;
+    const previous = this.platform;
+    const staged = cloneData(previous);
+    const changedIds = new Set<string>();
+
+    for (const change of changes) {
+      const current = previous.spaces.find((item) => item.id === change.id);
+      const target = staged.spaces.find((item) => item.id === change.id);
+      if (!current || !target) throw new Error(`Unknown spec owner ${change.id}`);
+      target.spec = normalizeSpec(authoredSpec(change.spec));
+      changedIds.add(change.id);
+    }
+
+    await savePlatform(this.catalog, staged);
+    let tables: Map<string, string[]>;
+    try {
+      tables = await this.reconcileSpecs(staged, changedIds);
+    } catch (error) {
+      try {
+        await savePlatform(this.catalog, previous);
+        await this.reconcileSpecs(previous, changedIds);
+      } catch (rollbackError) {
+        console.error("builder.run failed to restore a spec commit", rollbackError);
       }
+      throw error;
+    }
+
+    const catalogTables = await listCatalogTables(this.catalog);
+    this.platform = staged;
+    this.catalogTables = catalogTables;
+    for (const [id, names] of tables) this.storeTables.set(id, names);
+    if (!this.silent) {
+      for (const listener of this.listeners) listener();
     }
   }
 
@@ -227,7 +281,7 @@ export class Host {
     const localKeys = new Set(spec.types.map((type) => type.key));
     const exposed = space.spec.types.filter((type) => isExposed(type) && !localKeys.has(type.key));
     spec.types = [...exposed, ...spec.types];
-    return applyDefaults(spec);
+    return effectiveSpec(spec);
   }
 
   snapshot(): HostSnapshot {
@@ -398,7 +452,7 @@ export class Host {
     draft = cloneData(draft);
     const expose = Boolean(draft.expose);
     const target = expose ? this.space() : this.app();
-    const spec = target.spec;
+    const spec = cloneSpec(target.spec);
     const next = normalizeSpec(
       {
         ...spec,
@@ -409,26 +463,46 @@ export class Host {
       },
       spec,
     );
-    const type = next.types.find((item) => item.key === draft.key) as TypeDef;
-    target.spec = applyDefaults(next);
-    await this.reconcileAll();
-    await this.persistAndEmit();
-    return type;
+    await this.commitSpecs([{ id: target.id, spec: next }]);
+    const committed = this.platform.spaces.find((item) => item.id === target.id);
+    return committed?.spec.types.find((item) => item.key === draft.key) as TypeDef;
+  }
+
+  async renameType(from: string, to: string): Promise<TypeDef> {
+    const { owner, spec, type } = this.writableTypeDraft(from);
+    const key = slugify(to);
+    if (!key) throw new Error("Type key required");
+    if (key === from) return this.findWritableType(from);
+    if (key === "_meta") throw new Error('Type key "_meta" is reserved by the runtime');
+    this.assertTypeRenameAvailable(owner, type, from, key);
+
+    type.key = key;
+    const changes = this.rewriteTypeInConsumers(owner, spec, from, key);
+    await this.commitSpecs(changes);
+    return this.findWritableType(key);
   }
 
   async deleteType(key: string): Promise<void> {
     const app = this.app();
-    app.spec.types = app.spec.types.filter((type) => type.key !== key);
-    app.spec = applyDefaults(app.spec);
     const space = this.space();
-    space.spec.types = space.spec.types.filter((type) => type.key !== key);
-    space.spec = applyDefaults(space.spec);
-    await this.reconcileAll();
-    await this.persistAndEmit();
+    const references = this.typeReferences(key).filter(
+      (reference) => !(reference.owner === "type" && reference.key === key),
+    );
+    if (references.length) throw referencedByError("type", key, references);
+    const changes = new Map<string, AppSpec>();
+    changes.set(app.id, {
+      ...cloneSpec(app.spec),
+      types: app.spec.types.filter((type) => type.key !== key),
+    });
+    changes.set(space.id, {
+      ...cloneSpec(space.spec),
+      types: space.spec.types.filter((type) => type.key !== key),
+    });
+    await this.commitSpecs([...changes].map(([id, spec]) => ({ id, spec })));
   }
 
   async renameField(typeKey: string, from: string, to: string): Promise<FieldDef> {
-    const type = this.findWritableType(typeKey);
+    const { owner, spec, type } = this.writableTypeDraft(typeKey);
     const field = type.fields.find((item) => item.key === from);
     if (!field) throw new Error(`Unknown field ${from}`);
     const key = normalizeFieldKey(to);
@@ -461,13 +535,13 @@ export class Host {
       : undefined;
     type.fields = nextFields;
     if (lifecycle) type.lifecycle = lifecycle;
-    await this.reconcileAll();
-    await this.persistAndEmit();
-    return nextFields.find((item) => item.key === key) as FieldDef;
+    const changes = this.rewriteFieldInConsumers(owner, spec, typeKey, from, key);
+    await this.commitSpecs(changes);
+    return this.findWritableType(typeKey).fields.find((item) => item.key === key) as FieldDef;
   }
 
   async deleteField(typeKey: string, key: string): Promise<void> {
-    const type = this.findWritableType(typeKey);
+    const { owner, spec, type } = this.writableTypeDraft(typeKey);
     if (type.lifecycle?.field === key) {
       throw new Error(`Cannot delete lifecycle field "${key}" while the lifecycle is configured`);
     }
@@ -483,8 +557,9 @@ export class Host {
         if (!next.visible_when) delete next.hidden_value;
         return next;
       });
-    await this.reconcileAll();
-    await this.persistAndEmit();
+    const references = this.fieldReferences(typeKey, key, { owner, spec });
+    if (references.length) throw referencedByError("field", `${typeKey}.${key}`, references);
+    await this.commitSpecs([{ id: owner.id, spec }]);
   }
 
   async submitForm(
@@ -516,7 +591,7 @@ export class Host {
     field: Partial<FieldDef> & { key: string },
   ): Promise<FieldDef> {
     field = cloneData(field);
-    const type = this.findWritableType(typeKey);
+    const { owner, spec, type } = this.writableTypeDraft(typeKey);
     const key = normalizeFieldKey(field.key);
     const existing = type.fields.find((item) => item.key === key);
     const label =
@@ -539,14 +614,13 @@ export class Host {
     validateFieldCapabilities(type.key, next);
     if (type.lifecycle) normalizeTypeLifecycle({ ...type, fields: next }, type.lifecycle);
     type.fields = next;
-    await this.reconcileAll();
-    await this.persistAndEmit();
-    return next.find((item) => item.key === key) as FieldDef;
+    await this.commitSpecs([{ id: owner.id, spec }]);
+    return this.findWritableType(typeKey).fields.find((item) => item.key === key) as FieldDef;
   }
 
   async reorderFields(typeKey: string, keys: string[]): Promise<TypeDef> {
     keys = cloneData(keys);
-    const type = this.findWritableType(typeKey);
+    const { owner, spec, type } = this.writableTypeDraft(typeKey);
     const map = new Map(type.fields.map((field) => [field.key, field]));
     const next = keys
       .map((key) => map.get(key))
@@ -555,13 +629,14 @@ export class Host {
       if (!keys.includes(field.key)) next.push(field);
     }
     type.fields = next;
-    await this.persistAndEmit();
-    return type;
+    await this.commitSpecs([{ id: owner.id, spec }]);
+    return this.findWritableType(typeKey);
   }
 
   async upsertView(draft: Partial<ViewDef> & { key: string }): Promise<ViewDef> {
     draft = cloneData(draft);
-    const spec = this.app().spec;
+    const appId = this.app().id;
+    const spec = cloneSpec(this.app().spec);
     const existing = spec.views.find((view) => view.key === draft.key);
     const groupBy = draft.group_by ?? existing?.group_by;
     const suppliedFields = Object.hasOwn(draft, "fields");
@@ -588,14 +663,14 @@ export class Host {
         implicit: false,
       }),
     );
-    this.app().spec = applyDefaults(normalizeSpec({ ...spec, views }, spec));
-    await this.persistAndEmit();
+    await this.commitSpecs([{ id: appId, spec: { ...spec, views } }]);
     return this.app().spec.views.find((item) => item.key === draft.key) as ViewDef;
   }
 
   async upsertForm(draft: Partial<FormDef> & { key: string }): Promise<FormDef> {
     draft = cloneData(draft);
-    const spec = this.app().spec;
+    const appId = this.app().id;
+    const spec = cloneSpec(this.app().spec);
     const existing = spec.forms.find((form) => form.key === draft.key);
     const forms = upsertNamed(spec.forms, {
       id: existing?.id || createSpecId(),
@@ -607,14 +682,14 @@ export class Host {
       ...draft,
       implicit: false,
     } as FormDef);
-    this.app().spec = applyDefaults(normalizeSpec({ ...spec, forms }, spec));
-    await this.persistAndEmit();
+    await this.commitSpecs([{ id: appId, spec: { ...spec, forms } }]);
     return this.app().spec.forms.find((item) => item.key === draft.key) as FormDef;
   }
 
   async upsertWorkflow(draft: Partial<WorkflowDef> & { key: string }): Promise<WorkflowDef> {
     draft = cloneData(draft);
-    const spec = this.app().spec;
+    const appId = this.app().id;
+    const spec = cloneSpec(this.app().spec);
     const existing = spec.workflows.find((workflow) => workflow.key === draft.key);
     const workflows = upsertNamed(spec.workflows, {
       label: labelFromKey(draft.key),
@@ -624,14 +699,14 @@ export class Host {
       id: existing?.id || draft.id || createSpecId(),
     });
     assertValidAutomation(workflows.find((item) => item.key === draft.key));
-    this.app().spec = normalizeSpec({ ...spec, workflows }, spec);
-    await this.persistAndEmit();
+    await this.commitSpecs([{ id: appId, spec: { ...spec, workflows } }]);
     return this.app().spec.workflows.find((item) => item.key === draft.key) as WorkflowDef;
   }
 
   async upsertPage(draft: Partial<PageDef> & { key: string }): Promise<PageDef> {
     draft = cloneData(draft);
-    const spec = this.app().spec;
+    const appId = this.app().id;
+    const spec = cloneSpec(this.app().spec);
     const existing = spec.pages.find((page) => page.key === draft.key);
     const folder = draft.folder !== undefined ? folderName(draft.folder) : existing?.folder;
     const blocks =
@@ -655,44 +730,42 @@ export class Host {
       implicit: false,
       blocks,
     });
-    this.app().spec = applyDefaults(normalizeSpec({ ...spec, pages }, spec));
-    await this.persistAndEmit();
+    await this.commitSpecs([{ id: appId, spec: { ...spec, pages } }]);
     return this.app().spec.pages.find((item) => item.key === draft.key) as PageDef;
   }
 
   async deleteView(key: string): Promise<void> {
-    const spec = this.app().spec;
-    this.app().spec = applyDefaults({
-      ...spec,
-      views: spec.views.filter((view) => view.key !== key),
-    });
-    await this.persistAndEmit();
+    const app = this.app();
+    const spec = cloneSpec(app.spec);
+    await this.commitSpecs([
+      { id: app.id, spec: { ...spec, views: spec.views.filter((view) => view.key !== key) } },
+    ]);
   }
 
   async deleteForm(key: string): Promise<void> {
-    const spec = this.app().spec;
-    this.app().spec = applyDefaults({
-      ...spec,
-      forms: spec.forms.filter((form) => form.key !== key),
-    });
-    await this.persistAndEmit();
+    const app = this.app();
+    const spec = cloneSpec(app.spec);
+    await this.commitSpecs([
+      { id: app.id, spec: { ...spec, forms: spec.forms.filter((form) => form.key !== key) } },
+    ]);
   }
 
   async deleteWorkflow(key: string): Promise<void> {
-    const spec = this.app().spec;
-    this.app().spec = {
-      ...spec,
-      workflows: spec.workflows.filter((workflow) => workflow.key !== key),
-    };
-    await this.persistAndEmit();
+    const app = this.app();
+    const spec = cloneSpec(app.spec);
+    await this.commitSpecs([
+      {
+        id: app.id,
+        spec: { ...spec, workflows: spec.workflows.filter((workflow) => workflow.key !== key) },
+      },
+    ]);
   }
 
   async replaceAuthoredPages(pages: PageDef[]): Promise<void> {
     pages = cloneData(pages);
-    const spec = this.app().spec;
-    const keep = spec.pages.filter(
-      (page) => page.implicit || page.key === "home" || page.path === "/",
-    );
+    const appId = this.app().id;
+    const spec = cloneSpec(this.app().spec);
+    const keep = spec.pages.filter((page) => page.key === "home" || page.path === "/");
     const authored = pages
       .filter((page) => !page.implicit && page.key !== "home" && page.path !== "/")
       .map((page) => ({
@@ -700,36 +773,32 @@ export class Host {
         folder: page.folder?.trim() || undefined,
         blocks: cloneData(page.blocks ?? []),
       }));
-    this.app().spec = applyDefaults({ ...spec, pages: [...keep, ...authored] });
-    await this.persistAndEmit();
+    await this.commitSpecs([{ id: appId, spec: { ...spec, pages: [...keep, ...authored] } }]);
   }
 
   async deletePage(key: string): Promise<void> {
-    const spec = this.app().spec;
-    this.app().spec = applyDefaults({
-      ...spec,
-      pages: spec.pages.filter((page) => page.key !== key),
-    });
-    await this.persistAndEmit();
+    const app = this.app();
+    const spec = cloneSpec(app.spec);
+    await this.commitSpecs([
+      { id: app.id, spec: { ...spec, pages: spec.pages.filter((page) => page.key !== key) } },
+    ]);
   }
 
   async applySpec(input: unknown): Promise<AppSpec> {
     const workspace = this.app();
-    const next = applyDefaults(normalizeSpec(cloneData(input) as never, workspace.spec));
+    const next = normalizeSpec(cloneData(input) as never, workspace.spec);
     const localKeys = new Set(next.types.map((type) => type.key));
     const exposed = this.space().spec.types.filter(
       (type) => isExposed(type) && !localKeys.has(type.key),
     );
-    const validationSpec = applyDefaults({
+    const validationSpec = effectiveSpec({
       ...cloneSpec(next),
       types: [...cloneData(exposed), ...next.types],
     });
     for (const page of next.pages) {
       page.blocks = configurePageRows(validationSpec, page.blocks);
     }
-    workspace.spec = next;
-    await this.reconcileAll();
-    await this.persistAndEmit();
+    await this.commitSpecs([{ id: workspace.id, spec: next }]);
     return this.resolvedSpec();
   }
 
@@ -755,7 +824,7 @@ export class Host {
       name,
       createdBy: this.actor().id,
       actors: [],
-      spec: spec ? applyDefaults(normalizeSpec(spec)) : newAppSpec(slugify(name), name),
+      spec: spec ? normalizeSpec(spec) : newAppSpec(slugify(name), name),
     };
     this.platform.spaces.push(app);
     this.platform.activeSpaceId = app.id;
@@ -909,10 +978,10 @@ export class Host {
       .filter((type) => !have.has(type.key))
       .map((type) => ({ ...type, store: "local" as const, expose: true as const }));
     if (!incoming.length) return;
-    space.spec = applyDefaults({
-      ...space.spec,
-      types: [...space.spec.types, ...incoming],
-    });
+    space.spec = normalizeSpec(
+      { ...space.spec, types: [...space.spec.types, ...incoming] },
+      space.spec,
+    );
   }
 
   private async seedRecords(
@@ -986,6 +1055,186 @@ export class Host {
     if (shared) return shared;
     throw new Error(`Unknown type ${typeKey}`);
   }
+
+  fieldReferences(
+    typeKey: string,
+    fieldKey: string,
+    candidate?: { owner: SpaceState; spec: AppSpec },
+  ): SpecReference[] {
+    const owner = candidate?.owner ?? this.writableTypeDraft(typeKey).owner;
+    const ownerSpec = candidate?.spec ?? owner.spec;
+    const references = findFieldReferences(ownerSpec, typeKey, fieldKey);
+    if (owner.id !== this.space().id) return references;
+
+    for (const app of this.apps()) {
+      if (app.spec.types.some((type) => type.key === typeKey)) continue;
+      const composite = specWithSharedTypes(app.spec, ownerSpec);
+      references.push(
+        ...findFieldReferences(composite, typeKey, fieldKey)
+          .filter((reference) => reference.owner !== "type")
+          .map((reference) => scopedReference(app, reference)),
+      );
+    }
+    return uniqueReferences(references);
+  }
+
+  typeReferences(typeKey: string): SpecReference[] {
+    const local = this.app().spec.types.some((type) => type.key === typeKey);
+    const owner = local ? this.app() : this.space();
+    const references = findTypeReferences(owner.spec, typeKey);
+    if (local) return references;
+
+    for (const app of this.apps()) {
+      if (app.spec.types.some((type) => type.key === typeKey)) continue;
+      const composite = specWithSharedTypes(app.spec, owner.spec);
+      references.push(
+        ...findTypeReferences(composite, typeKey)
+          .filter((reference) => reference.owner !== "type")
+          .map((reference) => scopedReference(app, reference)),
+      );
+    }
+    return uniqueReferences(references);
+  }
+
+  private rewriteFieldInConsumers(
+    owner: SpaceState,
+    ownerSpec: AppSpec,
+    typeKey: string,
+    from: string,
+    to: string,
+  ): Array<{ id: string; spec: AppSpec }> {
+    const changes = new Map<string, AppSpec>();
+    const rewrittenOwner = rewriteFieldReferences(ownerSpec, typeKey, from, to);
+    changes.set(owner.id, rewrittenOwner);
+    if (owner.id !== this.space().id) return [...changes].map(([id, spec]) => ({ id, spec }));
+
+    for (const app of this.apps()) {
+      if (app.spec.types.some((type) => type.key === typeKey)) continue;
+      const composite = rewriteFieldReferences(
+        specWithSharedTypes(app.spec, rewrittenOwner),
+        typeKey,
+        from,
+        to,
+      );
+      changes.set(app.id, {
+        ...cloneSpec(app.spec),
+        views: composite.views,
+        forms: composite.forms,
+        workflows: composite.workflows,
+        pages: composite.pages,
+      });
+    }
+    return [...changes].map(([id, spec]) => ({ id, spec }));
+  }
+
+  private rewriteTypeInConsumers(
+    owner: SpaceState,
+    ownerSpec: AppSpec,
+    from: string,
+    to: string,
+  ): Array<{ id: string; spec: AppSpec }> {
+    const changes = new Map<string, AppSpec>();
+    changes.set(owner.id, rewriteTypeReferences(ownerSpec, from, to));
+    if (owner.id !== this.space().id) return [...changes].map(([id, spec]) => ({ id, spec }));
+
+    for (const app of this.apps()) {
+      if (app.spec.types.some((type) => type.key === from)) continue;
+      changes.set(app.id, rewriteTypeReferences(app.spec, from, to));
+    }
+    return [...changes].map(([id, spec]) => ({ id, spec }));
+  }
+
+  private assertTypeRenameAvailable(
+    owner: SpaceState,
+    type: TypeDef,
+    from: string,
+    to: string,
+  ): void {
+    const consumers =
+      owner.id === this.space().id ? [owner, ...this.apps()] : [owner, this.space()];
+    for (const consumer of consumers) {
+      const conflict = consumer.spec.types.find(
+        (candidate) => candidate.key === to && candidate.id !== type.id,
+      );
+      if (conflict) {
+        throw new Error(`Type key "${to}" is already used by ${conflict.label}`);
+      }
+    }
+
+    for (const app of owner.id === this.space().id ? this.apps() : [owner]) {
+      const view = app.spec.views.find(
+        (candidate) => candidate.key === `${to}_list` && candidate.source !== from,
+      );
+      if (view) throw new Error(`Type key "${to}" conflicts with view "${view.key}"`);
+      const form = app.spec.forms.find(
+        (candidate) =>
+          (candidate.key === `${to}_create` || candidate.key === `${to}_edit`) &&
+          candidate.type !== from,
+      );
+      if (form) throw new Error(`Type key "${to}" conflicts with form "${form.key}"`);
+      const page = app.spec.pages.find((candidate) => candidate.key === `${to}_page`);
+      if (page) throw new Error(`Type key "${to}" conflicts with page "${page.key}"`);
+    }
+  }
+
+  private writableTypeDraft(typeKey: string): {
+    owner: SpaceState;
+    spec: AppSpec;
+    type: TypeDef;
+  } {
+    const owner = this.app().spec.types.some((type) => type.key === typeKey)
+      ? this.app()
+      : this.space().spec.types.some((type) => type.key === typeKey)
+        ? this.space()
+        : undefined;
+    if (!owner) throw new Error(`Unknown type ${typeKey}`);
+    const spec = cloneSpec(owner.spec);
+    const type = spec.types.find((item) => item.key === typeKey);
+    if (!type) throw new Error(`Unknown type ${typeKey}`);
+    return { owner, spec, type };
+  }
+}
+
+function specWithSharedTypes(app: AppSpec, space: AppSpec): AppSpec {
+  const local = cloneSpec(app);
+  const localKeys = new Set(local.types.map((type) => type.key));
+  return {
+    ...local,
+    types: [
+      ...local.types,
+      ...cloneData(space.types.filter((type) => isExposed(type) && !localKeys.has(type.key))),
+    ],
+  };
+}
+
+function scopedReference(scope: SpaceState, reference: SpecReference): SpecReference {
+  return {
+    ...reference,
+    path: `spaces.${scope.id}.${reference.path}`,
+    description: `${scope.name}: ${reference.description}`,
+  };
+}
+
+function uniqueReferences(references: SpecReference[]): SpecReference[] {
+  const seen = new Set<string>();
+  return references.filter((reference) => {
+    if (seen.has(reference.path)) return false;
+    seen.add(reference.path);
+    return true;
+  });
+}
+
+function referencedByError(
+  kind: "type" | "field",
+  key: string,
+  references: SpecReference[],
+): Error {
+  const preview = references
+    .slice(0, 3)
+    .map((reference) => reference.description)
+    .join(", ");
+  const remaining = references.length > 3 ? ` and ${references.length - 3} more` : "";
+  return new Error(`Cannot delete ${kind} "${key}" because it is used by ${preview}${remaining}`);
 }
 
 function folderName(value: unknown): string | undefined {

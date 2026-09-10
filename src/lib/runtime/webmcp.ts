@@ -710,6 +710,22 @@ export function buildTools(host: Host, options: BuildToolsOptions = {}): ToolDef
       execute: async (input) => host.upsertType(input as never),
     },
     {
+      name: "rename_type",
+      title: "Rename a type key",
+      description:
+        "Rename a technical type key while preserving its stable identity, records, and direct spec references. Explicit view, form, page, and workflow keys remain unchanged.",
+      inputSchema: {
+        type: "object",
+        properties: {
+          from: { type: "string" },
+          to: { type: "string", minLength: 1, pattern: "\\S" },
+        },
+        required: ["from", "to"],
+        additionalProperties: false,
+      },
+      execute: async (input) => host.renameType(String(input.from), String(input.to)),
+    },
+    {
       name: "upsert_field",
       title: "Add or update a field",
       description:

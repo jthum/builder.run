@@ -95,6 +95,9 @@
 	let typeLabel = $state("");
 	let collectionName = $state("");
 	let namingPending = $state(false);
+	let technicalKey = $state("");
+	let renameTypeOpen = $state(false);
+	let typeKeyPending = $state(false);
 	let fieldPending = $state(false);
 	let editing = $state<FieldDef | null>(null);
 	let fieldKey = $state("");
@@ -156,6 +159,7 @@
 		namingTypeId = type.id;
 		typeLabel = type.label;
 		collectionName = type.collection_label ?? "";
+		technicalKey = type.key;
 	});
 
 	async function saveNaming(event: SubmitEvent) {
@@ -173,6 +177,29 @@
 			toast.success("Type naming saved");
 		} finally {
 			namingPending = false;
+		}
+	}
+
+	function confirmTypeRename() {
+		const key = slugify(technicalKey);
+		if (!key || key === type.key) return;
+		technicalKey = key;
+		renameTypeOpen = true;
+	}
+
+	async function renameTechnicalKey() {
+		const key = slugify(technicalKey);
+		if (!key || key === type.key) return;
+		typeKeyPending = true;
+		try {
+			await runtime().renameType(type.key, key);
+			renameTypeOpen = false;
+			toast.success("Technical key renamed");
+			await goto(`/build/types/${key}`);
+		} catch (error) {
+			toast.error(error instanceof Error ? error.message : "Could not rename the type key");
+		} finally {
+			typeKeyPending = false;
 		}
 	}
 
@@ -433,15 +460,23 @@
 
 	async function remove() {
 		if (!removeKey) return;
-		await runtime().deleteField(type.key, removeKey);
-		removeKey = null;
-		toast.success("Field removed");
+		try {
+			await runtime().deleteField(type.key, removeKey);
+			removeKey = null;
+			toast.success("Field removed");
+		} catch (error) {
+			toast.error(error instanceof Error ? error.message : "Could not remove field");
+		}
 	}
 
 	async function removeType() {
-		await runtime().deleteType(type.key);
-		toast.success("Type removed");
-		await goto("/build/types");
+		try {
+			await runtime().deleteType(type.key);
+			toast.success("Type removed");
+			await goto("/build/types");
+		} catch (error) {
+			toast.error(error instanceof Error ? error.message : "Could not remove type");
+		}
 	}
 
 	const removing = $derived(type.fields.find((field) => field.key === removeKey));
@@ -640,14 +675,40 @@
 		<Collapsible.Trigger class="flex w-full items-center justify-between gap-3 rounded-xl px-1 py-2 text-start text-muted-foreground hover:text-foreground">
 			<span class="flex flex-col gap-0">
 				<span class="font-medium text-foreground">Advanced</span>
-				<span class="text-sm">Optional behavior for records with a defined lifecycle.</span>
+				<span class="text-sm">Schema identity and optional lifecycle behavior.</span>
 			</span>
 			<span class="flex shrink-0 items-center gap-2">
 				{#if type.lifecycle}<Badge variant="secondary">Lifecycle configured</Badge>{/if}
 				<ChevronDownIcon class="size-4 transition-transform {schemaAdvanced ? 'rotate-180' : ''}" />
 			</span>
 		</Collapsible.Trigger>
-		<Collapsible.Content class="pt-3">
+		<Collapsible.Content class="flex flex-col gap-3 pt-3">
+			<Card.Root class="h-auto">
+				<Card.Header class="gap-0">
+					<Card.Title>Technical key</Card.Title>
+					<Card.Description>
+						Used in the spec, URLs, and runtime storage. Use Naming above for ordinary wording changes.
+					</Card.Description>
+				</Card.Header>
+				<Card.Content>
+					<Field.Field>
+						<Field.Label for="type-technical-key">Key</Field.Label>
+						<Input id="type-technical-key" bind:value={technicalKey} placeholder="project" />
+						<Field.Description>
+							Renaming preserves the type identity and records, and updates references throughout the space.
+						</Field.Description>
+					</Field.Field>
+				</Card.Content>
+				<Card.Footer class="justify-end">
+					<Button
+						variant="outline"
+						disabled={!slugify(technicalKey) || slugify(technicalKey) === type.key || typeKeyPending}
+						onclick={confirmTypeRename}
+					>
+						Rename key
+					</Button>
+				</Card.Footer>
+			</Card.Root>
 			<LifecycleEditor {type} />
 		</Collapsible.Content>
 	</Collapsible.Root>
@@ -901,6 +962,26 @@
 		<AlertDialog.Footer>
 			<AlertDialog.Cancel>Cancel</AlertDialog.Cancel>
 			<AlertDialog.Action variant="destructive" onclick={remove}>Remove</AlertDialog.Action>
+		</AlertDialog.Footer>
+	</AlertDialog.Content>
+</AlertDialog.Root>
+
+<AlertDialog.Root bind:open={renameTypeOpen}>
+	<AlertDialog.Content>
+		<AlertDialog.Header>
+			<AlertDialog.Title>Rename the technical key?</AlertDialog.Title>
+			<AlertDialog.Description>
+				This changes <span class="font-mono">{type.key}</span> to
+				<span class="font-mono">{slugify(technicalKey)}</span>, renames its runtime storage, and updates
+				direct references. Names you explicitly gave views, forms, pages, and rules stay unchanged.
+			</AlertDialog.Description>
+		</AlertDialog.Header>
+		<AlertDialog.Footer>
+			<AlertDialog.Cancel disabled={typeKeyPending}>Cancel</AlertDialog.Cancel>
+			<AlertDialog.Action disabled={typeKeyPending} onclick={renameTechnicalKey}>
+				{#if typeKeyPending}<Spinner data-icon="inline-start" />{/if}
+				Rename key
+			</AlertDialog.Action>
 		</AlertDialog.Footer>
 	</AlertDialog.Content>
 </AlertDialog.Root>

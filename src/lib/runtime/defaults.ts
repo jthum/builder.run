@@ -9,6 +9,17 @@ import {
 } from "./model.ts";
 import { firstViewKey, normalizePageRows } from "./widgets.ts";
 
+const implicitIds = new Map<string, string>();
+
+function implicitId(type: TypeDef, role: string): string {
+  const key = `${type.id}:${role}`;
+  const existing = implicitIds.get(key);
+  if (existing) return existing;
+  const id = createSpecId();
+  implicitIds.set(key, id);
+  return id;
+}
+
 export function implicitViewKey(typeKey: string): string {
   return `${typeKey}_list`;
 }
@@ -39,7 +50,7 @@ function guessLabelField(target: string): string {
 
 export function defaultViewFor(type: TypeDef): ViewDef {
   return {
-    id: createSpecId(),
+    id: implicitId(type, "view"),
     key: implicitViewKey(type.key),
     label: labelFromKey(type.key),
     source: type.key,
@@ -53,7 +64,7 @@ export function defaultFormsFor(type: TypeDef): FormDef[] {
   const fields = type.fields.map((field) => field.key);
   return [
     {
-      id: createSpecId(),
+      id: implicitId(type, "create-form"),
       key: implicitCreateFormKey(type.key),
       label: `New ${type.label}`,
       type: type.key,
@@ -62,7 +73,7 @@ export function defaultFormsFor(type: TypeDef): FormDef[] {
       implicit: true,
     },
     {
-      id: createSpecId(),
+      id: implicitId(type, "edit-form"),
       key: implicitEditFormKey(type.key),
       label: `Edit ${type.label}`,
       type: type.key,
@@ -75,7 +86,7 @@ export function defaultFormsFor(type: TypeDef): FormDef[] {
 
 export function defaultPageFor(type: TypeDef): PageDef {
   return {
-    id: createSpecId(),
+    id: implicitId(type, "page"),
     key: implicitPageKey(type.key),
     label: type.label,
     path: `/t/${type.key}`,
@@ -90,8 +101,16 @@ export function defaultPageFor(type: TypeDef): PageDef {
   };
 }
 
-export function applyDefaults(spec: AppSpec): AppSpec {
-  const next: AppSpec = cloneData(spec);
+export function authoredSpec(spec: AppSpec): AppSpec {
+  const authored = cloneData(spec);
+  authored.views = authored.views.filter((view) => !view.implicit);
+  authored.forms = authored.forms.filter((form) => !form.implicit);
+  authored.pages = authored.pages.filter((page) => !page.implicit);
+  return authored;
+}
+
+export function effectiveSpec(spec: AppSpec): AppSpec {
+  const next = authoredSpec(spec);
   for (const type of next.types) {
     if (
       !next.views.some(
@@ -127,8 +146,4 @@ export function applyDefaults(spec: AppSpec): AppSpec {
     return next.views.some((view) => view.key === viewKey);
   });
   return next;
-}
-
-export function effectiveSpec(spec: AppSpec): AppSpec {
-  return applyDefaults(spec);
 }

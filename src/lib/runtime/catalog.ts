@@ -1,4 +1,3 @@
-import { applyDefaults } from "./defaults.ts";
 import type { Actor, AppSpec } from "./model.ts";
 import { nowIso, normalizeSpec } from "./model.ts";
 import {
@@ -90,7 +89,7 @@ export async function loadPlatform(conn: SqlConnection): Promise<PlatformState |
     createdBy: row.created_by ? scalarString(row.created_by) : undefined,
     actors: actorsBySpace.get(String(row.id)) ?? [],
     appearance: appearanceBySpace.get(String(row.id)),
-    spec: applyDefaults(normalizeSpec(JSON.parse(String(row.spec)) as AppSpec)),
+    spec: normalizeSpec(JSON.parse(String(row.spec)) as AppSpec),
   }));
   const active = await conn.query(`SELECT value FROM kv WHERE key = 'active_space_id'`);
   return {

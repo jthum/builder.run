@@ -89,6 +89,22 @@ describe("sqlite materialisation", () => {
     expect(row?.priority).toBe("high");
   });
 
+  it("renames type tables by stable identity without losing records", async () => {
+    const host = await Host.open({ persist: false });
+    const type = await host.upsertType({ key: "project", fields: { name: "text" } });
+    const created = await host.create("project", { name: "Acme" });
+
+    const renamed = await host.renameType("project", "engagement");
+    expect(renamed.id).toBe(type.id);
+    expect(await host.getRecord("engagement", created.id)).toMatchObject({
+      id: created.id,
+      name: "Acme",
+    });
+    const info = await host.inspectStore("local");
+    expect(info.tables.some((table) => table.name === "project")).toBe(false);
+    expect(info.tables.some((table) => table.name === "engagement")).toBe(true);
+  });
+
   it("emits readable CREATE TABLE SQL", () => {
     expect.hasAssertions();
     const sql = createTableSql("project", [

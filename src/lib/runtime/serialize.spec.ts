@@ -1,9 +1,48 @@
 import { describe, expect, it } from "vite-plus/test";
-import { applyDefaults } from "./defaults.ts";
+import { authoredSpec, effectiveSpec } from "./defaults.ts";
 import { normalizeSpec } from "./model.ts";
 import { authoringSpec, sharedTypeDependencies } from "./serialize.ts";
 
 describe("authoring spec export", () => {
+  it("derives stable defaults without changing the authored spec", () => {
+    const authored = normalizeSpec({ types: { note: { fields: { title: "text" } } } });
+    const first = effectiveSpec(authored);
+    const second = effectiveSpec(authored);
+
+    expect(authored.views).toEqual([]);
+    expect(authored.forms).toEqual([]);
+    expect(authored.pages).toEqual([]);
+    expect(first.views[0]?.id).toBe(second.views[0]?.id);
+    expect(first.forms.map((form) => form.id)).toEqual(second.forms.map((form) => form.id));
+    expect(first.pages[0]?.id).toBe(second.pages[0]?.id);
+    expect(authoredSpec(first)).toEqual(authored);
+  });
+
+  it("refreshes derived fields when an authored type changes", () => {
+    const authored = normalizeSpec({ types: { note: { fields: { title: "text" } } } });
+    const initial = effectiveSpec(authored);
+    const changed = normalizeSpec(
+      {
+        ...authored,
+        types: {
+          note: {
+            ...authored.types[0],
+            fields: [...authored.types[0]!.fields, { key: "summary", type: "text" }],
+          },
+        },
+      },
+      authored,
+    );
+    const refreshed = effectiveSpec(changed);
+
+    expect(initial.views[0]?.fields).toEqual(["title"]);
+    expect(refreshed.views[0]?.fields).toEqual(["title", "summary"]);
+    expect(refreshed.forms.find((form) => form.mode === "create")?.fields).toEqual([
+      "title",
+      "summary",
+    ]);
+  });
+
   it("reports shared types that an app export depends on", () => {
     const shared = normalizeSpec({
       types: {
@@ -23,7 +62,7 @@ describe("authoring spec export", () => {
 
   it("omits generated default forms, views, and pages", () => {
     expect.hasAssertions();
-    const spec = applyDefaults(normalizeSpec({ types: { note: { fields: { title: "text" } } } }));
+    const spec = effectiveSpec(normalizeSpec({ types: { note: { fields: { title: "text" } } } }));
     expect(spec.forms.length).toBeGreaterThan(0);
     expect(spec.views.length).toBeGreaterThan(0);
     expect(spec.pages.length).toBeGreaterThan(0);
@@ -36,7 +75,7 @@ describe("authoring spec export", () => {
 
   it("keeps forms that are no longer implicit", () => {
     expect.hasAssertions();
-    const spec = applyDefaults(normalizeSpec({ types: { note: { fields: { title: "text" } } } }));
+    const spec = effectiveSpec(normalizeSpec({ types: { note: { fields: { title: "text" } } } }));
     const create = spec.forms.find((form) => form.key === "note_create");
     expect(create).toBeTruthy();
     create!.implicit = false;

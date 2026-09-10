@@ -73,6 +73,23 @@ describe("builder.run host", () => {
     expect(spec.forms.some((form) => form.type === "invoice")).toBe(true);
   });
 
+  it("keeps generated resources out of authored app state", async () => {
+    const host = await Host.open({ persist: false });
+    await host.upsertType({ key: "note", fields: { title: "text" } });
+
+    expect(host.app().spec.views.some((view) => view.implicit)).toBe(false);
+    expect(host.app().spec.forms.some((form) => form.implicit)).toBe(false);
+    expect(host.app().spec.pages.some((page) => page.implicit)).toBe(false);
+    expect(host.resolvedSpec().views).toContainEqual(
+      expect.objectContaining({ key: "note_list", implicit: true, fields: ["title"] }),
+    );
+
+    await host.upsertField("note", { key: "summary", type: "text" });
+    expect(host.resolvedSpec().views).toContainEqual(
+      expect.objectContaining({ key: "note_list", fields: ["title", "summary"] }),
+    );
+  });
+
   it("runs structured results, gates, loops, and deterministic branches", async () => {
     const host = await Host.open({ persist: false });
     await host.upsertType({
@@ -362,6 +379,148 @@ types:
     ).not.toHaveProperty("visible_when");
   });
 
+  it("rewrites authored field references and blocks destructive dangling references", async () => {
+    const host = await Host.open({ persist: false });
+    await host.upsertType({
+      key: "project",
+      fields: { name: "text", budget: "number" },
+    });
+    await host.upsertView({
+      key: "projects",
+      source: "project",
+      fields: ["name", "budget"],
+      where: [{ field: "name", op: "not_empty" }],
+    });
+    await host.upsertForm({
+      key: "project_form",
+      type: "project",
+      fields: ["name", "budget"],
+      mode: "create",
+    });
+
+    await host.renameField("project", "name", "title");
+    expect(host.app().spec.views.find((view) => view.key === "projects")).toMatchObject({
+      fields: ["title", "budget"],
+      where: [{ field: "title", op: "not_empty" }],
+    });
+    expect(host.app().spec.forms.find((form) => form.key === "project_form")?.fields).toEqual([
+      "title",
+      "budget",
+    ]);
+    await expect(host.deleteField("project", "title")).rejects.toThrow(
+      'Cannot delete field "project.title" because it is used by',
+    );
+    await expect(host.deleteType("project")).rejects.toThrow(
+      'Cannot delete type "project" because it is used by',
+    );
+  });
+
+  it("keeps references to shared fields coherent across apps", async () => {
+    const host = await Host.open({ persist: false });
+    await host.upsertType({ key: "client", expose: true, fields: { name: "text" } });
+    await host.upsertView({ key: "clients", source: "client", fields: ["name"] });
+    await host.createApp("Other app");
+    await host.upsertView({ key: "client_directory", source: "client", fields: ["name"] });
+
+    await host.renameField("client", "name", "display_name");
+    expect(host.apps().map((app) => app.spec.views.flatMap((view) => view.fields))).toEqual(
+      expect.arrayContaining([["display_name"], ["display_name"]]),
+    );
+    expect(host.fieldReferences("client", "display_name")).toHaveLength(2);
+  });
+
+  it("renames type references while preserving explicitly authored resource keys", async () => {
+    const host = await Host.open({ persist: false });
+    const type = await host.upsertType({ key: "project", fields: { name: "text" } });
+    await host.upsertView({ key: "active_projects", source: "project", fields: ["name"] });
+    await host.upsertForm({
+      key: "project_intake",
+      type: "project",
+      fields: ["name"],
+      mode: "create",
+    });
+    await host.upsertWorkflow({
+      key: "touch_project",
+      input: { project: { record: "project" } },
+      trigger: { key: "project.name.changed" },
+      steps: [
+        {
+          effect: {
+            key: "records.set",
+            params: { record: { $ref: "vars.project" }, values: { name: "Touched" } },
+          },
+        },
+      ],
+    });
+    await host.upsertPage({
+      key: "project_overview",
+      blocks: [
+        { kind: "widget", widget: "table", values: { view: "project_list" } },
+        { kind: "widget", widget: "form", values: { form: "project_create" } },
+      ],
+    });
+
+    const renamed = await host.renameType("project", "engagement");
+    expect(renamed.id).toBe(type.id);
+    expect(host.app().spec.views).toContainEqual(
+      expect.objectContaining({ key: "active_projects", source: "engagement" }),
+    );
+    expect(host.app().spec.forms).toContainEqual(
+      expect.objectContaining({ key: "project_intake", type: "engagement" }),
+    );
+    expect(host.app().spec.workflows).toContainEqual(
+      expect.objectContaining({
+        key: "touch_project",
+        input: { project: { record: "engagement" } },
+        trigger: { key: "engagement.name.changed" },
+      }),
+    );
+    expect(host.app().spec.pages.find((page) => page.key === "project_overview")?.blocks).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          blocks: [expect.objectContaining({ values: { view: "engagement_list" } })],
+        }),
+        expect.objectContaining({
+          blocks: [expect.objectContaining({ values: { form: "engagement_create" } })],
+        }),
+      ]),
+    );
+    expect(host.resolvedSpec().views.some((view) => view.key === "engagement_list")).toBe(true);
+    expect(host.resolvedSpec().views.some((view) => view.key === "project_list")).toBe(false);
+  });
+
+  it("renames a shared type across every consuming app", async () => {
+    const host = await Host.open({ persist: false });
+    const type = await host.upsertType({ key: "client", expose: true, fields: { name: "text" } });
+    await host.upsertView({ key: "clients", source: "client", fields: ["name"] });
+    await host.createApp("Other app");
+    await host.upsertView({ key: "directory", source: "client", fields: ["name"] });
+
+    const renamed = await host.renameType("client", "customer");
+    expect(renamed).toMatchObject({ id: type.id, key: "customer", expose: true });
+    expect(
+      host
+        .apps()
+        .flatMap((app) => app.spec.views)
+        .map((view) => view.source),
+    ).toEqual(expect.arrayContaining(["customer", "customer"]));
+    expect(host.space().spec.types.some((item) => item.key === "client")).toBe(false);
+    expect(host.space().spec.types.some((item) => item.key === "customer")).toBe(true);
+  });
+
+  it("rejects conflicting type keys before changing storage", async () => {
+    const host = await Host.open({ persist: false });
+    await host.upsertType({ key: "project", fields: { name: "text" } });
+    await host.upsertType({ key: "engagement", fields: { title: "text" } });
+
+    await expect(host.renameType("project", "engagement")).rejects.toThrow(
+      'Type key "engagement" is already used',
+    );
+    expect(host.resolvedSpec().types.map((type) => type.key)).toEqual(
+      expect.arrayContaining(["project", "engagement"]),
+    );
+  });
+
   it("stores explicit badge semantics for enum values", async () => {
     expect.hasAssertions();
     const host = await Host.open({ persist: false });
@@ -621,6 +780,10 @@ types:
     let published = 0;
     host.subscribe(() => published++);
     rejectWrites = true;
+    await expect(host.upsertType({ key: "note", fields: { title: "text" } })).rejects.toThrow(
+      "catalog unavailable",
+    );
+    expect(host.resolvedSpec().types.some((type) => type.key === "note")).toBe(false);
     await expect(host.renameSpace("Unsaved name")).rejects.toThrow("catalog unavailable");
     expect(published).toBe(0);
   });
