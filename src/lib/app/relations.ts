@@ -150,7 +150,14 @@ export function workflowSummary(workflow: WorkflowDef, spec?: AppSpec): string {
     .map((step) => humanStep(step, spec))
     .filter(Boolean);
   if (workflow.trigger?.key) {
-    const when = `When ${humanTrigger(workflow.trigger.key, spec)}`;
+    const formKey =
+      workflow.trigger.key === "form.submitted" && typeof workflow.trigger.config?.form === "string"
+        ? workflow.trigger.config.form
+        : undefined;
+    const formLabel = formKey
+      ? (spec?.forms.find((form) => form.key === formKey)?.label ?? labelFromKey(formKey))
+      : undefined;
+    const when = `When ${formLabel ? `${formLabel} is submitted` : humanTrigger(workflow.trigger.key, spec)}`;
     return [when, guard ? `if ${humanCondition(guard)}` : "", steps[0]].filter(Boolean).join(" · ");
   }
   const target = workflowInputName(workflow);

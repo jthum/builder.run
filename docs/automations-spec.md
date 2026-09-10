@@ -55,7 +55,7 @@ steps:
                 paid_at: { $ref: meta.now }
 ```
 
-Trigger keys are registered vocabulary. Builder.run currently dispatches `<type>.created`, `<type>.changed`, `<type>.<field>.changed`, and `<type>.deleted`. Portable hosts may add keys such as `schedule.cron` and `webhook.received`, with options under `trigger.config`. Matching automations run by descending priority.
+Trigger keys are registered vocabulary. Builder.run currently dispatches `<type>.created`, `<type>.changed`, `<type>.<field>.changed`, `<type>.deleted`, and `form.submitted`. Set `trigger.config.form` to a form key when a workflow should listen to one form; its normalized answers arrive in `vars.values`. Portable hosts may add keys such as `schedule.cron` and `webhook.received`, with options under `trigger.config`. Matching automations run by descending priority.
 
 ## Context and bindings
 
@@ -203,7 +203,7 @@ Runtime compatibility separately reports whether required capabilities are suppo
 
 ## Editor contract
 
-The Automations editor directly edits the simple record-trigger, gate, create, and update subset. When it encounters advanced composition it cannot represent, saving is disabled and the canonical spec remains intact. A future node editor may project the same nested structure, but it must constrain connections to legal composition instead of introducing an independent graph format.
+The Automations editor directly edits record and form triggers, gates, record effects, and the structured composition primitives above. A future node editor may project the same nested structure, but it must constrain connections to legal composition instead of introducing an independent graph format.
 
 ## State lifecycles and schema migrations
 

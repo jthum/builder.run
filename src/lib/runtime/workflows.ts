@@ -574,3 +574,18 @@ export function matchingTriggers(workflows: WorkflowDef[], change: ChangeEvent):
     })
     .sort((left, right) => (right.priority ?? 0) - (left.priority ?? 0));
 }
+
+export function matchingEventTriggers(
+  workflows: WorkflowDef[],
+  key: string,
+  payload: Record<string, unknown>,
+): WorkflowDef[] {
+  return workflows
+    .filter((workflow) => workflow.enabled !== false && workflow.trigger?.key === key)
+    .filter((workflow) =>
+      Object.entries(workflow.trigger?.config ?? {}).every(
+        ([name, expected]) => JSON.stringify(payload[name]) === JSON.stringify(expected),
+      ),
+    )
+    .sort((left, right) => (right.priority ?? 0) - (left.priority ?? 0));
+}

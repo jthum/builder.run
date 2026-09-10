@@ -12,6 +12,8 @@ A workflow without a trigger is an explicit action such as “mark project compl
 
 Adding a trigger makes the workflow respond to an application event. For example, an `invoice.status.changed` trigger can gate on the new value being `paid` and set `paid_at` to the run time.
 
+`form.submitted` responds to validated form input. Its optional `config.form` selects one form, while `vars.values` contains that form's normalized answers. The event does not persist a submission by itself; record creation or external delivery is an explicit workflow step.
+
 ## Composition
 
 Workflows are ordered steps. A step may call a registered effect, compute variables, invoke another workflow, gate nested branches, iterate, run parallel branches, delay, or wait. The structure is recursive, so a simple workflow remains a short list while advanced behaviour pays complexity only where it uses it.

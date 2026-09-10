@@ -10,6 +10,7 @@
 	import { runtime, session } from "$lib/app/session.svelte.ts";
 	import AppSelect from "$lib/components/app-select.svelte";
 	import EditorActions from "$lib/components/editor-actions.svelte";
+	import FormInputSheet from "$lib/components/form-input-sheet.svelte";
 	import PageHeader from "$lib/components/page-header.svelte";
 	import RecordForm from "$lib/components/record-form.svelte";
 	import * as AlertDialog from "$lib/components/ui/alert-dialog/index.js";
@@ -22,7 +23,8 @@
 	import { Separator } from "$lib/components/ui/separator/index.js";
 	import { Switch } from "$lib/components/ui/switch/index.js";
 	import * as ToggleGroup from "$lib/components/ui/toggle-group/index.js";
-	import type { FormDef } from "$lib/runtime/model.ts";
+	import { conditionFieldKeys, renameConditionField } from "$lib/runtime/field-state.ts";
+	import { normalizeField, type FieldDef, type FormDef } from "$lib/runtime/model.ts";
 	import { cn, stableStringify } from "$lib/utils.ts";
 	import ChevronDownIcon from "@lucide/svelte/icons/chevron-down";
 	import ChevronUpIcon from "@lucide/svelte/icons/chevron-up";
@@ -44,6 +46,9 @@
 	let typeKey = $state("");
 	let mode = $state<FormDef["mode"]>("create");
 	let fieldRows = $state<FormFieldRow[]>([]);
+	let formInputs = $state<FieldDef[]>([]);
+	let inputSheetOpen = $state(false);
+	let editingInput = $state<FieldDef | null>(null);
 	let submitWorkflow = $state("");
 	let deleteOpen = $state(false);
 	let advancedOpen = $state(false);
@@ -53,17 +58,18 @@
 
 	$effect(() => {
 		const type = types.find((item) => item.key === form.type);
-		if (!type) return;
+		if (form.mode !== "standalone" && !type) return;
 		const identity = `${form.id}:${form.key}`;
 		if (initializedForm === identity) return;
 		initializedForm = identity;
 		untrack(() => {
 			label = form.label;
-			typeKey = form.type;
+			typeKey = form.type ?? types[0]?.key ?? "";
 			mode = form.mode;
+			formInputs = structuredClone(form.inputs ?? []);
 			submitWorkflow = form.submit?.workflow ?? "";
 			advancedOpen = Boolean(form.submit?.workflow);
-			fieldRows = mergeFields([], type.fields.map((field) => field.key), form.fields);
+			fieldRows = mergeFields([], type?.fields.map((field) => field.key) ?? [], form.fields);
 		});
 	});
 
@@ -86,13 +92,16 @@
 	});
 
 	const draft = $derived({
-		...form,
+		id: form.id,
+		...(form.meta ? { meta: form.meta } : {}),
+		key: form.key,
 		label,
-		type: typeKey,
 		mode,
-		fields: selected,
+		...(mode === "standalone"
+			? { inputs: formInputs }
+			: { type: typeKey, fields: selected }),
 		submit: submitWorkflow ? { workflow: submitWorkflow } : undefined,
-	});
+	} as FormDef);
 	const dirty = $derived(stableStringify(draft) !== stableStringify(form));
 
 	function mergeFields(current: FormFieldRow[], choices: string[], preferredOn?: string[]): FormFieldRow[] {
@@ -110,6 +119,49 @@
 	function setFieldOn(field: string, on: boolean) {
 		if (!on && selected.length <= 1) return;
 		fieldRows = fieldRows.map((row) => row.field === field ? { ...row, on } : row);
+	}
+
+	function openAddInput() {
+		editingInput = null;
+		inputSheetOpen = true;
+	}
+
+	function saveInput(input: Partial<FieldDef> & { key: string }) {
+		const existing = editingInput ?? formInputs.find((item) => item.id === input.id);
+		const normalized = normalizeField(input.key, input, existing ?? undefined);
+		let next = formInputs.map((item) => (item.id === normalized.id ? normalized : item));
+		if (!existing) next = [...next, normalized];
+		if (existing && existing.key !== normalized.key) {
+			next = next.map((item) => {
+				const updated = { ...item };
+				for (const property of ["visible_when", "enabled_when", "required_when"] as const) {
+					if (updated[property]) updated[property] = renameConditionField(updated[property], existing.key, normalized.key);
+				}
+				return updated;
+			});
+		}
+		formInputs = next;
+	}
+
+	function removeInput(input: FieldDef) {
+		formInputs = formInputs
+			.filter((item) => item.id !== input.id)
+			.map((item) => {
+				const next = { ...item };
+				for (const property of ["visible_when", "enabled_when", "required_when"] as const) {
+					if (next[property] && conditionFieldKeys(next[property]).includes(input.key)) delete next[property];
+				}
+				if (!next.visible_when) delete next.hidden_value;
+				return next;
+			});
+	}
+
+	function moveInput(index: number, delta: number) {
+		const target = index + delta;
+		if (target < 0 || target >= formInputs.length) return;
+		const next = [...formInputs];
+		[next[index], next[target]] = [next[target]!, next[index]!];
+		formInputs = next;
 	}
 
 	function moveField(index: number, delta: number) {
@@ -143,11 +195,38 @@
 		if (!dragSession) dragField = null;
 	}
 
+	function onInputDragStart(input: FieldDef, event: PointerEvent) {
+		const handle = event.currentTarget as HTMLElement;
+		dragField = input.key;
+		dragSession = startVerticalDrag({
+			event,
+			container: fieldList,
+			item: handle.closest<HTMLElement>("[role=listitem]"),
+			onMove: (clientY) => {
+				const target = verticalDropTarget(fieldList, clientY);
+				if (target) formInputs = reorderAtVerticalTarget(formInputs, input.key, target, (item) => item.key);
+			},
+			onDrop: () => {
+				dragSession = null;
+				dragField = null;
+			},
+			onCancel: () => {
+				dragSession = null;
+				dragField = null;
+			},
+		});
+		if (!dragSession) dragField = null;
+	}
+
 	onDestroy(() => dragSession?.cancel());
 
 	async function save() {
-		await runtime().upsertForm(draft);
-		toast.success("Form saved");
+		try {
+			await runtime().upsertForm(draft);
+			toast.success("Form saved");
+		} catch (error) {
+			toast.error(error instanceof Error ? error.message : "Could not save form");
+		}
 	}
 
 	async function remove() {
@@ -160,29 +239,16 @@
 <div class="flex flex-col gap-8">
 	<PageHeader
 		title={label || form.label}
-		description="Choose what this form is for, arrange its fields, and preview the result as you work."
+		description="Choose what this form collects, arrange its inputs, and preview the result as you work."
 	/>
 
 	<Card.Root class="h-auto">
 		<Card.Header class="gap-0">
 			<Card.Title>Form setup</Card.Title>
-			<Card.Description>Name the form, choose its records, and decide when it is used.</Card.Description>
+			<Card.Description>Decide what the form does, then choose its records and give it a name.</Card.Description>
 		</Card.Header>
 		<Card.Content>
 			<Field.Group>
-				<div class="grid gap-4 sm:grid-cols-2">
-					<Field.Field>
-						<Field.Label for="form-name">Name</Field.Label>
-						<Input id="form-name" bind:value={label} placeholder="Add project" />
-					</Field.Field>
-					<Field.Field>
-						<Field.Label>Record type</Field.Label>
-						<AppSelect
-							bind:value={typeKey}
-							options={types.map((type) => ({ value: type.key, label: type.label }))}
-						/>
-					</Field.Field>
-				</div>
 				<Field.FieldSet>
 					<Field.FieldLegend>What is this form for?</Field.FieldLegend>
 					<ToggleGroup.Root
@@ -212,29 +278,77 @@
 								<span class="text-xs font-normal text-muted-foreground">Shown when someone changes an existing record.</span>
 							</span>
 						</ToggleGroup.Item>
-						<ToggleGroup.Item value="custom">
+						<ToggleGroup.Item value="standalone">
 							<span class="mt-0.5 flex size-4 shrink-0 rounded-full border group-data-[state=on]/toggle:border-primary">
 								<span class="m-auto size-2 rounded-full bg-primary opacity-0 group-data-[state=on]/toggle:opacity-100"></span>
 							</span>
 							<span class="flex min-w-0 flex-col gap-0.5">
-								<span>Custom use</span>
-								<span class="text-xs font-normal text-muted-foreground">Opened explicitly from a page or workflow.</span>
+								<span>Custom form</span>
+								<span class="text-xs font-normal text-muted-foreground">Collect information and use workflows to take action.</span>
 							</span>
 						</ToggleGroup.Item>
 					</ToggleGroup.Root>
 				</Field.FieldSet>
+				{#if mode !== "standalone"}
+					<Field.Field>
+						<Field.Label>Record type</Field.Label>
+						<AppSelect
+							bind:value={typeKey}
+							options={types.map((type) => ({ value: type.key, label: type.label }))}
+						/>
+					</Field.Field>
+				{/if}
+				<Field.Field>
+					<Field.Label for="form-name">Name</Field.Label>
+					<Input id="form-name" bind:value={label} placeholder="Contact us" />
+				</Field.Field>
 			</Field.Group>
 		</Card.Content>
 	</Card.Root>
 
 	<Card.Root class="h-auto">
 		<Card.Header class="gap-0">
-			<Card.Title>Fields</Card.Title>
-			<Card.Description>Turn fields on or off and drag them into the order people should complete them.</Card.Description>
-			<Card.Action><Badge variant="secondary">{selected.length} shown</Badge></Card.Action>
+			<Card.Title>{mode === "standalone" ? "Inputs" : "Fields"}</Card.Title>
+			<Card.Description>
+				{mode === "standalone"
+					? "Define the answers this form collects and arrange their reading order."
+					: "Turn fields on or off and drag them into the order people should complete them."}
+			</Card.Description>
+			<Card.Action><Badge variant="secondary">{mode === "standalone" ? formInputs.length : selected.length} shown</Badge></Card.Action>
 		</Card.Header>
 		<Card.Content>
 			<div class="flex flex-col gap-2" role="list" bind:this={fieldList}>
+				{#if mode === "standalone"}
+					{#if !formInputs.length}
+						<div class="flex flex-col items-center gap-3 rounded-2xl border border-dashed px-6 py-10 text-center">
+							<div><p class="font-medium">No inputs yet</p><p class="text-sm text-muted-foreground">Add the first question this form should ask.</p></div>
+							<Button variant="outline" size="sm" onclick={openAddInput}>Add input</Button>
+						</div>
+					{/if}
+					{#each formInputs as item, index (item.id)}
+						<div
+							role="listitem"
+							data-sort-key={item.key}
+							animate:flip={{ duration: 160 }}
+							class={cn(
+								"flex items-center gap-3 rounded-2xl bg-card px-3 py-3 ring-1 ring-foreground/10",
+								dragField === item.key && "pointer-events-none opacity-0",
+							)}
+						>
+							<button type="button" class="touch-none cursor-grab text-muted-foreground select-none hover:text-foreground active:cursor-grabbing" aria-label="Drag to reorder {item.label}" onpointerdown={(event) => onInputDragStart(item, event)}><GripVerticalIcon class="size-4" /></button>
+							<button type="button" class="min-w-0 flex-1 text-start" onclick={() => ((editingInput = item), (inputSheetOpen = true))}>
+								<div class="font-medium">{item.label}</div>
+								<div class="text-sm text-muted-foreground">{fieldKindLabel[item.type]}{#if item.description} · {item.description}{/if}</div>
+							</button>
+							{#if item.required}<Badge variant="outline">Required</Badge>{/if}
+							{#if item.visible_when || item.enabled_when || item.required_when}<Badge variant="outline">Conditional</Badge>{/if}
+							<div class="flex shrink-0 items-center">
+								<Button variant="ghost" size="icon-sm" disabled={index === 0} onclick={() => moveInput(index, -1)} aria-label="Move {item.label} up"><ChevronUpIcon /></Button>
+								<Button variant="ghost" size="icon-sm" disabled={index === formInputs.length - 1} onclick={() => moveInput(index, 1)} aria-label="Move {item.label} down"><ChevronDownIcon /></Button>
+							</div>
+						</div>
+					{/each}
+				{:else}
 				{#each availableFields as item, index (item.field)}
 					<div
 						role="listitem"
@@ -276,11 +390,16 @@
 						</div>
 					</div>
 				{/each}
+				{/if}
 			</div>
 		</Card.Content>
 		<Card.Footer class="justify-between gap-3">
 			<span class="text-xs text-muted-foreground">Order here becomes the form’s reading order.</span>
-			<Badge variant="outline">{fieldRows.length - selected.length} hidden</Badge>
+			{#if mode === "standalone"}
+				{#if formInputs.length}<Button variant="outline" size="sm" onclick={openAddInput}>Add another</Button>{/if}
+			{:else}
+				<Badge variant="outline">{fieldRows.length - selected.length} hidden</Badge>
+			{/if}
 		</Card.Footer>
 	</Card.Root>
 
@@ -289,7 +408,7 @@
 		<Collapsible.Trigger class="flex w-full items-center justify-between gap-3 rounded-xl px-1 py-2 text-start text-muted-foreground hover:text-foreground">
 			<span class="flex flex-col gap-0">
 				<span class="font-medium text-foreground">Advanced</span>
-				<span class="text-sm">Optionally run a workflow after the record is saved.</span>
+				<span class="text-sm">Optionally continue with a workflow after submission.</span>
 			</span>
 			<span class="flex shrink-0 items-center gap-2">
 				{#if submitWorkflow}<Badge variant="secondary">Workflow connected</Badge>{/if}
@@ -299,8 +418,8 @@
 		<Collapsible.Content class="pt-3">
 			<Card.Root class="h-auto">
 				<Card.Header class="gap-0">
-					<Card.Title>After save</Card.Title>
-					<Card.Description>Continue with a workflow after this form successfully saves its record.</Card.Description>
+					<Card.Title>After submission</Card.Title>
+					<Card.Description>Pass the answers to a workflow after this form succeeds.</Card.Description>
 				</Card.Header>
 				<Card.Content>
 					<Field.Field>
@@ -308,16 +427,18 @@
 						<AppSelect
 							bind:value={submitWorkflow}
 							options={[
-								{ value: "", label: "Just save the record" },
+								{ value: "", label: mode === "standalone" ? "Emit the submission event" : "Just save the record" },
 								...workflows.map((item) => ({ value: item.key, label: item.label })),
 							]}
 						/>
-						<Field.Description>Only workflows available in this app are listed.</Field.Description>
+						<Field.Description>Connect one workflow directly, or let rules listen through the “A form is submitted” event.</Field.Description>
 					</Field.Field>
 				</Card.Content>
 			</Card.Root>
 		</Collapsible.Content>
 	</Collapsible.Root>
+
+	<Separator />
 
 	<Card.Root class="h-auto">
 		<Card.Header class="gap-0">
@@ -325,9 +446,9 @@
 			<Card.Description>This is how the selected fields and their order will appear.</Card.Description>
 		</Card.Header>
 		<Card.Content>
-			{#if sourceType}
+			{#if mode === "standalone" || sourceType}
 				<div inert>
-					<RecordForm type={sourceType} form={draft} fields={selected} fullWidth />
+					<RecordForm type={sourceType} form={draft} fields={mode === "standalone" ? undefined : selected} fullWidth />
 				</div>
 			{/if}
 		</Card.Content>
@@ -341,6 +462,15 @@
 		{/snippet}
 	</EditorActions>
 </div>
+
+<FormInputSheet
+	bind:open={inputSheetOpen}
+	input={editingInput}
+	inputs={formInputs}
+	{types}
+	onSave={saveInput}
+	onRemove={removeInput}
+/>
 
 <AlertDialog.Root bind:open={deleteOpen}>
 	<AlertDialog.Content>

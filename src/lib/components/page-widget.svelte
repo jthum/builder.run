@@ -77,7 +77,7 @@
 	<ViewCards rows={ready ? viewRows : null} {view} {type} />
 {:else if widget === "list" && view}
 	<ViewList rows={ready ? viewRows : null} {view} {type} />
-{:else if widget === "form" && form && formType}
+{:else if widget === "form" && form && (form.mode === "standalone" || formType)}
 	<Card.Root class="w-full">
 		<Card.Header>
 			<Card.Title>{String(values.title || form.label)}</Card.Title>

@@ -134,7 +134,8 @@ export function effectiveSpec(spec: AppSpec): AppSpec {
     (view) => !view.implicit || next.types.some((type) => type.key === view.source),
   );
   next.forms = next.forms.filter(
-    (form) => !form.implicit || next.types.some((type) => type.key === form.type),
+    (form) =>
+      !form.implicit || (Boolean(form.type) && next.types.some((type) => type.key === form.type)),
   );
   for (const page of next.pages) {
     page.blocks = normalizePageRows(page.blocks);

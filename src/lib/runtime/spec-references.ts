@@ -75,6 +75,16 @@ export function findTypeReferences(spec: AppSpec, typeKey: string): SpecReferenc
     if (form.type === typeKey) {
       add("form", form.key, `forms.${form.key}.type`, `Form “${form.label}”`);
     }
+    for (const input of form.inputs ?? []) {
+      if (input.type === "reference" && referencedType(input.target) === typeKey) {
+        add(
+          "form",
+          form.key,
+          `forms.${form.key}.inputs.${input.key}.target`,
+          `Form “${form.label}” input “${input.label}”`,
+        );
+      }
+    }
   }
   for (const workflow of spec.workflows) {
     for (const [name, input] of Object.entries(workflow.input ?? {})) {
@@ -154,6 +164,11 @@ export function rewriteTypeReferences(spec: AppSpec, from: string, to: string): 
   }
   for (const form of next.forms) {
     if (form.type === from) form.type = to;
+    for (const input of form.inputs ?? []) {
+      if (input.type === "reference" && referencedType(input.target) === from) {
+        input.target = replaceReferencedType(input.target, to);
+      }
+    }
   }
   for (const workflow of next.workflows) {
     for (const input of Object.values(workflow.input ?? {})) {
@@ -254,7 +269,7 @@ function walkFieldReferences(spec: AppSpec, walk: FieldWalk): void {
   for (const form of spec.forms) {
     if (form.type !== walk.type) continue;
     const owner = ownerFor("form", form.key, form.label);
-    form.fields = form.fields.map((field, index) => {
+    form.fields = (form.fields ?? []).map((field, index) => {
       if (field !== walk.field) return field;
       addFieldReference(walk, owner, `fields[${index}]`, "field");
       return walk.replacement ?? field;

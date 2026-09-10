@@ -16,9 +16,10 @@
 	import { resolveFieldState } from "$lib/runtime/field-state.ts";
 	import { fieldWidget, findType } from "$lib/runtime/query.ts";
 	import { cn } from "$lib/utils.ts";
+	import { toast } from "svelte-sonner";
 
 	let {
-		type,
+		type = null,
 		record = null,
 		fields,
 		form = null,
@@ -29,7 +30,7 @@
 		submitLabel,
 		fullWidth = false,
 	}: {
-		type: TypeDef;
+		type?: TypeDef | null;
 		record?: RecordValue | null;
 		fields?: string[];
 		form?: FormDef | null;
@@ -41,15 +42,16 @@
 		fullWidth?: boolean;
 	} = $props();
 
+	const definitions = $derived(form?.mode === "standalone" ? (form.inputs ?? []) : (type?.fields ?? []));
 	const keys = $derived(
-		(fields?.length ? fields : type.fields.map((field) => field.key)).filter(
+		(fields?.length ? fields : definitions.map((field) => field.key)).filter(
 			(key) => !omit.includes(key),
 		),
 	);
 	const configuredFields = $derived(
 		keys
-			.filter((key) => key !== type.lifecycle?.field)
-			.map((key) => type.fields.find((field) => field.key === key))
+			.filter((key) => key !== type?.lifecycle?.field)
+			.map((key) => definitions.find((field) => field.key === key))
 			.filter(Boolean) as FieldDef[],
 	);
 	let values = $state<Record<string, unknown>>({});
@@ -62,13 +64,13 @@
 	);
 
 	function formValues(
-		current: TypeDef,
+		current: FieldDef[],
 		row: RecordValue | null | undefined,
 		initial: Record<string, unknown>,
 	): Record<string, unknown> {
 		const next: Record<string, unknown> = {};
-		for (const field of current.fields) {
-			if (field.key === current.lifecycle?.field) continue;
+		for (const field of current) {
+			if (field.key === type?.lifecycle?.field) continue;
 			const raw = row?.[field.key] ?? initial[field.key] ?? field.default;
 			if (field.type === "boolean") next[field.key] = Boolean(raw);
 			else next[field.key] = raw ?? "";
@@ -84,7 +86,7 @@
 	$effect.pre(() => {
 		void recordId;
 		const initial = JSON.parse(defaultsKey) as Record<string, unknown>;
-		values = formValues(type, record, initial);
+		values = formValues(definitions, record, initial);
 	});
 
 	$effect(() => {
@@ -143,9 +145,15 @@
 			const payload = { ...values };
 			const saved = form
 				? await runtime().submitForm(form.key, payload, record?.id)
-				: record
+				: record && type
 					? await runtime().update(type.key, record.id, payload)
-					: await runtime().create(type.key, payload);
+					: type
+						? await runtime().create(type.key, payload)
+						: null;
+			if (form?.mode === "standalone") {
+				values = formValues(definitions, null, {});
+				toast.success("Response submitted");
+			}
 			onSaved?.(saved);
 		} catch (err) {
 			error = err instanceof Error ? err.message : String(err);
@@ -244,7 +252,7 @@
 	<div class="flex gap-2">
 		<Button type="submit" disabled={pending} data-testid="record-submit">
 			{#if pending}<Spinner data-icon="inline-start" />{/if}
-			{submitLabel ?? (record ? "Save" : addLabel(type))}
+			{submitLabel ?? (record ? "Save" : type ? addLabel(type) : "Submit")}
 		</Button>
 		{#if onCancel}
 			<Button type="button" variant="outline" onclick={onCancel}>Cancel</Button>

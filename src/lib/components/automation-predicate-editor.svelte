@@ -7,7 +7,7 @@
 	import { Input } from "$lib/components/ui/input/index.js";
 	import { labelFromKey } from "$lib/runtime/ids.ts";
 	import type { AutomationCondition, AutomationPredicate, AutomationValue } from "$lib/runtime/automation/model.ts";
-	import type { TypeDef } from "$lib/runtime/model.ts";
+	import type { FieldDef, TypeDef } from "$lib/runtime/model.ts";
 	import PlusIcon from "@lucide/svelte/icons/plus";
 	import SplitIcon from "@lucide/svelte/icons/split";
 	import Trash2Icon from "@lucide/svelte/icons/trash-2";
@@ -16,6 +16,8 @@
 		predicate,
 		inputName,
 		type,
+		fields,
+		inputLabel,
 		compact = false,
 		onPredicateChange,
 		references = [],
@@ -23,6 +25,8 @@
 		predicate: AutomationPredicate;
 		inputName: string;
 		type?: TypeDef;
+		fields?: FieldDef[];
+		inputLabel?: string;
 		compact?: boolean;
 		onPredicateChange?: (predicate: AutomationPredicate) => void;
 		references?: AutomationReferenceOption[];
@@ -40,14 +44,15 @@
 	);
 	const conditionPath = $derived(typeof condition?.path === "string" ? condition.path : "");
 	const fieldKey = $derived(conditionPath.split(".").at(-1) ?? "");
-	const field = $derived(type?.fields.find((item) => item.key === fieldKey));
+	const availableFields = $derived(fields ?? type?.fields ?? []);
+	const field = $derived(availableFields.find((item) => item.key === fieldKey));
 	const referenceOptions = $derived([
 		...new Map(
 			[
 				{ value: "meta.now", label: "Current date and time", group: "Runtime" },
 				{ value: "actor.id", label: "Current actor ID", group: "Runtime" },
-				{ value: `vars.${inputName}`, label: type?.label ?? "Current record", group: "Current record" },
-				...(type?.fields ?? []).map((item) => ({ value: `vars.${inputName}.${item.key}`, label: item.label, group: "Current record" })),
+				{ value: `vars.${inputName}`, label: inputLabel ?? type?.label ?? "Current record", group: fields ? "Submission" : "Current record" },
+				...availableFields.map((item) => ({ value: `vars.${inputName}.${item.key}`, label: item.label, group: fields ? "Submission" : "Current record" })),
 				...references,
 			].map((option) => [option.value, option] as const),
 		).values(),
@@ -267,6 +272,8 @@
 								onPredicateChange={(next) => replaceChild(index, next)}
 								{inputName}
 								{type}
+								{fields}
+								{inputLabel}
 								{references}
 								compact
 							/>
@@ -293,6 +300,8 @@
 					onPredicateChange={(next) => update({ not: next })}
 					{inputName}
 					{type}
+					{fields}
+					{inputLabel}
 					{references}
 					compact
 				/>

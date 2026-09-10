@@ -31,6 +31,7 @@
 	let { workflow }: { workflow: WorkflowDef } = $props();
 	const spec = $derived(session.snapshot?.spec);
 	const types = $derived(spec?.types ?? []);
+	const forms = $derived(spec?.forms ?? []);
 	const workflows = $derived(spec?.workflows ?? []);
 
 	let initializedWorkflow = $state("");
@@ -44,6 +45,7 @@
 	let preserveMissingInput = $state(false);
 	let triggerEvent = $state("field");
 	let triggerField = $state("");
+	let triggerForm = $state("");
 	let triggerCustom = $state(false);
 	let triggerKey = $state("");
 	let triggerConfig = $state<Record<string, AutomationValue>>({});
@@ -55,6 +57,16 @@
 	let deleteOpen = $state(false);
 	let saving = $state(false);
 
+	const submittedForm = $derived(forms.find((form) => form.key === triggerForm));
+	const formTrigger = $derived(kind === "automatic" && triggerEvent === "form");
+	const contextInputName = $derived(formTrigger ? "values" : inputName);
+	const contextFields = $derived.by(() => {
+		if (!formTrigger) return undefined;
+		if (submittedForm?.mode === "standalone") return submittedForm.inputs ?? [];
+		const source = types.find((type) => type.key === submittedForm?.type);
+		const selected = new Set(submittedForm?.fields ?? []);
+		return source?.fields.filter((field) => !selected.size || selected.has(field.key)) ?? [];
+	});
 	const inputTypeDef = $derived(types.find((type) => type.key === inputType));
 
 	$effect(() => {
@@ -79,6 +91,7 @@
 		if (parsedTrigger) {
 			triggerEvent = parsedTrigger.event;
 			triggerField = parsedTrigger.field ?? "";
+			triggerForm = parsedTrigger.form ?? "";
 		}
 		const entryGate = extractEntryGate(workflow.steps);
 		guardEnabled = Boolean(entryGate);
@@ -96,7 +109,12 @@
 		if (kind !== "automatic") return undefined;
 		if (triggerCustom) return triggerKey ? { key: triggerKey, ...(Object.keys(triggerConfig).length ? { config: triggerConfig } : {}) } : undefined;
 		const key = standardTriggerKey();
-		return key ? { key } : undefined;
+		return key
+			? {
+					key,
+					...(triggerEvent === "form" && triggerForm ? { config: { form: triggerForm } } : {}),
+				}
+			: undefined;
 	});
 	const compiledExpose = $derived.by((): Exposure[] | undefined => {
 		const expose: Exposure[] = [
@@ -110,7 +128,9 @@
 		label,
 		description: description || undefined,
 		enabled,
-		input: preserveMissingInput
+		input: formTrigger
+			? { values: { value: "object" } }
+			: preserveMissingInput
 			? workflow.input
 			: inputEditable && inputType
 				? { [inputName || inputType]: { record: inputType } }
@@ -130,8 +150,15 @@
 		if (source.length !== 1 || !first || !("gate" in first) || first.id || first.gate.fail !== undefined) return undefined;
 		return { predicate: first.gate.predicate, steps: first.gate.pass ?? [] };
 	}
-	function parseTrigger(key: string, typeKey: string): { event: string; field?: string } | undefined {
+	function parseTrigger(
+		key: string,
+		typeKey: string,
+	): { event: string; field?: string; form?: string } | undefined {
 		if (!key) return undefined;
+		if (key === "form.submitted") {
+			const form = typeof workflow.trigger?.config?.form === "string" ? workflow.trigger.config.form : "";
+			return { event: "form", form };
+		}
 		if (key === `${typeKey}.created`) return { event: "created" };
 		if (key === `${typeKey}.changed`) return { event: "changed" };
 		if (key === `${typeKey}.deleted`) return { event: "deleted" };
@@ -140,11 +167,34 @@
 	}
 	function escapeRegex(value: string): string { return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"); }
 	function standardTriggerKey(): string | undefined {
+		if (triggerEvent === "form") return triggerForm ? "form.submitted" : undefined;
 		if (!inputType) return undefined;
 		if (triggerEvent === "created") return `${inputType}.created`;
 		if (triggerEvent === "deleted") return `${inputType}.deleted`;
 		if (triggerEvent === "field") return triggerField ? `${inputType}.${triggerField}.changed` : undefined;
 		return `${inputType}.changed`;
+	}
+	function setTriggerEvent(next: string) {
+		triggerEvent = next;
+		if (next === "form") {
+			triggerForm ||= forms.find((form) => form.mode === "standalone")?.key ?? forms[0]?.key ?? "";
+			const first = forms.find((form) => form.key === triggerForm)?.inputs?.[0];
+			guardPredicate = {
+				op: "context.equals",
+				path: `vars.values.${first?.key ?? "value"}`,
+				value: "",
+			};
+		} else if (inputType === "values" || !types.some((type) => type.key === inputType)) {
+			setInputType(types[0]?.key ?? "");
+		}
+	}
+	function setWorkflowKind(next: string) {
+		kind = next as "manual" | "automatic";
+		if (kind === "manual" && !types.some((type) => type.key === inputType)) {
+			inputEditable = true;
+			preserveMissingInput = false;
+			setInputType(types[0]?.key ?? "");
+		}
 	}
 	function setInputType(next: string) {
 		const previousName = inputName;
@@ -241,7 +291,7 @@
 					<Field.Group class="gap-4">
 						<Field.FieldSet>
 							<Field.FieldLegend>How should this workflow start?</Field.FieldLegend>
-							<ToggleGroup.Root type="single" bind:value={kind} variant="card" size="card" spacing={2} class="grid w-full grid-cols-1 sm:grid-cols-2">
+							<ToggleGroup.Root type="single" value={kind} onValueChange={(value) => value && setWorkflowKind(value)} variant="card" size="card" spacing={2} class="grid w-full grid-cols-1 sm:grid-cols-2">
 								<ToggleGroup.Item value="automatic">
 									<span class="mt-0.5 flex size-4 shrink-0 rounded-full border group-data-[state=on]/toggle:border-primary">
 										<span class="m-auto size-2 rounded-full bg-primary opacity-0 group-data-[state=on]/toggle:opacity-100"></span>
@@ -256,20 +306,26 @@
 								</ToggleGroup.Item>
 							</ToggleGroup.Root>
 						</Field.FieldSet>
+						{#if kind === "automatic" && !triggerCustom}
+							<Field.Field>
+								<Field.Label>Event</Field.Label>
+								<AppSelect value={triggerEvent} onValueChange={setTriggerEvent} options={[{ value: "created", label: "A record is added" }, { value: "changed", label: "A record changes" }, { value: "field", label: "A field changes" }, { value: "deleted", label: "A record is deleted" }, { value: "form", label: "A form is submitted" }]} />
+							</Field.Field>
+						{/if}
 						<Field.Field>
-							<Field.Label>{kind === "manual" ? "Show on" : "Watch"}</Field.Label>
-							<AppSelect value={inputType} onValueChange={setInputType} options={types.map((type) => ({ value: type.key, label: type.label }))} disabled={!inputEditable} />
-							{#if !inputEditable}<Field.Description>Structured inputs are preserved from the spec.</Field.Description>{/if}
+							<Field.Label>{kind === "manual" ? "Show on" : triggerEvent === "form" ? "Form" : "Watch"}</Field.Label>
+							{#if kind === "automatic" && triggerEvent === "form"}
+								<AppSelect bind:value={triggerForm} options={forms.map((form) => ({ value: form.key, label: form.label }))} placeholder="Select a form" />
+							{:else}
+								<AppSelect value={inputType} onValueChange={setInputType} options={types.map((type) => ({ value: type.key, label: type.label }))} disabled={!inputEditable} />
+							{/if}
+							{#if !inputEditable && !formTrigger}<Field.Description>Structured inputs are preserved from the spec.</Field.Description>{/if}
 						</Field.Field>
 						{#if kind === "automatic"}
 							{#if triggerCustom}
 								<Field.Field><Field.Label>Trigger key</Field.Label><Input bind:value={triggerKey} /><Field.Description>Portable registry key, such as schedule.cron or webhook.received.</Field.Description></Field.Field>
 								<Field.Field><Field.Label>Trigger configuration</Field.Label><AutomationValueMapEditor values={triggerConfig} onValuesChange={(config) => (triggerConfig = config)} keyPlaceholder="Setting" /></Field.Field>
 							{:else}
-								<Field.Field>
-									<Field.Label>Event</Field.Label>
-									<AppSelect bind:value={triggerEvent} options={[{ value: "created", label: "A record is added" }, { value: "changed", label: "A record changes" }, { value: "field", label: "A field changes" }, { value: "deleted", label: "A record is deleted" }]} />
-								</Field.Field>
 								{#if triggerEvent === "field"}
 									<Field.Field><Field.Label>Field</Field.Label><AppSelect bind:value={triggerField} options={(inputTypeDef?.fields ?? []).map((field) => ({ value: field.key, label: field.label }))} placeholder="Select a field" /></Field.Field>
 								{/if}
@@ -295,7 +351,7 @@
 					<div class="flex items-center justify-between gap-3"><div class="flex flex-col gap-0"><Card.Title>If</Card.Title><Card.Description>Optionally limit when this workflow continues.</Card.Description></div><Switch bind:checked={guardEnabled} aria-label="Use entry condition" /></div>
 				</Card.Header>
 				{#if guardEnabled}
-					<Card.Content><AutomationPredicateEditor predicate={guardPredicate} onPredicateChange={(next) => (guardPredicate = next)} {inputName} type={inputTypeDef} /></Card.Content>
+					<Card.Content><AutomationPredicateEditor predicate={guardPredicate} onPredicateChange={(next) => (guardPredicate = next)} inputName={contextInputName} type={inputTypeDef} fields={contextFields} inputLabel={submittedForm?.label} /></Card.Content>
 				{:else}
 					<Card.Content>
 						<Alert.Root class="border-primary/15 bg-primary/5">
@@ -313,7 +369,7 @@
 				<div class="relative hidden size-10 items-center justify-center rounded-full border border-primary bg-primary text-sm font-semibold text-primary-foreground sm:flex">3</div>
 			<Card.Root>
 				<Card.Header class="gap-0"><Card.Title>Then</Card.Title><Card.Description>Actions run from top to bottom. Conditions can branch into more steps.</Card.Description></Card.Header>
-				<Card.Content><AutomationStepList {steps} onStepsChange={(next) => (steps = next)} {inputName} {inputType} {types} workflows={workflows.filter((item) => item.key !== workflow.key)} {spec} /></Card.Content>
+				<Card.Content><AutomationStepList {steps} onStepsChange={(next) => (steps = next)} inputName={contextInputName} {inputType} inputFields={contextFields} inputLabel={submittedForm?.label} recordInput={!formTrigger} {types} workflows={workflows.filter((item) => item.key !== workflow.key)} {spec} /></Card.Content>
 				</Card.Root>
 			</section>
 		</div>

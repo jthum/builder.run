@@ -30,8 +30,16 @@ export function validateRecord(
   values: Record<string, unknown>,
   partial = false,
 ): string[] {
+  return validateFields(type.fields, values, partial);
+}
+
+export function validateFields(
+  fields: FieldDef[],
+  values: Record<string, unknown>,
+  partial = false,
+): string[] {
   const errors: string[] = [];
-  for (const field of type.fields) {
+  for (const field of fields) {
     const value = values[field.key];
     const missing = value == null || value === "";
     const state = resolveFieldState(field, values);
@@ -106,20 +114,29 @@ export function prepareValues(
   type: TypeDef,
   values: Record<string, unknown>,
 ): Record<string, unknown> {
+  const source = { ...values };
+  if (
+    type.lifecycle &&
+    (source[type.lifecycle.field] == null || source[type.lifecycle.field] === "")
+  ) {
+    source[type.lifecycle.field] = type.lifecycle.initial;
+  }
+  return prepareFieldValues(type.fields, source);
+}
+
+export function prepareFieldValues(
+  fields: FieldDef[],
+  values: Record<string, unknown>,
+): Record<string, unknown> {
   const prepared: Record<string, unknown> = {};
-  for (const field of type.fields) {
-    if (
-      field.key === type.lifecycle?.field &&
-      (values[field.key] == null || values[field.key] === "")
-    ) {
-      prepared[field.key] = type.lifecycle.initial;
-    } else if (field.key in values) {
+  for (const field of fields) {
+    if (field.key in values) {
       prepared[field.key] = coerceFieldValue(field.type, values[field.key]);
     } else if (field.default !== undefined) {
       prepared[field.key] = coerceFieldValue(field.type, field.default);
     }
   }
-  for (const field of type.fields) {
+  for (const field of fields) {
     if (field.hidden_value === "clear" && !resolveFieldState(field, prepared).visible) {
       prepared[field.key] = null;
     }

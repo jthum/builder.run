@@ -21,13 +21,11 @@
 
 	async function create(name: string) {
 		const key = slugify(name);
-		const type = types[0];
 		await runtime().upsertForm({
 			key,
 			label: name,
-			type: type?.key ?? "",
-			mode: "create",
-			fields: type?.fields.map((field) => field.key) ?? [],
+			mode: "standalone",
+			inputs: [{ key: "name", label: "Name", type: "text" }],
 		});
 		await goto(`/build/forms/${key}`);
 	}
@@ -36,10 +34,10 @@
 <div class="flex flex-col gap-6">
 	<PageHeader
 		title="Forms"
-		description="Screens for adding and editing. Each kind of record already has a built-in pair."
+		description="Collect information or create focused screens for adding and editing records."
 	>
 		{#snippet actions()}
-			<Button onclick={() => (open = true)} disabled={!types.length}>
+			<Button onclick={() => (open = true)}>
 				<PlusIcon data-icon="inline-start" />
 				Add form
 			</Button>
@@ -64,8 +62,9 @@
 							<Card.Header>
 								<Card.Title>{form.label}</Card.Title>
 								<Card.Description>
-									{form.mode === "create" ? "Add" : form.mode === "edit" ? "Edit" : "Custom"}
-									{types.find((type) => type.key === form.type)?.label ?? form.type}
+									{form.mode === "standalone"
+										? `${form.inputs?.length ?? 0} ${(form.inputs?.length ?? 0) === 1 ? "input" : "inputs"}`
+										: `${form.mode === "create" ? "Add" : "Edit"} ${types.find((type) => type.key === form.type)?.label ?? form.type}`}
 								</Card.Description>
 							</Card.Header>
 						</Card.Root>
@@ -98,7 +97,7 @@
 <NameDialog
 	bind:open
 	title="New form"
-	description="A custom add or edit screen. You'll pick fields next."
+	description="Start with a standalone form. You can connect it to records or workflows next."
 	confirm="Create form"
 	onSubmit={create}
 />

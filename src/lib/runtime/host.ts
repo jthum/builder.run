@@ -8,7 +8,12 @@ import {
 import { authoredSpec, defaultViewFields, effectiveSpec } from "./defaults.ts";
 import { assertValidAutomation } from "./automation/validate.ts";
 import type { TableEngine } from "./engine.ts";
-import { invokeWorkflow, matchingTriggers, type WorkflowRun } from "./workflows.ts";
+import {
+  invokeWorkflow,
+  matchingEventTriggers,
+  matchingTriggers,
+  type WorkflowRun,
+} from "./workflows.ts";
 import { conditionFieldKeys, renameConditionField } from "./field-state.ts";
 import { createId, createSpecId, labelFromKey, slugify } from "./ids.ts";
 import {
@@ -26,6 +31,7 @@ import {
   type FieldDef,
   type WorkflowDef,
   type FormDef,
+  type FormDraft,
   type PageDef,
   type RecordValue,
   type TypeDef,
@@ -45,7 +51,9 @@ import {
   createRecord,
   decodeRecord,
   deleteRecord,
+  prepareFieldValues,
   updateRecord,
+  validateFields,
   type ChangeEvent,
 } from "./records.ts";
 import { newAppSpec, rootSpaceSpec, sampleApps } from "./samples.ts";
@@ -571,19 +579,51 @@ export class Host {
     const form = spec.forms.find((item) => item.key === formKey);
     if (!form) throw new Error(`Unknown form ${formKey}`);
     let record: RecordValue | null = null;
-    if (recordId) {
-      record = await this.update(form.type, recordId, values);
-    } else if (form.mode !== "custom" || !form.submit?.workflow) {
-      record = await this.create(form.type, values);
+    let submitted = cloneData(values);
+    if (form.mode === "standalone") {
+      if (recordId) throw new Error(`${form.label} is not attached to a record`);
+      submitted = prepareFieldValues(form.inputs ?? [], submitted);
+      const errors = validateFields(form.inputs ?? [], submitted);
+      if (errors.length) throw new Error(errors.join("; "));
+    } else {
+      if (!form.type) throw new Error(`${form.label} needs a record type`);
+      if (recordId) record = await this.update(form.type, recordId, submitted);
+      else record = await this.create(form.type, submitted);
+      submitted = Object.fromEntries(
+        (form.fields ?? [])
+          .filter((field) => record && Object.hasOwn(record, field))
+          .map((field) => [field, record?.[field]]),
+      );
     }
     if (form.submit?.workflow) {
       await this.invoke(form.submit.workflow, {
-        ...(record ? { [form.type]: record.id } : {}),
-        ...values,
+        ...(record && form.type ? { [form.type]: record.id } : {}),
+        form: form.key,
+        values: submitted,
+        ...submitted,
       });
-      if (record) record = await this.getRecord(form.type, record.id);
+      if (record && form.type) record = await this.getRecord(form.type, record.id);
     }
+    await this.afterEvent("form.submitted", {
+      form: form.key,
+      values: submitted,
+      ...(record ? { record } : {}),
+    });
     return record;
+  }
+
+  private async afterEvent(key: string, payload: Record<string, unknown>): Promise<void> {
+    const spec = this.resolvedSpec();
+    for (const workflow of matchingEventTriggers(spec.workflows, key, payload)) {
+      const run = await invokeWorkflow(
+        this.queryContext(),
+        workflow,
+        cloneData(payload),
+        this.context(),
+        { getWorkflow: (workflowKey) => spec.workflows.find((item) => item.key === workflowKey) },
+      );
+      await this.afterChanges(run.changes);
+    }
   }
 
   async upsertField(
@@ -667,22 +707,39 @@ export class Host {
     return this.app().spec.views.find((item) => item.key === draft.key) as ViewDef;
   }
 
-  async upsertForm(draft: Partial<FormDef> & { key: string }): Promise<FormDef> {
+  async upsertForm(draft: FormDraft & { key: string }): Promise<FormDef> {
     draft = cloneData(draft);
     const appId = this.app().id;
     const spec = cloneSpec(this.app().spec);
     const existing = spec.forms.find((form) => form.key === draft.key);
-    const forms = upsertNamed(spec.forms, {
+    const candidate = {
       id: existing?.id || createSpecId(),
       label: labelFromKey(draft.key),
-      type: "",
-      fields: [],
-      mode: "custom",
+      mode: draft.type ? "create" : "standalone",
       ...existing,
       ...draft,
+      key: draft.key,
       implicit: false,
-    } as FormDef);
-    await this.commitSpecs([{ id: appId, spec: { ...spec, forms } }]);
+    } as FormDraft & { id: string; key: string; label: string; mode: FormDef["mode"] };
+    if (existing?.inputs && Array.isArray(candidate.inputs)) {
+      const existingById = new Map(existing.inputs.map((input) => [input.id, input]));
+      for (const input of candidate.inputs) {
+        if (typeof input === "string" || !input.id || !input.key) continue;
+        const previous = existingById.get(input.id);
+        if (!previous || previous.key === input.key) continue;
+        const nextKey = input.key;
+        for (const sibling of candidate.inputs) {
+          if (typeof sibling === "string") continue;
+          for (const property of ["visible_when", "enabled_when", "required_when"] as const) {
+            if (sibling[property]) {
+              sibling[property] = renameConditionField(sibling[property], previous.key, nextKey);
+            }
+          }
+        }
+      }
+    }
+    const next = normalizeSpec({ ...spec, forms: upsertNamed(spec.forms, candidate) }, spec);
+    await this.commitSpecs([{ id: appId, spec: next }]);
     return this.app().spec.forms.find((item) => item.key === draft.key) as FormDef;
   }
 

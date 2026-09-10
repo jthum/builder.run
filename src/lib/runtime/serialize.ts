@@ -47,7 +47,10 @@ export function sharedTypeDependencies(spec: AppSpec, sharedTypes: TypeDef[]): T
     for (const field of type.fields) add(field.target);
   }
   for (const view of spec.views) add(view.source);
-  for (const form of spec.forms) add(form.type);
+  for (const form of spec.forms) {
+    add(form.type);
+    for (const input of form.inputs ?? []) add(input.target);
+  }
   for (const workflow of spec.workflows) {
     for (const input of Object.values(workflow.input ?? {}))
       if ("record" in input) add(input.record);
@@ -164,9 +167,43 @@ export function authoringSpec(spec: AppSpec): Record<string, unknown> {
             id: form.id,
             label: form.label,
             ...(form.meta ? { meta: form.meta } : {}),
-            type: form.type,
-            fields: form.fields,
             mode: form.mode,
+            ...(form.type ? { type: form.type } : {}),
+            ...(form.fields ? { fields: form.fields } : {}),
+            ...(form.inputs
+              ? {
+                  inputs: Object.fromEntries(
+                    form.inputs.map((input) => [
+                      input.key,
+                      {
+                        id: input.id,
+                        label: input.label,
+                        ...(input.meta ? { meta: input.meta } : {}),
+                        type: input.type,
+                        ...(input.description ? { description: input.description } : {}),
+                        ...(input.placeholder ? { placeholder: input.placeholder } : {}),
+                        ...(input.required ? { required: true } : {}),
+                        ...(input.default !== undefined ? { default: input.default } : {}),
+                        ...(input.values ? { values: input.values } : {}),
+                        ...(input.target ? { target: input.target } : {}),
+                        ...(input.format ? { format: input.format } : {}),
+                        ...(input.currency ? { currency: input.currency } : {}),
+                        ...(input.presentation ? { presentation: input.presentation } : {}),
+                        ...(input.variant ? { variant: input.variant } : {}),
+                        ...(input.max !== undefined ? { max: input.max } : {}),
+                        ...(input.value_semantics
+                          ? { value_semantics: input.value_semantics }
+                          : {}),
+                        ...(input.validation ? { validation: input.validation } : {}),
+                        ...(input.visible_when ? { visible_when: input.visible_when } : {}),
+                        ...(input.enabled_when ? { enabled_when: input.enabled_when } : {}),
+                        ...(input.required_when ? { required_when: input.required_when } : {}),
+                        ...(input.hidden_value ? { hidden_value: input.hidden_value } : {}),
+                      },
+                    ]),
+                  ),
+                }
+              : {}),
             ...(form.submit ? { submit: form.submit } : {}),
           },
         ]),

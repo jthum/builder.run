@@ -45,7 +45,7 @@ The current browser runtime supports:
 - **Spaces and Apps** — apps can keep local data while reusing types exposed by their parent Space.
 - **Types and fields** — including text, number, date, boolean, choice, and reference fields.
 - **Views** — reusable filtered and ordered projections over application data.
-- **Forms** — implicit create/edit forms from types, with custom forms where needed.
+- **Forms** — implicit create/edit forms from types plus standalone, validated input surfaces that can drive workflows without creating records.
 - **Pages and widgets** — dashboards and app screens composed from content, number cards, lists, tables, and bar/donut/line charts.
 - **Rules (Flows)** — callable actions and triggered behaviour composed from runtime steps.
 - **Actors** — the runtime models actions against an actor identity; this version starts with one local human administrator.

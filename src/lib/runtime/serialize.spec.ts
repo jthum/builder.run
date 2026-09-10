@@ -60,6 +60,22 @@ describe("authoring spec export", () => {
     expect(sharedTypeDependencies(app, shared).map((type) => type.key)).toEqual(["organisation"]);
   });
 
+  it("includes shared types referenced by standalone form inputs", () => {
+    const shared = normalizeSpec({
+      types: { organisation: { expose: true, fields: { name: "text" } } },
+    }).types;
+    const app = normalizeSpec({
+      forms: {
+        enquiry: {
+          mode: "standalone",
+          inputs: { organisation: { type: "reference", target: "organisation" } },
+        },
+      },
+    });
+
+    expect(sharedTypeDependencies(app, shared).map((type) => type.key)).toEqual(["organisation"]);
+  });
+
   it("omits generated default forms, views, and pages", () => {
     expect.hasAssertions();
     const spec = effectiveSpec(normalizeSpec({ types: { note: { fields: { title: "text" } } } }));
@@ -128,6 +144,33 @@ describe("authoring spec export", () => {
       label: "Person",
       collection_label: "People",
     });
+  });
+
+  it("round-trips standalone form-owned inputs", () => {
+    const spec = normalizeSpec({
+      forms: {
+        contact_us: {
+          mode: "standalone",
+          inputs: {
+            name: { type: "text", required: true },
+            email: { type: "text", format: "email" },
+          },
+        },
+      },
+    });
+    const authored = authoringSpec(spec) as {
+      forms: { contact_us: { type?: string; inputs: Record<string, Record<string, unknown>> } };
+    };
+
+    expect(spec.forms[0]).toMatchObject({
+      mode: "standalone",
+      inputs: [
+        { key: "name", required: true },
+        { key: "email", format: "email" },
+      ],
+    });
+    expect(authored.forms.contact_us.type).toBeUndefined();
+    expect(authored.forms.contact_us.inputs.email).toMatchObject({ type: "text", format: "email" });
   });
 
   it("normalizes field keys and rejects anonymous, duplicate, or reserved fields", () => {

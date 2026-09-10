@@ -880,7 +880,7 @@ export function buildTools(host: Host, options: BuildToolsOptions = {}): ToolDef
       name: "upsert_form",
       title: "Create or update a form",
       description:
-        'Create or update a form over a type. Example: upsert_form({ key: "intake", type: "client", fields: ["name", "email"], mode: "create" }).',
+        'Create or update a record-backed or standalone form. Record forms use type plus ordered field keys. Standalone forms own reusable field definitions under inputs and emit form.submitted with {form, values}. Example: upsert_form({ key: "contact_us", mode: "standalone", inputs: { name: { type: "text", required: true }, email: { type: "text", format: "email" } } }).',
       inputSchema: {
         type: "object",
         properties: {
@@ -889,9 +889,19 @@ export function buildTools(host: Host, options: BuildToolsOptions = {}): ToolDef
           meta: { type: "object", additionalProperties: true },
           type: { type: "string" },
           fields: { type: "array", items: { type: "string" } },
-          mode: { type: "string", enum: ["create", "edit", "custom"] },
+          inputs: {
+            type: "object",
+            description: "Named field definitions for a standalone form.",
+            additionalProperties: fieldDraftSchema,
+          },
+          mode: { type: "string", enum: ["create", "edit", "standalone"] },
+          submit: {
+            type: "object",
+            properties: { workflow: { type: "string" } },
+            additionalProperties: false,
+          },
         },
-        required: ["key", "type"],
+        required: ["key"],
         additionalProperties: false,
       },
       execute: async (input) => host.upsertForm(input as never),

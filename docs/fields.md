@@ -1,6 +1,6 @@
 # Fields
 
-Fields are the shared input and storage primitive used by Types and their Forms. A basic field stays deliberately small:
+Fields are the shared value-definition primitive used by Types and standalone Forms. On a Type they also define stored columns; on a standalone Form they define validated submission inputs without implying storage. A basic field stays deliberately small:
 
 ```yaml
 email:

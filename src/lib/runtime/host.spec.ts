@@ -6,6 +6,86 @@ import { createNodeGateway } from "./sql-node.ts";
 import { CATALOG_DATABASE } from "./catalog.ts";
 
 describe("builder.run host", () => {
+  it("validates standalone forms and dispatches form submission workflows", async () => {
+    const host = await Host.open({ persist: false });
+    await host.upsertType({
+      key: "lead",
+      fields: {
+        name: { type: "text", required: true },
+        email: { type: "text", format: "email" },
+      },
+    });
+    await host.upsertForm({
+      key: "contact_us",
+      label: "Contact us",
+      mode: "standalone",
+      inputs: [
+        { key: "name", type: "text", required: true },
+        { key: "email", type: "text", format: "email" },
+      ] as never,
+    });
+    await host.upsertWorkflow({
+      key: "capture_contact",
+      input: { values: { value: "object" } },
+      trigger: { key: "form.submitted", config: { form: "contact_us" } },
+      steps: [
+        {
+          effect: {
+            key: "records.create",
+            params: {
+              type: "lead",
+              fields: {
+                name: { $ref: "vars.values.name" },
+                email: { $ref: "vars.values.email" },
+              },
+            },
+          },
+        },
+      ],
+    });
+
+    await expect(
+      host.submitForm("contact_us", { name: "Ada", email: "not-an-email" }),
+    ).rejects.toThrow("Email must be an email address");
+    await expect(
+      host.submitForm("contact_us", { name: "Ada", email: "ada@example.com" }),
+    ).resolves.toBeNull();
+    await expect(host.listRecords("lead")).resolves.toEqual([
+      expect.objectContaining({ name: "Ada", email: "ada@example.com" }),
+    ]);
+  });
+
+  it("preserves standalone input identity and conditions when an input key changes", async () => {
+    const host = await Host.open({ persist: false });
+    const form = await host.upsertForm({
+      key: "address",
+      mode: "standalone",
+      inputs: [
+        { key: "country", type: "text" },
+        {
+          key: "state",
+          type: "text",
+          visible_when: { field: "country", op: "eq", value: "us" },
+        },
+      ],
+    });
+    const country = form.inputs?.[0];
+
+    const renamed = await host.upsertForm({
+      key: "address",
+      inputs: form.inputs?.map((input) =>
+        input.id === country?.id ? { ...input, key: "region" } : input,
+      ),
+    });
+
+    expect(renamed.inputs?.[0]).toMatchObject({ id: country?.id, key: "region" });
+    expect(renamed.inputs?.[1]?.visible_when).toEqual({
+      field: "region",
+      op: "eq",
+      value: "us",
+    });
+  });
+
   it("materialises a type into records, views, and a triggered workflow", async () => {
     expect.hasAssertions();
     const host = await Host.open({ persist: false });

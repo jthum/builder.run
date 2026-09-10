@@ -88,6 +88,34 @@ Types generate sensible create/edit forms by default.
 
 A **Form** becomes useful when the app needs a deliberate input surface rather than the implicit type form: a different field order, a subset of fields, or behaviour attached to submission.
 
+Forms can also be standalone. A standalone form owns its input definitions, uses the same formats, validation, and conditional behaviour as type fields, and does not imply record storage. Successful submissions emit `form.submitted` with the form key and validated answers. A workflow can listen for one form using trigger configuration:
+
+```yaml
+forms:
+  contact_us:
+    mode: standalone
+    inputs:
+      name:
+        type: text
+        required: true
+      email:
+        type: text
+        format: email
+
+workflows:
+  capture_contact:
+    input:
+      values:
+        value: object
+    trigger:
+      key: form.submitted
+      config:
+        form: contact_us
+    steps: []
+```
+
+Submission data is transient unless a workflow deliberately stores it. This keeps persistence a runtime or application decision rather than a hidden consequence of rendering a form.
+
 ## Pages and widgets
 
 A **Page** is a user-facing application surface composed from widgets.

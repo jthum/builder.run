@@ -165,9 +165,13 @@ export interface ViewMeasure {
 export interface FormDef extends SpecNode {
   key: string;
   label: string;
-  type: string;
-  fields: string[];
-  mode: "create" | "edit" | "custom";
+  /** Record type used by create and edit forms. Standalone forms have no record source. */
+  type?: string;
+  /** Ordered references to fields on the record type. */
+  fields?: string[];
+  /** Ordered, form-owned input definitions for standalone forms. */
+  inputs?: FieldDef[];
+  mode: "create" | "edit" | "standalone";
   submit?: { workflow?: string };
   implicit?: boolean;
 }
@@ -302,12 +306,15 @@ type ViewDraft = Partial<ViewDef> & {
   groupBy?: string;
   sort?: Array<{ field: string; direction?: SortDirection }>;
 };
+export type FormDraft = Partial<Omit<FormDef, "inputs">> & {
+  inputs?: Record<string, FieldDraft> | FieldDraft[];
+};
 type SpecDraft = Partial<
   Omit<AppSpec, "types" | "views" | "forms" | "workflows" | "pages" | "stores">
 > & {
   types?: Record<string, TypeDraft> | TypeDef[];
   views?: Record<string, ViewDraft> | ViewDraft[];
-  forms?: Record<string, Partial<FormDef>> | FormDef[];
+  forms?: Record<string, FormDraft> | FormDraft[];
   workflows?: Record<string, Partial<WorkflowDef>> | WorkflowDef[];
   pages?: Record<string, Partial<PageDef>> | PageDef[];
   stores?: Record<string, Partial<StoreDef>> | StoreDef[];
@@ -824,6 +831,62 @@ export function normalizeView(view: ViewDraft & Pick<ViewDef, "id" | "key" | "la
   };
 }
 
+function normalizeForm(
+  draft: FormDraft & Pick<FormDef, "id" | "key" | "label">,
+  existing?: FormDef,
+): FormDef {
+  const mode = draft.mode ?? existing?.mode ?? (draft.type ? "create" : "standalone");
+  if (!["create", "edit", "standalone"].includes(mode)) {
+    throw new Error(`Unknown form mode "${String(mode)}" on ${draft.key}`);
+  }
+  if (mode === "standalone") {
+    const existingInputs = existing?.mode === "standalone" ? (existing.inputs ?? []) : [];
+    const existingByKey = new Map(existingInputs.map((field) => [field.key, field]));
+    const existingById = new Map(existingInputs.map((field) => [field.id, field]));
+    const source = draft.inputs !== undefined ? draft.inputs : existingInputs;
+    const seen = new Set<string>();
+    const inputs = asEntries(source as FormDraft["inputs"]).map(([fieldKey, fieldDraft]) => {
+      const key = fieldKeyFrom(fieldKey, fieldDraft as FieldDraft);
+      if (seen.has(key)) throw new Error(`Duplicate input key "${key}" on form ${draft.key}`);
+      seen.add(key);
+      const id =
+        typeof fieldDraft === "object" && fieldDraft && "id" in fieldDraft
+          ? String(fieldDraft.id ?? "")
+          : "";
+      return normalizeField(
+        key,
+        fieldDraft as FieldDraft,
+        (id ? existingById.get(id) : undefined) ?? existingByKey.get(key),
+      );
+    });
+    if (!inputs.length) throw new Error(`${draft.label} needs at least one input`);
+    validateFieldCapabilities(`form ${draft.key}`, inputs);
+    return {
+      id: draft.id,
+      ...(draft.meta ? { meta: draft.meta } : {}),
+      key: draft.key,
+      label: draft.label,
+      mode,
+      inputs,
+      ...(draft.submit ? { submit: draft.submit } : {}),
+      ...(draft.implicit ? { implicit: true } : {}),
+    };
+  }
+  const type = String(draft.type ?? existing?.type ?? "").trim();
+  if (!type) throw new Error(`${draft.label} needs a record type`);
+  return {
+    id: draft.id,
+    ...(draft.meta ? { meta: draft.meta } : {}),
+    key: draft.key,
+    label: draft.label,
+    type,
+    fields: [...(draft.fields ?? existing?.fields ?? [])],
+    mode,
+    ...(draft.submit ? { submit: draft.submit } : {}),
+    ...(draft.implicit ? { implicit: true } : {}),
+  };
+}
+
 export function normalizeSpec(input: SpecDraft | AppSpec, existing?: AppSpec): AppSpec {
   for (const property of Object.keys(input)) {
     if (!SPEC_PROPERTIES.has(property)) throw new Error(`Unknown spec property "${property}"`);
@@ -871,7 +934,14 @@ export function normalizeSpec(input: SpecDraft | AppSpec, existing?: AppSpec): A
     views: (namedList(input.views as never, existing?.views as never) as ViewDef[]).map(
       normalizeView,
     ),
-    forms: namedList(input.forms as never, existing?.forms as never) as FormDef[],
+    forms: namedList(input.forms as never, existing?.forms as never).map((form) =>
+      normalizeForm(
+        form as FormDraft & Pick<FormDef, "id" | "key" | "label">,
+        existing?.forms.find(
+          (item) => item.id === (form as FormDef).id || item.key === (form as FormDef).key,
+        ),
+      ),
+    ),
     workflows: (
       namedList(input.workflows as never, existing?.workflows as never) as WorkflowDef[]
     ).map(normalizeWorkflow),
@@ -880,11 +950,6 @@ export function normalizeSpec(input: SpecDraft | AppSpec, existing?: AppSpec): A
   for (const view of spec.views) {
     view.source = view.source || spec.types[0]?.key || "";
     view.fields = view.fields || [];
-  }
-  for (const form of spec.forms) {
-    form.type = form.type || spec.types[0]?.key || "";
-    form.fields = form.fields || [];
-    form.mode = form.mode || "custom";
   }
   for (const workflow of spec.workflows) {
     workflow.steps = workflow.steps || [];
@@ -909,7 +974,10 @@ function assertUniqueSpecIds(spec: AppSpec): void {
     for (const field of type.fields) add(field, `field ${type.key}.${field.key}`);
   }
   for (const view of spec.views) add(view, `view ${view.key}`);
-  for (const form of spec.forms) add(form, `form ${form.key}`);
+  for (const form of spec.forms) {
+    add(form, `form ${form.key}`);
+    for (const input of form.inputs ?? []) add(input, `input ${form.key}.${input.key}`);
+  }
   for (const workflow of spec.workflows) add(workflow, `workflow ${workflow.key}`);
   for (const page of spec.pages) add(page, `page ${page.key}`);
 }
