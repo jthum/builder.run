@@ -172,7 +172,10 @@ export interface FormDef extends SpecNode {
   /** Ordered, form-owned input definitions for standalone forms. */
   inputs?: FieldDef[];
   mode: "create" | "edit" | "standalone";
-  submit?: { workflow?: string };
+  submit?: {
+    /** Optional presentation shown after a standalone form succeeds. */
+    success?: { title?: string; description?: string };
+  };
   implicit?: boolean;
 }
 
@@ -839,6 +842,7 @@ function normalizeForm(
   if (!["create", "edit", "standalone"].includes(mode)) {
     throw new Error(`Unknown form mode "${String(mode)}" on ${draft.key}`);
   }
+  const submit = normalizeFormSubmit(draft.submit, mode, draft.key);
   if (mode === "standalone") {
     const existingInputs = existing?.mode === "standalone" ? (existing.inputs ?? []) : [];
     const existingByKey = new Map(existingInputs.map((field) => [field.key, field]));
@@ -868,7 +872,7 @@ function normalizeForm(
       label: draft.label,
       mode,
       inputs,
-      ...(draft.submit ? { submit: draft.submit } : {}),
+      ...(submit ? { submit } : {}),
       ...(draft.implicit ? { implicit: true } : {}),
     };
   }
@@ -882,9 +886,36 @@ function normalizeForm(
     type,
     fields: [...(draft.fields ?? existing?.fields ?? [])],
     mode,
-    ...(draft.submit ? { submit: draft.submit } : {}),
+    ...(submit ? { submit } : {}),
     ...(draft.implicit ? { implicit: true } : {}),
   };
+}
+
+function normalizeFormSubmit(
+  value: FormDef["submit"] | undefined,
+  mode: FormDef["mode"],
+  formKey: string,
+): FormDef["submit"] | undefined {
+  if (!value) return undefined;
+  for (const property of Object.keys(value)) {
+    if (property !== "success") {
+      throw new Error(`Unknown form submit property "${property}" on ${formKey}`);
+    }
+  }
+  if (!value.success) return undefined;
+  if (mode !== "standalone") {
+    throw new Error(`Success messages are only supported by standalone forms`);
+  }
+  for (const property of Object.keys(value.success)) {
+    if (property !== "title" && property !== "description") {
+      throw new Error(`Unknown form success property "${property}" on ${formKey}`);
+    }
+  }
+  const title = String(value.success.title ?? "").trim();
+  const description = String(value.success.description ?? "").trim();
+  return title || description
+    ? { success: { ...(title ? { title } : {}), ...(description ? { description } : {}) } }
+    : undefined;
 }
 
 export function normalizeSpec(input: SpecDraft | AppSpec, existing?: AppSpec): AppSpec {

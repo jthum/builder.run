@@ -193,7 +193,8 @@
 				},
 			};
 		} else if (kind === "create") {
-			step = { effect: { key: "records.create", params: { type: types[0]?.key ?? "", fields: {} } } };
+			const type = types[0]?.key ?? "";
+			step = { effect: { key: "records.create", params: { type, fields: matchingCreateFields(type) } } };
 		} else if (kind === "delete") {
 			step = { effect: { key: "records.delete", params: { record: { $ref: `vars.${inputName}` } } } };
 		} else if (kind === "invoke") {
@@ -243,6 +244,32 @@
 
 	function setCreateFields(step: AutomationStep, fields: Record<string, AutomationValue>): AutomationStep {
 		return setEffectParam(step, "fields", fields);
+	}
+
+	function matchingCreateFields(typeKey: string): Record<string, AutomationValue> {
+		const target = types.find((type) => type.key === typeKey);
+		if (!target) return {};
+		const inputs = new Map(contextFields.map((field) => [field.key, field]));
+		return Object.fromEntries(
+			target.fields
+				.filter((field) => inputs.get(field.key)?.type === field.type)
+				.map((field) => [field.key, { $ref: `vars.${inputName}.${field.key}` }]),
+		);
+	}
+
+	function setCreateType(step: AutomationStep, typeKey: string): AutomationStep {
+		if (!("effect" in step)) return step;
+		return {
+			...step,
+			effect: {
+				...step.effect,
+				params: {
+					...step.effect.params,
+					type: typeKey,
+					fields: matchingCreateFields(typeKey),
+				},
+			},
+		};
 	}
 
 	function querySource(step: AutomationStep): string {
@@ -483,21 +510,28 @@
 				</div>
 			{:else if "effect" in step && step.effect.key === "records.create"}
 				{@const createdType = types.find((type) => type.key === String(step.effect.params?.type ?? ""))}
-				<div class="flex flex-col gap-2">
-					<AppSelect
-						value={String(step.effect.params?.type ?? "")}
-						onValueChange={(next) => replace(index, setEffectParam(step, "type", next))}
-						options={types.map((type) => ({ value: type.key, label: type.label }))}
-						placeholder="Record type"
-					/>
-					<AutomationValueMapEditor
-						values={createFieldsFor(step)}
-						onValuesChange={(fields) => replace(index, setCreateFields(step, fields))}
-						keys={(createdType?.fields ?? []).map((field) => ({ value: field.key, label: field.label, type: field.type, values: field.values }))}
-						keyPlaceholder="Field"
-						references={referencesBefore(index)}
-					/>
-				</div>
+				<Field.Group>
+					<Field.Field>
+						<Field.Label>Record type</Field.Label>
+						<AppSelect
+							value={String(step.effect.params?.type ?? "")}
+							onValueChange={(next) => replace(index, setCreateType(step, next))}
+							options={types.map((type) => ({ value: type.key, label: type.label }))}
+							placeholder="Record type"
+						/>
+					</Field.Field>
+					<Field.Field>
+						<Field.Label>Field mapping</Field.Label>
+						<AutomationValueMapEditor
+							values={createFieldsFor(step)}
+							onValuesChange={(fields) => replace(index, setCreateFields(step, fields))}
+							keys={(createdType?.fields ?? []).map((field) => ({ value: field.key, label: field.label, type: field.type, values: field.values }))}
+							keyPlaceholder="Field"
+							references={referencesBefore(index)}
+						/>
+						<Field.Description>Compatible fields with matching keys are connected automatically. Use the value picker to map the rest.</Field.Description>
+					</Field.Field>
+				</Field.Group>
 			{:else if "effect" in step && step.effect.key === "records.query"}
 				<Field.Group>
 					<Field.Field>

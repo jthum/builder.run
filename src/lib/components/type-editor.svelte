@@ -28,6 +28,7 @@
 	import {
 		FIELD_KINDS,
 		VALUE_SEMANTICS,
+		cloneData,
 		fieldCapability,
 		type FieldDef,
 		type FieldCondition,
@@ -279,9 +280,9 @@
 		fieldValidationMaxLength = valueString(field.validation?.max_length);
 		fieldValidationPattern = field.validation?.pattern ?? "";
 		fieldValidationMessage = field.validation?.message ?? "";
-		fieldVisibleWhen = field.visible_when ? structuredClone(field.visible_when) : undefined;
-		fieldEnabledWhen = field.enabled_when ? structuredClone(field.enabled_when) : undefined;
-		fieldRequiredWhen = field.required_when ? structuredClone(field.required_when) : undefined;
+		fieldVisibleWhen = field.visible_when ? cloneData(field.visible_when) : undefined;
+		fieldEnabledWhen = field.enabled_when ? cloneData(field.enabled_when) : undefined;
+		fieldRequiredWhen = field.required_when ? cloneData(field.required_when) : undefined;
 		fieldHiddenValue = field.hidden_value ?? "preserve";
 		advanced = Boolean(
 			field.description || field.placeholder || field.validation || field.visible_when || field.enabled_when || field.required_when,

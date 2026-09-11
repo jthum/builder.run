@@ -101,6 +101,10 @@ forms:
       email:
         type: text
         format: email
+    submit:
+      success:
+        title: Thanks for getting in touch
+        description: We received your message and will reply shortly.
 
 workflows:
   capture_contact:
@@ -115,6 +119,8 @@ workflows:
 ```
 
 Submission data is transient unless a workflow deliberately stores it. This keeps persistence a runtime or application decision rather than a hidden consequence of rendering a form.
+
+Standalone forms may define an optional success title and description under `submit.success`. This is presentation only; it does not alter delivery or persistence semantics.
 
 ## Pages and widgets
 

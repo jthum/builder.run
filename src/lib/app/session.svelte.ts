@@ -12,23 +12,17 @@ import {
   type WebMcpAppToolMode,
 } from "$lib/runtime/webmcp.ts";
 
-export const session: {
-  ready: boolean;
-  host: Host | null;
-  snapshot: HostSnapshot | null;
-  error: string | null;
-  revision: number;
-  webmcp: boolean;
-  webmcpToolMode: WebMcpAppToolMode;
-} = $state({
-  ready: false,
-  host: null,
-  snapshot: null,
-  error: null,
-  revision: 0,
-  webmcp: false,
-  webmcpToolMode: "compact",
-});
+class SessionState {
+  ready = $state(false);
+  host = $state.raw<Host | null>(null);
+  snapshot = $state.raw<HostSnapshot | null>(null);
+  error = $state<string | null>(null);
+  revision = $state(0);
+  webmcp = $state(false);
+  webmcpToolMode = $state<WebMcpAppToolMode>("compact");
+}
+
+export const session = new SessionState();
 
 type LiveRuntime = {
   host: Host;

@@ -96,7 +96,7 @@
 		return value.op.replace("context.", "");
 	}
 
-	function simpleCondition(field = type?.fields[0]?.key ?? "id"): AutomationPredicate {
+	function simpleCondition(field = availableFields[0]?.key ?? "id"): AutomationPredicate {
 		return { op: "context.equals", path: `vars.${inputName}.${field}`, value: "" };
 	}
 
@@ -115,7 +115,7 @@
 
 	function setOperator(next: string) {
 		if (!condition) return;
-		const path = condition.path ?? `vars.${inputName}.${type?.fields[0]?.key ?? "id"}`;
+		const path = condition.path ?? `vars.${inputName}.${availableFields[0]?.key ?? "id"}`;
 		if (["filled", "empty"].includes(next)) {
 			update({ op: `context.${next}`, path } as AutomationCondition);
 			return;
@@ -210,8 +210,8 @@
 					value={fieldKey}
 					onValueChange={setField}
 					options={[
-						...(type?.fields ?? []).map((item) => ({ value: item.key, label: item.label })),
-						...(type?.fields.some((item) => item.key === fieldKey) || !fieldKey
+						...availableFields.map((item) => ({ value: item.key, label: item.label })),
+						...(availableFields.some((item) => item.key === fieldKey) || !fieldKey
 							? []
 							: [{ value: fieldKey, label: labelFromKey(fieldKey) }]),
 					]}

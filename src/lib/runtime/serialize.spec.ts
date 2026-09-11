@@ -151,6 +151,9 @@ describe("authoring spec export", () => {
       forms: {
         contact_us: {
           mode: "standalone",
+          submit: {
+            success: { title: "Thanks", description: "We will be in touch." },
+          },
           inputs: {
             name: { type: "text", required: true },
             email: { type: "text", format: "email" },
@@ -159,7 +162,13 @@ describe("authoring spec export", () => {
       },
     });
     const authored = authoringSpec(spec) as {
-      forms: { contact_us: { type?: string; inputs: Record<string, Record<string, unknown>> } };
+      forms: {
+        contact_us: {
+          type?: string;
+          inputs: Record<string, Record<string, unknown>>;
+          submit?: { success?: { title?: string; description?: string } };
+        };
+      };
     };
 
     expect(spec.forms[0]).toMatchObject({
@@ -171,6 +180,23 @@ describe("authoring spec export", () => {
     });
     expect(authored.forms.contact_us.type).toBeUndefined();
     expect(authored.forms.contact_us.inputs.email).toMatchObject({ type: "text", format: "email" });
+    expect(authored.forms.contact_us.submit).toEqual({
+      success: { title: "Thanks", description: "We will be in touch." },
+    });
+  });
+
+  it("rejects workflow behavior embedded in forms", () => {
+    expect(() =>
+      normalizeSpec({
+        forms: {
+          contact_us: {
+            mode: "standalone",
+            inputs: { name: { type: "text" } },
+            submit: { workflow: "capture_contact" },
+          } as never,
+        },
+      }),
+    ).toThrow('Unknown form submit property "workflow"');
   });
 
   it("normalizes field keys and rejects anonymous, duplicate, or reserved fields", () => {

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vite-plus/test";
 import { Host } from "$lib/runtime/host.ts";
-import { applicableWorkflows } from "./relations.ts";
+import { applicableWorkflows, workflowsForForm } from "./relations.ts";
 
 describe("record actions", () => {
   it("seeds template records and keeps buttons on the matching type", async () => {
@@ -21,5 +21,32 @@ describe("record actions", () => {
     expect(applicableWorkflows(spec, "invoice", sent!).map((workflow) => workflow.key)).toContain(
       "mark_invoice_paid",
     );
+  });
+});
+
+describe("workflow relationships", () => {
+  it("finds workflows explicitly connected to a form", async () => {
+    const host = await Host.open({ persist: false });
+    await host.upsertForm({
+      key: "contact_us",
+      mode: "standalone",
+      inputs: { name: { type: "text" } },
+    });
+    await host.upsertWorkflow({
+      key: "capture_contact",
+      trigger: { key: "form.submitted", config: { form: "contact_us" } },
+      input: { values: { value: "object" } },
+      steps: [],
+    });
+    await host.upsertWorkflow({
+      key: "other_form",
+      trigger: { key: "form.submitted", config: { form: "another_form" } },
+      input: { values: { value: "object" } },
+      steps: [],
+    });
+
+    expect(workflowsForForm(host.resolvedSpec(), "contact_us").map((item) => item.key)).toEqual([
+      "capture_contact",
+    ]);
   });
 });

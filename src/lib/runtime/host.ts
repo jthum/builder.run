@@ -595,15 +595,6 @@ export class Host {
           .map((field) => [field, record?.[field]]),
       );
     }
-    if (form.submit?.workflow) {
-      await this.invoke(form.submit.workflow, {
-        ...(record && form.type ? { [form.type]: record.id } : {}),
-        form: form.key,
-        values: submitted,
-        ...submitted,
-      });
-      if (record && form.type) record = await this.getRecord(form.type, record.id);
-    }
     await this.afterEvent("form.submitted", {
       form: form.key,
       values: submitted,

@@ -880,7 +880,7 @@ export function buildTools(host: Host, options: BuildToolsOptions = {}): ToolDef
       name: "upsert_form",
       title: "Create or update a form",
       description:
-        'Create or update a record-backed or standalone form. Record forms use type plus ordered field keys. Standalone forms own reusable field definitions under inputs and emit form.submitted with {form, values}. Example: upsert_form({ key: "contact_us", mode: "standalone", inputs: { name: { type: "text", required: true }, email: { type: "text", format: "email" } } }).',
+        'Create or update a record-backed or standalone form. Record forms use type plus ordered field keys. Standalone forms own reusable field definitions under inputs and emit form.submitted with {form, values}. submit.success optionally customizes the standalone confirmation; workflow behavior belongs in a workflow listening for form.submitted. Example: upsert_form({ key: "contact_us", mode: "standalone", inputs: { name: { type: "text", required: true }, email: { type: "text", format: "email" } }, submit: { success: { title: "Thanks" } } }).',
       inputSchema: {
         type: "object",
         properties: {
@@ -897,7 +897,16 @@ export function buildTools(host: Host, options: BuildToolsOptions = {}): ToolDef
           mode: { type: "string", enum: ["create", "edit", "standalone"] },
           submit: {
             type: "object",
-            properties: { workflow: { type: "string" } },
+            properties: {
+              success: {
+                type: "object",
+                properties: {
+                  title: { type: "string" },
+                  description: { type: "string" },
+                },
+                additionalProperties: false,
+              },
+            },
             additionalProperties: false,
           },
         },

@@ -74,6 +74,14 @@ export function workflowKind(workflow: WorkflowDef): "manual" | "automatic" {
   return workflow.trigger ? "automatic" : "manual";
 }
 
+/** Workflows whose explicit trigger is one form's submission event. */
+export function workflowsForForm(spec: AppSpec | undefined, formKey: string): WorkflowDef[] {
+  return (spec?.workflows ?? []).filter(
+    (workflow) =>
+      workflow.trigger?.key === "form.submitted" && workflow.trigger.config?.form === formKey,
+  );
+}
+
 export function humanTrigger(when: string, spec?: AppSpec): string {
   const created = /^(.+)\.created$/.exec(when);
   if (created) return `a ${typeLabel(spec, created[1]).toLowerCase()} is added`;

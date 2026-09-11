@@ -7,6 +7,7 @@
 		verticalDropTarget,
 	} from "$lib/app/drag.ts";
 	import { fieldKindLabel } from "$lib/app/labels.ts";
+	import { workflowsForForm, workflowSummary } from "$lib/app/relations.ts";
 	import { runtime, session } from "$lib/app/session.svelte.ts";
 	import AppSelect from "$lib/components/app-select.svelte";
 	import EditorActions from "$lib/components/editor-actions.svelte";
@@ -14,6 +15,7 @@
 	import FormPurposePicker from "$lib/components/form-purpose-picker.svelte";
 	import PageHeader from "$lib/components/page-header.svelte";
 	import RecordForm from "$lib/components/record-form.svelte";
+	import StatusPill from "$lib/components/status-pill.svelte";
 	import * as AlertDialog from "$lib/components/ui/alert-dialog/index.js";
 	import { Badge } from "$lib/components/ui/badge/index.js";
 	import { Button } from "$lib/components/ui/button/index.js";
@@ -24,7 +26,8 @@
 	import { Separator } from "$lib/components/ui/separator/index.js";
 	import { Switch } from "$lib/components/ui/switch/index.js";
 	import { conditionFieldKeys, renameConditionField } from "$lib/runtime/field-state.ts";
-	import { normalizeField, type FieldDef, type FormDef } from "$lib/runtime/model.ts";
+	import { slugify } from "$lib/runtime/ids.ts";
+	import { cloneData, normalizeField, type FieldDef, type FormDef } from "$lib/runtime/model.ts";
 	import { cn, stableStringify } from "$lib/utils.ts";
 	import ChevronDownIcon from "@lucide/svelte/icons/chevron-down";
 	import ChevronUpIcon from "@lucide/svelte/icons/chevron-up";
@@ -49,7 +52,8 @@
 	let formInputs = $state<FieldDef[]>([]);
 	let inputSheetOpen = $state(false);
 	let editingInput = $state<FieldDef | null>(null);
-	let submitWorkflow = $state("");
+	let successTitle = $state("");
+	let successDescription = $state("");
 	let deleteOpen = $state(false);
 	let advancedOpen = $state(false);
 	let dragField = $state<string | null>(null);
@@ -66,9 +70,10 @@
 			label = form.label;
 			typeKey = form.type ?? types[0]?.key ?? "";
 			mode = form.mode;
-			formInputs = structuredClone(form.inputs ?? []);
-			submitWorkflow = form.submit?.workflow ?? "";
-			advancedOpen = Boolean(form.submit?.workflow);
+			formInputs = cloneData(form.inputs ?? []);
+			successTitle = form.submit?.success?.title ?? "";
+			successDescription = form.submit?.success?.description ?? "";
+			advancedOpen = Boolean(form.submit?.success || workflowsForForm(spec, form.key).length);
 			fieldRows = mergeFields([], type?.fields.map((field) => field.key) ?? [], form.fields);
 		});
 	});
@@ -77,6 +82,7 @@
 		types.find((item) => item.key === typeKey) ?? types.find((item) => item.key === form.type),
 	);
 	const selected = $derived(fieldRows.filter((row) => row.on).map((row) => row.field));
+	const connectedWorkflows = $derived(workflowsForForm(spec, form.key));
 	const availableFields = $derived(
 		fieldRows.flatMap((row) => {
 			const definition = sourceType?.fields.find((field) => field.key === row.field);
@@ -100,7 +106,15 @@
 		...(mode === "standalone"
 			? { inputs: formInputs }
 			: { type: typeKey, fields: selected }),
-		submit: submitWorkflow ? { workflow: submitWorkflow } : undefined,
+		submit:
+			mode === "standalone" && (successTitle.trim() || successDescription.trim())
+				? {
+						success: {
+							...(successTitle.trim() ? { title: successTitle.trim() } : {}),
+							...(successDescription.trim() ? { description: successDescription.trim() } : {}),
+						},
+					}
+				: undefined,
 	} as FormDef);
 	const dirty = $derived(stableStringify(draft) !== stableStringify(form));
 
@@ -226,6 +240,28 @@
 			toast.success("Form saved");
 		} catch (error) {
 			toast.error(error instanceof Error ? error.message : "Could not save form");
+		}
+	}
+
+	async function addAutomation() {
+		try {
+			if (dirty) await runtime().upsertForm(draft);
+			const formLabel = label.trim() || form.label;
+			const workflowLabel = `Handle ${formLabel}`;
+			const baseKey = slugify(workflowLabel);
+			let key = baseKey;
+			let suffix = 2;
+			while (workflows.some((item) => item.key === key)) key = `${baseKey}_${suffix++}`;
+			await runtime().upsertWorkflow({
+				key,
+				label: workflowLabel,
+				input: { values: { value: "object" } },
+				trigger: { key: "form.submitted", config: { form: form.key } },
+				steps: [],
+			});
+			await goto(`/build/automations/${key}`);
+		} catch (error) {
+			toast.error(error instanceof Error ? error.message : "Could not add automation");
 		}
 	}
 
@@ -369,10 +405,11 @@
 		<Collapsible.Trigger class="flex w-full items-center justify-between gap-3 rounded-xl px-1 py-2 text-start text-muted-foreground hover:text-foreground">
 			<span class="flex flex-col gap-0">
 				<span class="font-medium text-foreground">Advanced</span>
-				<span class="text-sm">Optionally continue with a workflow after submission.</span>
+				<span class="text-sm">Configure submission automations and confirmation.</span>
 			</span>
 			<span class="flex shrink-0 items-center gap-2">
-				{#if submitWorkflow}<Badge variant="secondary">Workflow connected</Badge>{/if}
+				{#if connectedWorkflows.length}<Badge variant="secondary">{connectedWorkflows.length} {connectedWorkflows.length === 1 ? "automation" : "automations"}</Badge>{/if}
+				{#if mode === "standalone" && (successTitle || successDescription)}<Badge variant="outline">Custom confirmation</Badge>{/if}
 				<ChevronDownIcon class="size-4 transition-transform {advancedOpen ? 'rotate-180' : ''}" />
 			</span>
 		</Collapsible.Trigger>
@@ -380,20 +417,50 @@
 			<Card.Root class="h-auto">
 				<Card.Header class="gap-0">
 					<Card.Title>After submission</Card.Title>
-					<Card.Description>Pass the answers to a workflow after this form succeeds.</Card.Description>
+					<Card.Description>Every successful submission emits an event that workflows can respond to.</Card.Description>
 				</Card.Header>
 				<Card.Content>
-					<Field.Field>
-						<Field.Label>Next step</Field.Label>
-						<AppSelect
-							bind:value={submitWorkflow}
-							options={[
-								{ value: "", label: mode === "standalone" ? "Emit the submission event" : "Just save the record" },
-								...workflows.map((item) => ({ value: item.key, label: item.label })),
-							]}
-						/>
-						<Field.Description>Connect one workflow directly, or let rules listen through the “A form is submitted” event.</Field.Description>
-					</Field.Field>
+					<Field.Group>
+						<div class="flex items-start justify-between gap-4">
+							<div class="flex min-w-0 flex-col gap-0.5">
+								<p class="font-medium">Automations</p>
+								<p class="text-sm text-muted-foreground">Business logic stays in workflows connected to this form.</p>
+							</div>
+							<Button variant="outline" size="sm" onclick={addAutomation}>Add automation</Button>
+						</div>
+						{#if connectedWorkflows.length}
+							<div class="flex flex-col gap-2">
+								{#each connectedWorkflows as workflow (workflow.id)}
+									<a href="/build/automations/{workflow.key}" class="flex items-center gap-3 rounded-xl border bg-background px-3 py-3 transition-colors hover:bg-muted/40">
+										<div class="min-w-0 flex-1">
+											<p class="font-medium">{workflow.label}</p>
+											<p class="truncate text-xs text-muted-foreground">{workflowSummary(workflow, spec)}</p>
+										</div>
+										<StatusPill path="status" value={workflow.enabled === false ? "Paused" : "Active"} tone={workflow.enabled === false ? "warning" : "info"} />
+									</a>
+								{/each}
+							</div>
+						{:else}
+							<p class="rounded-xl border border-dashed px-4 py-3 text-sm text-muted-foreground">No workflows respond to this form yet. Submissions are validated, then discarded unless an automation stores or sends them.</p>
+						{/if}
+						{#if mode === "standalone"}
+							<Separator />
+							<Field.FieldSet>
+								<Field.FieldLegend>Success message</Field.FieldLegend>
+								<Field.Description>Optional confirmation shown after the form is submitted.</Field.Description>
+								<Field.Group>
+									<Field.Field>
+										<Field.Label for="success-title">Title</Field.Label>
+										<Input id="success-title" bind:value={successTitle} placeholder="Response submitted" />
+									</Field.Field>
+									<Field.Field>
+										<Field.Label for="success-description">Message</Field.Label>
+										<Input id="success-description" bind:value={successDescription} placeholder="Thank you. Your response has been received." />
+									</Field.Field>
+								</Field.Group>
+							</Field.FieldSet>
+						{/if}
+					</Field.Group>
 				</Card.Content>
 			</Card.Root>
 		</Collapsible.Content>

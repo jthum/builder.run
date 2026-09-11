@@ -14,6 +14,7 @@
 	import { slugify, uniqueKey } from "$lib/runtime/ids.ts";
 	import {
 		FIELD_KINDS,
+		cloneData,
 		fieldCapability,
 		type FieldCondition,
 		type FieldDef,
@@ -98,9 +99,9 @@
 			validationMaxLength = valueString(input?.validation?.max_length);
 			validationPattern = input?.validation?.pattern ?? "";
 			validationMessage = input?.validation?.message ?? "";
-			visibleWhen = input?.visible_when ? structuredClone(input.visible_when) : undefined;
-			enabledWhen = input?.enabled_when ? structuredClone(input.enabled_when) : undefined;
-			requiredWhen = input?.required_when ? structuredClone(input.required_when) : undefined;
+			visibleWhen = input?.visible_when ? cloneData(input.visible_when) : undefined;
+			enabledWhen = input?.enabled_when ? cloneData(input.enabled_when) : undefined;
+			requiredWhen = input?.required_when ? cloneData(input.required_when) : undefined;
 			hiddenValue = input?.hidden_value ?? "preserve";
 			advanced = Boolean(
 				input?.description ||

@@ -188,6 +188,22 @@
 			setInputType(types[0]?.key ?? "");
 		}
 	}
+	function setTriggerForm(next: string) {
+		triggerForm = next;
+		if (guardEnabled) return;
+		const form = forms.find((item) => item.key === next);
+		const source = types.find((type) => type.key === form?.type);
+		const selected = new Set(form?.fields ?? []);
+		const first =
+			form?.mode === "standalone"
+				? form.inputs?.[0]
+				: source?.fields.find((field) => !selected.size || selected.has(field.key));
+		guardPredicate = {
+			op: "context.equals",
+			path: `vars.values.${first?.key ?? "value"}`,
+			value: "",
+		};
+	}
 	function setWorkflowKind(next: string) {
 		kind = next as "manual" | "automatic";
 		if (kind === "manual" && !types.some((type) => type.key === inputType)) {
@@ -315,7 +331,7 @@
 						<Field.Field>
 							<Field.Label>{kind === "manual" ? "Show on" : triggerEvent === "form" ? "Form" : "Watch"}</Field.Label>
 							{#if kind === "automatic" && triggerEvent === "form"}
-								<AppSelect bind:value={triggerForm} options={forms.map((form) => ({ value: form.key, label: form.label }))} placeholder="Select a form" />
+								<AppSelect value={triggerForm} onValueChange={setTriggerForm} options={forms.map((form) => ({ value: form.key, label: form.label }))} placeholder="Select a form" />
 							{:else}
 								<AppSelect value={inputType} onValueChange={setInputType} options={types.map((type) => ({ value: type.key, label: type.label }))} disabled={!inputEditable} />
 							{/if}
