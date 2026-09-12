@@ -59,6 +59,14 @@ The runtime services are the important shared boundary.
 
 A record mutation initiated from a form and the equivalent mutation initiated from WebMCP should pass through the same validation and persistence path.
 
+The browser runtime currently separates that boundary into three roles:
+
+- `SpecService` owns authored spec mutations, reference-safe renames, and definition validation. It does not know how a runtime persists or materialises a spec.
+- `RecordService` owns record operations, form submission, view execution, and the workflow cascade caused by data events.
+- `Host` composes those services with the browser's catalog and SQLite engines. Its commit path stages and validates spec changes, persists the catalog, reconciles record stores, rolls back failures, and only then publishes a new snapshot.
+
+The UI and WebMCP use `Host` as the browser-runtime facade, but its methods are not part of the portable application format. A future runtime can provide a different facade while consuming the same canonical spec and preserving the same semantic contracts.
+
 ## Browser stack
 
 The current implementation uses:
@@ -139,3 +147,5 @@ These are runtime boundaries, not reasons to bake browser-specific assumptions i
 Builder.run is still pre-user and its application format is allowed to change cleanly. A schema change updates the model, runtime, editors, agent contracts, templates, tests, and documentation together. Previous shapes are rejected; they are not carried through converters, dual readers, deprecated fields, or hidden compatibility branches.
 
 Add a migration only when real persisted user data creates a deliberate compatibility requirement. Until then, prefer one current representation and a lean implementation over speculative legacy support.
+
+The browser runtime therefore reads platform state only from its current SQLite catalog. It does not probe previous JSON stores or accept compatibility-only startup options.

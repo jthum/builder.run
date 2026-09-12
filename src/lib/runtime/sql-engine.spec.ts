@@ -5,7 +5,7 @@ import { createTableSql } from "./sql.ts";
 describe("sqlite materialisation", () => {
   it("creates real tables and columns from a type", async () => {
     expect.hasAssertions();
-    const host = await Host.open({ persist: false });
+    const host = await Host.open();
     await host.upsertType({
       key: "project",
       fields: [
@@ -58,7 +58,7 @@ describe("sqlite materialisation", () => {
 
   it("renames and drops columns without losing other values", async () => {
     expect.hasAssertions();
-    const host = await Host.open({ persist: false });
+    const host = await Host.open();
     await host.upsertType({
       key: "project",
       fields: [
@@ -90,7 +90,7 @@ describe("sqlite materialisation", () => {
   });
 
   it("renames type tables by stable identity without losing records", async () => {
-    const host = await Host.open({ persist: false });
+    const host = await Host.open();
     const type = await host.upsertType({ key: "project", fields: { name: "text" } });
     const created = await host.create("project", { name: "Acme" });
 

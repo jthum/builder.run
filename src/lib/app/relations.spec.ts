@@ -5,7 +5,7 @@ import { applicableWorkflows, workflowsForForm } from "./relations.ts";
 describe("record actions", () => {
   it("seeds template records and keeps buttons on the matching type", async () => {
     expect.hasAssertions();
-    const host = await Host.open({ persist: false });
+    const host = await Host.open();
     await host.loadSample("freelance_crm");
     const spec = host.resolvedSpec();
     const organisations = await host.listRecords("organisation");
@@ -26,7 +26,7 @@ describe("record actions", () => {
 
 describe("workflow relationships", () => {
   it("finds workflows explicitly connected to a form", async () => {
-    const host = await Host.open({ persist: false });
+    const host = await Host.open();
     await host.upsertForm({
       key: "contact_us",
       mode: "standalone",

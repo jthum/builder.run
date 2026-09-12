@@ -22,7 +22,7 @@ function mockRegistry() {
 
 describe("webmcp bridge", () => {
   it("uses compact record tools and describes available lifecycle transitions", async () => {
-    const host = await Host.open({ persist: false });
+    const host = await Host.open();
     await host.upsertType({
       key: "ticket",
       fields: [{ key: "status", type: "enum", required: true, values: ["new", "resolved"] }],
@@ -51,7 +51,7 @@ describe("webmcp bridge", () => {
   });
 
   it("offers typed record aliases as a schema-only adapter", async () => {
-    const host = await Host.open({ persist: false });
+    const host = await Host.open();
     await host.upsertType({
       key: "ticket",
       fields: [
@@ -81,7 +81,7 @@ describe("webmcp bridge", () => {
   });
 
   it("runs compact CRUD through the generic surface", async () => {
-    const host = await Host.open({ persist: false });
+    const host = await Host.open();
     await host.upsertType({
       key: "note",
       fields: [{ key: "title", type: "text", required: true }],
@@ -103,7 +103,7 @@ describe("webmcp bridge", () => {
   });
 
   it("keeps the compact record tool schema stable as types are added", async () => {
-    const host = await Host.open({ persist: false });
+    const host = await Host.open();
     const before = buildTools(host).filter((tool) => toolSurface(tool) === "app");
     for (let index = 0; index < 25; index += 1) {
       await host.upsertType({
@@ -117,7 +117,7 @@ describe("webmcp bridge", () => {
 
   it("does not abort or re-register tools after a record mutation", async () => {
     expect.hasAssertions();
-    const host = await Host.open({ persist: false });
+    const host = await Host.open();
     await host.upsertType({
       key: "note",
       fields: [{ key: "title", type: "text", label: "Title" }] as never,
@@ -136,7 +136,7 @@ describe("webmcp bridge", () => {
 
   it("does not churn compact CRUD tools when a type is added", async () => {
     expect.hasAssertions();
-    const host = await Host.open({ persist: false });
+    const host = await Host.open();
     const registry = mockRegistry();
     const bridge = createWebMcpBridge(host, registry);
     await bridge.flush();
@@ -158,7 +158,7 @@ describe("webmcp bridge", () => {
 
   it("does not call registerTool while a tool execute is still on the stack", async () => {
     expect.hasAssertions();
-    const host = await Host.open({ persist: false });
+    const host = await Host.open();
     const registry = mockRegistry();
     let insideExecute = false;
     const orig = registry.registerTool.bind(registry);
@@ -186,7 +186,7 @@ describe("webmcp bridge", () => {
 
   it("retries registerTool with backoff instead of spinning when it throws", async () => {
     expect.hasAssertions();
-    const host = await Host.open({ persist: false });
+    const host = await Host.open();
     const registry = mockRegistry();
     const orig = registry.registerTool.bind(registry);
     let failRemaining = 0;
@@ -213,7 +213,7 @@ describe("webmcp bridge", () => {
 
   it("picks up CRUD tools after create_app then upsert_type", async () => {
     expect.hasAssertions();
-    const host = await Host.open({ persist: false });
+    const host = await Host.open();
     const registry = mockRegistry();
     const bridge = createWebMcpBridge(host, registry, { appTools: "typed" });
     await bridge.flush();
@@ -232,7 +232,7 @@ describe("webmcp bridge", () => {
 
   it("returns JSON strings from tools", async () => {
     expect.hasAssertions();
-    const host = await Host.open({ persist: false });
+    const host = await Host.open();
     const registry = mockRegistry();
     const bridge = createWebMcpBridge(host, registry);
     await bridge.flush();
@@ -246,7 +246,7 @@ describe("webmcp bridge", () => {
   });
 
   it("lets an agent assign explicit enum badge semantics", async () => {
-    const host = await Host.open({ persist: false });
+    const host = await Host.open();
     await host.upsertType({ key: "submission", fields: [] });
     const tools = new Map(buildTools(host).map((tool) => [tool.name, tool]));
     await tools.get("upsert_field")!.execute({
@@ -268,7 +268,7 @@ describe("webmcp bridge", () => {
   });
 
   it("publishes one canonical single-field tool contract", async () => {
-    const host = await Host.open({ persist: false });
+    const host = await Host.open();
     const tool = buildTools(host).find((item) => item.name === "upsert_field");
     const properties = (tool?.inputSchema.properties ?? {}) as Record<string, unknown>;
     expect(Object.keys(properties)).toContain("kind");
@@ -279,7 +279,7 @@ describe("webmcp bridge", () => {
 
   it("returns grouped view measures through the shared query_view tool", async () => {
     expect.hasAssertions();
-    const host = await Host.open({ persist: false });
+    const host = await Host.open();
     await host.upsertType({
       key: "review",
       fields: [
@@ -334,7 +334,7 @@ describe("webmcp bridge", () => {
 
   it("guides and repairs normal views created without visible fields", async () => {
     expect.hasAssertions();
-    const host = await Host.open({ persist: false });
+    const host = await Host.open();
     await host.upsertType({
       key: "task",
       fields: { title: "text", status: "text", owner: "text" },
@@ -361,7 +361,7 @@ describe("webmcp bridge", () => {
 
   it("lists space-exposed types on get_space and shares them across apps", async () => {
     expect.hasAssertions();
-    const host = await Host.open({ persist: false });
+    const host = await Host.open();
     const registry = mockRegistry();
     const bridge = createWebMcpBridge(host, registry);
     await bridge.flush();
@@ -385,7 +385,7 @@ describe("webmcp bridge", () => {
 
   it("upsert_page accepts nested groups, including a single unwrapped child", async () => {
     expect.hasAssertions();
-    const host = await Host.open({ persist: false });
+    const host = await Host.open();
     const registry = mockRegistry();
     const bridge = createWebMcpBridge(host, registry);
     await bridge.flush();
@@ -425,7 +425,7 @@ describe("webmcp bridge", () => {
 
   it("describes widget fields and validates agent-authored chart and board values", async () => {
     expect.hasAssertions();
-    const host = await Host.open({ persist: false });
+    const host = await Host.open();
     await host.upsertType({
       key: "task",
       fields: [
@@ -495,7 +495,7 @@ describe("webmcp bridge", () => {
   });
 
   it("publishes the structured automation grammar and effect contracts", async () => {
-    const host = await Host.open({ persist: false });
+    const host = await Host.open();
     const catalogue = buildTools(host).find((tool) => tool.name === "get_automation_primitives");
     expect(catalogue).toBeTruthy();
 
@@ -514,7 +514,7 @@ describe("webmcp bridge", () => {
 
   it("upsert_type creates fields from an inline array or map", async () => {
     expect.hasAssertions();
-    const host = await Host.open({ persist: false });
+    const host = await Host.open();
     const registry = mockRegistry();
     const bridge = createWebMcpBridge(host, registry);
     await bridge.flush();
@@ -547,7 +547,7 @@ describe("webmcp bridge", () => {
 
   it("returns a clear error when an agent supplies a blank field", async () => {
     expect.hasAssertions();
-    const host = await Host.open({ persist: false });
+    const host = await Host.open();
     const registry = mockRegistry();
     const bridge = createWebMcpBridge(host, registry);
     await bridge.flush();
@@ -564,7 +564,7 @@ describe("webmcp bridge", () => {
 
   it("puts enum values and reference targets on create/update schemas", async () => {
     expect.hasAssertions();
-    const host = await Host.open({ persist: false });
+    const host = await Host.open();
     await host.loadSample("freelance_crm");
     const typedTools = buildTools(host, { appTools: "typed" });
     const createProject = typedTools.find((tool) => tool.name === "create_project");
@@ -589,7 +589,7 @@ describe("webmcp bridge", () => {
 
   it("does not apply_spec without confirm: true", async () => {
     expect.hasAssertions();
-    const host = await Host.open({ persist: false });
+    const host = await Host.open();
     await host.upsertType({ key: "note", fields: { title: "text" } });
     const registry = mockRegistry();
     const bridge = createWebMcpBridge(host, registry);
@@ -616,7 +616,7 @@ describe("webmcp bridge", () => {
 
   it("refuses a confirmed apply_spec that has no types unless wipe is set", async () => {
     expect.hasAssertions();
-    const host = await Host.open({ persist: false });
+    const host = await Host.open();
     await host.upsertType({ key: "note", fields: { title: "text" } });
     const registry = mockRegistry();
     const bridge = createWebMcpBridge(host, registry);
@@ -637,7 +637,7 @@ describe("webmcp bridge", () => {
 
   it("query_view runs a named view and names unknown views", async () => {
     expect.hasAssertions();
-    const host = await Host.open({ persist: false });
+    const host = await Host.open();
     await host.loadSample("freelance_crm");
     const registry = mockRegistry();
     const bridge = createWebMcpBridge(host, registry);

@@ -7,7 +7,7 @@ import { CATALOG_DATABASE } from "./catalog.ts";
 
 describe("builder.run host", () => {
   it("validates standalone forms and dispatches form submission workflows", async () => {
-    const host = await Host.open({ persist: false });
+    const host = await Host.open();
     await host.upsertType({
       key: "lead",
       fields: {
@@ -56,7 +56,7 @@ describe("builder.run host", () => {
   });
 
   it("preserves standalone input identity and conditions when an input key changes", async () => {
-    const host = await Host.open({ persist: false });
+    const host = await Host.open();
     const form = await host.upsertForm({
       key: "address",
       mode: "standalone",
@@ -88,7 +88,7 @@ describe("builder.run host", () => {
 
   it("materialises a type into records, views, and a triggered workflow", async () => {
     expect.hasAssertions();
-    const host = await Host.open({ persist: false });
+    const host = await Host.open();
     await host.upsertType({
       key: "invoice",
       fields: [
@@ -154,7 +154,7 @@ describe("builder.run host", () => {
   });
 
   it("keeps generated resources out of authored app state", async () => {
-    const host = await Host.open({ persist: false });
+    const host = await Host.open();
     await host.upsertType({ key: "note", fields: { title: "text" } });
 
     expect(host.app().spec.views.some((view) => view.implicit)).toBe(false);
@@ -171,7 +171,7 @@ describe("builder.run host", () => {
   });
 
   it("runs structured results, gates, loops, and deterministic branches", async () => {
-    const host = await Host.open({ persist: false });
+    const host = await Host.open();
     await host.upsertType({
       key: "invoice",
       fields: [
@@ -266,7 +266,7 @@ describe("builder.run host", () => {
   });
 
   it("enforces type lifecycles and dispatches named transition triggers", async () => {
-    const host = await Host.open({ persist: false });
+    const host = await Host.open();
     await host.upsertType({
       key: "ticket",
       fields: [
@@ -323,7 +323,7 @@ describe("builder.run host", () => {
   });
 
   it("compensates completed effects when a later step fails", async () => {
-    const host = await Host.open({ persist: false });
+    const host = await Host.open();
     await host.upsertType({ key: "note", fields: { title: "text" } });
     await host.upsertWorkflow({
       key: "create_then_fail",
@@ -379,7 +379,7 @@ types:
 
   it("stores ratings as validated numbers", async () => {
     expect.hasAssertions();
-    const host = await Host.open({ persist: false });
+    const host = await Host.open();
     await host.upsertType({
       key: "review",
       fields: [
@@ -414,7 +414,7 @@ types:
 
   it("enforces reusable field validation and conditional requirements", async () => {
     expect.hasAssertions();
-    const host = await Host.open({ persist: false });
+    const host = await Host.open();
     await host.upsertType({
       key: "contact",
       fields: [
@@ -460,7 +460,7 @@ types:
   });
 
   it("rewrites authored field references and blocks destructive dangling references", async () => {
-    const host = await Host.open({ persist: false });
+    const host = await Host.open();
     await host.upsertType({
       key: "project",
       fields: { name: "text", budget: "number" },
@@ -496,7 +496,7 @@ types:
   });
 
   it("keeps references to shared fields coherent across apps", async () => {
-    const host = await Host.open({ persist: false });
+    const host = await Host.open();
     await host.upsertType({ key: "client", expose: true, fields: { name: "text" } });
     await host.upsertView({ key: "clients", source: "client", fields: ["name"] });
     await host.createApp("Other app");
@@ -510,7 +510,7 @@ types:
   });
 
   it("renames type references while preserving explicitly authored resource keys", async () => {
-    const host = await Host.open({ persist: false });
+    const host = await Host.open();
     const type = await host.upsertType({ key: "project", fields: { name: "text" } });
     await host.upsertView({ key: "active_projects", source: "project", fields: ["name"] });
     await host.upsertForm({
@@ -570,7 +570,7 @@ types:
   });
 
   it("renames a shared type across every consuming app", async () => {
-    const host = await Host.open({ persist: false });
+    const host = await Host.open();
     const type = await host.upsertType({ key: "client", expose: true, fields: { name: "text" } });
     await host.upsertView({ key: "clients", source: "client", fields: ["name"] });
     await host.createApp("Other app");
@@ -589,7 +589,7 @@ types:
   });
 
   it("rejects conflicting type keys before changing storage", async () => {
-    const host = await Host.open({ persist: false });
+    const host = await Host.open();
     await host.upsertType({ key: "project", fields: { name: "text" } });
     await host.upsertType({ key: "engagement", fields: { title: "text" } });
 
@@ -603,7 +603,7 @@ types:
 
   it("stores explicit badge semantics for enum values", async () => {
     expect.hasAssertions();
-    const host = await Host.open({ persist: false });
+    const host = await Host.open();
     await host.upsertType({ key: "submission", fields: [] });
     const stage = await host.upsertField("submission", {
       key: "stage",
@@ -644,7 +644,7 @@ types:
 
   it("enforces field identity rules on direct field changes", async () => {
     expect.hasAssertions();
-    const host = await Host.open({ persist: false });
+    const host = await Host.open();
     await host.upsertType({ key: "review", fields: [] });
     const score = await host.upsertField("review", {
       key: " Review Score ",
@@ -666,7 +666,7 @@ types:
 
   it("derives and reorders a grouped review leaderboard without mutating submissions", async () => {
     expect.hasAssertions();
-    const host = await Host.open({ persist: false });
+    const host = await Host.open();
     await host.upsertType({
       key: "submission",
       fields: [{ key: "name", label: "Name", type: "text", required: true }] as never,
@@ -761,7 +761,7 @@ types:
 
   it("walks the freelance CRM mould-and-use loop", async () => {
     expect.hasAssertions();
-    const host = await Host.open({ persist: false });
+    const host = await Host.open();
     await host.loadSample("freelance_crm");
     const org = await host.create("organisation", { name: "Acme" });
     const project = await host.create("project", {
@@ -798,7 +798,7 @@ types:
 
   it("keeps actors as the permission subject", async () => {
     expect.hasAssertions();
-    const host = await Host.open({ persist: false });
+    const host = await Host.open();
     const actor = host.actor();
     expect(actor.kind).toBe("human");
     expect(actor.roles).toContain("admin");
@@ -812,7 +812,7 @@ types:
 
   it("updates the local person and names a space", async () => {
     expect.hasAssertions();
-    const host = await Host.open({ persist: false });
+    const host = await Host.open();
     const actor = await host.updateActor({ name: "Ada", email: "ada@example.com" });
     expect(actor.name).toBe("Ada");
     expect(actor.email).toBe("ada@example.com");
@@ -831,9 +831,9 @@ types:
 
   it("persists space appearance across runtime instances", async () => {
     const gateway = createNodeGateway();
-    const host = await Host.open({ gateway, persist: false });
+    const host = await Host.open({ gateway });
     await host.updateSpaceAppearance("violet");
-    const reloaded = await Host.open({ gateway, persist: false });
+    const reloaded = await Host.open({ gateway });
     expect(reloaded.space().appearance?.accent).toBe("violet");
   });
 
@@ -856,7 +856,7 @@ types:
       },
       wipe: () => base.wipe(),
     };
-    const host = await Host.open({ gateway, persist: false });
+    const host = await Host.open({ gateway });
     let published = 0;
     host.subscribe(() => published++);
     rejectWrites = true;
@@ -870,7 +870,7 @@ types:
 
   it("deletes an app and leaves a blank one if it was the last", async () => {
     expect.hasAssertions();
-    const host = await Host.open({ persist: false });
+    const host = await Host.open();
     await host.createApp("Pipeline", "freelance_crm");
     const keep = await host.createApp("Notes");
     await host.deleteApp(host.apps().find((item) => item.name === "Pipeline")!.id);
@@ -885,7 +885,7 @@ types:
 
   it("treats apps as spaces created by the account actor", async () => {
     expect.hasAssertions();
-    const host = await Host.open({ persist: false });
+    const host = await Host.open();
     expect(host.space().name).toBe("Personal Space");
     expect(host.app().name).toBe("Home");
     expect(host.app().createdBy).toBe(host.actor().id);
@@ -931,7 +931,7 @@ types:
 
   it("orders a view by more than one field", async () => {
     expect.hasAssertions();
-    const host = await Host.open({ persist: false });
+    const host = await Host.open();
     await host.loadSample("freelance_crm");
     await host.create("invoice", { number: "INV-105", amount: 500, status: "sent" });
     await host.create("invoice", { number: "INV-106", amount: 9000, status: "paid" });
@@ -957,7 +957,7 @@ types:
 
   it("chooses useful fields for new views and protects them on updates", async () => {
     expect.hasAssertions();
-    const host = await Host.open({ persist: false });
+    const host = await Host.open();
     await host.upsertType({ key: "organisation", fields: { name: "text" } });
     await host.upsertType({
       key: "project",
@@ -991,7 +991,7 @@ types:
 
   it("accepts nested group blocks and a null folder on upsert_page", async () => {
     expect.hasAssertions();
-    const host = await Host.open({ persist: false });
+    const host = await Host.open();
     await host.upsertType({
       key: "client",
       fields: [{ key: "name", type: "text", label: "Name" }] as never,
@@ -1027,7 +1027,7 @@ types:
 
   it("rejects supplied invalid page icons instead of silently inferring one", async () => {
     expect.hasAssertions();
-    const host = await Host.open({ persist: false });
+    const host = await Host.open();
     await expect(host.upsertPage({ key: "blank", icon: "" as never })).rejects.toThrow(
       'Invalid page icon ""',
     );
@@ -1038,7 +1038,7 @@ types:
 
   it("accepts upsert_page when a group's inner blocks is a single object", async () => {
     expect.hasAssertions();
-    const host = await Host.open({ persist: false });
+    const host = await Host.open();
     const page = await host.upsertPage({
       key: "diag_nested",
       label: "Diagnostic Nested",
@@ -1062,7 +1062,7 @@ types:
 
   it("validates widget contracts before replacing a full spec", async () => {
     expect.hasAssertions();
-    const host = await Host.open({ persist: false });
+    const host = await Host.open();
     await host.upsertType({ key: "note", fields: { title: "text" } });
     await expect(
       host.applySpec({
@@ -1093,7 +1093,7 @@ types:
 
   it("updates page metadata without replacing its blocks", async () => {
     expect.hasAssertions();
-    const host = await Host.open({ persist: false });
+    const host = await Host.open();
     const blocks = [
       {
         kind: "group" as const,
@@ -1118,7 +1118,7 @@ types:
 
   it("creates a type from inline fields as an array or a map, and keeps them on later upserts", async () => {
     expect.hasAssertions();
-    const host = await Host.open({ persist: false });
+    const host = await Host.open();
     await host.upsertType({
       key: "client",
       fields: {
@@ -1161,7 +1161,7 @@ types:
 
   it("exports authored forms and omits generated default forms", async () => {
     expect.hasAssertions();
-    const host = await Host.open({ persist: false });
+    const host = await Host.open();
     await host.upsertType({
       key: "client",
       fields: { name: { type: "text" } },
@@ -1186,7 +1186,7 @@ types:
 
   it("drops old type tables when replaceSpecText replaces the spec", async () => {
     expect.hasAssertions();
-    const host = await Host.open({ persist: false });
+    const host = await Host.open();
     await host.upsertType({ key: "note", fields: { title: "text" } });
     await host.replaceSpecText("types:\n  gone:\n    fields:\n      x: text\n");
     expect(host.resolvedSpec().types.map((type) => type.key)).toContain("gone");
@@ -1198,7 +1198,7 @@ types:
 
   it("gives the UI a copy of space and app, not the live host objects", async () => {
     expect.hasAssertions();
-    const host = await Host.open({ persist: false });
+    const host = await Host.open();
     const snap = host.snapshot();
     expect(snap.app).not.toBe(host.app());
     expect(snap.space).not.toBe(host.space());
@@ -1209,7 +1209,7 @@ types:
 
   it("saves exposed view filters from a reactive array", async () => {
     expect.hasAssertions();
-    const host = await Host.open({ persist: false });
+    const host = await Host.open();
     await host.loadSample("freelance_crm");
     const expose = new Proxy(["status"], {});
     const saved = await host.upsertView({
@@ -1222,7 +1222,7 @@ types:
 
   it("filters a view by the current record", async () => {
     expect.hasAssertions();
-    const host = await Host.open({ persist: false });
+    const host = await Host.open();
     await host.loadSample("freelance_crm");
     const project = (await host.listRecords("project")).find(
       (row) => row.name === "Website redesign",
@@ -1254,7 +1254,7 @@ types:
   });
 
   it("applies related filters before limiting view results", async () => {
-    const host = await Host.open({ persist: false });
+    const host = await Host.open();
     await host.loadSample("freelance_crm");
     await host.upsertView({
       key: "website_invoices",
@@ -1272,7 +1272,7 @@ types:
 
   it("previews a draft view without saving it", async () => {
     expect.hasAssertions();
-    const host = await Host.open({ persist: false });
+    const host = await Host.open();
     await host.loadSample("freelance_crm");
     const saved = host.resolvedSpec().views.find((item) => item.key === "unpaid_invoices");
     expect(saved).toBeTruthy();
@@ -1287,12 +1287,12 @@ types:
   it("wipes local data so a new host reseeds without leftover space ids", async () => {
     expect.hasAssertions();
     const gateway = createNodeGateway();
-    const host = await Host.open({ gateway, persist: false });
+    const host = await Host.open({ gateway });
     await host.loadSample("freelance_crm");
     const oldSpace = host.space().id;
     const oldApp = host.app().id;
     await host.resetLocalData();
-    const next = await Host.open({ gateway, persist: false });
+    const next = await Host.open({ gateway });
     expect(next.space().id).not.toBe(oldSpace);
     expect(next.app().id).not.toBe(oldApp);
     expect(next.space().id.startsWith("spc_")).toBe(false);

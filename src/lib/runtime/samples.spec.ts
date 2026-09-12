@@ -22,7 +22,7 @@ describe("starter app templates", () => {
   for (const sample of sampleApps) {
     it(`loads ${sample.label} with usable data, views, and pages`, async () => {
       expect.hasAssertions();
-      const host = await Host.open({ persist: false });
+      const host = await Host.open();
 
       await host.loadSample(sample.key);
 
