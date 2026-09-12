@@ -1,5 +1,5 @@
-import { wipeLocalData, type PersistenceBackend } from "./persist.ts";
-import type { SqlConnection, SqlGateway } from "./sql-gateway.ts";
+import { wipeLocalData, type PersistenceBackend } from "./browser-storage.ts";
+import type { SqlConnection, SqlGateway } from "./gateway.ts";
 
 type RpcResult = {
   id: number;
@@ -16,7 +16,7 @@ export async function connectWorkerGateway(): Promise<SqlGateway> {
 }
 
 async function openWorkerGateway(): Promise<SqlGateway> {
-  const worker = new Worker(new URL("./sqlite-worker.ts", import.meta.url), { type: "module" });
+  const worker = new Worker(new URL("./worker.ts", import.meta.url), { type: "module" });
   workerRef = worker;
   const pending = new Map<
     number,

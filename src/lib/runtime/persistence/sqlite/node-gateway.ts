@@ -1,6 +1,6 @@
 import { DatabaseSync } from "node:sqlite";
-import type { PersistenceBackend } from "./persist.ts";
-import type { SqlConnection, SqlGateway } from "./sql-gateway.ts";
+import type { PersistenceBackend } from "./browser-storage.ts";
+import type { SqlConnection, SqlGateway } from "./gateway.ts";
 import { bindValue } from "./sql.ts";
 
 class NodeConnection implements SqlConnection {
@@ -21,7 +21,8 @@ class NodeConnection implements SqlConnection {
   }
 
   async close(): Promise<void> {
-    this.db.close();
+    // The gateway owns the shared in-memory database. Closing one logical
+    // connection must not destroy data that a later Host instance reopens.
   }
 }
 

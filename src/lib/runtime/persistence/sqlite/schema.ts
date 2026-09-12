@@ -1,6 +1,6 @@
-import type { TableEngine } from "./engine.ts";
-import { sqlTypeFor, type AppSpec, type TypeDef } from "./model.ts";
-import { scalarString } from "./values.ts";
+import { sqlTypeFor, type AppSpec, type TypeDef } from "../../model.ts";
+import { scalarString } from "../../values.ts";
+import type { TableEngine } from "./table-engine.ts";
 
 export const META_TABLE = "_meta";
 
@@ -27,7 +27,42 @@ export async function ensureMeta(engine: TableEngine): Promise<void> {
   }
 }
 
-export async function reconcileStore(engine: TableEngine, types: TypeDef[]): Promise<string[]> {
+export async function prepareStoreSchema(engine: TableEngine, types: TypeDef[]): Promise<void> {
+  const identities = await loadIdentities(engine);
+  const byId = new Map(identities.map((row) => [row.id, row]));
+  const present = new Set(await engine.listTables());
+
+  for (const type of types) {
+    const previous = byId.get(type.id);
+    if (
+      previous?.table_name &&
+      previous.table_name !== type.key &&
+      present.has(previous.table_name) &&
+      present.has(type.key)
+    ) {
+      throw new Error(`Cannot rename ${previous.table_name} to existing table ${type.key}`);
+    }
+    const currentTable =
+      previous?.table_name && present.has(previous.table_name) ? previous.table_name : type.key;
+    if (!present.has(currentTable)) continue;
+    const columns = new Set((await engine.tableInfo(currentTable)).map((column) => column.name));
+    for (const field of type.fields) {
+      const previousField = byId.get(field.id);
+      if (
+        previousField?.column_name &&
+        previousField.column_name !== field.key &&
+        columns.has(previousField.column_name) &&
+        columns.has(field.key)
+      ) {
+        throw new Error(
+          `Cannot rename ${currentTable}.${previousField.column_name} to existing column ${field.key}`,
+        );
+      }
+    }
+  }
+}
+
+export async function applyStoreSchema(engine: TableEngine, types: TypeDef[]): Promise<string[]> {
   await ensureMeta(engine);
   const changes: string[] = [];
   const identities = await loadIdentities(engine);
@@ -91,6 +126,15 @@ export async function reconcileStore(engine: TableEngine, types: TypeDef[]): Pro
     }
   }
 
+  return changes;
+}
+
+export async function pruneStoreSchema(engine: TableEngine, types: TypeDef[]): Promise<string[]> {
+  await ensureMeta(engine);
+  const changes: string[] = [];
+  const identities = await loadIdentities(engine);
+  const present = new Set(await engine.listTables());
+
   const desiredTypeIds = new Set(types.map((type) => type.id));
   for (const identity of identities) {
     if (identity.kind === "type" && !desiredTypeIds.has(identity.id) && identity.table_name) {
@@ -128,6 +172,7 @@ export async function reconcileStore(engine: TableEngine, types: TypeDef[]): Pro
 }
 
 async function loadIdentities(engine: TableEngine): Promise<IdentityRow[]> {
+  if (!(await engine.listTables()).includes(META_TABLE)) return [];
   const rows = await engine.select(META_TABLE);
   return rows.map((row) => ({
     id: row.id,

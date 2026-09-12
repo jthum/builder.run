@@ -1,5 +1,3 @@
-import type { TableEngine } from "./engine.ts";
-import { matchesWhere } from "./engine.ts";
 import { exposeFilters, matchFilters, normalizeFilters, type FilterClause } from "./filters.ts";
 import { scalarString } from "./values.ts";
 import {
@@ -13,6 +11,7 @@ import {
   type ViewDef,
   type ViewMeasure,
 } from "./model.ts";
+import type { RecordStore } from "./storage.ts";
 
 function mergeExpose(base: FilterClause[], extra: FilterClause[]): FilterClause[] {
   const next = [...base];
@@ -27,7 +26,52 @@ function mergeExpose(base: FilterClause[], extra: FilterClause[]): FilterClause[
 export interface QueryContext {
   spec: AppSpec;
   sharedTypes: TypeDef[];
-  engineFor: (type: TypeDef) => TableEngine;
+  recordsFor: (type: TypeDef) => RecordStore;
+  queries: QueryExecutor;
+}
+
+/** Executes portable views; runtimes may replace this when they can do more natively. */
+export interface QueryExecutor {
+  execute(
+    context: QueryContext,
+    view: ViewDef,
+    expose?: Record<string, unknown>,
+    run?: ViewRunContext,
+  ): Promise<Array<Record<string, unknown>>>;
+}
+
+export class PortableQueryExecutor implements QueryExecutor {
+  execute(
+    context: QueryContext,
+    view: ViewDef,
+    expose?: Record<string, unknown>,
+    run?: ViewRunContext,
+  ): Promise<Array<Record<string, unknown>>> {
+    return executePortableView(context, view, expose, run);
+  }
+}
+
+export interface QuerySession {
+  related: Map<string, Promise<RecordValue | null>>;
+}
+
+function createQuerySession(): QuerySession {
+  return { related: new Map() };
+}
+
+function relatedRecord(
+  ctx: QueryContext,
+  target: TypeDef,
+  id: string,
+  session: QuerySession,
+): Promise<RecordValue | null> {
+  const cacheKey = `${target.id}:${id}`;
+  let lookup = session.related.get(cacheKey);
+  if (!lookup) {
+    lookup = ctx.recordsFor(target).get(target, id);
+    session.related.set(cacheKey, lookup);
+  }
+  return lookup;
 }
 
 export function allTypes(ctx: QueryContext): TypeDef[] {
@@ -45,11 +89,12 @@ export async function projectRow(
   type: TypeDef,
   row: RecordValue,
   fieldPaths: string[],
+  session: QuerySession = createQuerySession(),
 ): Promise<Record<string, unknown>> {
   const projected: Record<string, unknown> = { id: row.id };
   const paths = fieldPaths.length ? fieldPaths : ["id", ...type.fields.map((field) => field.key)];
   for (const path of paths) {
-    projected[path] = await resolvePath(ctx, type, row, path);
+    projected[path] = await resolvePath(ctx, type, row, path, session);
   }
   projected.created_at = row.created_at;
   projected.updated_at = row.updated_at;
@@ -61,6 +106,7 @@ export async function resolvePath(
   type: TypeDef,
   row: RecordValue,
   path: string,
+  session: QuerySession = createQuerySession(),
 ): Promise<unknown> {
   const parts = path.split(".");
   let currentType: TypeDef | undefined = type;
@@ -72,8 +118,8 @@ export async function resolvePath(
     if (field?.type === "reference") {
       const target = findType(ctx, field.target || "");
       if (!target) return record[part] ?? null;
-      const engine = ctx.engineFor(target);
-      const related = await engine.get(target.key, scalarString(record[part]));
+      const id = scalarString(record[part]);
+      const related = await relatedRecord(ctx, target, id, session);
       current = related;
       currentType = target;
     } else {
@@ -105,49 +151,62 @@ export async function executeView(
   expose?: Record<string, unknown>,
   context?: ViewRunContext,
 ): Promise<Array<Record<string, unknown>>> {
+  return ctx.queries.execute(ctx, view, expose, context);
+}
+
+async function executePortableView(
+  ctx: QueryContext,
+  view: ViewDef,
+  expose?: Record<string, unknown>,
+  context?: ViewRunContext,
+): Promise<Array<Record<string, unknown>>> {
+  const session = createQuerySession();
   const type = findType(ctx, view.source);
   if (!type) return [];
-  const engine = ctx.engineFor(type);
+  const records = ctx.recordsFor(type);
   const clauses = mergeExpose(normalizeFilters(view.where), exposeFilters(view.expose, expose)).map(
     (clause) => resolveClause(clause, context),
   );
-  const sqlClauses = clauses.filter((clause) => !clause.field.includes("."));
-  const memClauses = clauses.filter((clause) => clause.field.includes("."));
+  const directClauses = clauses.filter((clause) => !clause.field.includes("."));
+  const relatedClauses = clauses.filter((clause) => clause.field.includes("."));
   if (view.group_by) {
-    const sourceRows = await engine.select(type.key, { where: sqlClauses });
+    const sourceRows = await records.query(type, { filters: directClauses });
     const filtered = [];
     for (const row of sourceRows) {
-      if (memClauses.length) {
+      if (relatedClauses.length) {
         const projected = await projectRow(
           ctx,
           type,
           row,
-          memClauses.map((clause) => clause.field),
+          relatedClauses.map((clause) => clause.field),
+          session,
         );
-        if (!matchFilters(projected, memClauses)) continue;
+        if (!matchFilters(projected, relatedClauses)) continue;
       }
       filtered.push(row);
     }
-    const grouped = await aggregateRows(ctx, type, filtered, view);
+    const grouped = await aggregateRows(ctx, type, filtered, view, session);
     return grouped.slice(0, view.limit ?? grouped.length);
   }
   const order = Object.entries(view.order_by ?? {});
   const hasRelatedOrder = order.some(([field]) => field.includes("."));
-  const needsMemoryPass = memClauses.length > 0 || hasRelatedOrder;
-  const rows = await engine.select(type.key, {
-    where: sqlClauses,
-    orderBy: hasRelatedOrder ? undefined : view.order_by,
-    limit: needsMemoryPass ? undefined : view.limit,
+  const needsPortablePass = relatedClauses.length > 0 || hasRelatedOrder;
+  const rows = await records.query(type, {
+    filters: directClauses,
+    order: hasRelatedOrder
+      ? undefined
+      : Object.entries(view.order_by ?? {}).map(([field, direction]) => ({ field, direction })),
+    limit: needsPortablePass ? undefined : view.limit,
   });
   const evaluationPaths = [
     ...view.fields,
-    ...memClauses.map((clause) => clause.field),
+    ...relatedClauses.map((clause) => clause.field),
     ...(hasRelatedOrder ? order.map(([field]) => field) : []),
   ];
   const projected: Array<Record<string, unknown>> = [];
   for (const row of rows) {
-    const next = await projectRow(ctx, type, row, [...new Set(evaluationPaths)]);
-    if (memClauses.length && !matchFilters(next, memClauses)) continue;
+    const next = await projectRow(ctx, type, row, [...new Set(evaluationPaths)], session);
+    if (relatedClauses.length && !matchFilters(next, relatedClauses)) continue;
     projected.push(next);
   }
   if (hasRelatedOrder) sortRows(projected, order);
@@ -183,6 +242,7 @@ async function aggregateRows(
   type: TypeDef,
   rows: RecordValue[],
   view: ViewDef,
+  session: QuerySession,
 ): Promise<Array<Record<string, unknown>>> {
   const groupBy = view.group_by as string;
   const groups = new Map<string, { value: unknown; rows: RecordValue[] }>();
@@ -197,7 +257,7 @@ async function aggregateRows(
     [...groups.values()].map(async (group) => {
       const output: Record<string, unknown> = {
         id: scalarString(group.value),
-        [groupBy]: await groupLabel(ctx, type, groupBy, group.value),
+        [groupBy]: await groupLabel(ctx, type, groupBy, group.value, session),
       };
       for (const [alias, measure] of Object.entries(view.measures ?? {})) {
         output[alias] = aggregateMeasure(group.rows, measure);
@@ -254,12 +314,14 @@ async function groupLabel(
   type: TypeDef,
   fieldKey: string,
   value: unknown,
+  session: QuerySession,
 ): Promise<unknown> {
   const field = type.fields.find((item) => item.key === fieldKey);
   if (field?.type !== "reference" || !field.target || value == null || value === "") return value;
   const target = findType(ctx, field.target);
   if (!target) return value;
-  const related = await ctx.engineFor(target).get(target.key, scalarString(value));
+  const id = scalarString(value);
+  const related = await relatedRecord(ctx, target, id, session);
   if (!related) return value;
   const title = ["name", "title", "number", "email"].find((key) =>
     target.fields.some((item) => item.key === key),
@@ -278,7 +340,8 @@ export function filterRows(
   where?: Record<string, unknown>,
 ): Array<Record<string, unknown>> {
   if (!where) return rows;
-  return rows.filter((row) => matchesWhere(row, where));
+  const clauses = normalizeFilters(where);
+  return rows.filter((row) => matchFilters(row, clauses));
 }
 
 export function fieldWidget(field: FieldDef): FieldInputWidget {

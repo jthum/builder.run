@@ -4,19 +4,6 @@ export type PersistenceBackend = "opfs" | "indexeddb" | "memory";
 const SQLITE_OPFS_DIR = "builder-run-sqlite";
 const SQLITE_IDB_NAME = "builder-run-sqlite";
 
-export async function detectBackend(): Promise<PersistenceBackend> {
-  if (typeof navigator !== "undefined" && navigator.storage?.getDirectory) {
-    try {
-      await navigator.storage.getDirectory();
-      return "opfs";
-    } catch {
-      // fall through
-    }
-  }
-  if (typeof indexedDB !== "undefined") return "indexeddb";
-  return "memory";
-}
-
 export async function wipeLocalData(): Promise<void> {
   if (typeof navigator !== "undefined" && navigator.storage?.getDirectory) {
     try {

@@ -25,3 +25,20 @@ export function scalarString(value: unknown): string {
 export function scalarEqual(left: unknown, right: unknown): boolean {
   return scalarString(left) === scalarString(right);
 }
+
+export function coerceFieldValue(type: string, value: unknown): unknown {
+  if (value == null || value === "") return null;
+  switch (type) {
+    case "number":
+      return typeof value === "number" ? value : Number(value);
+    case "boolean":
+      if (typeof value === "boolean") return value;
+      if (value === "true" || value === 1 || value === "1") return true;
+      if (value === "false" || value === 0 || value === "0") return false;
+      return Boolean(value);
+    case "reference":
+      return scalarString(value);
+    default:
+      return value;
+  }
+}

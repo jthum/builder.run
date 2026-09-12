@@ -16,6 +16,8 @@ The runtime chooses the best available persistence backend:
 
 The **Inspect** screen reports the active backend and the databases currently in use.
 
+All SQLite-specific code, including catalog SQL, is contained in the browser runtime's SQLite persistence adapter. Runtime services depend on logical `RecordStore`, `SchemaMaterializer`, and `CatalogRepository` contracts rather than SQL connections.
+
 ## Catalogue and application databases
 
 The runtime maintains a small catalogue for information such as:
@@ -28,9 +30,22 @@ Each Space/App materialises its own application data in SQLite.
 
 Types become real tables and readable field keys become real columns. The spec, rather than the physical schema, remains authoritative.
 
+The browser Host does not issue SQL or DDL itself. It talks to logical persistence contracts, with SQLite supplied by the current `SqlitePersistence` adapter. This keeps record behaviour and the portable query model independent from the physical database without pretending that unlike databases share every capability.
+
+The current split is:
+
+- record CRUD and direct filtering/sorting/limits through `RecordStore`;
+- portable view execution through `PortableQueryExecutor`;
+- physical type reconciliation through `SchemaMaterializer`;
+- runtime workspace state through `CatalogRepository`.
+
+A future operational adapter can implement those contracts natively. An analytical engine such as DuckDB may instead sit alongside the operational store when that better matches its workload; storage interchangeability is not a requirement that every engine serve the same role.
+
 ## Schema reconciliation
 
 When the application spec changes, builder.run reconciles the materialised SQLite schema.
+
+Reconciliation validates every affected store before changing any of them. Additions and stable-ID renames are applied before the catalog accepts the new spec; destructive pruning happens only after that commit. An interrupted cleanup can therefore leave an unused table or column to prune later, but it cannot make the accepted logical spec unusable.
 
 Typical changes include:
 

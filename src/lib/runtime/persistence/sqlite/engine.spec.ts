@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vite-plus/test";
-import { Host } from "./host.ts";
+import { Host } from "../../host.ts";
 import { createTableSql } from "./sql.ts";
 
 describe("sqlite materialisation", () => {

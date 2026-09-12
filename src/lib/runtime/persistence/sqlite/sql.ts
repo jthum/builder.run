@@ -1,5 +1,5 @@
-import { systemColumns, type ColumnInfo } from "./engine.ts";
-import { scalarString } from "./values.ts";
+import { systemColumns, type ColumnInfo } from "./table-engine.ts";
+import { scalarString } from "../../values.ts";
 
 export function sqlIdent(name: string): string {
   if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(name)) {

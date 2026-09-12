@@ -48,9 +48,9 @@ At a high level:
 ```text
 Human UI ─────────────┐
                      │
-WebMCP tools ─────────┼──> Runtime services ───> SQLite
-                     │          ▲
-Spec editor ─────────┘          │
+WebMCP tools ─────────┼──> Runtime services ───> persistence contracts
+                     │          ▲                       │
+Spec editor ─────────┘          │                       └──> SQLite adapter
                                 │
                          Application spec
 ```
@@ -63,7 +63,19 @@ The browser runtime currently separates that boundary into three roles:
 
 - `SpecService` owns authored spec mutations, reference-safe renames, and definition validation. It does not know how a runtime persists or materialises a spec.
 - `RecordService` owns record operations, form submission, view execution, and the workflow cascade caused by data events.
-- `Host` composes those services with the browser's catalog and SQLite engines. Its commit path stages and validates spec changes, persists the catalog, reconciles record stores, rolls back failures, and only then publishes a new snapshot.
+- `PortableQueryExecutor` turns views into storage-neutral record query plans and completes relation traversal, projection, and aggregation above persistence.
+- `Host` composes those services with a `RuntimePersistence` plug-in. Its commit path stages and validates spec changes, persists the catalog, reconciles record stores, rolls back failures, and only then publishes a new snapshot.
+
+The persistence boundary is intentionally split by responsibility:
+
+- `RecordStore` receives logical record operations against a `TypeDef`, rather than table names or SQL.
+- `SchemaMaterializer` reconciles a set of portable Types with the active persistence technology. SQLite performs DDL; a schemaless runtime can implement different semantics.
+- `CatalogRepository` persists runtime-owned spaces, actors, preferences, and specs.
+- `RuntimePersistence` opens those components and reports the active implementation.
+
+SQLite remains the reference adapter. Its catalog SQL, lower-level table engine, schema reconciler, worker, and gateway live together under `runtime/persistence/sqlite`. They are implementation details below these contracts rather than dependencies of forms, views, workflows, or `Host`.
+
+Schema commits use four phases: validate every affected store, apply non-destructive additions and renames, save the catalog, and finally prune obsolete physical fields and collections. This keeps destructive cleanup out of the failure-sensitive portion of a multi-store commit. If cleanup itself fails, the accepted spec remains usable and the inaccessible physical leftovers can be pruned on a later reconciliation.
 
 The UI and WebMCP use `Host` as the browser-runtime facade, but its methods are not part of the portable application format. A future runtime can provide a different facade while consuming the same canonical spec and preserving the same semantic contracts.
 
@@ -141,6 +153,8 @@ This first runtime intentionally keeps several concerns narrow:
 - hosted multiplayer and cross-device persistence are future runtime concerns.
 
 These are runtime boundaries, not reasons to bake browser-specific assumptions into the portable spec.
+
+Persistence implementations are not expected to pretend that every technology has identical semantics. Realtime subscriptions, offline conflict handling, durable workflow execution, advanced joins, and analytical scans should be added as explicit capabilities when a concrete runtime needs them. The core contracts do not currently promise those behaviours. A reusable persistence contract suite checks the semantics that are promised today: catalog round-tripping, logical record CRUD and queries, schema materialisation, and data-preserving stable-ID renames.
 
 ## Evolution policy
 

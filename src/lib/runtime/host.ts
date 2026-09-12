@@ -1,12 +1,4 @@
-import {
-  CATALOG_DATABASE,
-  ensureCatalog,
-  listCatalogTables,
-  loadPlatform,
-  savePlatform,
-} from "./catalog.ts";
 import { authoredSpec, effectiveSpec } from "./defaults.ts";
-import type { TableEngine } from "./engine.ts";
 import { createId, slugify } from "./ids.ts";
 import {
   cloneData,
@@ -26,27 +18,35 @@ import {
   type ViewDef,
   isExposed,
 } from "./model.ts";
-import type { PersistenceBackend } from "./persist.ts";
 import {
   SPACE_ACCENT_KEYS,
   type PlatformState,
   type SpaceAccent,
   type SpaceState,
 } from "./platform.ts";
-import { findType, type QueryContext, type ViewRunContext } from "./query.ts";
+import {
+  findType,
+  PortableQueryExecutor,
+  type QueryContext,
+  type ViewRunContext,
+} from "./query.ts";
 import { RecordService, type WorkflowRun } from "./record-service.ts";
 import { newAppSpec, rootSpaceSpec, sampleApps } from "./samples.ts";
-import { reconcileStore } from "./schema.ts";
 import { SpecService, type SpecChange } from "./spec-service.ts";
-import { SqliteEngine } from "./sql-engine.ts";
-import { openSqlGateway, type SqlConnection, type SqlGateway } from "./sql-gateway.ts";
+import { SqlitePersistence } from "./persistence/sqlite/persistence.ts";
+import type {
+  CatalogRepository,
+  RecordStore,
+  RuntimePersistence,
+  RuntimeStore,
+} from "./storage.ts";
 import type { SpecReference } from "./spec-references.ts";
 
 export type { PlatformState, SpaceState } from "./platform.ts";
 
 export interface HostSnapshot {
-  backend: PersistenceBackend;
-  engine: "sqlite";
+  backend: string;
+  engine: string;
   webmcp: boolean;
   space: SpaceState;
   app: SpaceState;
@@ -60,21 +60,22 @@ export interface HostSnapshot {
 }
 
 export interface HostOptions {
-  gateway?: SqlGateway;
+  persistence?: RuntimePersistence;
 }
 
 type Listener = () => void;
 
 export class Host {
-  backend: PersistenceBackend = "memory";
+  backend = "memory";
   private platform!: PlatformState;
-  private gateway!: SqlGateway;
-  private catalog!: SqlConnection;
-  private engines = new Map<string, TableEngine>();
+  private persistence!: RuntimePersistence;
+  private catalog!: CatalogRepository;
+  private stores = new Map<string, RuntimeStore>();
   private listeners = new Set<Listener>();
   private silent = false;
   private storeTables = new Map<string, string[]>();
   private catalogTables: string[] = [];
+  private readonly queries = new PortableQueryExecutor();
   private readonly records = new RecordService({
     resolvedSpec: () => this.resolvedSpec(),
     queryContext: () => this.queryContext(),
@@ -91,17 +92,16 @@ export class Host {
 
   static async open(options: HostOptions = {}): Promise<Host> {
     const host = new Host();
-    host.gateway = options.gateway ?? (await openSqlGateway());
-    host.backend = host.gateway.backend;
-    host.catalog = await host.gateway.open(CATALOG_DATABASE);
-    await ensureCatalog(host.catalog);
-    const loaded = await loadPlatform(host.catalog);
+    host.persistence = options.persistence ?? (await SqlitePersistence.open());
+    host.backend = host.persistence.backend;
+    host.catalog = await host.persistence.openCatalog();
+    const loaded = await host.catalog.load();
     if (loaded) {
       host.platform = loaded;
     } else {
       host.platform = seedPlatform();
     }
-    await host.bootEngines();
+    await host.bootStores();
     await host.reconcileAll();
     await host.saveCatalog();
     return host;
@@ -119,43 +119,97 @@ export class Host {
   }
 
   private async saveCatalog(): Promise<void> {
-    await savePlatform(this.catalog, this.platform);
-    this.catalogTables = await listCatalogTables(this.catalog);
+    await this.catalog.save(this.platform);
+    this.catalogTables = await this.catalog.collections();
   }
 
-  private spaceFile(id: string): string {
-    return `space-${id}`;
-  }
-
-  private async bootEngines(): Promise<void> {
-    this.engines.clear();
+  private async bootStores(): Promise<void> {
     const ids = new Set([this.app().id, this.space().id]);
+    for (const [id, store] of this.stores) {
+      if (ids.has(id)) continue;
+      await store.close();
+      this.stores.delete(id);
+      this.storeTables.delete(id);
+    }
+    await this.openStores(ids);
+  }
+
+  private async openStores(ids: ReadonlySet<string>): Promise<Set<string>> {
+    const opened = new Set<string>();
+    try {
+      for (const id of ids) {
+        if (this.stores.has(id)) continue;
+        this.stores.set(id, await this.persistence.openStore(id));
+        opened.add(id);
+      }
+      return opened;
+    } catch (error) {
+      await this.closeInactiveStores(opened);
+      throw error;
+    }
+  }
+
+  private async closeInactiveStores(ids: ReadonlySet<string>): Promise<void> {
+    const active = new Set([this.app().id, this.space().id]);
     for (const id of ids) {
-      const name = this.spaceFile(id);
-      const conn = await this.gateway.open(name);
-      this.engines.set(id, new SqliteEngine(conn, name));
+      if (active.has(id)) continue;
+      try {
+        await this.stores.get(id)?.close();
+      } catch (error) {
+        console.warn(`builder.run failed to close inactive store ${id}`, error);
+      } finally {
+        this.stores.delete(id);
+        this.storeTables.delete(id);
+      }
     }
   }
 
   private async reconcileAll(): Promise<void> {
-    const tables = await this.reconcileSpecs(
-      this.platform,
-      new Set([this.space().id, this.app().id]),
-    );
+    const ids = new Set([this.space().id, this.app().id]);
+    await this.prepareSchemas(this.platform, ids);
+    await this.applySchemas(this.platform, ids);
+    await this.pruneSchemas(this.platform, ids);
+    const tables = await this.inspectSchemas(ids);
     for (const [id, names] of tables) this.storeTables.set(id, names);
   }
 
-  private async reconcileSpecs(
-    platform: PlatformState,
-    ids: ReadonlySet<string>,
-  ): Promise<Map<string, string[]>> {
+  private schemaTarget(platform: PlatformState, id: string) {
+    const store = this.stores.get(id);
+    const owner = platform.spaces.find((item) => item.id === id);
+    if (!store || !owner) throw new Error(`Store for spec owner ${id} is not open`);
+    return { schema: store.schema, types: owner.spec.types };
+  }
+
+  private async prepareSchemas(platform: PlatformState, ids: ReadonlySet<string>): Promise<void> {
+    for (const id of ids) {
+      const target = this.schemaTarget(platform, id);
+      await target.schema.prepare(target.types);
+    }
+  }
+
+  private async applySchemas(platform: PlatformState, ids: ReadonlySet<string>): Promise<void> {
+    for (const id of ids) {
+      const target = this.schemaTarget(platform, id);
+      await target.schema.apply(target.types);
+    }
+  }
+
+  private async pruneSchemas(platform: PlatformState, ids: ReadonlySet<string>): Promise<void> {
+    for (const id of ids) {
+      const target = this.schemaTarget(platform, id);
+      await target.schema.prune(target.types);
+    }
+  }
+
+  private async inspectSchemas(ids: ReadonlySet<string>): Promise<Map<string, string[]>> {
     const tables = new Map<string, string[]>();
     for (const id of ids) {
-      const engine = this.engines.get(id);
-      const target = platform.spaces.find((item) => item.id === id);
-      if (!engine || !target) continue;
-      await engine.transaction(() => reconcileStore(engine, target.spec.types));
-      tables.set(id, await engine.listTables());
+      const store = this.stores.get(id);
+      if (!store) throw new Error(`Store for spec owner ${id} is not open`);
+      tables.set(
+        id,
+        (await store.schema.inspect()).collections.map((collection) => collection.name),
+      );
     }
     return tables;
   }
@@ -178,36 +232,53 @@ export class Host {
       changedIds.add(change.id);
     }
 
-    await savePlatform(this.catalog, staged);
-    let tables: Map<string, string[]>;
+    const opened = await this.openStores(changedIds);
     try {
-      tables = await this.reconcileSpecs(staged, changedIds);
-    } catch (error) {
+      await this.prepareSchemas(staged, changedIds);
       try {
-        await savePlatform(this.catalog, previous);
-        await this.reconcileSpecs(previous, changedIds);
-      } catch (rollbackError) {
-        console.error("builder.run failed to restore a spec commit", rollbackError);
+        await this.applySchemas(staged, changedIds);
+        await this.catalog.save(staged);
+      } catch (error) {
+        try {
+          await this.prepareSchemas(previous, changedIds);
+          await this.applySchemas(previous, changedIds);
+          await this.pruneSchemas(previous, changedIds);
+          await this.catalog.save(previous);
+        } catch (rollbackError) {
+          console.error("builder.run failed to restore a spec commit", rollbackError);
+        }
+        throw error;
       }
-      throw error;
-    }
 
-    const catalogTables = await listCatalogTables(this.catalog);
-    this.platform = staged;
-    this.catalogTables = catalogTables;
-    for (const [id, names] of tables) this.storeTables.set(id, names);
-    if (!this.silent) {
-      for (const listener of this.listeners) listener();
+      this.platform = staged;
+      try {
+        await this.pruneSchemas(staged, changedIds);
+      } catch (error) {
+        console.warn("builder.run left obsolete physical schema for a later cleanup", error);
+      }
+
+      try {
+        this.catalogTables = await this.catalog.collections();
+        const tables = await this.inspectSchemas(changedIds);
+        for (const [id, names] of tables) this.storeTables.set(id, names);
+      } catch (error) {
+        console.warn("builder.run could not refresh persistence diagnostics", error);
+      }
+      if (!this.silent) {
+        for (const listener of this.listeners) listener();
+      }
+    } finally {
+      await this.closeInactiveStores(opened);
     }
   }
 
-  private engineForType(type: TypeDef): TableEngine {
+  private recordsForType(type: TypeDef): RecordStore {
     const appHas = this.app().spec.types.some((item) => item.key === type.key);
     const spaceHas = this.space().spec.types.some((item) => item.key === type.key);
     const id = appHas ? this.app().id : spaceHas ? this.space().id : this.app().id;
-    const engine = this.engines.get(id);
-    if (!engine) throw new Error(`Store for ${type.key} is not open`);
-    return engine;
+    const store = this.stores.get(id);
+    if (!store) throw new Error(`Store for ${type.key} is not open`);
+    return store.records;
   }
 
   /** Account space: the space that holds the current actor. */
@@ -276,7 +347,7 @@ export class Host {
     const app = this.app();
     return {
       backend: this.backend,
-      engine: "sqlite",
+      engine: this.persistence.kind,
       webmcp: typeof document !== "undefined" && Boolean(document.modelContext),
       space: cloneData(space),
       app: cloneData(app),
@@ -294,19 +365,19 @@ export class Host {
               {
                 key: "space",
                 label: space.name,
-                database: this.spaceFile(space.id),
+                database: this.stores.get(space.id)?.records.name ?? space.id,
                 tables: this.storeTables.get(space.id) ?? [],
               },
             ]),
         {
           key: "app",
           label: app.name,
-          database: this.spaceFile(app.id),
+          database: this.stores.get(app.id)?.records.name ?? app.id,
           tables: this.storeTables.get(app.id) ?? [],
         },
       ],
       catalog: {
-        database: CATALOG_DATABASE,
+        database: this.catalog.name,
         tables: this.catalogTables,
       },
     };
@@ -317,7 +388,8 @@ export class Host {
     return {
       spec,
       sharedTypes: this.space().spec.types.filter(isExposed),
-      engineFor: (type) => this.engineForType(type),
+      recordsFor: (type) => this.recordsForType(type),
+      queries: this.queries,
     };
   }
 
@@ -462,7 +534,7 @@ export class Host {
     };
     this.platform.spaces.push(app);
     this.platform.activeSpaceId = app.id;
-    await this.bootEngines();
+    await this.bootStores();
     await this.reconcileAll();
     if (!options.silent) await this.persistAndEmit();
     return app;
@@ -472,7 +544,7 @@ export class Host {
     const app = this.apps().find((item) => item.id === id);
     if (!app) throw new Error("Unknown app");
     this.platform.activeSpaceId = id;
-    await this.bootEngines();
+    await this.bootStores();
     await this.reconcileAll();
     await this.persistAndEmit();
   }
@@ -481,7 +553,7 @@ export class Host {
     const seeded = seedSpace(name);
     this.platform.spaces.push(...seeded.spaces);
     this.platform.activeSpaceId = seeded.activeId;
-    await this.bootEngines();
+    await this.bootStores();
     await this.reconcileAll();
     await this.persistAndEmit();
     return this.space();
@@ -494,7 +566,7 @@ export class Host {
     const firstApp = this.platform.spaces.find((item) => item.createdBy === human?.id);
     if (firstApp) {
       this.platform.activeSpaceId = firstApp.id;
-      await this.bootEngines();
+      await this.bootStores();
       await this.reconcileAll();
       await this.persistAndEmit();
       return;
@@ -546,7 +618,7 @@ export class Host {
       (item) => item.createdBy === createdBy && item.id !== id,
     );
     const deletingActive = this.platform.activeSpaceId === id;
-    if (deletingActive) await this.closeLocalEngine();
+    if (deletingActive) await this.closeLocalStore();
     this.platform.spaces = this.platform.spaces.filter((item) => item.id !== id);
     if (deletingActive) {
       if (others.length) this.platform.activeSpaceId = others[0]!.id;
@@ -561,21 +633,18 @@ export class Host {
         this.platform.spaces.push(blank);
         this.platform.activeSpaceId = blank.id;
       }
-      await this.bootEngines();
+      await this.bootStores();
       await this.reconcileAll();
     }
     await this.persistAndEmit();
     return this.app();
   }
 
-  private async closeLocalEngine(): Promise<void> {
+  private async closeLocalStore(): Promise<void> {
     const appId = this.app().id;
     if (appId === this.space().id) return;
-    const engine = this.engines.get(appId);
-    if (engine && "close" in engine && typeof engine.close === "function") {
-      await engine.close();
-    }
-    this.engines.delete(appId);
+    await this.stores.get(appId)?.close();
+    this.stores.delete(appId);
   }
 
   async createApp(name: string, template?: string | null): Promise<SpaceState> {
@@ -651,35 +720,32 @@ export class Host {
   ): Promise<{ database: string; tables: Array<{ name: string; columns: string[] }> }> {
     if (which !== "local" && which !== "space") throw new Error(`Unknown store ${which}`);
     const id = which === "space" ? this.space().id : this.app().id;
-    const engine = this.engines.get(id);
-    if (!engine) throw new Error(`Store ${which} is not open`);
-    const names = await engine.listTables();
-    const tables = [];
-    for (const name of names) {
-      const columns = await engine.tableInfo(name);
-      tables.push({ name, columns: columns.map((column) => `${column.name} ${column.sqlType}`) });
-    }
-    return { database: this.spaceFile(id), tables };
+    const store = this.stores.get(id);
+    if (!store) throw new Error(`Store ${which} is not open`);
+    const inspection = await store.schema.inspect();
+    const tables = inspection.collections.map((collection) => ({
+      name: collection.name,
+      columns: collection.fields,
+    }));
+    return { database: inspection.name, tables };
   }
 
   /** Close stores and delete catalog, space files, and leftover IndexedDB on this device. */
   async resetLocalData(): Promise<void> {
-    for (const engine of this.engines.values()) {
+    for (const store of this.stores.values()) {
       try {
-        if ("close" in engine && typeof engine.close === "function") {
-          await engine.close();
-        }
+        await store.close();
       } catch (error) {
         console.warn("builder.run close store failed", error);
       }
     }
-    this.engines.clear();
+    this.stores.clear();
     try {
       await this.catalog.close();
     } catch (error) {
       console.warn("builder.run close catalog failed", error);
     }
-    await this.gateway.wipe();
+    await this.persistence.wipe();
   }
 
   fieldReferences(

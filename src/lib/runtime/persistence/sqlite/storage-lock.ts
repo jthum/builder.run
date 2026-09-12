@@ -1,3 +1,4 @@
+/** Stable worker error code used when SQLite cannot acquire its browser storage lock. */
 export const STORAGE_LOCKED = "STORAGE_LOCKED";
 
 const RELOAD_KEY = "builder-run:storage-locked-reload";

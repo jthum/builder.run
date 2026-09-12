@@ -38,8 +38,8 @@ export class RecordService {
     const context = this.context.queryContext();
     const type = findType(context, typeKey);
     if (!type) return [];
-    const rows = await context.engineFor(type).select(type.key, {
-      orderBy: { updated_at: "desc" },
+    const rows = await context.recordsFor(type).query(type, {
+      order: [{ field: "updated_at", direction: "desc" }],
     });
     return rows.map((row) => decodeRecord(type, row));
   }
@@ -48,7 +48,7 @@ export class RecordService {
     const context = this.context.queryContext();
     const type = findType(context, typeKey);
     if (!type) return null;
-    const row = await context.engineFor(type).get(type.key, id);
+    const row = await context.recordsFor(type).get(type, id);
     return row ? decodeRecord(type, row) : null;
   }
 

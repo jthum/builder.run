@@ -1,9 +1,11 @@
-import { describe, expect, it } from "vite-plus/test";
+import { describe, expect, it, vi } from "vite-plus/test";
 import { Host } from "./host.ts";
 import { groupChart } from "./chart-data.ts";
+import type { TypeDef } from "./model.ts";
 import { specFromText } from "./serialize.ts";
-import { createNodeGateway } from "./sql-node.ts";
-import { CATALOG_DATABASE } from "./catalog.ts";
+import { CATALOG_DATABASE } from "./persistence/sqlite/catalog.ts";
+import { createNodeGateway } from "./persistence/sqlite/node-gateway.ts";
+import { SqlitePersistence } from "./persistence/sqlite/persistence.ts";
 
 describe("builder.run host", () => {
   it("validates standalone forms and dispatches form submission workflows", async () => {
@@ -831,10 +833,40 @@ types:
 
   it("persists space appearance across runtime instances", async () => {
     const gateway = createNodeGateway();
-    const host = await Host.open({ gateway });
+    const host = await Host.open({ persistence: new SqlitePersistence(gateway) });
     await host.updateSpaceAppearance("violet");
-    const reloaded = await Host.open({ gateway });
+    const reloaded = await Host.open({ persistence: new SqlitePersistence(gateway) });
     expect(reloaded.space().appearance?.accent).toBe("violet");
+  });
+
+  it("closes inactive app stores while retaining the active app and account space", async () => {
+    const base = createNodeGateway();
+    const closed: string[] = [];
+    const gateway = {
+      backend: base.backend,
+      async open(name: string) {
+        const connection = await base.open(name);
+        return {
+          exec: connection.exec.bind(connection),
+          query: connection.query.bind(connection),
+          async close() {
+            closed.push(name);
+            await connection.close();
+          },
+        };
+      },
+      wipe: () => base.wipe(),
+    };
+    const host = await Host.open({ persistence: new SqlitePersistence(gateway) });
+    const first = host.app();
+    const firstDatabase = host.snapshot().stores.find((store) => store.key === "app")!.database;
+    const second = await host.createApp("Second");
+
+    expect(closed).toContain(firstDatabase);
+    expect(host.app().id).toBe(second.id);
+    await host.switchApp(first.id);
+    expect(closed).toContain(`space-${second.id}`);
+    expect(host.snapshot().stores).toHaveLength(2);
   });
 
   it("rejects and does not publish a mutation when catalog persistence fails", async () => {
@@ -856,16 +888,77 @@ types:
       },
       wipe: () => base.wipe(),
     };
-    const host = await Host.open({ gateway });
+    const host = await Host.open({ persistence: new SqlitePersistence(gateway) });
+    await host.upsertType({
+      key: "task",
+      fields: { title: "text", detail: "text" },
+    });
+    const task = await host.create("task", { title: "Keep", detail: "Do not lose" });
     let published = 0;
     host.subscribe(() => published++);
     rejectWrites = true;
+    await expect(host.deleteField("task", "detail")).rejects.toThrow("catalog unavailable");
+    await expect(host.getRecord("task", task.id)).resolves.toMatchObject({
+      title: "Keep",
+      detail: "Do not lose",
+    });
     await expect(host.upsertType({ key: "note", fields: { title: "text" } })).rejects.toThrow(
       "catalog unavailable",
     );
     expect(host.resolvedSpec().types.some((type) => type.key === "note")).toBe(false);
     await expect(host.renameSpace("Unsaved name")).rejects.toThrow("catalog unavailable");
     expect(published).toBe(0);
+  });
+
+  it("accepts a committed spec when destructive schema cleanup must be retried", async () => {
+    const sqlite = new SqlitePersistence(createNodeGateway());
+    let rejectPrune = false;
+    const persistence = {
+      kind: sqlite.kind,
+      backend: sqlite.backend,
+      openCatalog: () => sqlite.openCatalog(),
+      async openStore(ownerId: string) {
+        const store = await sqlite.openStore(ownerId);
+        return {
+          records: store.records,
+          close: () => store.close(),
+          schema: {
+            prepare: store.schema.prepare.bind(store.schema),
+            apply: store.schema.apply.bind(store.schema),
+            inspect: store.schema.inspect.bind(store.schema),
+            prune(types: TypeDef[]) {
+              if (rejectPrune) throw new Error("cleanup unavailable");
+              return store.schema.prune(types);
+            },
+          },
+        };
+      },
+      wipe: () => sqlite.wipe(),
+    };
+    const host = await Host.open({ persistence });
+    await host.upsertType({ key: "task", fields: { title: "text", detail: "text" } });
+    const task = await host.create("task", { title: "Keep", detail: "Remove" });
+    const warning = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+
+    rejectPrune = true;
+    try {
+      await expect(host.deleteField("task", "detail")).resolves.toBeUndefined();
+      expect(
+        host
+          .resolvedSpec()
+          .types.find((type) => type.key === "task")
+          ?.fields.map((field) => field.key),
+      ).toEqual(["title"]);
+      await expect(host.getRecord("task", task.id)).resolves.toEqual(
+        expect.not.objectContaining({ detail: "Remove" }),
+      );
+      expect(warning).toHaveBeenCalledWith(
+        "builder.run left obsolete physical schema for a later cleanup",
+        expect.any(Error),
+      );
+    } finally {
+      warning.mockRestore();
+    }
   });
 
   it("deletes an app and leaves a blank one if it was the last", async () => {
@@ -1287,12 +1380,12 @@ types:
   it("wipes local data so a new host reseeds without leftover space ids", async () => {
     expect.hasAssertions();
     const gateway = createNodeGateway();
-    const host = await Host.open({ gateway });
+    const host = await Host.open({ persistence: new SqlitePersistence(gateway) });
     await host.loadSample("freelance_crm");
     const oldSpace = host.space().id;
     const oldApp = host.app().id;
     await host.resetLocalData();
-    const next = await Host.open({ gateway });
+    const next = await Host.open({ persistence: new SqlitePersistence(gateway) });
     expect(next.space().id).not.toBe(oldSpace);
     expect(next.app().id).not.toBe(oldApp);
     expect(next.space().id.startsWith("spc_")).toBe(false);

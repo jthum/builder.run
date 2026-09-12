@@ -8,6 +8,7 @@ import type {
   AutomationEffectCall,
   AutomationPredicate,
 } from "./automation/model.ts";
+import { normalizeFilters } from "./filters.ts";
 import { validateAutomation } from "./automation/validate.ts";
 import type { ExecutionContext, WorkflowDef, WorkflowStep, RecordValue } from "./model.ts";
 import { nowIso } from "./model.ts";
@@ -110,7 +111,7 @@ async function hydrateInputs(
     }
     const type = findType(ctx, definition.record);
     if (!type) throw new Error(`Unknown input record type ${definition.record}`);
-    const record = await ctx.engineFor(type).get(type.key, scalarString(value));
+    const record = await ctx.recordsFor(type).get(type, scalarString(value));
     if (!record) throw new Error(`Unknown ${definition.record} record ${scalarString(value)}`);
     scope[name] = record;
   }
@@ -304,7 +305,9 @@ async function executeEffect(
     }
     const type = findType(ctx, scalarString(params.type));
     if (!type) throw new Error(`Unknown type ${scalarString(params.type)}`);
-    return ctx.engineFor(type).select(type.key, { where: asObject(params.where) });
+    return ctx.recordsFor(type).query(type, {
+      filters: normalizeFilters(asObject(params.where)),
+    });
   }
   throw new Error(`Unknown effect ${call.key}`);
 }

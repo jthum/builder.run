@@ -1,13 +1,14 @@
-import type { Actor, AppSpec } from "./model.ts";
-import { nowIso, normalizeSpec } from "./model.ts";
+import type { Actor, AppSpec } from "../../model.ts";
+import { nowIso, normalizeSpec } from "../../model.ts";
 import {
   SPACE_ACCENT_KEYS,
   type PlatformState,
   type SpaceAccent,
   type SpaceState,
-} from "./platform.ts";
-import type { SqlConnection } from "./sql-gateway.ts";
-import { scalarString } from "./values.ts";
+} from "../../platform.ts";
+import type { CatalogRepository } from "../../storage.ts";
+import { scalarString } from "../../values.ts";
+import type { SqlConnection } from "./gateway.ts";
 
 /** Platform registry. Spaces, actors, and which space is active. */
 export const CATALOG_DATABASE = "catalog";
@@ -187,5 +188,29 @@ export async function savePlatform(conn: SqlConnection, platform: PlatformState)
       // ignore
     }
     throw error;
+  }
+}
+
+/** Keeps the browser Host independent of the SQLite catalogue representation. */
+export class SqliteCatalogRepository implements CatalogRepository {
+  readonly name = CATALOG_DATABASE;
+
+  constructor(private readonly connection: SqlConnection) {}
+
+  async load(): Promise<PlatformState | null> {
+    await ensureCatalog(this.connection);
+    return loadPlatform(this.connection);
+  }
+
+  save(platform: PlatformState): Promise<void> {
+    return savePlatform(this.connection, platform);
+  }
+
+  collections(): Promise<string[]> {
+    return listCatalogTables(this.connection);
+  }
+
+  close(): Promise<void> {
+    return this.connection.close();
   }
 }

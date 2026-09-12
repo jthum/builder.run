@@ -1,9 +1,14 @@
-import { nowIso, type RecordValue } from "./model.ts";
-import { type ColumnInfo, type SelectOptions, type TableEngine, systemColumns } from "./engine.ts";
-import type { SqlConnection } from "./sql-gateway.ts";
-import { inValues, normalizeFilters, type FilterClause } from "./filters.ts";
+import { inValues, normalizeFilters, type FilterClause } from "../../filters.ts";
+import { nowIso, type RecordValue } from "../../model.ts";
+import { scalarString } from "../../values.ts";
+import type { SqlConnection } from "./gateway.ts";
 import { bindValue, createTableSql, placeholders, quoteList, sqlIdent } from "./sql.ts";
-import { scalarString } from "./values.ts";
+import {
+  type ColumnInfo,
+  type SelectOptions,
+  type TableEngine,
+  systemColumns,
+} from "./table-engine.ts";
 
 export class SqliteEngine implements TableEngine {
   readonly name: string;
@@ -159,31 +164,6 @@ export class SqliteEngine implements TableEngine {
         throw error;
       }
     });
-  }
-
-  async dump(): Promise<Record<string, RecordValue[]>> {
-    const data: Record<string, RecordValue[]> = {};
-    for (const table of await this.listTables()) {
-      data[table] = await this.select(table);
-    }
-    return data;
-  }
-
-  async load(data: Record<string, RecordValue[]>): Promise<void> {
-    for (const [table, rows] of Object.entries(data)) {
-      const existing = await this.listTables();
-      if (!existing.includes(table) && rows[0]) {
-        const columns: ColumnInfo[] = Object.keys(rows[0])
-          .filter((name) => !systemColumns().some((column) => column.name === name))
-          .map((name) => ({ name, sqlType: "TEXT" }));
-        await this.createTable(table, columns);
-      }
-      for (const row of rows) {
-        const current = await this.get(table, row.id);
-        if (current) await this.update(table, row.id, row);
-        else await this.insert(table, row);
-      }
-    }
   }
 
   async close(): Promise<void> {

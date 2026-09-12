@@ -1,4 +1,3 @@
-import { coerceFieldValue, type TableEngine } from "./engine.ts";
 import { resolveFieldState } from "./field-state.ts";
 import {
   nowIso,
@@ -8,7 +7,7 @@ import {
   type TypeDef,
 } from "./model.ts";
 import { findType, type QueryContext } from "./query.ts";
-import { scalarEqual, scalarString } from "./values.ts";
+import { coerceFieldValue, scalarEqual, scalarString } from "./values.ts";
 
 export interface ChangeEvent {
   kind: "created" | "updated" | "deleted";
@@ -163,7 +162,7 @@ export async function createRecord(
   const prepared = prepareValues(type, values);
   const errors = validateRecord(type, prepared);
   if (errors.length) throw new Error(errors.join("; "));
-  const engine = ctx.engineFor(type);
+  const records = ctx.recordsFor(type);
   const stamp = nowIso();
   const record = {
     created_at: stamp,
@@ -172,7 +171,7 @@ export async function createRecord(
     updated_by: exec.actorId,
     ...prepared,
   };
-  const stored = decodeRecord(type, await engine.insert(type.key, record));
+  const stored = decodeRecord(type, await records.create(type, record));
   return {
     record: stored,
     change: {
@@ -193,20 +192,20 @@ export async function updateRecord(
   exec: ExecutionContext,
 ): Promise<{ record: RecordValue; change: ChangeEvent }> {
   const type = requireType(ctx, typeKey);
-  const engine = ctx.engineFor(type);
-  const before = await engine.get(type.key, id);
+  const records = ctx.recordsFor(type);
+  const before = await records.get(type, id);
   if (!before) throw new Error(`${type.label} ${id} not found`);
   const prepared = prepareValues(type, { ...before, ...values });
   const errors = validateRecord(type, prepared);
   if (errors.length) throw new Error(errors.join("; "));
   const changed = changedFields(type.fields, before, prepared);
   const transition = resolveLifecycleTransition(type, before, prepared);
-  await engine.update(type.key, id, {
+  await records.update(type, id, {
     ...prepared,
     updated_by: exec.actorId,
     updated_at: nowIso(),
   });
-  const record = decodeRecord(type, (await engine.get(type.key, id)) as RecordValue);
+  const record = decodeRecord(type, (await records.get(type, id)) as RecordValue);
   return {
     record,
     change: {
@@ -245,10 +244,10 @@ export async function deleteRecord(
   id: string,
 ): Promise<{ change: ChangeEvent }> {
   const type = requireType(ctx, typeKey);
-  const engine = ctx.engineFor(type);
-  const before = await engine.get(type.key, id);
+  const records = ctx.recordsFor(type);
+  const before = await records.get(type, id);
   if (!before) throw new Error(`${type.label} ${id} not found`);
-  await engine.delete(type.key, id);
+  await records.delete(type, id);
   return {
     change: {
       kind: "deleted",
@@ -284,12 +283,4 @@ function requireType(ctx: QueryContext, typeKey: string): TypeDef {
   const type = findType(ctx, typeKey);
   if (!type) throw new Error(`Unknown type ${typeKey}`);
   return type;
-}
-
-export function engineLookup(engines: Map<string, TableEngine>): (storeKey: string) => TableEngine {
-  return (storeKey: string) => {
-    const engine = engines.get(storeKey);
-    if (!engine) throw new Error(`Unknown store ${storeKey}`);
-    return engine;
-  };
 }

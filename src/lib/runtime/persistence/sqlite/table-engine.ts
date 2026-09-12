@@ -1,6 +1,4 @@
-import type { FilterClause, RecordValue } from "./model.ts";
-import { matchFilters, normalizeFilters } from "./filters.ts";
-import { scalarEqual, scalarString } from "./values.ts";
+import type { FilterClause, RecordValue } from "../../model.ts";
 
 export interface ColumnInfo {
   name: string;
@@ -29,8 +27,6 @@ export interface TableEngine {
   get(table: string, id: string): Promise<RecordValue | null>;
   select(table: string, options?: SelectOptions): Promise<RecordValue[]>;
   transaction<T>(fn: () => Promise<T>): Promise<T>;
-  dump(): Promise<Record<string, RecordValue[]>>;
-  load(data: Record<string, RecordValue[]>): Promise<void>;
 }
 
 const META_COLUMNS: ColumnInfo[] = [
@@ -45,36 +41,4 @@ export function systemColumns(idSqlType = "TEXT"): ColumnInfo[] {
   return META_COLUMNS.map((column) =>
     column.name === "id" ? { ...column, sqlType: idSqlType } : { ...column },
   );
-}
-
-export function matchesWhere(
-  row: Record<string, unknown>,
-  where: FilterClause[] | Record<string, unknown>,
-): boolean {
-  return matchFilters(row, normalizeFilters(where));
-}
-
-export function valuesEqual(left: unknown, right: unknown): boolean {
-  if (left == null && right == null) return true;
-  if (typeof left === "boolean" || typeof right === "boolean") {
-    return Boolean(left) === Boolean(right);
-  }
-  return scalarEqual(left, right);
-}
-
-export function coerceFieldValue(type: string, value: unknown): unknown {
-  if (value == null || value === "") return null;
-  switch (type) {
-    case "number":
-      return typeof value === "number" ? value : Number(value);
-    case "boolean":
-      if (typeof value === "boolean") return value;
-      if (value === "true" || value === 1 || value === "1") return true;
-      if (value === "false" || value === 0 || value === "0") return false;
-      return Boolean(value);
-    case "reference":
-      return scalarString(value);
-    default:
-      return value;
-  }
 }

@@ -3,7 +3,7 @@ import {
   clearStorageLockReload,
   isStorageLocked,
   takeStorageLockReload,
-} from "$lib/runtime/storage-lock.ts";
+} from "$lib/runtime/persistence/sqlite/storage-lock.ts";
 import {
   createWebMcpBridge,
   getWebMcpAppToolMode,
@@ -107,7 +107,7 @@ export async function wipeAllLocalData(): Promise<void> {
   if (session.host) {
     await session.host.resetLocalData();
   } else {
-    const { wipeLocalData } = await import("$lib/runtime/persist.ts");
+    const { wipeLocalData } = await import("$lib/runtime/persistence/sqlite/browser-storage.ts");
     await wipeLocalData();
   }
   location.reload();

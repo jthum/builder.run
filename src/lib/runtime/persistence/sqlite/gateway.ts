@@ -1,4 +1,4 @@
-import type { PersistenceBackend } from "./persist.ts";
+import type { PersistenceBackend } from "./browser-storage.ts";
 
 export interface SqlConnection {
   exec(sql: string, params?: unknown[]): Promise<void>;
@@ -14,9 +14,9 @@ export interface SqlGateway {
 
 export async function openSqlGateway(): Promise<SqlGateway> {
   if (typeof window === "undefined") {
-    const { createNodeGateway } = await import("./sql-node.ts");
+    const { createNodeGateway } = await import("./node-gateway.ts");
     return createNodeGateway();
   }
-  const { connectWorkerGateway } = await import("./sql-browser.ts");
+  const { connectWorkerGateway } = await import("./browser-gateway.ts");
   return connectWorkerGateway();
 }
