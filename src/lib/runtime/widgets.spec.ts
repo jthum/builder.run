@@ -4,6 +4,7 @@ import {
   appendInGroup,
   collectViewKeys,
   configurePageRows,
+  configureWidgetValues,
   defaultRowHeight,
   describeWidget,
   groupHeightClass,
@@ -197,6 +198,15 @@ describe("page widgets", () => {
         { kind: "widget", widget: "kanban", values: { view: "tasks", field: "points" } },
       ]),
     ).toThrow('Widget "kanban" values.field cannot be "points". Valid options: status.');
+
+    const progress = widgetByKey("progress");
+    expect(progress).toBeTruthy();
+    expect(() =>
+      configureWidgetValues(spec, progress!, {
+        view: "tasks",
+        target: "100",
+      }),
+    ).toThrow('Widget "progress" values.target must be a finite number');
   });
 
   it("wraps a single nested block object so group.blocks.filter never throws", () => {

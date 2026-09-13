@@ -1,10 +1,13 @@
 <script lang="ts">
+	import { goto } from "$app/navigation";
 	import { runtime, session } from "$lib/app/session.svelte.ts";
 	import PageHeader from "$lib/components/page-header.svelte";
 	import PageWidget from "$lib/components/page-widget.svelte";
 	import WidgetPicker from "$lib/components/widget-picker.svelte";
 	import WidgetSheet from "$lib/components/widget-sheet.svelte";
+	import { Badge } from "$lib/components/ui/badge/index.js";
 	import { Button } from "$lib/components/ui/button/index.js";
+	import * as Card from "$lib/components/ui/card/index.js";
 	import * as DropdownMenu from "$lib/components/ui/dropdown-menu/index.js";
 	import * as Empty from "$lib/components/ui/empty/index.js";
 	import type { PageBlock, PageDef, PageRowHeight } from "$lib/runtime/model.ts";
@@ -48,16 +51,19 @@
 		title,
 		description,
 		editable = true,
+		startEditing = false,
 	}: {
 		page: PageDef;
 		title: string;
 		description?: string;
 		editable?: boolean;
+		startEditing?: boolean;
 	} = $props();
 
 	const spec = $derived(session.snapshot?.spec);
 	let editing = $state(false);
 	let draft = $state<PageBlock[]>([]);
+	let draftPageKey = "";
 	let pickerOpen = $state(false);
 	let insertPath = $state<number[] | null>(null);
 	let sheetOpen = $state(false);
@@ -69,9 +75,16 @@
 	const editingBlock = $derived(editingPath ? blockFrom(live, editingPath) : null);
 
 	$effect(() => {
+		if (startEditing) editing = true;
+	});
+
+	$effect(() => {
 		void session.revision;
 		void current.key;
-		if (!editing) draft = normalizePage(current).blocks;
+		if (!editing || draftPageKey !== current.key) {
+			draft = normalizePage(current).blocks;
+			draftPageKey = current.key;
+		}
 	});
 
 	$effect(() => {
@@ -106,6 +119,7 @@
 
 	async function persist(next: PageBlock[]) {
 		draft = next;
+		draftPageKey = current.key;
 		editing = true;
 		if (!spec) return;
 		try {
@@ -131,6 +145,9 @@
 		editing = false;
 		pickerOpen = false;
 		sheetOpen = false;
+		if (startEditing && typeof location !== "undefined") {
+			void goto(location.pathname, { replace: true, shallow: true });
+		}
 	}
 
 	async function addGrid(columns: number) {
@@ -216,6 +233,10 @@
 		{ value: "l", label: "Tall" },
 		{ value: "xl", label: "Extra tall" },
 	];
+
+	function countLabel(count: number, singular: string): string {
+		return `${count} ${count === 1 ? singular : `${singular}s`}`;
+	}
 </script>
 
 <div class="flex flex-col gap-6">
@@ -226,9 +247,9 @@
 					<DropdownMenu.Root>
 						<DropdownMenu.Trigger>
 							{#snippet child({ props })}
-								<Button variant="outline" {...props}>
-									<PlusIcon data-icon="inline-start" />
-									Add grid
+							<Button variant="outline" {...props}>
+								<PlusIcon data-icon="inline-start" />
+								Add section
 								</Button>
 							{/snippet}
 						</DropdownMenu.Trigger>
@@ -237,14 +258,14 @@
 								{@const Icon = choice.icon}
 								<DropdownMenu.Item onSelect={() => addGrid(choice.columns)}>
 									<Icon />
-									{choice.label}
+									{choice.label} section
 								</DropdownMenu.Item>
 							{/each}
 						</DropdownMenu.Content>
 					</DropdownMenu.Root>
 					<Button onclick={stopEdit} data-testid="page-done">
 						<CheckIcon data-icon="inline-start" />
-						Done
+						Finish editing
 					</Button>
 				{:else}
 					<Button variant="outline" onclick={startEdit} data-testid="page-edit">
@@ -262,15 +283,32 @@
 				<Empty.Media variant="icon"><LayersIcon /></Empty.Media>
 				<Empty.Title>Empty page</Empty.Title>
 				<Empty.Description>
-					{editing ? "Add a grid, then drop widgets into the cells." : "Edit this page to add widgets."}
+					{editing ? "Add a section, then choose the widgets it should contain." : "Edit this page to add widgets."}
 				</Empty.Description>
 			</Empty.Header>
 			{#if editing}
 				<Empty.Content>
-					<Button onclick={() => addGrid(2)}>
-						<PlusIcon data-icon="inline-start" />
-						Add a 2-column grid
-					</Button>
+					<DropdownMenu.Root>
+						<DropdownMenu.Trigger>
+							{#snippet child({ props })}
+								<Button {...props}>
+									<PlusIcon data-icon="inline-start" />
+									Add first section
+								</Button>
+							{/snippet}
+						</DropdownMenu.Trigger>
+						<DropdownMenu.Content align="center">
+							<DropdownMenu.Group>
+								{#each gridChoices as choice (choice.columns)}
+									{@const Icon = choice.icon}
+									<DropdownMenu.Item onSelect={() => addGrid(choice.columns)}>
+										<Icon />
+										{choice.label}
+									</DropdownMenu.Item>
+								{/each}
+							</DropdownMenu.Group>
+						</DropdownMenu.Content>
+					</DropdownMenu.Root>
 				</Empty.Content>
 			{/if}
 		</Empty.Root>
@@ -278,40 +316,52 @@
 
 	{#each live as block, index (index)}
 		{#if block.kind === "group"}
-			<div class="flex flex-col gap-2">
-				{#if editing}
-					<div class="flex flex-wrap items-center justify-between gap-2">
-						<div class="flex flex-wrap items-center gap-1">
-							{#each gridChoices as choice (choice.columns)}
-								{@const Icon = choice.icon}
-								<Button
-									variant={(block.columns ?? 1) === choice.columns ? "secondary" : "ghost"}
-									size="icon-sm"
-									onclick={() => changeColumns(index, choice.columns)}
-								>
-									<Icon />
-									<span class="sr-only">{choice.label}</span>
-								</Button>
-							{/each}
+			{#if editing}
+				<Card.Root size="sm" class="h-auto">
+					<Card.Header class="gap-0">
+						<Card.Title>Section {index + 1}</Card.Title>
+						<Card.Description>
+							{countLabel(block.blocks.length, "widget")} · {gridChoices.find((item) => item.columns === (block.columns ?? 1))?.label ?? "Full width"}
+						</Card.Description>
+						<Card.Action class="flex flex-wrap items-center justify-end gap-1">
 							<DropdownMenu.Root>
 								<DropdownMenu.Trigger>
 									{#snippet child({ props })}
-										<Button variant="ghost" size="sm" class="h-8 px-2 text-xs" {...props}>
-											{heightChoices.find((item) => item.value === block.min_height)?.label ??
-												"Default height"}
+										<Button variant="outline" size="xs" {...props}>
+											{gridChoices.find((item) => item.columns === (block.columns ?? 1))?.label ?? "Layout"}
 										</Button>
 									{/snippet}
 								</DropdownMenu.Trigger>
-								<DropdownMenu.Content align="start">
-									{#each heightChoices as choice (choice.value ?? "default")}
-										<DropdownMenu.Item onSelect={() => changeHeight(index, choice.value)}>
-											{choice.label}
-										</DropdownMenu.Item>
-									{/each}
+								<DropdownMenu.Content align="end">
+									<DropdownMenu.Group>
+										{#each gridChoices as choice (choice.columns)}
+											{@const Icon = choice.icon}
+											<DropdownMenu.Item onSelect={() => changeColumns(index, choice.columns)}>
+												<Icon />
+												{choice.label}
+											</DropdownMenu.Item>
+										{/each}
+									</DropdownMenu.Group>
 								</DropdownMenu.Content>
 							</DropdownMenu.Root>
-						</div>
-						<div class="flex items-center gap-1">
+							<DropdownMenu.Root>
+								<DropdownMenu.Trigger>
+									{#snippet child({ props })}
+										<Button variant="ghost" size="xs" {...props}>
+											{heightChoices.find((item) => item.value === block.min_height)?.label ?? "Auto height"}
+										</Button>
+									{/snippet}
+								</DropdownMenu.Trigger>
+								<DropdownMenu.Content align="end">
+									<DropdownMenu.Group>
+										{#each heightChoices as choice (choice.value ?? "default")}
+											<DropdownMenu.Item onSelect={() => changeHeight(index, choice.value)}>
+												{choice.label}
+											</DropdownMenu.Item>
+										{/each}
+									</DropdownMenu.Group>
+								</DropdownMenu.Content>
+							</DropdownMenu.Root>
 							<Button
 								variant="ghost"
 								size="icon-sm"
@@ -332,25 +382,22 @@
 							</Button>
 							<Button variant="ghost" size="icon-sm" onclick={() => remove([index])}>
 								<Trash2Icon />
-								<span class="sr-only">Remove grid</span>
+								<span class="sr-only">Remove section</span>
 							</Button>
-						</div>
-					</div>
-				{/if}
-				<div class="{gridClass(block.columns ?? 1)} items-stretch {groupHeightClass(block)}">
+						</Card.Action>
+					</Card.Header>
+					<Card.Content class="p-2">
+						<div class="{gridClass(block.columns ?? 1)} items-stretch {groupHeightClass(block)}">
 					{#each block.blocks as child, childIndex (`${index}-${childIndex}`)}
 						<div
-							class="flex h-full flex-col {groupHeightClass(block)} {editing
-								? 'group/cell relative rounded-xl p-2 ring-1 ring-transparent hover:ring-border'
-								: ''}"
+							class="flex h-full flex-col overflow-hidden rounded-xl bg-surface-chrome p-1 {groupHeightClass(block)}"
 						>
-							{#if editing}
-								<div
-									class="absolute top-2 right-2 z-10 hidden gap-0.5 rounded-lg border bg-background p-0.5 shadow-sm group-hover/cell:flex"
-								>
+								<div class="flex min-h-9 items-center justify-between gap-2 px-2 py-1">
+									<Badge variant="outline">{widgetLabel(child)}</Badge>
+									<div class="flex items-center gap-0.5">
 									<Button
 										size="icon-xs"
-										variant="outline"
+										variant="ghost"
 										disabled={childIndex === 0}
 										onclick={() => moveWidget(index, childIndex, childIndex - 1)}
 									>
@@ -359,65 +406,100 @@
 									</Button>
 									<Button
 										size="icon-xs"
-										variant="outline"
+										variant="ghost"
 										disabled={childIndex === block.blocks.length - 1}
 										onclick={() => moveWidget(index, childIndex, childIndex + 1)}
 									>
 										<ArrowRightIcon />
 										<span class="sr-only">Move right</span>
 									</Button>
-									<Button size="xs" variant="outline" onclick={() => openSheet([index, childIndex])}>
+									<Button size="xs" variant="ghost" onclick={() => openSheet([index, childIndex])}>
 										Edit
 									</Button>
 									<Button
 										size="icon-xs"
-										variant="outline"
+										variant="ghost"
 										onclick={() => remove([index, childIndex])}
 									>
 										<Trash2Icon />
 										<span class="sr-only">Remove {widgetLabel(child)}</span>
 									</Button>
+									</div>
 								</div>
-							{/if}
-							<div class="flex min-h-0 flex-1 flex-col">
+							<div class="flex min-h-0 flex-1 flex-col rounded-lg bg-background p-3">
 								<PageWidget block={child} rows={viewRows} ready={rowsReady} />
 							</div>
 						</div>
 					{/each}
-					{#if editing}
-						<button
+							<button
 							type="button"
-							class="flex min-h-28 items-center justify-center rounded-xl border border-dashed text-sm text-muted-foreground hover:bg-muted/40 hover:text-foreground"
+							class="flex min-h-28 items-center justify-center gap-2 rounded-xl border border-dashed text-sm text-muted-foreground hover:bg-muted/40 hover:text-foreground"
 							onclick={() => openPicker([index])}
 							data-testid="add-widget-slot"
 						>
 							<PlusIcon class="size-4" />
-							Add widget
-						</button>
-					{/if}
+								Add widget
+							</button>
+						</div>
+					</Card.Content>
+				</Card.Root>
+			{:else}
+				<div class="{gridClass(block.columns ?? 1)} items-stretch {groupHeightClass(block)}">
+					{#each block.blocks as child, childIndex (`${index}-${childIndex}`)}
+						<div class="flex h-full min-h-0 flex-col {groupHeightClass(block)}">
+							<PageWidget block={child} rows={viewRows} ready={rowsReady} />
+						</div>
+					{/each}
 				</div>
-			</div>
+			{/if}
 		{:else}
 			<div
 				class={editing
-					? "group/cell relative h-full min-h-0 rounded-xl p-2 ring-1 ring-transparent hover:ring-border"
+					? "flex h-full min-h-0 flex-col overflow-hidden rounded-xl bg-surface-chrome p-1"
 					: "h-full min-h-0"}
 			>
 				{#if editing}
-					<div
-						class="absolute top-2 right-2 z-10 hidden gap-0.5 rounded-lg border bg-background p-0.5 shadow-sm group-hover/cell:flex"
-					>
-						<Button size="xs" variant="outline" onclick={() => openSheet([index])}>Edit</Button>
-						<Button size="icon-xs" variant="outline" onclick={() => remove([index])}>
+					<div class="flex min-h-9 items-center justify-between gap-2 px-2 py-1">
+						<Badge variant="outline">{widgetLabel(block)}</Badge>
+						<div class="flex items-center gap-0.5">
+						<Button size="xs" variant="ghost" onclick={() => openSheet([index])}>Edit</Button>
+						<Button size="icon-xs" variant="ghost" onclick={() => remove([index])}>
 							<Trash2Icon />
 							<span class="sr-only">Remove</span>
 						</Button>
+						</div>
 					</div>
 				{/if}
-				<PageWidget {block} rows={viewRows} ready={rowsReady} />
+				<div class={editing ? "flex min-h-0 flex-1 flex-col rounded-lg bg-background p-3" : "h-full min-h-0"}>
+					<PageWidget {block} rows={viewRows} ready={rowsReady} />
+				</div>
 			</div>
 		{/if}
 	{/each}
+
+	{#if editing && live.length}
+		<DropdownMenu.Root>
+			<DropdownMenu.Trigger>
+				{#snippet child({ props })}
+					<Button variant="outline" class="h-12 w-full border-dashed" {...props}>
+						<PlusIcon data-icon="inline-start" />
+						Add section
+					</Button>
+				{/snippet}
+			</DropdownMenu.Trigger>
+			<DropdownMenu.Content align="center">
+				<DropdownMenu.Group>
+					{#each gridChoices as choice (choice.columns)}
+						{@const Icon = choice.icon}
+						<DropdownMenu.Item onSelect={() => addGrid(choice.columns)}>
+							<Icon />
+							{choice.label} section
+						</DropdownMenu.Item>
+					{/each}
+				</DropdownMenu.Group>
+			</DropdownMenu.Content>
+		</DropdownMenu.Root>
+	{/if}
 </div>
 
 <WidgetPicker bind:open={pickerOpen} onPick={pickWidget} />

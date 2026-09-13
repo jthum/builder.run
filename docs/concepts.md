@@ -128,16 +128,17 @@ A **Page** is a user-facing application surface composed from widgets.
 
 Pages are deliberately first-class navigation. They are not merely generated CRUD screens.
 
-The current runtime includes widgets for:
+The official library is organised into four user-facing groups:
 
-- headings and descriptive content;
-- number cards;
-- lists and tables;
-- bar charts;
-- donut charts;
-- line charts.
+- **Highlights** — heroes, progress, record spotlights, and activity feeds;
+- **Content** — headings, section headings, text, and callouts;
+- **Data** — number and metric cards, tables, cards, lists, boards, and calendars;
+- **Charts** — bar, line, donut, and stacked-bar visualisations;
+- **Actions** — forms, workflow buttons, and compact quick-action groups.
 
 Widgets reuse other primitives instead of inventing their own data model. A table or chart, for example, is backed by a View.
+
+The registry keeps each widget's small declarative definition separate from its Svelte renderer. Definitions are available immediately to editors, validation, and agents; renderers are loaded only when a page uses them. This lets the official library grow without putting every widget implementation—or a heavy dependency used by one widget—into the initial page bundle.
 
 Pages can be organised into folders when an app needs navigation hierarchy.
 

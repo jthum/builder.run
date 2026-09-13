@@ -93,7 +93,18 @@ Judging Dashboard
 [ Table: review queue ]
 ```
 
-The current chart widgets are **bar**, **donut**, and **line**. Use them where the underlying data naturally supports the visualisation rather than adding charts only for decoration.
+The current chart widgets are **bar**, **donut**, **line**, and **stacked bar**. Use them where the underlying data naturally supports the visualisation rather than adding charts only for decoration.
+
+### Growing the official widget library
+
+Every official widget lives in its own folder under `src/lib/widgets`. A widget has two parts:
+
+- `definition.ts` describes its stable key, category, configuration inputs, and editor copy;
+- `widget.svelte` renders it.
+
+Folders may be nested to keep a large library navigable. The registry discovers both files recursively, so a new widget does not require another central switch statement. Keep the definition lightweight: it is loaded for discovery and validation. The renderer is an independent lazy import and may import specialised libraries; those dependencies are fetched only when that widget is rendered, while dependencies shared by several loaded widgets are deduplicated by the module graph.
+
+Use `/dev/widgets` during development to review the complete official library with deterministic mock data. The route is unavailable in production.
 
 Pages may also be organised into folders when the app needs explicit navigation hierarchy.
 

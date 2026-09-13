@@ -64,6 +64,12 @@
 								<Field.Label>{input.label}</Field.Label>
 								{#if input.type === "textarea"}
 									<Textarea bind:value={values[input.key] as string} />
+								{:else if input.type === "number"}
+									<Input
+										type="number"
+										value={Number(values[input.key] ?? input.default ?? 0)}
+										oninput={(event) => (values[input.key] = event.currentTarget.valueAsNumber)}
+									/>
 								{:else if input.type === "view"}
 									<AppSelect
 										bind:value={values[input.key] as string}

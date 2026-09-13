@@ -5,7 +5,9 @@
 	import NameDialog from "$lib/components/name-dialog.svelte";
 	import PageHeader from "$lib/components/page-header.svelte";
 	import * as AlertDialog from "$lib/components/ui/alert-dialog/index.js";
+	import { Badge } from "$lib/components/ui/badge/index.js";
 	import { Button } from "$lib/components/ui/button/index.js";
+	import * as Card from "$lib/components/ui/card/index.js";
 	import * as Dialog from "$lib/components/ui/dialog/index.js";
 	import * as DropdownMenu from "$lib/components/ui/dropdown-menu/index.js";
 	import * as Empty from "$lib/components/ui/empty/index.js";
@@ -16,6 +18,7 @@
 	import { pageIconEntry, pageIconList, type PageIconKey } from "$lib/runtime/page-icons.ts";
 	import { authoredNavPages, groupPagesByFolder, moveAuthoredPage, pageHref } from "$lib/runtime/widgets.ts";
 	import EllipsisIcon from "@lucide/svelte/icons/ellipsis";
+	import ArrowRightIcon from "@lucide/svelte/icons/arrow-right";
 	import FolderIcon from "@lucide/svelte/icons/folder";
 	import GripVerticalIcon from "@lucide/svelte/icons/grip-vertical";
 	import LayersIcon from "@lucide/svelte/icons/layers";
@@ -65,6 +68,18 @@
 		createOpen = true;
 	}
 
+	function pageCounts(page: PageDef): { sections: number; widgets: number } {
+		const widgetsIn = (blocks: NonNullable<PageDef["blocks"]>): number =>
+			blocks.reduce(
+				(count, block) => count + (block.kind === "group" ? widgetsIn(block.blocks) : 1),
+				0,
+			);
+		return {
+			sections: page.blocks?.filter((block) => block.kind === "group").length ?? 0,
+			widgets: widgetsIn(page.blocks ?? []),
+		};
+	}
+
 	function openEdit(page: PageDef) {
 		editingPage = page;
 		createName = page.label;
@@ -101,23 +116,11 @@
 				label: name,
 				icon: createIcon,
 				folder: createFolder.trim() || undefined,
-				blocks: [
-					{
-						kind: "group",
-						columns: 1,
-						blocks: [
-							{
-								kind: "widget",
-								widget: "heading",
-								values: { title: name, description: "" },
-							},
-						],
-					},
-				],
+				blocks: [],
 			});
 			createOpen = false;
 			toast.success("Page added");
-			await goto(`/p/${key}`);
+			await goto(`/p/${key}?edit=1`);
 		} finally {
 			pending = false;
 		}
@@ -231,10 +234,10 @@
 <div class="flex flex-col gap-6">
 	<PageHeader
 		title="Pages"
-		description="Drag to reorder. Drop onto a folder to group. These screens show under Home."
+		description="Build the screens people use, then arrange how they appear in the app."
 	>
 		{#snippet actions()}
-			<Button onclick={() => openCreate()}>
+			<Button onclick={() => openCreate()} data-testid="add-page">
 				<PlusIcon data-icon="inline-start" />
 				Add page
 			</Button>
@@ -257,41 +260,41 @@
 		</Empty.Root>
 	{:else}
 		<div class="flex flex-col gap-4" bind:this={pageList}>
-			{#if folders.length}
+			{#if folders.length && dragKey}
 				<div
 					data-page-folder=""
-					class="rounded-xl border border-dashed px-3 py-2 text-sm text-muted-foreground"
+					class="rounded-xl border border-dashed px-4 py-3 text-center text-sm text-muted-foreground"
 				>
-					Drop here to keep a page under Home, outside a folder.
+					Drop here to move the page out of its folder.
 				</div>
 			{/if}
 			{#each groups as group (group.folder ?? "__root")}
-				<div class="flex flex-col gap-2">
-					{#if group.folder}
-						<div
-							role="group"
-							data-page-folder={group.folder}
-							aria-label={`Folder ${group.folder}`}
-							class="flex items-center justify-between gap-2 rounded-xl px-1 py-1"
-						>
-							<h2 class="flex items-center gap-2 text-sm font-medium">
-								<FolderIcon class="size-4 text-muted-foreground" />
-								{group.folder}
-							</h2>
+				<Card.Root size="sm" class="h-auto" data-page-folder={group.folder ?? ""}>
+					<Card.Header class="gap-0" role="group" aria-label={group.folder ? `Folder ${group.folder}` : "Pages outside folders"}>
+						<Card.Title class="flex items-center gap-2">
+							{#if group.folder}<FolderIcon class="size-4 text-muted-foreground" />{/if}
+							{group.folder ?? "Pages"}
+						</Card.Title>
+						<Card.Description>
+							{group.folder ? "Grouped together in the app navigation." : "Shown directly under Home."}
+						</Card.Description>
+						<Card.Action class="flex items-center gap-2">
+							<Badge variant="outline">{group.pages.length}</Badge>
 							<Button variant="ghost" size="xs" onclick={() => openCreate(group.folder ?? "")}>
 								<PlusIcon data-icon="inline-start" />
-								Add
+								Add page
 							</Button>
-						</div>
-					{/if}
-					<div class="flex flex-col gap-2" role="list">
+						</Card.Action>
+					</Card.Header>
+					<Card.Content class="p-0" role="list">
 						{#each group.pages as item (item.id)}
 							{@const Icon = pageIconEntry(item.icon).icon}
+							{@const counts = pageCounts(item)}
 							<div
 								role="listitem"
 								data-page-key={item.key}
 								animate:flip={{ duration: 160 }}
-								class="flex items-center gap-2 rounded-2xl bg-card px-2 py-2 ring-1 ring-foreground/10 {dragKey ===
+								class="flex min-h-16 items-center gap-2 border-b px-3 py-2.5 last:border-b-0 {dragKey ===
 								item.key
 									? 'pointer-events-none opacity-0'
 									: ''}"
@@ -307,7 +310,7 @@
 								<DropdownMenu.Root>
 									<DropdownMenu.Trigger>
 										{#snippet child({ props })}
-											<Button variant="ghost" size="icon-sm" {...props} aria-label="Page icon">
+											<Button variant="outline" size="icon-sm" {...props} aria-label="Change page icon">
 												<Icon />
 											</Button>
 										{/snippet}
@@ -324,12 +327,17 @@
 										</DropdownMenu.Group>
 									</DropdownMenu.Content>
 								</DropdownMenu.Root>
-								<a href={pageHref(item)} class="min-w-0 flex-1 rounded-md outline-none focus-visible:ring-2 focus-visible:ring-ring">
+								<a href={pageHref(item)} class="min-w-0 flex-1 rounded-md px-1 outline-none focus-visible:ring-2 focus-visible:ring-ring">
 									<div class="font-medium">{item.label}</div>
 									<div class="text-sm text-muted-foreground">
-										{item.folder ? item.folder : "In the menu"}
+										{counts.sections} {counts.sections === 1 ? "section" : "sections"} · {counts.widgets}
+										{counts.widgets === 1 ? "widget" : "widgets"}
 									</div>
 								</a>
+								<Button variant="ghost" size="sm" class="hidden sm:inline-flex" href={pageHref(item)}>
+									Edit layout
+									<ArrowRightIcon data-icon="inline-end" />
+								</Button>
 								<DropdownMenu.Root>
 									<DropdownMenu.Trigger>
 										{#snippet child({ props })}
@@ -375,8 +383,8 @@
 								</DropdownMenu.Root>
 							</div>
 						{/each}
-					</div>
-				</div>
+					</Card.Content>
+				</Card.Root>
 			{/each}
 		</div>
 	{/if}
