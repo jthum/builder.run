@@ -252,6 +252,13 @@ export function breadcrumbFor(path: string, spec?: AppSpec): Crumb[] {
   if (parts[0] === "diagnostics") {
     return [{ label: "Edit app", href: "/build" }, { label: "Inspect" }];
   }
+  if (parts[0] === "library") {
+    return [
+      { label: "Edit app", href: "/build" },
+      { label: "Library", href: "/library/widgets" },
+      ...(parts[1] ? [{ label: labelFromKey(parts[1]) }] : []),
+    ];
+  }
   if (parts[0] === "v") {
     const view = spec?.views.find((item) => item.key === parts[1]);
     return [{ label: "Home", href: "/" }, { label: view?.label ?? "List" }];

@@ -25,6 +25,7 @@
 	import FormInputIcon from "@lucide/svelte/icons/form-input";
 	import LayersIcon from "@lucide/svelte/icons/layers";
 	import LayoutDashboardIcon from "@lucide/svelte/icons/layout-dashboard";
+	import LibraryIcon from "@lucide/svelte/icons/library";
 	import PencilIcon from "@lucide/svelte/icons/pencil";
 	import PlusIcon from "@lucide/svelte/icons/plus";
 	import SearchIcon from "@lucide/svelte/icons/search";
@@ -43,7 +44,7 @@
 	const snap = $derived(session.snapshot);
 	const spec = $derived(snap?.spec);
 	const path = $derived(page.url.pathname);
-	const studio = $derived(path.startsWith("/build") || path.startsWith("/diagnostics"));
+	const studio = $derived(path.startsWith("/build") || path.startsWith("/library") || path.startsWith("/diagnostics"));
 	const space = $derived(spaceLabel(snap?.space.name));
 
 	const views = $derived(spec ? featuredViews(spec) : []);
@@ -83,6 +84,7 @@
 		"/build/actors": UsersIcon,
 		"/build/settings": SettingsIcon,
 		"/build/spec": FileTextIcon,
+		"/library/widgets": LibraryIcon,
 		"/diagnostics": SearchIcon,
 	};
 

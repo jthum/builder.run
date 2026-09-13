@@ -21,16 +21,22 @@
 	import ChartBarIcon from "@lucide/svelte/icons/chart-bar";
 	import ChartLineIcon from "@lucide/svelte/icons/chart-line";
 	import ChartPieIcon from "@lucide/svelte/icons/chart-pie";
+	import ChartScatterIcon from "@lucide/svelte/icons/chart-scatter";
 	import Columns3Icon from "@lucide/svelte/icons/columns-3";
+	import GitCompareArrowsIcon from "@lucide/svelte/icons/git-compare-arrows";
 	import GaugeIcon from "@lucide/svelte/icons/gauge";
+	import Grid3X3Icon from "@lucide/svelte/icons/grid-3x3";
 	import ActivityIcon from "@lucide/svelte/icons/activity";
 	import FlagIcon from "@lucide/svelte/icons/flag";
 	import LayoutTemplateIcon from "@lucide/svelte/icons/layout-template";
 	import ListChecksIcon from "@lucide/svelte/icons/list-checks";
+	import ListFilterIcon from "@lucide/svelte/icons/list-filter";
 	import SparklesIcon from "@lucide/svelte/icons/sparkles";
 	import MegaphoneIcon from "@lucide/svelte/icons/megaphone";
 	import TableIcon from "@lucide/svelte/icons/table";
 	import TextIcon from "@lucide/svelte/icons/text";
+	import TrophyIcon from "@lucide/svelte/icons/trophy";
+	import WorkflowIcon from "@lucide/svelte/icons/workflow";
 	import type { Component } from "svelte";
 
 	let {
@@ -64,6 +70,12 @@
 		activity_feed: ActivityIcon,
 		section_heading: HeadingIcon,
 		quick_actions: ListChecksIcon,
+		comparison: GitCompareArrowsIcon,
+		leaderboard: TrophyIcon,
+		timeline: WorkflowIcon,
+		funnel: ListFilterIcon,
+		scatter: ChartScatterIcon,
+		heatmap: Grid3X3Icon,
 	};
 
 	let query = $state("");

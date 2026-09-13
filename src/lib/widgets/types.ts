@@ -52,3 +52,24 @@ export type WidgetRenderer = Component<WidgetRendererProps>;
 export interface WidgetModule {
   default: WidgetRenderer;
 }
+
+export interface WidgetPreview {
+  values: Record<string, unknown>;
+  rows?: Record<string, Array<Record<string, unknown>>>;
+  spec?: AppSpec;
+}
+
+export interface WidgetPreviewModule {
+  default: WidgetPreview;
+}
+
+/** A normalized catalog that has been installed into the application bundle. */
+export interface WidgetRegistrySource {
+  key: string;
+  label: string;
+  description: string;
+  kind: "bundled";
+  widgets: readonly WidgetDef[];
+  loadRenderer: (key: string) => Promise<WidgetRenderer | undefined>;
+  loadPreview: (key: string) => Promise<WidgetPreview | undefined>;
+}

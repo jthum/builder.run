@@ -31,6 +31,12 @@ export const studioItems = [
     group: "Behaviour",
   },
   {
+    href: "/library/widgets",
+    label: "Widgets",
+    description: "Browse the visual building blocks available for pages.",
+    group: "Library",
+  },
+  {
     href: "/build/actors",
     label: "People",
     description: "Who can use this space.",
@@ -56,4 +62,4 @@ export const studioItems = [
   },
 ] as const;
 
-export const studioGroupOrder = ["Build", "Behaviour", "Space"] as const;
+export const studioGroupOrder = ["Build", "Behaviour", "Library", "Space"] as const;

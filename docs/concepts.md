@@ -128,12 +128,12 @@ A **Page** is a user-facing application surface composed from widgets.
 
 Pages are deliberately first-class navigation. They are not merely generated CRUD screens.
 
-The official library is organised into four user-facing groups:
+The official library is organised into five user-facing groups:
 
-- **Highlights** — heroes, progress, record spotlights, and activity feeds;
+- **Highlights** — heroes, progress, comparisons, record spotlights, and activity feeds;
 - **Content** — headings, section headings, text, and callouts;
-- **Data** — number and metric cards, tables, cards, lists, boards, and calendars;
-- **Charts** — bar, line, donut, and stacked-bar visualisations;
+- **Data** — number and metric cards, tables, cards, lists, leaderboards, timelines, boards, and calendars;
+- **Charts** — bar, line, donut, stacked-bar, funnel, scatter, and activity heatmap visualisations;
 - **Actions** — forms, workflow buttons, and compact quick-action groups.
 
 Widgets reuse other primitives instead of inventing their own data model. A table or chart, for example, is backed by a View.

@@ -266,12 +266,20 @@ export const sampleApps: SampleApp[] = [
                 {
                   kind: "widget",
                   widget: "stat",
-                  values: { view: "active_projects", title: "Active projects" },
+                  values: {
+                    view: "active_projects",
+                    title: "Active projects",
+                    description: "Client work currently in delivery",
+                  },
                 },
                 {
                   kind: "widget",
                   widget: "stat",
-                  values: { view: "blocked_tasks", title: "Blocked tasks" },
+                  values: {
+                    view: "blocked_tasks",
+                    title: "Blocked tasks",
+                    description: "Items that need attention",
+                  },
                 },
                 {
                   kind: "widget",
@@ -281,6 +289,7 @@ export const sampleApps: SampleApp[] = [
                     value: "budget",
                     date: "due_date",
                     title: "Portfolio budget",
+                    description: "Across the complete project portfolio",
                   },
                 },
               ],
@@ -308,6 +317,39 @@ export const sampleApps: SampleApp[] = [
                     category: "status",
                     value: "estimated_hours",
                     title: "Estimated hours",
+                  },
+                },
+              ],
+            },
+            {
+              kind: "group",
+              columns: 2,
+              min_height: "m",
+              blocks: [
+                {
+                  kind: "widget",
+                  widget: "leaderboard",
+                  values: {
+                    view: "all_tasks",
+                    title: "Largest pieces of work",
+                    label_field: "title",
+                    value_field: "estimate",
+                    detail_field: "project.name",
+                    limit: 5,
+                  },
+                },
+                {
+                  kind: "widget",
+                  widget: "timeline",
+                  values: {
+                    view: "all_tasks",
+                    title: "Upcoming delivery",
+                    description: "Milestones ordered by due date",
+                    title_field: "title",
+                    description_field: "project.name",
+                    date_field: "due_date",
+                    status_field: "status",
+                    limit: 6,
                   },
                 },
               ],
@@ -747,12 +789,20 @@ export const sampleApps: SampleApp[] = [
                 {
                   kind: "widget",
                   widget: "stat",
-                  values: { view: "approval_queue", title: "Awaiting approval" },
+                  values: {
+                    view: "approval_queue",
+                    title: "Awaiting approval",
+                    description: "Submitted requests ready to review",
+                  },
                 },
                 {
                   kind: "widget",
                   widget: "stat",
-                  values: { view: "paid_expenses", title: "Paid expenses" },
+                  values: {
+                    view: "paid_expenses",
+                    title: "Paid expenses",
+                    description: "Requests settled and complete",
+                  },
                 },
                 {
                   kind: "widget",
@@ -762,6 +812,7 @@ export const sampleApps: SampleApp[] = [
                     value: "amount",
                     date: "spent_on",
                     title: "Total submitted",
+                    description: "All recorded spend to date",
                   },
                 },
               ],
@@ -789,6 +840,39 @@ export const sampleApps: SampleApp[] = [
                     category: "category",
                     value: "total_amount",
                     title: "Spend by category",
+                  },
+                },
+              ],
+            },
+            {
+              kind: "group",
+              columns: 2,
+              min_height: "m",
+              blocks: [
+                {
+                  kind: "widget",
+                  widget: "leaderboard",
+                  values: {
+                    view: "all_expenses",
+                    title: "Largest requests",
+                    label_field: "title",
+                    value_field: "amount",
+                    detail_field: "submitter",
+                    limit: 5,
+                  },
+                },
+                {
+                  kind: "widget",
+                  widget: "timeline",
+                  values: {
+                    view: "all_expenses",
+                    title: "Recent spend",
+                    description: "Requests ordered by spend date",
+                    title_field: "title",
+                    description_field: "submitter",
+                    date_field: "spent_on",
+                    status_field: "status",
+                    limit: 6,
                   },
                 },
               ],
@@ -1119,12 +1203,20 @@ export const sampleApps: SampleApp[] = [
                 {
                   kind: "widget",
                   widget: "stat",
-                  values: { view: "active_projects", title: "Active projects" },
+                  values: {
+                    view: "active_projects",
+                    title: "Active projects",
+                    description: "Client engagements currently moving",
+                  },
                 },
                 {
                   kind: "widget",
                   widget: "stat",
-                  values: { view: "overdue_invoices", title: "Overdue invoices" },
+                  values: {
+                    view: "overdue_invoices",
+                    title: "Overdue invoices",
+                    description: "Payments that need follow-up",
+                  },
                 },
                 {
                   kind: "widget",
@@ -1134,6 +1226,7 @@ export const sampleApps: SampleApp[] = [
                     value: "amount",
                     date: "issued_on",
                     title: "Total invoiced",
+                    description: "Value billed across all client work",
                   },
                 },
               ],
@@ -1161,6 +1254,39 @@ export const sampleApps: SampleApp[] = [
                     category: "issued_on",
                     value: "amount",
                     title: "Invoicing over time",
+                  },
+                },
+              ],
+            },
+            {
+              kind: "group",
+              columns: 2,
+              min_height: "m",
+              blocks: [
+                {
+                  kind: "widget",
+                  widget: "leaderboard",
+                  values: {
+                    view: "all_invoices",
+                    title: "Largest invoices",
+                    label_field: "number",
+                    value_field: "amount",
+                    detail_field: "project.name",
+                    limit: 5,
+                  },
+                },
+                {
+                  kind: "widget",
+                  widget: "timeline",
+                  values: {
+                    view: "all_invoices",
+                    title: "Invoice timeline",
+                    description: "Invoices ordered by due date",
+                    title_field: "number",
+                    description_field: "project.name",
+                    date_field: "due_date",
+                    status_field: "status",
+                    limit: 6,
                   },
                 },
               ],

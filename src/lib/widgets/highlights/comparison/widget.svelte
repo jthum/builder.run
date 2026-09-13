@@ -1,0 +1,69 @@
+<script lang="ts">
+	import FormattedValue from "$lib/components/formatted-value.svelte";
+	import { Badge } from "$lib/components/ui/badge/index.js";
+	import * as Card from "$lib/components/ui/card/index.js";
+	import { Progress } from "$lib/components/ui/progress/index.js";
+	import { asNumber, cellValue } from "$lib/runtime/chart-data.ts";
+	import type { WidgetRendererProps } from "$lib/widgets/types.ts";
+	import ArrowDownRightIcon from "@lucide/svelte/icons/arrow-down-right";
+	import ArrowUpRightIcon from "@lucide/svelte/icons/arrow-up-right";
+
+	let { values, rows, spec }: WidgetRendererProps = $props();
+	const viewKey = $derived(String(values.view ?? ""));
+	const view = $derived(spec?.views.find((item) => item.key === viewKey));
+	const type = $derived(spec?.types.find((item) => item.key === view?.source));
+	const field = $derived(String(values.value ?? ""));
+	const current = $derived(total(rows[viewKey] ?? [], field));
+	const comparisonKey = $derived(String(values.comparison_view ?? ""));
+	const comparisonField = $derived(String(values.comparison_value || field));
+	const hasTarget = $derived(typeof values.target === "number" && Number.isFinite(values.target));
+	const hasComparison = $derived(Boolean(comparisonKey));
+	const reference = $derived(
+		hasComparison
+			? total(rows[comparisonKey] ?? [], comparisonField)
+			: hasTarget
+				? Number(values.target)
+				: undefined,
+	);
+	const ratio = $derived(reference && reference !== 0 ? (current / reference) * 100 : undefined);
+	const delta = $derived(hasComparison && ratio !== undefined ? ratio - 100 : undefined);
+
+	function total(items: Array<Record<string, unknown>>, path: string): number {
+		return path
+			? items.reduce((sum, item) => sum + asNumber(cellValue(item, path)), 0)
+			: items.length;
+	}
+</script>
+
+{#if view}
+	<Card.Root class="h-full">
+		<Card.Header class="gap-0">
+			<Card.Title>{String(values.title || view.label)}</Card.Title>
+			{#if values.description}<Card.Description>{String(values.description)}</Card.Description>{/if}
+			{#if delta !== undefined}
+				<Card.Action>
+					<Badge variant={delta >= 0 ? "default" : "destructive"}>
+						{#if delta >= 0}<ArrowUpRightIcon />{:else}<ArrowDownRightIcon />{/if}
+						{Math.abs(delta).toLocaleString(undefined, { maximumFractionDigits: 1 })}%
+					</Badge>
+				</Card.Action>
+			{/if}
+		</Card.Header>
+		<Card.Content class="flex flex-col justify-center gap-5">
+			<div class="flex items-end justify-between gap-4">
+				<p class="text-3xl font-semibold tracking-tight tabular-nums">
+					<FormattedValue path={field} value={current} {type} maximumFractionDigits={1} />
+				</p>
+				{#if reference !== undefined}
+					<p class="text-sm text-muted-foreground">
+						<span class="font-medium text-foreground"><FormattedValue path={comparisonField} value={reference} {type} maximumFractionDigits={1} /></span>
+						{String(values.reference_label || (hasComparison ? "comparison" : "target"))}
+					</p>
+				{/if}
+			</div>
+			{#if !hasComparison && ratio !== undefined}<Progress value={Math.min(100, ratio)} max={100} />{/if}
+		</Card.Content>
+	</Card.Root>
+{:else}
+	<p class="text-sm text-muted-foreground">Pick a view for this widget.</p>
+{/if}
