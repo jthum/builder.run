@@ -19,6 +19,13 @@ If you are using or building an app, start with:
 7. [Automation language](automations-spec.md)
 8. [Data and persistence](data-and-persistence.md)
 
+If you are developing the shared framework, start with:
+
+1. [Framework development](framework/README.md)
+2. [Coding standards](framework/coding-standards.md)
+3. [Testing strategy](framework/testing.md)
+4. [Errors](framework/errors.md)
+
 The central idea throughout the project is simple:
 
 > **The application spec is the canonical product artefact.**
