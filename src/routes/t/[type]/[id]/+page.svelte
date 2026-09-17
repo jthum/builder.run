@@ -8,11 +8,11 @@
 	import PageHeader from "$lib/components/page-header.svelte";
 	import RecordForm from "$lib/components/record-form.svelte";
 	import RecordTable from "$lib/components/record-table.svelte";
-	import * as AlertDialog from "$lib/components/ui/alert-dialog/index.js";
-	import { Button } from "$lib/components/ui/button/index.js";
-	import * as Card from "$lib/components/ui/card/index.js";
-	import * as Dialog from "$lib/components/ui/dialog/index.js";
-	import * as DropdownMenu from "$lib/components/ui/dropdown-menu/index.js";
+	import * as AlertDialog from "@jthum/framework/svelte/ui/alert-dialog";
+	import { Button } from "@jthum/framework/svelte/ui/button";
+	import * as Card from "@jthum/framework/svelte/ui/card";
+	import * as Dialog from "@jthum/framework/svelte/ui/dialog";
+	import * as DropdownMenu from "@jthum/framework/svelte/ui/dropdown-menu";
 	import {
 		implicitCreateFormKey,
 		implicitEditFormKey,

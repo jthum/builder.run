@@ -1,11 +1,11 @@
 <script lang="ts">
 	import AppSelect from "$lib/components/app-select.svelte";
-	import { Button } from "$lib/components/ui/button/index.js";
-	import * as Field from "$lib/components/ui/field/index.js";
-	import { Input } from "$lib/components/ui/input/index.js";
-	import * as Sheet from "$lib/components/ui/sheet/index.js";
-	import { Switch } from "$lib/components/ui/switch/index.js";
-	import { Textarea } from "$lib/components/ui/textarea/index.js";
+	import { Button } from "@jthum/framework/svelte/ui/button";
+	import * as Field from "@jthum/framework/svelte/ui/field";
+	import { Input } from "@jthum/framework/svelte/ui/input";
+	import * as Sheet from "@jthum/framework/svelte/ui/sheet";
+	import { Switch } from "@jthum/framework/svelte/ui/switch";
+	import { Textarea } from "@jthum/framework/svelte/ui/textarea";
 	import type { AppSpec, PageLayoutNode } from "$lib/runtime/model.ts";
 	import { blockByKey, blockInputOptions, blockInputs } from "$lib/runtime/blocks.ts";
 

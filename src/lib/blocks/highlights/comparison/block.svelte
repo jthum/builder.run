@@ -1,8 +1,8 @@
 <script lang="ts">
 	import FormattedValue from "$lib/components/formatted-value.svelte";
-	import { Badge } from "$lib/components/ui/badge/index.js";
-	import * as Card from "$lib/components/ui/card/index.js";
-	import { Progress } from "$lib/components/ui/progress/index.js";
+	import { Badge } from "@jthum/framework/svelte/ui/badge";
+	import * as Card from "@jthum/framework/svelte/ui/card";
+	import { Progress } from "@jthum/framework/svelte/ui/progress";
 	import { asNumber, cellValue } from "$lib/runtime/chart-data.ts";
 	import type { BlockProps } from "$lib/blocks/types.ts";
 	import ArrowDownRightIcon from "@lucide/svelte/icons/arrow-down-right";

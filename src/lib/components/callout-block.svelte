@@ -1,5 +1,5 @@
 <script lang="ts">
-	import * as Alert from "$lib/components/ui/alert/index.js";
+	import * as Alert from "@jthum/framework/svelte/ui/alert";
 	import CircleAlertIcon from "@lucide/svelte/icons/circle-alert";
 	import InfoIcon from "@lucide/svelte/icons/info";
 	import TriangleAlertIcon from "@lucide/svelte/icons/triangle-alert";

@@ -2,8 +2,8 @@
 	import AppSelect from "$lib/components/app-select.svelte";
 	import PageHeader from "$lib/components/page-header.svelte";
 	import BlockLibraryItem from "$lib/components/block-library-item.svelte";
-	import { Badge } from "$lib/components/ui/badge/index.js";
-	import { Button } from "$lib/components/ui/button/index.js";
+	import { Badge } from "@jthum/framework/svelte/ui/badge";
+	import { Button } from "@jthum/framework/svelte/ui/button";
 	import { blockCategories, blocks, type BlockCategory } from "$lib/runtime/blocks.ts";
 	import { preloadBlockAssets } from "$lib/blocks/registry.ts";
 	import ChartNoAxesCombinedIcon from "@lucide/svelte/icons/chart-no-axes-combined";

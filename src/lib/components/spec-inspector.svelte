@@ -1,11 +1,11 @@
 <script lang="ts">
 	import { runtime, session } from "$lib/app/session.svelte.ts";
-	import * as Alert from "$lib/components/ui/alert/index.js";
-	import { Button } from "$lib/components/ui/button/index.js";
-	import * as Card from "$lib/components/ui/card/index.js";
-	import * as Field from "$lib/components/ui/field/index.js";
-	import { Textarea } from "$lib/components/ui/textarea/index.js";
-	import * as ToggleGroup from "$lib/components/ui/toggle-group/index.js";
+	import * as Alert from "@jthum/framework/svelte/ui/alert";
+	import { Button } from "@jthum/framework/svelte/ui/button";
+	import * as Card from "@jthum/framework/svelte/ui/card";
+	import * as Field from "@jthum/framework/svelte/ui/field";
+	import { Textarea } from "@jthum/framework/svelte/ui/textarea";
+	import * as ToggleGroup from "@jthum/framework/svelte/ui/toggle-group";
 	import { sharedTypeDependencies } from "$lib/runtime/serialize.ts";
 	import TriangleAlertIcon from "@lucide/svelte/icons/triangle-alert";
 	import { toast } from "svelte-sonner";

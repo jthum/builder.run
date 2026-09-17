@@ -1,7 +1,7 @@
 <script lang="ts">
-	import * as Card from "$lib/components/ui/card/index.js";
-	import * as Empty from "$lib/components/ui/empty/index.js";
-	import { Skeleton } from "$lib/components/ui/skeleton/index.js";
+	import * as Card from "@jthum/framework/svelte/ui/card";
+	import * as Empty from "@jthum/framework/svelte/ui/empty";
+	import { Skeleton } from "@jthum/framework/svelte/ui/skeleton";
 	import InboxIcon from "@lucide/svelte/icons/inbox";
 	import type { Snippet } from "svelte";
 

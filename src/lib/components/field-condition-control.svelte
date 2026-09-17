@@ -1,9 +1,9 @@
 <script lang="ts">
 	import AppSelect from "$lib/components/app-select.svelte";
-	import { Badge } from "$lib/components/ui/badge/index.js";
-	import * as Field from "$lib/components/ui/field/index.js";
-	import { Input } from "$lib/components/ui/input/index.js";
-	import { Switch } from "$lib/components/ui/switch/index.js";
+	import { Badge } from "@jthum/framework/svelte/ui/badge";
+	import * as Field from "@jthum/framework/svelte/ui/field";
+	import { Input } from "@jthum/framework/svelte/ui/input";
+	import { Switch } from "@jthum/framework/svelte/ui/switch";
 	import type { FieldCondition, FilterClause, FieldDef, FilterOp } from "$lib/runtime/model.ts";
 
 	let {

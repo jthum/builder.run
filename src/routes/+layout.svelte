@@ -6,13 +6,13 @@
 	import { breadcrumbFor } from "$lib/app/labels.ts";
 	import { boot, session } from "$lib/app/session.svelte.ts";
 	import AppSidebar from "$lib/components/app-sidebar.svelte";
-	import * as Breadcrumb from "$lib/components/ui/breadcrumb/index.js";
-	import * as Sidebar from "$lib/components/ui/sidebar/index.js";
-	import { Separator } from "$lib/components/ui/separator/index.js";
-	import { Button } from "$lib/components/ui/button/index.js";
-	import * as Empty from "$lib/components/ui/empty/index.js";
-	import { Spinner } from "$lib/components/ui/spinner/index.js";
-	import { Toaster } from "$lib/components/ui/sonner/index.js";
+	import * as Breadcrumb from "@jthum/framework/svelte/ui/breadcrumb";
+	import * as Sidebar from "@jthum/framework/svelte/ui/sidebar";
+	import { Separator } from "@jthum/framework/svelte/ui/separator";
+	import { Button } from "@jthum/framework/svelte/ui/button";
+	import * as Empty from "@jthum/framework/svelte/ui/empty";
+	import { Spinner } from "@jthum/framework/svelte/ui/spinner";
+	import { Toaster } from "@jthum/framework/svelte/ui/sonner";
 	import RefreshCwIcon from "@lucide/svelte/icons/refresh-cw";
 	import { page } from "$app/state";
 

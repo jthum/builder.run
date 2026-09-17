@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { runtime } from "$lib/app/session.svelte.ts";
-	import { Button } from "$lib/components/ui/button/index.js";
-	import * as Card from "$lib/components/ui/card/index.js";
+	import { Button } from "@jthum/framework/svelte/ui/button";
+	import * as Card from "@jthum/framework/svelte/ui/card";
 	import type { BlockProps } from "$lib/blocks/types.ts";
 	import ArrowRightIcon from "@lucide/svelte/icons/arrow-right";
 	import { toast } from "svelte-sonner";

@@ -1,8 +1,8 @@
 <script lang="ts">
 	import Block from "$lib/components/block.svelte";
-	import { Badge } from "$lib/components/ui/badge/index.js";
-	import * as Card from "$lib/components/ui/card/index.js";
-	import { Skeleton } from "$lib/components/ui/skeleton/index.js";
+	import { Badge } from "@jthum/framework/svelte/ui/badge";
+	import * as Card from "@jthum/framework/svelte/ui/card";
+	import { Skeleton } from "@jthum/framework/svelte/ui/skeleton";
 	import type { PageLayoutNode } from "$lib/runtime/model.ts";
 	import type { BlockDefinition } from "$lib/runtime/blocks.ts";
 	import { cn } from "$lib/utils.ts";

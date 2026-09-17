@@ -1,5 +1,5 @@
 <script lang="ts">
-	import * as ToggleGroup from "$lib/components/ui/toggle-group/index.js";
+	import * as ToggleGroup from "@jthum/framework/svelte/ui/toggle-group";
 
 	let {
 		value = $bindable(),

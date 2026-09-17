@@ -10,11 +10,11 @@
 	import NewAppDialog from "$lib/components/new-app-dialog.svelte";
 	import ProfileDialog from "$lib/components/profile-dialog.svelte";
 	import SpaceSettingsDialog from "$lib/components/space-settings-dialog.svelte";
-	import * as Avatar from "$lib/components/ui/avatar/index.js";
-	import { Button } from "$lib/components/ui/button/index.js";
-	import * as Command from "$lib/components/ui/command/index.js";
-	import * as DropdownMenu from "$lib/components/ui/dropdown-menu/index.js";
-	import * as Sidebar from "$lib/components/ui/sidebar/index.js";
+	import * as Avatar from "@jthum/framework/svelte/ui/avatar";
+	import { Button } from "@jthum/framework/svelte/ui/button";
+	import * as Command from "@jthum/framework/svelte/ui/command";
+	import * as DropdownMenu from "@jthum/framework/svelte/ui/dropdown-menu";
+	import * as Sidebar from "@jthum/framework/svelte/ui/sidebar";
 	import ArrowLeftIcon from "@lucide/svelte/icons/arrow-left";
 	import BoxIcon from "@lucide/svelte/icons/box";
 	import Building2Icon from "@lucide/svelte/icons/building-2";

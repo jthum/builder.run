@@ -3,9 +3,9 @@
 	import { openNewApp, runtime, session } from "$lib/app/session.svelte.ts";
 	import PageCanvas from "$lib/components/page-canvas.svelte";
 	import PageHeader from "$lib/components/page-header.svelte";
-	import { Badge } from "$lib/components/ui/badge/index.js";
-	import { Button } from "$lib/components/ui/button/index.js";
-	import * as Card from "$lib/components/ui/card/index.js";
+	import { Badge } from "@jthum/framework/svelte/ui/badge";
+	import { Button } from "@jthum/framework/svelte/ui/button";
+	import * as Card from "@jthum/framework/svelte/ui/card";
 	import type { PageDef } from "$lib/runtime/model.ts";
 	import { sampleApps, templateCategories } from "$lib/runtime/samples.ts";
 	import { resolveHomePage } from "$lib/runtime/blocks.ts";

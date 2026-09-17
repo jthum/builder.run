@@ -2,10 +2,10 @@
 	import { renameApp, session } from "$lib/app/session.svelte.ts";
 	import AppNameField from "$lib/components/app-name-field.svelte";
 	import SettingsDialogShell from "$lib/components/settings-dialog-shell.svelte";
-	import { Button } from "$lib/components/ui/button/index.js";
-	import * as Field from "$lib/components/ui/field/index.js";
-	import { Spinner } from "$lib/components/ui/spinner/index.js";
-	import * as Tabs from "$lib/components/ui/tabs/index.js";
+	import { Button } from "@jthum/framework/svelte/ui/button";
+	import * as Field from "@jthum/framework/svelte/ui/field";
+	import { Spinner } from "@jthum/framework/svelte/ui/spinner";
+	import * as Tabs from "@jthum/framework/svelte/ui/tabs";
 	import SettingsIcon from "@lucide/svelte/icons/settings";
 	import { toast } from "svelte-sonner";
 

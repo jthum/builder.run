@@ -1,9 +1,9 @@
 <script lang="ts">
 	import { session } from "$lib/app/session.svelte.ts";
 	import PageHeader from "$lib/components/page-header.svelte";
-	import * as Alert from "$lib/components/ui/alert/index.js";
-	import { Badge } from "$lib/components/ui/badge/index.js";
-	import * as Table from "$lib/components/ui/table/index.js";
+	import * as Alert from "@jthum/framework/svelte/ui/alert";
+	import { Badge } from "@jthum/framework/svelte/ui/badge";
+	import * as Table from "@jthum/framework/svelte/ui/table";
 	import { labelFromKey } from "$lib/runtime/ids.ts";
 
 	const actors = $derived(session.actors);

@@ -4,7 +4,7 @@
 	import { runtime, session } from "$lib/app/session.svelte.ts";
 	import PageHeader from "$lib/components/page-header.svelte";
 	import RecordTable from "$lib/components/record-table.svelte";
-	import { Button } from "$lib/components/ui/button/index.js";
+	import { Button } from "@jthum/framework/svelte/ui/button";
 	import { implicitViewKey } from "$lib/runtime/defaults.ts";
 	import PlusIcon from "@lucide/svelte/icons/plus";
 

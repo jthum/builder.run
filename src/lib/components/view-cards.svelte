@@ -1,9 +1,9 @@
 <script lang="ts">
 	import { columnLabel, isStatusPath } from "$lib/app/labels.ts";
 	import FormattedValue from "$lib/components/formatted-value.svelte";
-	import * as Card from "$lib/components/ui/card/index.js";
-	import * as Empty from "$lib/components/ui/empty/index.js";
-	import { Skeleton } from "$lib/components/ui/skeleton/index.js";
+	import * as Card from "@jthum/framework/svelte/ui/card";
+	import * as Empty from "@jthum/framework/svelte/ui/empty";
+	import { Skeleton } from "@jthum/framework/svelte/ui/skeleton";
 	import type { TypeDef, ViewDef } from "$lib/runtime/model.ts";
 	import InboxIcon from "@lucide/svelte/icons/inbox";
 

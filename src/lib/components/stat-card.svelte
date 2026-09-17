@@ -1,6 +1,6 @@
 <script lang="ts">
-	import * as Card from "$lib/components/ui/card/index.js";
-	import { Skeleton } from "$lib/components/ui/skeleton/index.js";
+	import * as Card from "@jthum/framework/svelte/ui/card";
+	import { Skeleton } from "@jthum/framework/svelte/ui/skeleton";
 	import ArrowUpRightIcon from "@lucide/svelte/icons/arrow-up-right";
 
 	let {

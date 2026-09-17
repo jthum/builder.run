@@ -7,9 +7,9 @@
 </script>
 
 <script lang="ts">
-	import * as Command from "$lib/components/ui/command/index.js";
-	import * as InputGroup from "$lib/components/ui/input-group/index.js";
-	import * as Popover from "$lib/components/ui/popover/index.js";
+	import * as Command from "@jthum/framework/svelte/ui/command";
+	import * as InputGroup from "@jthum/framework/svelte/ui/input-group";
+	import * as Popover from "@jthum/framework/svelte/ui/popover";
 	import type { AutomationValue } from "$lib/runtime/automation/model.ts";
 	import BracesIcon from "@lucide/svelte/icons/braces";
 

@@ -1,13 +1,13 @@
 <script lang="ts">
 	import { runtime, session, wipeAllLocalData } from "$lib/app/session.svelte.ts";
 	import PageHeader from "$lib/components/page-header.svelte";
-	import * as AlertDialog from "$lib/components/ui/alert-dialog/index.js";
-	import { Badge } from "$lib/components/ui/badge/index.js";
-	import { Button } from "$lib/components/ui/button/index.js";
-	import * as Card from "$lib/components/ui/card/index.js";
-	import * as Empty from "$lib/components/ui/empty/index.js";
-	import { Spinner } from "$lib/components/ui/spinner/index.js";
-	import * as Tabs from "$lib/components/ui/tabs/index.js";
+	import * as AlertDialog from "@jthum/framework/svelte/ui/alert-dialog";
+	import { Badge } from "@jthum/framework/svelte/ui/badge";
+	import { Button } from "@jthum/framework/svelte/ui/button";
+	import * as Card from "@jthum/framework/svelte/ui/card";
+	import * as Empty from "@jthum/framework/svelte/ui/empty";
+	import { Spinner } from "@jthum/framework/svelte/ui/spinner";
+	import * as Tabs from "@jthum/framework/svelte/ui/tabs";
 	import { buildTools, toolSurface, webmcpSupported } from "$lib/runtime/webmcp.ts";
 	import { toast } from "svelte-sonner";
 

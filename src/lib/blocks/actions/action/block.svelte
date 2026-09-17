@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { runtime } from "$lib/app/session.svelte.ts";
-	import { Button } from "$lib/components/ui/button/index.js";
+	import { Button } from "@jthum/framework/svelte/ui/button";
 	import type { BlockProps } from "$lib/blocks/types.ts";
 	import { toast } from "svelte-sonner";
 	let { config }: BlockProps = $props();

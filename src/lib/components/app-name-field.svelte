@@ -1,6 +1,6 @@
 <script lang="ts">
-	import * as Field from "$lib/components/ui/field/index.js";
-	import { Input } from "$lib/components/ui/input/index.js";
+	import * as Field from "@jthum/framework/svelte/ui/field";
+	import { Input } from "@jthum/framework/svelte/ui/input";
 
 	let {
 		value = $bindable(""),

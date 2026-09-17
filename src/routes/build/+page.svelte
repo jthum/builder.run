@@ -3,8 +3,8 @@
 	import { studioItems } from "$lib/app/studio.ts";
 	import DeleteAppDialog from "$lib/components/delete-app-dialog.svelte";
 	import PageHeader from "$lib/components/page-header.svelte";
-	import { Button } from "$lib/components/ui/button/index.js";
-	import * as Card from "$lib/components/ui/card/index.js";
+	import { Button } from "@jthum/framework/svelte/ui/button";
+	import * as Card from "@jthum/framework/svelte/ui/card";
 
 	let deleteOpen = $state(false);
 	const appName = $derived(session.app?.name ?? "this app");

@@ -18,8 +18,8 @@
 	import DataTable from "$lib/components/data-table.svelte";
 	import FormattedValue from "$lib/components/formatted-value.svelte";
 	import ViewExposeBar from "$lib/components/view-expose-bar.svelte";
-	import * as AlertDialog from "$lib/components/ui/alert-dialog/index.js";
-	import * as Table from "$lib/components/ui/table/index.js";
+	import * as AlertDialog from "@jthum/framework/svelte/ui/alert-dialog";
+	import * as Table from "@jthum/framework/svelte/ui/table";
 	import type { FieldDef, TypeDef, ViewDef } from "$lib/runtime/model.ts";
 	import { toast } from "svelte-sonner";
 

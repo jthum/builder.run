@@ -1,10 +1,10 @@
 <script lang="ts">
 	import { columnLabel, isStatusPath } from "$lib/app/labels.ts";
 	import FormattedValue from "$lib/components/formatted-value.svelte";
-	import { Badge } from "$lib/components/ui/badge/index.js";
-	import * as Card from "$lib/components/ui/card/index.js";
-	import * as Empty from "$lib/components/ui/empty/index.js";
-	import { Skeleton } from "$lib/components/ui/skeleton/index.js";
+	import { Badge } from "@jthum/framework/svelte/ui/badge";
+	import * as Card from "@jthum/framework/svelte/ui/card";
+	import * as Empty from "@jthum/framework/svelte/ui/empty";
+	import { Skeleton } from "@jthum/framework/svelte/ui/skeleton";
 	import { cellValue } from "$lib/runtime/chart-data.ts";
 	import { labelFromKey } from "$lib/runtime/ids.ts";
 	import type { TypeDef, ViewDef } from "$lib/runtime/model.ts";

@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { Skeleton } from "$lib/components/ui/skeleton/index.js";
+	import { Skeleton } from "@jthum/framework/svelte/ui/skeleton";
 	import type { AppSpec, PageLayoutNode } from "$lib/runtime/model.ts";
 	import { loadBlock } from "$lib/blocks/registry.ts";
 

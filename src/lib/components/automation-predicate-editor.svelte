@@ -2,9 +2,9 @@
 	import AppSelect from "$lib/components/app-select.svelte";
 	import AutomationPredicateEditor from "$lib/components/automation-predicate-editor.svelte";
 	import AutomationValueInput, { type AutomationReferenceOption } from "$lib/components/automation-value-input.svelte";
-	import { Button } from "$lib/components/ui/button/index.js";
-	import * as Card from "$lib/components/ui/card/index.js";
-	import { Input } from "$lib/components/ui/input/index.js";
+	import { Button } from "@jthum/framework/svelte/ui/button";
+	import * as Card from "@jthum/framework/svelte/ui/card";
+	import { Input } from "@jthum/framework/svelte/ui/input";
 	import { labelFromKey } from "$lib/runtime/ids.ts";
 	import type { AutomationCondition, AutomationPredicate, AutomationValue } from "$lib/runtime/automation/model.ts";
 	import type { FieldDef, TypeDef } from "$lib/runtime/model.ts";

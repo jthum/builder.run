@@ -1,6 +1,6 @@
 <script lang="ts">
-	import * as Dialog from "$lib/components/ui/dialog/index.js";
-	import * as Tabs from "$lib/components/ui/tabs/index.js";
+	import * as Dialog from "@jthum/framework/svelte/ui/dialog";
+	import * as Tabs from "@jthum/framework/svelte/ui/tabs";
 	import { cn } from "$lib/utils.js";
 	import type { Component, Snippet } from "svelte";
 

@@ -1,8 +1,8 @@
 <script lang="ts">
 	import AppSelect from "$lib/components/app-select.svelte";
 	import AutomationValueInput, { type AutomationReferenceOption } from "$lib/components/automation-value-input.svelte";
-	import { Button } from "$lib/components/ui/button/index.js";
-	import { Input } from "$lib/components/ui/input/index.js";
+	import { Button } from "@jthum/framework/svelte/ui/button";
+	import { Input } from "@jthum/framework/svelte/ui/input";
 	import type { AutomationValue } from "$lib/runtime/automation/model.ts";
 	import PlusIcon from "@lucide/svelte/icons/plus";
 	import Trash2Icon from "@lucide/svelte/icons/trash-2";

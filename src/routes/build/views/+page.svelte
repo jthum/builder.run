@@ -3,10 +3,10 @@
 	import { session, runtime } from "$lib/app/session.svelte.ts";
 	import NameDialog from "$lib/components/name-dialog.svelte";
 	import PageHeader from "$lib/components/page-header.svelte";
-	import { Badge } from "$lib/components/ui/badge/index.js";
-	import { Button } from "$lib/components/ui/button/index.js";
-	import * as Card from "$lib/components/ui/card/index.js";
-	import * as Empty from "$lib/components/ui/empty/index.js";
+	import { Badge } from "@jthum/framework/svelte/ui/badge";
+	import { Button } from "@jthum/framework/svelte/ui/button";
+	import * as Card from "@jthum/framework/svelte/ui/card";
+	import * as Empty from "@jthum/framework/svelte/ui/empty";
 	import { slugify } from "$lib/runtime/ids.ts";
 	import ArrowRightIcon from "@lucide/svelte/icons/arrow-right";
 	import PlusIcon from "@lucide/svelte/icons/plus";

@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { session } from "$lib/app/session.svelte.ts";
 	import { toneFromAccent } from "$lib/app/color.ts";
-	import * as Card from "$lib/components/ui/card/index.js";
+	import * as Card from "@jthum/framework/svelte/ui/card";
 	import { asLabel, asNumber, cellValue } from "$lib/runtime/chart-data.ts";
 	import { chartPalette } from "$lib/runtime/chart-geometry.ts";
 	import type { BlockProps } from "$lib/blocks/types.ts";

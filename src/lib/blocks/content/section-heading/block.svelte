@@ -1,6 +1,6 @@
 <script lang="ts">
-	import { Button } from "$lib/components/ui/button/index.js";
-	import { Separator } from "$lib/components/ui/separator/index.js";
+	import { Button } from "@jthum/framework/svelte/ui/button";
+	import { Separator } from "@jthum/framework/svelte/ui/separator";
 	import type { BlockProps } from "$lib/blocks/types.ts";
 	import ArrowRightIcon from "@lucide/svelte/icons/arrow-right";
 	let { config }: BlockProps = $props();

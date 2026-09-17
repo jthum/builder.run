@@ -1,12 +1,12 @@
 <script lang="ts">
 	import { runtime } from "$lib/app/session.svelte.ts";
 	import AppSelect from "$lib/components/app-select.svelte";
-	import { Badge } from "$lib/components/ui/badge/index.js";
-	import { Button } from "$lib/components/ui/button/index.js";
-	import * as Card from "$lib/components/ui/card/index.js";
-	import { Checkbox } from "$lib/components/ui/checkbox/index.js";
-	import * as Field from "$lib/components/ui/field/index.js";
-	import { Input } from "$lib/components/ui/input/index.js";
+	import { Badge } from "@jthum/framework/svelte/ui/badge";
+	import { Button } from "@jthum/framework/svelte/ui/button";
+	import * as Card from "@jthum/framework/svelte/ui/card";
+	import { Checkbox } from "@jthum/framework/svelte/ui/checkbox";
+	import * as Field from "@jthum/framework/svelte/ui/field";
+	import { Input } from "@jthum/framework/svelte/ui/input";
 	import { labelFromKey, slugify } from "$lib/runtime/ids.ts";
 	import type { TypeDef, TypeTransitionDef } from "$lib/runtime/model.ts";
 	import ArrowRightIcon from "@lucide/svelte/icons/arrow-right";

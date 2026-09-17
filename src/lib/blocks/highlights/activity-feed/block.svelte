@@ -1,7 +1,7 @@
 <script lang="ts">
 	import FormattedValue from "$lib/components/formatted-value.svelte";
-	import * as Card from "$lib/components/ui/card/index.js";
-	import { Separator } from "$lib/components/ui/separator/index.js";
+	import * as Card from "@jthum/framework/svelte/ui/card";
+	import { Separator } from "@jthum/framework/svelte/ui/separator";
 	import type { BlockProps } from "$lib/blocks/types.ts";
 	let { config, rows, spec }: BlockProps = $props();
 	const viewKey = $derived(String(config.view ?? ""));

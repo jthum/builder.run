@@ -4,11 +4,11 @@
 	import Block from "$lib/components/block.svelte";
 	import BlockPicker from "$lib/components/block-picker.svelte";
 	import BlockSettings from "$lib/components/block-settings.svelte";
-	import { Badge } from "$lib/components/ui/badge/index.js";
-	import { Button } from "$lib/components/ui/button/index.js";
-	import * as Card from "$lib/components/ui/card/index.js";
-	import * as DropdownMenu from "$lib/components/ui/dropdown-menu/index.js";
-	import * as Empty from "$lib/components/ui/empty/index.js";
+	import { Badge } from "@jthum/framework/svelte/ui/badge";
+	import { Button } from "@jthum/framework/svelte/ui/button";
+	import * as Card from "@jthum/framework/svelte/ui/card";
+	import * as DropdownMenu from "@jthum/framework/svelte/ui/dropdown-menu";
+	import * as Empty from "@jthum/framework/svelte/ui/empty";
 	import type { AppSpec, PageLayoutNode, PageDef, PageRowHeight } from "$lib/runtime/model.ts";
 	import {
 		appendInGroup,

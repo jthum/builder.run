@@ -1,6 +1,6 @@
 <script lang="ts">
 	import RecordForm from "$lib/components/record-form.svelte";
-	import * as Card from "$lib/components/ui/card/index.js";
+	import * as Card from "@jthum/framework/svelte/ui/card";
 	import type { BlockProps } from "$lib/blocks/types.ts";
 	let { config, spec }: BlockProps = $props();
 	const form = $derived(spec?.forms.find((item) => item.key === String(config.form ?? "")));

@@ -1,6 +1,6 @@
 <script lang="ts">
-	import * as Field from "$lib/components/ui/field/index.js";
-	import * as ToggleGroup from "$lib/components/ui/toggle-group/index.js";
+	import * as Field from "@jthum/framework/svelte/ui/field";
+	import * as ToggleGroup from "@jthum/framework/svelte/ui/toggle-group";
 	import type { FormDef } from "$lib/runtime/model.ts";
 
 	let {

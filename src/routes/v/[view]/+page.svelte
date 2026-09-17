@@ -4,7 +4,7 @@
 	import { runtime, session } from "$lib/app/session.svelte.ts";
 	import PageHeader from "$lib/components/page-header.svelte";
 	import RecordTable from "$lib/components/record-table.svelte";
-	import { Button } from "$lib/components/ui/button/index.js";
+	import { Button } from "@jthum/framework/svelte/ui/button";
 	import PlusIcon from "@lucide/svelte/icons/plus";
 
 	const viewKey = $derived(page.params.view);

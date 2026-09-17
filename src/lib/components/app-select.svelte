@@ -1,5 +1,5 @@
 <script lang="ts">
-	import * as Select from "$lib/components/ui/select/index.js";
+	import * as Select from "@jthum/framework/svelte/ui/select";
 	import { cn } from "$lib/utils.js";
 
 	const empty = "__empty__";

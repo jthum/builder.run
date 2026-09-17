@@ -1,6 +1,6 @@
 <script lang="ts">
 	import FormattedValue from "$lib/components/formatted-value.svelte";
-	import * as Card from "$lib/components/ui/card/index.js";
+	import * as Card from "@jthum/framework/svelte/ui/card";
 	import { cellValue } from "$lib/runtime/chart-data.ts";
 	import type { BlockProps } from "$lib/blocks/types.ts";
 

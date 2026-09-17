@@ -1,8 +1,8 @@
 <script lang="ts">
 	import { listHref } from "$lib/app/labels.ts";
-	import { Button } from "$lib/components/ui/button/index.js";
-	import * as Card from "$lib/components/ui/card/index.js";
-	import { Progress } from "$lib/components/ui/progress/index.js";
+	import { Button } from "@jthum/framework/svelte/ui/button";
+	import * as Card from "@jthum/framework/svelte/ui/card";
+	import { Progress } from "@jthum/framework/svelte/ui/progress";
 	import { asNumber, cellValue } from "$lib/runtime/chart-data.ts";
 	import type { BlockProps } from "$lib/blocks/types.ts";
 	import ArrowUpRightIcon from "@lucide/svelte/icons/arrow-up-right";

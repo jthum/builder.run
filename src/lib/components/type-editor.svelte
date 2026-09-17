@@ -13,17 +13,17 @@
 	import LifecycleEditor from "$lib/components/lifecycle-editor.svelte";
 	import PageHeader from "$lib/components/page-header.svelte";
 	import StatusPill from "$lib/components/status-pill.svelte";
-	import * as AlertDialog from "$lib/components/ui/alert-dialog/index.js";
-	import { Badge } from "$lib/components/ui/badge/index.js";
-	import { Button } from "$lib/components/ui/button/index.js";
-	import * as Card from "$lib/components/ui/card/index.js";
-	import * as Collapsible from "$lib/components/ui/collapsible/index.js";
-	import * as Field from "$lib/components/ui/field/index.js";
-	import { Separator } from "$lib/components/ui/separator/index.js";
-	import { Input } from "$lib/components/ui/input/index.js";
-	import * as Sheet from "$lib/components/ui/sheet/index.js";
-	import { Spinner } from "$lib/components/ui/spinner/index.js";
-	import { Switch } from "$lib/components/ui/switch/index.js";
+	import * as AlertDialog from "@jthum/framework/svelte/ui/alert-dialog";
+	import { Badge } from "@jthum/framework/svelte/ui/badge";
+	import { Button } from "@jthum/framework/svelte/ui/button";
+	import * as Card from "@jthum/framework/svelte/ui/card";
+	import * as Collapsible from "@jthum/framework/svelte/ui/collapsible";
+	import * as Field from "@jthum/framework/svelte/ui/field";
+	import { Separator } from "@jthum/framework/svelte/ui/separator";
+	import { Input } from "@jthum/framework/svelte/ui/input";
+	import * as Sheet from "@jthum/framework/svelte/ui/sheet";
+	import { Spinner } from "@jthum/framework/svelte/ui/spinner";
+	import { Switch } from "@jthum/framework/svelte/ui/switch";
 	import { slugify, uniqueKey } from "$lib/runtime/ids.ts";
 	import {
 		FIELD_KINDS,

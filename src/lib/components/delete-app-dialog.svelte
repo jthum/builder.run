@@ -1,11 +1,11 @@
 <script lang="ts">
 	import { goto } from "$app/navigation";
 	import { deleteApp, session } from "$lib/app/session.svelte.ts";
-	import { Button } from "$lib/components/ui/button/index.js";
-	import * as Dialog from "$lib/components/ui/dialog/index.js";
-	import * as Field from "$lib/components/ui/field/index.js";
-	import { Input } from "$lib/components/ui/input/index.js";
-	import { Spinner } from "$lib/components/ui/spinner/index.js";
+	import { Button } from "@jthum/framework/svelte/ui/button";
+	import * as Dialog from "@jthum/framework/svelte/ui/dialog";
+	import * as Field from "@jthum/framework/svelte/ui/field";
+	import { Input } from "@jthum/framework/svelte/ui/input";
+	import { Spinner } from "@jthum/framework/svelte/ui/spinner";
 	import { toast } from "svelte-sonner";
 
 	let { open = $bindable(false) }: { open?: boolean } = $props();

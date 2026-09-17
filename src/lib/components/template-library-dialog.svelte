@@ -1,6 +1,6 @@
 <script lang="ts">
-	import { Button } from "$lib/components/ui/button/index.js";
-	import * as Dialog from "$lib/components/ui/dialog/index.js";
+	import { Button } from "@jthum/framework/svelte/ui/button";
+	import * as Dialog from "@jthum/framework/svelte/ui/dialog";
 	import ChevronLeftIcon from "@lucide/svelte/icons/chevron-left";
 	import ChevronRightIcon from "@lucide/svelte/icons/chevron-right";
 	import type { Snippet } from "svelte";

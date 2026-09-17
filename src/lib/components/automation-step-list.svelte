@@ -5,12 +5,12 @@
 	import AutomationValueMapEditor from "$lib/components/automation-value-map-editor.svelte";
 	import AppSelect from "$lib/components/app-select.svelte";
 	import { reorderAtVerticalTarget, startVerticalDrag, type VerticalDragSession, type VerticalDropTarget } from "$lib/app/drag.ts";
-	import * as Collapsible from "$lib/components/ui/collapsible/index.js";
-	import * as Command from "$lib/components/ui/command/index.js";
-	import { Button } from "$lib/components/ui/button/index.js";
-	import * as Card from "$lib/components/ui/card/index.js";
-	import * as Field from "$lib/components/ui/field/index.js";
-	import { Input } from "$lib/components/ui/input/index.js";
+	import * as Collapsible from "@jthum/framework/svelte/ui/collapsible";
+	import * as Command from "@jthum/framework/svelte/ui/command";
+	import { Button } from "@jthum/framework/svelte/ui/button";
+	import * as Card from "@jthum/framework/svelte/ui/card";
+	import * as Field from "@jthum/framework/svelte/ui/field";
+	import { Input } from "@jthum/framework/svelte/ui/input";
 	import { humanStep } from "$lib/app/relations.ts";
 	import { DEFAULT_AUTOMATION_REGISTRY } from "$lib/runtime/automation/registry.ts";
 	import { labelFromKey } from "$lib/runtime/ids.ts";

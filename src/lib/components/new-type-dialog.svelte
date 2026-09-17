@@ -3,10 +3,10 @@
 	import { runtime, session } from "$lib/app/session.svelte.ts";
 	import AppSelect from "$lib/components/app-select.svelte";
 	import TemplateLibraryDialog from "$lib/components/template-library-dialog.svelte";
-	import { Badge } from "$lib/components/ui/badge/index.js";
-	import { Button } from "$lib/components/ui/button/index.js";
-	import * as InputGroup from "$lib/components/ui/input-group/index.js";
-	import { Spinner } from "$lib/components/ui/spinner/index.js";
+	import { Badge } from "@jthum/framework/svelte/ui/badge";
+	import { Button } from "@jthum/framework/svelte/ui/button";
+	import * as InputGroup from "@jthum/framework/svelte/ui/input-group";
+	import { Spinner } from "@jthum/framework/svelte/ui/spinner";
 	import { labelFromKey } from "$lib/runtime/ids.ts";
 	import { typeDraftFromTemplate, typeTemplateCategories, typeTemplates } from "$lib/runtime/type-templates.ts";
 	import { cn } from "$lib/utils.js";

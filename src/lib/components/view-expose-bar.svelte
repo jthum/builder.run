@@ -5,10 +5,10 @@
 		semanticDotClass,
 		statusDotClass,
 	} from "$lib/app/labels.ts";
-	import { Badge } from "$lib/components/ui/badge/index.js";
-	import { Button } from "$lib/components/ui/button/index.js";
-	import * as DropdownMenu from "$lib/components/ui/dropdown-menu/index.js";
-	import * as InputGroup from "$lib/components/ui/input-group/index.js";
+	import { Badge } from "@jthum/framework/svelte/ui/badge";
+	import { Button } from "@jthum/framework/svelte/ui/button";
+	import * as DropdownMenu from "@jthum/framework/svelte/ui/dropdown-menu";
+	import * as InputGroup from "@jthum/framework/svelte/ui/input-group";
 	import { labelFromKey } from "$lib/runtime/ids.ts";
 	import type { FieldDef } from "$lib/runtime/model.ts";
 	import ChevronDownIcon from "@lucide/svelte/icons/chevron-down";

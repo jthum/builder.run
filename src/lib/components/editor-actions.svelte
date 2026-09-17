@@ -1,6 +1,6 @@
 <script lang="ts">
-	import { Button } from "$lib/components/ui/button/index.js";
-	import { Spinner } from "$lib/components/ui/spinner/index.js";
+	import { Button } from "@jthum/framework/svelte/ui/button";
+	import { Spinner } from "@jthum/framework/svelte/ui/spinner";
 	import { onMount, type Snippet } from "svelte";
 
 	let {

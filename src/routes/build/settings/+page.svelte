@@ -2,9 +2,9 @@
 	import { renameApp, session } from "$lib/app/session.svelte.ts";
 	import AppNameField from "$lib/components/app-name-field.svelte";
 	import PageHeader from "$lib/components/page-header.svelte";
-	import { Button } from "$lib/components/ui/button/index.js";
-	import * as Card from "$lib/components/ui/card/index.js";
-	import { Spinner } from "$lib/components/ui/spinner/index.js";
+	import { Button } from "@jthum/framework/svelte/ui/button";
+	import * as Card from "@jthum/framework/svelte/ui/card";
+	import { Spinner } from "@jthum/framework/svelte/ui/spinner";
 	import { toast } from "svelte-sonner";
 
 	let appId = $state("");

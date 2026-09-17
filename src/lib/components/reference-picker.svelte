@@ -1,7 +1,7 @@
 <script lang="ts">
-	import { Button } from "$lib/components/ui/button/index.js";
-	import * as Command from "$lib/components/ui/command/index.js";
-	import * as Popover from "$lib/components/ui/popover/index.js";
+	import { Button } from "@jthum/framework/svelte/ui/button";
+	import * as Command from "@jthum/framework/svelte/ui/command";
+	import * as Popover from "@jthum/framework/svelte/ui/popover";
 	import { cn } from "$lib/utils.js";
 	import ChevronsUpDownIcon from "@lucide/svelte/icons/chevrons-up-down";
 
