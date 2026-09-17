@@ -79,6 +79,7 @@ export function specFromText(text: string): AppSpec {
 export function authoringSpec(spec: AppSpec): Record<string, unknown> {
   const copy = cloneSpec(spec);
   return {
+    id: copy.id,
     version: copy.version,
     key: copy.key,
     label: copy.label,

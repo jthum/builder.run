@@ -19,6 +19,7 @@
     "test:browser": "node scripts/browser-smoke.mjs"
   },
   "dependencies": {
+    "@jthum/framework": "link:../framework",
     "nanoid": "^6.0.1",
     "pluralize": "^8.0.0",
     "wa-sqlite": "^1.0.0",

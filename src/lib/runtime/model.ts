@@ -198,7 +198,7 @@ export interface PageDef extends SpecNode {
   implicit?: boolean;
 }
 
-export interface AppSpec {
+export interface AppSpec extends SpecNode {
   version: typeof SPEC_VERSION;
   key: string;
   label: string;
@@ -268,6 +268,7 @@ export const RESERVED_FIELD_KEYS = new Set([
 
 export function emptySpec(key = "app", label = "App"): AppSpec {
   return {
+    id: createSpecId(),
     version: SPEC_VERSION,
     key,
     label,
@@ -324,6 +325,7 @@ type SpecDraft = Partial<
 };
 
 const SPEC_PROPERTIES = new Set([
+  "id",
   "version",
   "key",
   "label",
@@ -956,6 +958,7 @@ export function normalizeSpec(input: SpecDraft | AppSpec, existing?: AppSpec): A
     );
   });
   const spec: AppSpec = {
+    id: input.id || existing?.id || createSpecId(),
     version: SPEC_VERSION,
     key,
     label: input.label || existing?.label || labelFromKey(key),
