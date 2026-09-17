@@ -2,7 +2,7 @@
 	import { page } from "$app/state";
 	import { initialsFromName, toneFromAccent, toneFromName } from "$lib/app/color.ts";
 	import { collectionLabel, featuredViews, spaceLabel } from "$lib/app/labels.ts";
-	import { chrome, openNewApp, session, runtime } from "$lib/app/session.svelte.ts";
+	import { chrome, createSpace, openNewApp, selectApp, selectSpace, session } from "$lib/app/session.svelte.ts";
 	import { studioGroupOrder, studioItems } from "$lib/app/studio.ts";
 	import AppSettingsDialog from "$lib/components/app-settings-dialog.svelte";
 	import SidebarNavGroup from "$lib/components/sidebar-nav-group.svelte";
@@ -100,7 +100,7 @@
 	async function switchApp(id: string) {
 		appMenuOpen = false;
 		if (id === snap?.app.id) return;
-		await runtime().switchApp(id);
+		await selectApp(id);
 	}
 
 	function createApp() {
@@ -375,7 +375,7 @@
 							</DropdownMenu.SubTrigger>
 							<DropdownMenu.SubContent class="min-w-48">
 								{#each snap?.spaces ?? [] as item (item.id)}
-									<DropdownMenu.Item onSelect={() => runtime().switchSpace(item.id)}>
+									<DropdownMenu.Item onSelect={() => selectSpace(item.id)}>
 										<span class="truncate">{spaceLabel(item.name)}</span>
 										{#if item.id === snap?.space.id}
 											<CheckIcon class="ms-auto" />
@@ -408,6 +408,6 @@
 	description="A separate space for apps, people, and types you expose to those apps."
 	confirm="Create space"
 	onSubmit={async (name) => {
-		await runtime().createSpace(name);
+		await createSpace(name);
 	}}
 />

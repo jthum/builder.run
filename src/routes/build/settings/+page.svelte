@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { runtime, session } from "$lib/app/session.svelte.ts";
+	import { renameApp, session } from "$lib/app/session.svelte.ts";
 	import AppNameField from "$lib/components/app-name-field.svelte";
 	import PageHeader from "$lib/components/page-header.svelte";
 	import { Button } from "$lib/components/ui/button/index.js";
@@ -24,7 +24,7 @@
 		if (!changed || pending) return;
 		pending = true;
 		try {
-			await runtime().renameApp(name);
+			await renameApp(name);
 			toast.success("App settings saved");
 		} finally {
 			pending = false;

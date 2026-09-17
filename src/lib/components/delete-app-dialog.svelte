@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { goto } from "$app/navigation";
-	import { runtime, session } from "$lib/app/session.svelte.ts";
+	import { deleteApp, session } from "$lib/app/session.svelte.ts";
 	import { Button } from "$lib/components/ui/button/index.js";
 	import * as Dialog from "$lib/components/ui/dialog/index.js";
 	import * as Field from "$lib/components/ui/field/index.js";
@@ -36,7 +36,7 @@
 		if (!app || !matches) return;
 		pending = true;
 		try {
-			await runtime().deleteApp(app.id);
+			await deleteApp(app.id);
 			toast.success(`${app.name} deleted`);
 			open = false;
 			await goto("/");

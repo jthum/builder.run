@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { goto } from "$app/navigation";
 	import { spaceLabel } from "$lib/app/labels.ts";
-	import { runtime, session } from "$lib/app/session.svelte.ts";
+	import { createApp, session } from "$lib/app/session.svelte.ts";
 	import AppSelect from "$lib/components/app-select.svelte";
 	import TemplateLibraryDialog from "$lib/components/template-library-dialog.svelte";
 	import { Badge } from "$lib/components/ui/badge/index.js";
@@ -119,7 +119,7 @@
 		const name = template?.label ?? "Untitled app";
 		pending = true;
 		try {
-			await runtime().createApp(name, template?.key ?? null);
+			await createApp(name, template?.key ?? null);
 			toast.success(`${name} is ready`, { description: "You can rename it in App settings." });
 			open = false;
 			await goto("/");

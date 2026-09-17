@@ -117,6 +117,31 @@ export function runtime(): Host {
   return session.host;
 }
 
+/** App-shell commands stay behind this boundary while their implementation moves to the Framework. */
+export async function selectApp(id: string): Promise<void> {
+  await runtime().switchApp(id);
+}
+
+export async function createApp(name: string, template?: string | null): Promise<void> {
+  await runtime().createApp(name, template);
+}
+
+export async function renameApp(name: string): Promise<void> {
+  await runtime().renameApp(name);
+}
+
+export async function deleteApp(id: string): Promise<void> {
+  await runtime().deleteApp(id);
+}
+
+export async function selectSpace(id: string): Promise<void> {
+  await runtime().switchSpace(id);
+}
+
+export async function createSpace(name: string): Promise<void> {
+  await runtime().createSpace(name);
+}
+
 export function configureWebMcpAppToolMode(mode: WebMcpAppToolMode): void {
   setWebMcpAppToolMode(mode);
   session.webmcpToolMode = mode;
