@@ -1,23 +1,16 @@
 import { SqlitePersistenceAdapter } from "@jthum/framework/sqlite";
-import type {
-  SqliteConnection as FrameworkSqliteConnection,
-  SqliteDatabase,
-  SqliteParameters,
-} from "@jthum/framework/sqlite";
-import type {
-  SqlConnection as BuilderSqlConnection,
-  SqlGateway,
-} from "$lib/runtime/persistence/sqlite/gateway.ts";
+import type { SqliteConnection, SqliteDatabase, SqliteParameters } from "@jthum/framework/sqlite";
+import type { SqlConnection, SqlGateway } from "$lib/runtime/persistence/sqlite/gateway.ts";
 
-export const RUNTIME_DATABASE = "builder-framework";
+export const RUNTIME_DATABASE = "framework-runtime";
 const leasedDatabaseNames = new WeakMap<SqlGateway, Set<string>>();
 
 /**
- * Uses Builder's environment-specific SQLite gateway as Framework persistence.
+ * Uses Builder.run's environment-specific SQLite gateway as Framework persistence.
  *
  * The gateway selects wa-sqlite in the browser and node:sqlite in tests. This adapter owns only
  * transaction ordering and the small difference between the two SQL interfaces; it does not
- * depend on Builder's legacy Host, catalog, or record services.
+ * depend on Builder.run's legacy Host, catalog, or record services.
  */
 export function createKernelSqlitePersistence(
   gateway: SqlGateway,
@@ -40,7 +33,7 @@ export function createKernelSqlitePersistence(
 function acquireDatabaseLease(gateway: SqlGateway, name: string): void {
   const names = leasedDatabaseNames.get(gateway) ?? new Set<string>();
   if (names.has(name)) {
-    throw new Error("Builder Kernel SQLite persistence already has an active session.");
+    throw new Error("Runtime SQLite persistence already has an active session.");
   }
   names.add(name);
   leasedDatabaseNames.set(gateway, names);
@@ -57,7 +50,7 @@ class GatewaySqliteDatabase implements SqliteDatabase {
   private closed = false;
 
   constructor(
-    private readonly connection: BuilderSqlConnection,
+    private readonly connection: SqlConnection,
     private readonly release: () => void,
   ) {}
 
@@ -80,7 +73,7 @@ class GatewaySqliteDatabase implements SqliteDatabase {
     return this.enqueue(async () => (await this.connection.query(sql, [...parameters])) as T[]);
   }
 
-  transaction<T>(work: (connection: FrameworkSqliteConnection) => Promise<T>): Promise<T> {
+  transaction<T>(work: (connection: SqliteConnection) => Promise<T>): Promise<T> {
     return this.enqueue(async () => {
       const connection = new TransactionSqliteConnection(this.connection);
       await connection.execute("BEGIN");
@@ -121,8 +114,8 @@ class GatewaySqliteDatabase implements SqliteDatabase {
   }
 }
 
-class TransactionSqliteConnection implements FrameworkSqliteConnection {
-  constructor(private readonly connection: BuilderSqlConnection) {}
+class TransactionSqliteConnection implements SqliteConnection {
+  constructor(private readonly connection: SqlConnection) {}
 
   execute(sql: string): Promise<void> {
     return this.connection.exec(sql);

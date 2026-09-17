@@ -5,7 +5,7 @@ import { Kernel } from "@jthum/framework/kernel";
 import { createApp, listApps, openRuntime, resolveApp } from "./bootstrap.ts";
 import { createKernelSqlitePersistence } from "./sqlite.ts";
 
-describe("Builder Framework vertical slice", () => {
+describe("Framework vertical slice", () => {
   it("runs shared records, an app Form, View, and Page on the Framework Kernel", async () => {
     expect.hasAssertions();
     const spaceSpec = normalizeSpec({
@@ -83,7 +83,7 @@ describe("Builder Framework vertical slice", () => {
     });
 
     expect(instance.isNew).toBe(true);
-    if (!instance.isNew) throw new Error("Expected a newly seeded Builder Kernel");
+    if (!instance.isNew) throw new Error("Expected a newly seeded runtime");
     expect(instance.gaps).toEqual([]);
     const emptyAppSpec = normalizeSpec({ key: "empty", label: "Empty" });
     const emptyApp = await createApp(instance.kernel, instance.spaceContext, {

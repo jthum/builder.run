@@ -3,7 +3,7 @@ import type { AppSpec, TypeDef } from "$lib/runtime/model.ts";
 import { sampleApps } from "$lib/runtime/samples.ts";
 import { assertFrameworkProjectionReady, projectFrameworkSpec } from "./projection.ts";
 
-describe("Builder Framework projection", () => {
+describe("Framework projection", () => {
   it("projects local and shared information-system surfaces without copying shared Collections", () => {
     expect.hasAssertions();
     const contact = contactType();

@@ -13,7 +13,7 @@ import { inValues, normalizeFilters } from "$lib/runtime/filters.ts";
 import { labelFromKey, slugify } from "$lib/runtime/ids.ts";
 import type {
   AppSpec,
-  FieldCondition as BuilderCondition,
+  FieldCondition as AppFieldCondition,
   FieldDef,
   FilterClause,
   PageBlock,
@@ -37,7 +37,7 @@ export interface FrameworkProjection {
 }
 
 /**
- * Transitional Builder host boundary. It projects only semantics represented by the Framework;
+ * Transitional host boundary. It projects only semantics represented by the Framework;
  * gaps are explicit so the host never silently loses behavior.
  */
 export function projectFrameworkSpec(
@@ -195,7 +195,7 @@ export function projectFrameworkSpec(
     gaps.push({
       path: "workflows",
       code: "RULES.NOT_PROJECTED",
-      message: "Builder workflows move when the Framework Rule primitive lands in Phase 5.",
+      message: "Workflows move when the Framework Rule primitive lands in Phase 5.",
     });
   }
   const spec: Spec = {
@@ -373,7 +373,7 @@ function fieldBehavior(field: FieldDef, siblings: readonly FieldDef[]) {
 }
 
 function projectCondition(
-  condition: BuilderCondition,
+  condition: AppFieldCondition,
   fields: ReadonlyMap<string, string>,
 ): FieldCondition {
   if ("all" in condition)

@@ -68,9 +68,9 @@ export type OpenedRuntime =
   | (AppRuntime & { readonly isNew: false });
 
 /**
- * Creates the Builder Space/App topology on the Framework Kernel.
+ * Creates the Space/App topology on the Framework Kernel.
  *
- * This seeds the canonical Framework database and never reads the old Builder database.
+ * This seeds the canonical Framework database and never reads the old Host database.
  */
 export async function createRuntime(input: CreateRuntimeInput): Promise<CreatedRuntime> {
   const spaceProjection = projectFrameworkSpec(input.spaceSpec, { sharedTypes: [] });
@@ -108,14 +108,14 @@ export async function createRuntime(input: CreateRuntimeInput): Promise<CreatedR
   }
 }
 
-/** Creates one Builder App as a child Workspace with explicit shared-Type Attachments. */
+/** Creates one App as a child Workspace with explicit shared-Type Attachments. */
 export async function createApp(
   kernel: Kernel,
   spaceContext: ExecutionContext,
   input: AppSeed,
 ): Promise<AppContext> {
   const space = await kernel.getWorkspace(spaceContext);
-  if (!space?.isRoot) throw new Error("Builder Apps must be created inside a Space.");
+  if (!space?.isRoot) throw new Error("Apps must be created inside a Space.");
   const projection = projectFrameworkSpec(input.spec, { sharedTypes: input.sharedTypes });
   assertSharedTypesProjected(input.sharedTypes, space.spec, projection.spec);
   return createProjectedApp(
@@ -128,13 +128,13 @@ export async function createApp(
   );
 }
 
-/** Lists the child Workspaces the current Actor can select as Builder Apps. */
+/** Lists the child Workspaces the current Actor can select as Apps. */
 export async function listApps(
   kernel: Kernel,
   spaceContext: ExecutionContext,
 ): Promise<readonly Workspace[]> {
   const space = await kernel.getWorkspace(spaceContext);
-  if (!space?.isRoot) throw new Error("Builder Apps must be listed from a Space.");
+  if (!space?.isRoot) throw new Error("Apps must be listed from a Space.");
   const [children, memberships] = await Promise.all([
     kernel.listChildWorkspaces(spaceContext, space.id),
     kernel.listMembershipsForActor(spaceContext, spaceContext.actorId),
@@ -143,7 +143,7 @@ export async function listApps(
   return children.filter((workspace) => memberOf.has(workspace.id));
 }
 
-/** Resolves Builder's Space/App convention for an Actor on an already-open Kernel. */
+/** Resolves the Space/App convention for an Actor on an already-open Kernel. */
 export async function resolveApp(
   kernel: Kernel,
   selection: AppSelection,
@@ -165,7 +165,7 @@ export async function resolveApp(
     !actor ||
     actor.rootId !== space.id
   ) {
-    throw new Error("Builder selection does not resolve to one Space and App for this Actor.");
+    throw new Error("Selection does not resolve to one Space and App for this Actor.");
   }
   return {
     spaceClient: await createWorkspaceClient(kernel, spaceContext),
@@ -179,7 +179,7 @@ export async function resolveApp(
   };
 }
 
-/** Opens the local Builder topology, creating it only when the catalog is empty. */
+/** Opens the local topology, creating it only when the catalog is empty. */
 export async function openRuntime(input: OpenRuntimeInput): Promise<OpenedRuntime> {
   const startup = await findStartup(input.kernel, input.preferredSelection, input.preferredActorId);
   if (startup) {
@@ -214,7 +214,7 @@ async function findStartup(
       (actor) => actor.kind === "user",
     );
     const actor = users.find((candidate) => candidate.id === preferredActorId) ?? users.at(0);
-    if (!actor) throw new Error(`Builder Space ${space.id} has no locally issued user.`);
+    if (!actor) throw new Error(`Space ${space.id} has no locally issued user.`);
     const memberOf = new Set(
       (await persistence.catalog.listMembershipsForActor(actor.id)).map(
         (membership) => membership.workspaceId,
@@ -224,7 +224,7 @@ async function findStartup(
       memberOf.has(workspace.id),
     );
     const app = apps.find((workspace) => workspace.id === preferredSelection?.appId) ?? apps.at(0);
-    if (!app) throw new Error(`Builder Space ${space.id} has no accessible App.`);
+    if (!app) throw new Error(`Space ${space.id} has no accessible App.`);
     return {
       selection: { spaceId: space.id, appId: app.id },
       actorId: actor.id,

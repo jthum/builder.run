@@ -4,7 +4,7 @@ import { createNodeGateway } from "$lib/runtime/persistence/sqlite/node-gateway.
 import { createKernelSqlitePersistence } from "./sqlite.ts";
 
 describe("Framework SQLite persistence", () => {
-  it("persists the Framework catalog and records through Builder's gateway", async () => {
+  it("persists the Framework catalog and records through the application gateway", async () => {
     expect.hasAssertions();
     const gateway = createNodeGateway();
     const persistence = createKernelSqlitePersistence(gateway);
