@@ -218,7 +218,7 @@ export function projectFrameworkSpec(
       key: page.key,
       label: page.label,
       meta: pageMeta(page.meta, page.icon, page.folder, page.path),
-      layout: page.blocks.map((block, index) => projectPageNode(block, page.id, [index])),
+      layout: page.blocks.map((block, index) => projectPageNode(block, [index])),
     })),
     rules: [],
   };
@@ -258,8 +258,8 @@ function projectCollection(
             initial: type.lifecycle.initial,
             ...(type.lifecycle.terminal ? { terminal: type.lifecycle.terminal } : {}),
             transitions: type.lifecycle.transitions.map((transition) => ({
-              id: `${type.id}:${transition.key}`,
               ...transition,
+              id: requireDefinitionId(transition.id, `${path}.lifecycle.transitions`),
             })),
           },
         }
@@ -447,19 +447,15 @@ function resolveFieldPath(
   return ids;
 }
 
-function projectPageNode(
-  block: PageBlock,
-  pageId: string,
-  path: readonly number[],
-): PageLayoutNode {
-  const id = `${pageId}:${path.join(".")}`;
+function projectPageNode(block: PageBlock, path: readonly number[]): PageLayoutNode {
+  const id = requireDefinitionId(block.id, `pages.layout.${path.join(".")}`);
   if (block.kind === "widget")
     return {
       id,
       kind: "block",
       block: block.widget,
       ...(block.values
-        ? { config: jsonObject(block.values, `pages.${pageId}.${path.join(".")}`) }
+        ? { config: jsonObject(block.values, `pages.layout.${path.join(".")}`) }
         : {}),
     };
   return {
@@ -467,8 +463,13 @@ function projectPageNode(
     kind: "group",
     ...(block.columns ? { columns: block.columns } : {}),
     ...(block.min_height ? { minHeight: block.min_height } : {}),
-    children: block.blocks.map((child, index) => projectPageNode(child, pageId, [...path, index])),
+    children: block.blocks.map((child, index) => projectPageNode(child, [...path, index])),
   };
+}
+
+function requireDefinitionId(id: string | undefined, path: string): string {
+  if (id) return id;
+  throw new Error(`Missing stable definition ID at ${path}.`);
 }
 
 function pageMeta(

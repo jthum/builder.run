@@ -161,9 +161,17 @@ function appSpec(contact: TypeDef): AppSpec {
         folder: "Overview",
         blocks: [
           {
+            id: "block-home-grid",
             kind: "group",
             columns: 1,
-            blocks: [{ kind: "widget", widget: "table", values: { view: "invoice_list" } }],
+            blocks: [
+              {
+                id: "block-invoice-table",
+                kind: "widget",
+                widget: "table",
+                values: { view: "invoice_list" },
+              },
+            ],
           },
         ],
       },

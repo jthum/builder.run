@@ -1103,7 +1103,7 @@ types:
     });
     expect(page.folder).toBeUndefined();
     expect(page.icon).toBe("table");
-    expect(page.blocks).toEqual([
+    expect(page.blocks).toMatchObject([
       {
         kind: "group",
         columns: 1,
@@ -1144,7 +1144,7 @@ types:
         },
       ],
     });
-    expect(page.blocks).toEqual([
+    expect(page.blocks).toMatchObject([
       {
         kind: "group",
         columns: 1,
@@ -1206,7 +1206,7 @@ types:
     expect(page.label).toBe("Project overview");
     expect(page.icon).toBe("dashboard");
     expect(page.folder).toBe("Projects");
-    expect(page.blocks).toEqual(blocks);
+    expect(page.blocks).toMatchObject(blocks);
   });
 
   it("creates a type from inline fields as an array or a map, and keeps them on later upserts", async () => {

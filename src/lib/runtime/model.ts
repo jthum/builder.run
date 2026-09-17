@@ -129,6 +129,8 @@ export interface TypeDef extends SpecNode {
 }
 
 export interface TypeTransitionDef {
+  /** Stable definition identity; the editable key is not identity. */
+  id?: string;
   key: string;
   label: string;
   from: string[];
@@ -185,8 +187,14 @@ export type WorkflowDef = AutomationDefinition;
 export type PageRowHeight = "s" | "m" | "l" | "xl";
 
 export type PageBlock =
-  | { kind: "widget"; widget: string; values?: Record<string, unknown> }
-  | { kind: "group"; columns?: number; min_height?: PageRowHeight; blocks: PageBlock[] };
+  | { id?: string; kind: "widget"; widget: string; values?: Record<string, unknown> }
+  | {
+      id?: string;
+      kind: "group";
+      columns?: number;
+      min_height?: PageRowHeight;
+      blocks: PageBlock[];
+    };
 
 export interface PageDef extends SpecNode {
   key: string;
@@ -196,6 +204,17 @@ export interface PageDef extends SpecNode {
   icon?: string;
   blocks: PageBlock[];
   implicit?: boolean;
+}
+
+/** Assigns identity once while preserving IDs through edits and reordering. */
+export function ensurePageBlockIds(blocks: readonly PageBlock[]): PageBlock[] {
+  return blocks.map((block) => {
+    const currentId = block.id;
+    const id = currentId && isSpecId(currentId) ? currentId : createSpecId();
+    return block.kind === "group"
+      ? { ...block, id, blocks: ensurePageBlockIds(block.blocks) }
+      : { ...block, id };
+  });
 }
 
 export interface AppSpec extends SpecNode {
@@ -744,7 +763,9 @@ export function normalizeTypeLifecycle(
       }
       pairs.add(pair);
     }
+    const transitionId = transition.id;
     return {
+      id: transitionId && isSpecId(transitionId) ? transitionId : createSpecId(),
       key,
       label: String(transition.label ?? "").trim() || labelFromKey(key),
       from,
@@ -979,7 +1000,10 @@ export function normalizeSpec(input: SpecDraft | AppSpec, existing?: AppSpec): A
     workflows: (
       namedList(input.workflows as never, existing?.workflows as never) as WorkflowDef[]
     ).map(normalizeWorkflow),
-    pages: namedList(input.pages as never, existing?.pages as never) as PageDef[],
+    pages: (namedList(input.pages as never, existing?.pages as never) as PageDef[]).map((page) => ({
+      ...page,
+      blocks: ensurePageBlockIds(page.blocks ?? []),
+    })),
   };
   for (const view of spec.views) {
     view.source = view.source || spec.types[0]?.key || "";
@@ -997,7 +1021,7 @@ export function normalizeSpec(input: SpecDraft | AppSpec, existing?: AppSpec): A
 
 function assertUniqueSpecIds(spec: AppSpec): void {
   const seen = new Map<string, string>();
-  const add = (node: SpecNode, owner: string) => {
+  const add = (node: { id: string }, owner: string) => {
     const previous = seen.get(node.id);
     if (previous) throw new Error(`Duplicate spec id "${node.id}" on ${previous} and ${owner}`);
     seen.set(node.id, owner);
@@ -1006,6 +1030,9 @@ function assertUniqueSpecIds(spec: AppSpec): void {
   for (const type of spec.types) {
     add(type, `type ${type.key}`);
     for (const field of type.fields) add(field, `field ${type.key}.${field.key}`);
+    for (const transition of type.lifecycle?.transitions ?? []) {
+      if (transition.id) add({ id: transition.id }, `transition ${type.key}.${transition.key}`);
+    }
   }
   for (const view of spec.views) add(view, `view ${view.key}`);
   for (const form of spec.forms) {
@@ -1013,7 +1040,19 @@ function assertUniqueSpecIds(spec: AppSpec): void {
     for (const input of form.inputs ?? []) add(input, `input ${form.key}.${input.key}`);
   }
   for (const workflow of spec.workflows) add(workflow, `workflow ${workflow.key}`);
-  for (const page of spec.pages) add(page, `page ${page.key}`);
+  for (const page of spec.pages) {
+    add(page, `page ${page.key}`);
+    visitPageBlocks(page.blocks, (block) => {
+      if (block.id) add({ id: block.id }, `block ${page.key}`);
+    });
+  }
+}
+
+function visitPageBlocks(blocks: readonly PageBlock[], visit: (block: PageBlock) => void): void {
+  for (const block of blocks) {
+    visit(block);
+    if (block.kind === "group") visitPageBlocks(block.blocks, visit);
+  }
 }
 
 function normalizeWorkflow(workflow: WorkflowDef): WorkflowDef {

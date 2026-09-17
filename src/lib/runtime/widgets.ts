@@ -8,7 +8,7 @@ import type {
   WidgetInputType,
 } from "$lib/widgets/types.ts";
 import type { AppSpec, FieldDef, PageBlock, PageDef, PageRowHeight, TypeDef } from "./model.ts";
-import { labelFromKey } from "./ids.ts";
+import { createSpecId, isSpecId, labelFromKey } from "./ids.ts";
 
 export const HOME_PAGE_KEY = "home";
 export { widgetCategories, widgets };
@@ -217,16 +217,19 @@ export function groupHeightClass(group: PageBlock): string {
 }
 
 export function normalizeBlock(block: PageBlock): PageBlock {
+  const currentId = block.id;
+  const id = currentId && isSpecId(currentId) ? currentId : createSpecId();
   if (block.kind === "group") {
     const height = rowHeight(block.min_height);
     return {
+      id,
       kind: "group",
       columns: clampColumns(block.columns),
       ...(height ? { min_height: height } : {}),
       blocks: normalizeBlockList(block.blocks),
     };
   }
-  return { kind: "widget", widget: block.widget, values: { ...block.values } };
+  return { id, kind: "widget", widget: block.widget, values: { ...block.values } };
 }
 
 export function normalizePage(page: PageDef): PageDef {
@@ -236,7 +239,9 @@ export function normalizePage(page: PageDef): PageDef {
 /** Page roots render as rows, so a valid root widget receives a one-column row. */
 export function normalizePageRows(blocks: unknown): PageBlock[] {
   return normalizeBlockList(blocks).map((block) =>
-    block.kind === "group" ? block : { kind: "group", columns: 1, blocks: [block] },
+    block.kind === "group"
+      ? block
+      : { id: createSpecId(), kind: "group", columns: 1, blocks: [block] },
   );
 }
 

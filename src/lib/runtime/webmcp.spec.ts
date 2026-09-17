@@ -417,7 +417,7 @@ describe("webmcp bridge", () => {
       ],
     });
     expect(JSON.parse(String(unwrapped)).error).toBeUndefined();
-    expect(JSON.parse(String(unwrapped)).blocks[0].blocks).toEqual([
+    expect(JSON.parse(String(unwrapped)).blocks[0].blocks).toMatchObject([
       { kind: "widget", widget: "heading", values: { title: "Diagnostics" } },
     ]);
     bridge.stop();

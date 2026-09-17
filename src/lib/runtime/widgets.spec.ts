@@ -63,16 +63,41 @@ describe("page folders", () => {
 });
 
 describe("page widgets", () => {
+  it("assigns stable layout identity and preserves it through reordering", () => {
+    expect.hasAssertions();
+    const first = normalizePage({
+      id: "A000000000000001",
+      key: "overview",
+      label: "Overview",
+      blocks: [
+        { kind: "widget", widget: "text", values: { text: "A" } },
+        { kind: "widget", widget: "text", values: { text: "B" } },
+      ],
+    });
+    const [firstRow, secondRow] = first.blocks;
+    expect(firstRow?.id).toBeTruthy();
+    expect(firstRow?.kind === "group" ? firstRow.blocks[0]?.id : undefined).toBeTruthy();
+
+    const reordered = normalizePage({ ...first, blocks: [secondRow!, firstRow!] });
+    expect(reordered.blocks.map((block) => block.id)).toEqual([secondRow?.id, firstRow?.id]);
+    expect(
+      reordered.blocks.map((block) => (block.kind === "group" ? block.blocks[0]?.id : undefined)),
+    ).toEqual([
+      secondRow?.kind === "group" ? secondRow.blocks[0]?.id : undefined,
+      firstRow?.kind === "group" ? firstRow.blocks[0]?.id : undefined,
+    ]);
+  });
+
   it("keeps only widget and group blocks", () => {
     expect.hasAssertions();
     expect(
       normalizeBlock({ kind: "widget", widget: "table", values: { view: "unpaid_invoices" } }),
-    ).toEqual({
+    ).toMatchObject({
       kind: "widget",
       widget: "table",
       values: { view: "unpaid_invoices" },
     });
-    expect(normalizeBlock({ kind: "group", columns: 9, blocks: [] })).toEqual({
+    expect(normalizeBlock({ kind: "group", columns: 9, blocks: [] })).toMatchObject({
       kind: "group",
       columns: 4,
       blocks: [],
@@ -181,7 +206,7 @@ describe("page widgets", () => {
     } as never;
     expect(
       configurePageRows(spec, [{ kind: "widget", widget: "kanban", values: { view: "tasks" } }]),
-    ).toEqual([
+    ).toMatchObject([
       {
         kind: "group",
         columns: 1,
@@ -212,16 +237,18 @@ describe("page widgets", () => {
   it("wraps a single nested block object so group.blocks.filter never throws", () => {
     expect.hasAssertions();
     const widget = { kind: "widget" as const, widget: "table", values: { view: "recent_time" } };
-    expect(normalizeBlockList([{ kind: "group", columns: 1, blocks: widget as never }])).toEqual([
+    expect(
+      normalizeBlockList([{ kind: "group", columns: 1, blocks: widget as never }]),
+    ).toMatchObject([
       {
         kind: "group",
         columns: 1,
         blocks: [widget],
       },
     ]);
-    expect(normalizeBlockList(widget)).toEqual([widget]);
-    expect(normalizeBlockList(JSON.stringify([widget]))).toEqual([widget]);
-    expect(normalizeBlockList({ 0: widget })).toEqual([widget]);
+    expect(normalizeBlockList(widget)).toMatchObject([widget]);
+    expect(normalizeBlockList(JSON.stringify([widget]))).toMatchObject([widget]);
+    expect(normalizeBlockList({ 0: widget })).toMatchObject([widget]);
     expect(normalizeBlockList(undefined)).toEqual([]);
   });
 
@@ -239,7 +266,7 @@ describe("page widgets", () => {
         label: "Overview",
         blocks: [heading],
       }).blocks,
-    ).toEqual([
+    ).toMatchObject([
       {
         kind: "group",
         columns: 1,
