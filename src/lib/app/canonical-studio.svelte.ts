@@ -2,10 +2,12 @@ import { session } from "$lib/app/session.svelte.ts";
 import {
   createCollection,
   createCollectionActions,
+  createViewActions,
   loadEditorContext,
   type CollectionActions,
   type EditorContext,
   type NewCollectionDraft,
+  type ViewActions,
   type ViewAuthoringSchemas,
 } from "@jthum/framework/svelte/studio";
 import type { Spec } from "@jthum/framework/spec";
@@ -56,6 +58,15 @@ class CanonicalStudioState {
     const runtime = session.framework;
     if (!runtime) throw new Error("The Framework runtime is not ready.");
     return createCollectionActions(runtime.appClient, {
+      schemas: this.schemas,
+      onChange: () => this.refresh(),
+    });
+  }
+
+  viewActions(): ViewActions {
+    const runtime = session.framework;
+    if (!runtime) throw new Error("The Framework runtime is not ready.");
+    return createViewActions(runtime.appClient, {
       schemas: this.schemas,
       onChange: () => this.refresh(),
     });

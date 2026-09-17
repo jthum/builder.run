@@ -4,9 +4,13 @@
 	import { canonicalStudio } from "$lib/app/canonical-studio.svelte.ts";
 	import TypeEditor from "$lib/components/type-editor.svelte";
 
+	const canonicalType = $derived(
+		canonicalStudio.context?.collections.find((item) => item.key === page.params.type),
+	);
 	const type = $derived(
-		canonicalStudio.context?.collections.find((item) => item.key === page.params.type) ??
-			session.resolvedSpec?.types.find((item) => item.key === page.params.type),
+		canonicalStudio.context
+			? canonicalType
+			: session.resolvedSpec?.types.find((item) => item.key === page.params.type),
 	);
 	const canonical = $derived(
 		Boolean(canonicalStudio.context?.collections.some((item) => item.key === page.params.type)),
