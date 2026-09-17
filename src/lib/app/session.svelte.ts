@@ -2,6 +2,7 @@ import { Host, type HostSnapshot } from "$lib/runtime/host.ts";
 import type { Actor, AppSpec, TypeDef } from "$lib/runtime/model.ts";
 import type { SpaceAccent } from "$lib/runtime/platform.ts";
 import { openRuntime, type OpenedRuntime } from "$lib/framework/bootstrap.ts";
+import { LOCAL_BROWSER_ENVIRONMENT } from "@jthum/framework/kernel";
 import { createKernelSqlitePersistence } from "$lib/framework/sqlite.ts";
 import { openSqlGateway } from "$lib/runtime/persistence/sqlite/gateway.ts";
 import {
@@ -128,6 +129,7 @@ export function boot(): Promise<void> {
       const snapshot = host.snapshot();
       const framework = await openRuntime({
         kernel: {
+          environment: { ...LOCAL_BROWSER_ENVIRONMENT, durableRuleExecution: true },
           persistence: createKernelSqlitePersistence(await openSqlGateway()),
         },
         seed: {

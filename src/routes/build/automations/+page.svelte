@@ -47,6 +47,7 @@
 		description="Automations that respond to events, and manual actions people or agents can run."
 	>
 		{#snippet actions()}
+			<Button variant="outline" href="/build/automations/runs">Workflow runs</Button>
 			<Button variant="outline" onclick={() => start("manual")} disabled={!types.length}>Add manual workflow</Button>
 			<Button onclick={() => start("automatic")} disabled={!types.length}>
 				<PlusIcon data-icon="inline-start" />
