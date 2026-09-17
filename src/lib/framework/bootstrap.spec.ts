@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vite-plus/test";
 import { normalizeSpec } from "$lib/runtime/model.ts";
-import { bootstrapBuilderKernel } from "./bootstrap.ts";
+import { createNodeGateway } from "$lib/runtime/persistence/sqlite/node-gateway.ts";
+import { bootstrapBuilderKernel, openBuilderKernel } from "./bootstrap.ts";
+import { createKernelSqlitePersistence } from "./sqlite.ts";
 
 describe("Builder Framework vertical slice", () => {
   it("runs shared records, an app Form, View, and Page on the Framework Kernel", async () => {
@@ -64,6 +66,8 @@ describe("Builder Framework vertical slice", () => {
         },
       },
     });
+    const gateway = createNodeGateway();
+    const persistence = createKernelSqlitePersistence(gateway, "builder-slice-test");
     const instance = await bootstrapBuilderKernel({
       spaceName: "Personal Space",
       appName: "Billing",
@@ -71,6 +75,7 @@ describe("Builder Framework vertical slice", () => {
       spaceSpec,
       appSpec,
       sharedTypes: [contact],
+      kernel: { persistence },
     });
 
     expect(instance.gaps).toEqual([]);
@@ -98,5 +103,27 @@ describe("Builder Framework vertical slice", () => {
     expect(await instance.kernel.listRecords(instance.spaceContext, "contact")).toHaveLength(1);
     expect(await instance.kernel.listRecords(instance.appContext, "invoice")).toHaveLength(1);
     await instance.kernel.close();
+
+    const reopened = await openBuilderKernel({
+      identity: instance.identity,
+      kernel: { persistence },
+    });
+    expect(await reopened.kernel.listRecords(reopened.spaceContext, "contact")).toHaveLength(1);
+    expect(await reopened.kernel.listRecords(reopened.appContext, "invoice")).toHaveLength(1);
+    expect(reopened.identity).toEqual(instance.identity);
+    await reopened.kernel.close();
+
+    await expect(
+      openBuilderKernel({
+        identity: { ...instance.identity, appId: instance.identity.spaceId },
+        kernel: { persistence },
+      }),
+    ).rejects.toThrow("does not resolve to one Space and App");
+    const recovered = await openBuilderKernel({
+      identity: instance.identity,
+      kernel: { persistence },
+    });
+    await recovered.kernel.close();
+    await gateway.wipe();
   });
 });

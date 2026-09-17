@@ -21,12 +21,27 @@ export interface BuilderKernelBootstrapInput {
   };
 }
 
+export interface BuilderKernelIdentity {
+  readonly spaceId: string;
+  readonly appId: string;
+  readonly actorId: string;
+}
+
+export interface OpenBuilderKernelInput {
+  readonly identity: BuilderKernelIdentity;
+  readonly kernel: KernelOptions;
+}
+
 export interface BuilderKernelInstance {
   readonly kernel: Kernel;
   readonly space: Workspace;
   readonly app: Workspace;
   readonly spaceContext: ExecutionContext;
   readonly appContext: ExecutionContext;
+  readonly identity: BuilderKernelIdentity;
+}
+
+export interface BuilderKernelBootstrap extends BuilderKernelInstance {
   /** Deliberate capabilities waiting on later framework phases. */
   readonly gaps: readonly FrameworkProjectionGap[];
 }
@@ -39,7 +54,7 @@ export interface BuilderKernelInstance {
  */
 export async function bootstrapBuilderKernel(
   input: BuilderKernelBootstrapInput,
-): Promise<BuilderKernelInstance> {
+): Promise<BuilderKernelBootstrap> {
   const kernel = await Kernel.open({
     ...input.kernel,
     persistence: input.kernel?.persistence ?? new MemoryPersistenceAdapter(),
@@ -74,7 +89,50 @@ export async function bootstrapBuilderKernel(
       app,
       spaceContext,
       appContext,
+      identity: {
+        spaceId: space.id,
+        appId: app.id,
+        actorId: bootstrap.user.id,
+      },
       gaps: [...spaceProjection.gaps, ...appProjection.gaps],
+    };
+  } catch (error) {
+    await kernel.close();
+    throw error;
+  }
+}
+
+/** Reopens an existing Builder topology from the host's local login/session identity. */
+export async function openBuilderKernel(
+  input: OpenBuilderKernelInput,
+): Promise<BuilderKernelInstance> {
+  const kernel = await Kernel.open(input.kernel);
+  try {
+    const { spaceId, appId, actorId } = input.identity;
+    const spaceContext = await kernel.resolveContext({ workspaceId: spaceId, actorId });
+    const appContext = await kernel.resolveContext({ workspaceId: appId, actorId });
+    const [space, app, actor] = await Promise.all([
+      kernel.getWorkspace(spaceContext),
+      kernel.getWorkspace(appContext),
+      kernel.getActor(spaceContext, actorId),
+    ]);
+    if (
+      !space?.isRoot ||
+      !app ||
+      app.isRoot ||
+      app.parentId !== space.id ||
+      !actor ||
+      actor.rootId !== space.id
+    ) {
+      throw new Error("Builder Kernel identity does not resolve to one Space and App.");
+    }
+    return {
+      kernel,
+      space,
+      app,
+      spaceContext,
+      appContext,
+      identity: { spaceId: space.id, appId: app.id, actorId: actor.id },
     };
   } catch (error) {
     await kernel.close();
