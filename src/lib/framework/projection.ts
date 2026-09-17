@@ -362,6 +362,7 @@ function projectCollection(
     id: type.id,
     key: type.key,
     label: type.label,
+    ...(type.collection_label ? { collectionLabel: type.collection_label } : {}),
     ...(type.meta ? { meta: type.meta } : {}),
     fields,
     ...(type.lifecycle && lifecycleField
