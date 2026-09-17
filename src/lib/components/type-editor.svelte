@@ -1,27 +1,14 @@
 <script lang="ts">
-  import { editorContext } from "$lib/app/studio.ts";
   import { canonicalStudio } from "$lib/app/canonical-studio.svelte.ts";
   import { goto } from "$app/navigation";
   import { CollectionEditor } from "@jthum/framework/svelte/studio";
   import { defaultCollectionLabel } from "$lib/app/labels.ts";
-  import { runtime, session } from "$lib/app/session.svelte.ts";
-  import type { CollectionActions, CollectionDraft } from "@jthum/framework/svelte/studio";
-  let { type, canonical = false }: { type: CollectionDraft; canonical?: boolean } = $props();
+  import type { CollectionDraft } from "@jthum/framework/svelte/studio";
+  let { type }: { type: CollectionDraft } = $props();
   const context = $derived(
-    canonical && canonicalStudio.context
-      ? canonicalStudio.context
-      : editorContext(session.resolvedSpec),
+    type.expose ? canonicalStudio.spaceContext! : canonicalStudio.context!,
   );
-  const legacyActions: CollectionActions = {
-    save: draft => runtime().upsertType(draft),
-    rename: (key, next) => runtime().renameType(key, next),
-    renameField: (collection, key, next) => runtime().renameField(collection, key, next),
-    saveField: (collection, field) => runtime().upsertField(collection, field),
-    reorderFields: (collection, keys) => runtime().reorderFields(collection, keys),
-    deleteField: (collection, key) => runtime().deleteField(collection, key),
-    remove: key => runtime().deleteType(key),
-  };
-  const actions = $derived(canonical && !type.expose ? canonicalStudio.actions() : legacyActions);
+  const actions = $derived(type.expose ? canonicalStudio.spaceActions() : canonicalStudio.actions());
 </script>
 
 <CollectionEditor collection={type} {context} {defaultCollectionLabel}

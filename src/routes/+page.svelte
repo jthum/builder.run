@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { greeting, isBlankApp } from "$lib/app/labels.ts";
-	import { openNewApp, runtime, session } from "$lib/app/session.svelte.ts";
+	import { openNewApp, session } from "$lib/app/session.svelte.ts";
 	import { canonicalStudio } from "$lib/app/canonical-studio.svelte.ts";
 	import PageCanvas from "$lib/components/page-canvas.svelte";
 	import { PageHeader } from "@jthum/framework/svelte/studio";
@@ -8,7 +8,7 @@
 	import { Button } from "@jthum/framework/svelte/ui/button";
 	import * as Card from "@jthum/framework/svelte/ui/card";
 	import type { PageDefinition } from "@jthum/framework/spec";
-	import { pageBlocks, pageDefinition } from "$lib/app/pages.ts";
+	import { pageDefinition } from "$lib/app/pages.ts";
 	import { sampleApps, templateCategories } from "$lib/runtime/samples.ts";
 	import { resolveHomePage } from "$lib/runtime/blocks.ts";
 	import BriefcaseIcon from "@lucide/svelte/icons/briefcase";
@@ -36,17 +36,8 @@
 				? pageDefinition(legacyHome)
 				: null,
 	);
-	const queryView = (key: string) => runtime().queryView(key);
-	const upsertPage = (draft: PageDefinition) =>
-		canonicalStudio.spec
-			? canonicalStudio.pageActions().save(draft)
-			: runtime().upsertPage({
-					id: draft.id,
-					key: draft.key,
-					label: draft.label,
-					meta: draft.meta,
-					blocks: pageBlocks(draft.layout),
-				});
+	const queryView = (key: string) => canonicalStudio.queryView(key);
+	const upsertPage = (draft: PageDefinition) => canonicalStudio.pageActions().save(draft);
 
 	const templateIcons: Record<string, Component> = {
 		freelance_crm: UsersIcon,
@@ -109,7 +100,7 @@
 		title={hello}
 		description={`A snapshot of ${appName}.`}
 		spec={session.resolvedSpec}
-		revision={session.revision}
+		revision={canonicalStudio.revision}
 		{queryView}
 		{upsertPage}
 	/>

@@ -1,6 +1,5 @@
 <script lang="ts">
 	import { goto } from "$app/navigation";
-	import { session, runtime } from "$lib/app/session.svelte.ts";
 	import { canonicalStudio } from "$lib/app/canonical-studio.svelte.ts";
 	import { NameDialog } from "@jthum/framework/svelte/studio";
 	import { PageHeader } from "@jthum/framework/svelte/studio";
@@ -13,9 +12,8 @@
 	import PlusIcon from "@lucide/svelte/icons/plus";
 	import TableIcon from "@lucide/svelte/icons/table";
 
-	const spec = $derived(session.resolvedSpec);
-	const types = $derived(canonicalStudio.context?.collections ?? spec?.types ?? []);
-	const views = $derived(canonicalStudio.context?.views ?? spec?.views ?? []);
+	const types = $derived(canonicalStudio.context?.collections ?? []);
+	const views = $derived(canonicalStudio.context?.views ?? []);
 	const custom = $derived(views.filter((view) => !view.implicit));
 	const builtin = $derived(views.filter((view) => view.implicit));
 
@@ -30,8 +28,7 @@
 			fields: types[0]?.fields.slice(0, 4).map((field) => field.key) ?? [],
 			implicit: false,
 		};
-		if (canonicalStudio.context) await canonicalStudio.viewActions().save(draft);
-		else await runtime().upsertView(draft);
+		await canonicalStudio.viewActions().save(draft);
 		await goto(`/build/views/${key}`);
 	}
 </script>

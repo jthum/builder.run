@@ -1,6 +1,5 @@
 <script lang="ts">
 	import { goto } from "$app/navigation";
-	import { runtime, session } from "$lib/app/session.svelte.ts";
 	import { canonicalStudio } from "$lib/app/canonical-studio.svelte.ts";
 	import { OptionSelect } from "@jthum/framework/svelte/studio";
 	import { FormPurposePicker } from "@jthum/framework/svelte/studio";
@@ -18,10 +17,9 @@
 	import PlusIcon from "@lucide/svelte/icons/plus";
 	import { toast } from "svelte-sonner";
 
-	const spec = $derived(session.resolvedSpec);
-	const types = $derived(canonicalStudio.context?.collections ?? spec?.types ?? []);
+	const types = $derived(canonicalStudio.context?.collections ?? []);
 	const recordTypes = $derived(types.filter((type) => !type.expose));
-	const forms = $derived(canonicalStudio.context?.forms ?? spec?.forms ?? []);
+	const forms = $derived(canonicalStudio.context?.forms ?? []);
 	const custom = $derived(forms.filter((form) => !form.implicit));
 	const builtin = $derived(forms.filter((form) => form.implicit));
 
@@ -46,27 +44,16 @@
 		try {
 			const key = slugify(label);
 			const type = recordTypes.find((item) => item.key === typeKey);
-			if (canonicalStudio.context) {
-				const actions = canonicalStudio.formActions();
-				await actions.save({
-					id: "",
-					key,
-					label,
-					mode,
-					...(mode === "standalone"
-						? { inputs: [actions.prepareField("name", { label: "Name", type: "text" })] }
-						: { type: typeKey, fields: type?.fields.map((field) => field.key) ?? [] }),
-				});
-			} else {
-				await runtime().upsertForm({
-					key,
-					label,
-					mode,
-					...(mode === "standalone"
-						? { inputs: [{ key: "name", label: "Name", type: "text" as const }] }
-						: { type: typeKey, fields: type?.fields.map((field) => field.key) ?? [] }),
-				});
-			}
+			const actions = canonicalStudio.formActions();
+			await actions.save({
+				id: "",
+				key,
+				label,
+				mode,
+				...(mode === "standalone"
+					? { inputs: [actions.prepareField("name", { label: "Name", type: "text" })] }
+					: { type: typeKey, fields: type?.fields.map((field) => field.key) ?? [] }),
+			});
 			open = false;
 			await goto(`/build/forms/${key}`);
 		} catch (error) {

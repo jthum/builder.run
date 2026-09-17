@@ -49,17 +49,17 @@
 <ModeWatcher />
 <Toaster />
 
-{#if !session.ready && !session.error}
+{#if (!session.ready || (session.framework && !canonicalStudio.context)) && !session.error && !canonicalStudio.error}
 	<div class="flex min-h-svh items-center justify-center gap-2 text-muted-foreground">
 		<Spinner />
 		Opening your space
 	</div>
-{:else if session.error}
+{:else if session.error || canonicalStudio.error}
 	<div class="flex min-h-svh items-center justify-center p-6">
 		<Empty.Root class="max-w-md border-none">
 			<Empty.Header>
 				<Empty.Title>Couldn't open your space</Empty.Title>
-				<Empty.Description>{session.error}</Empty.Description>
+				<Empty.Description>{session.error ?? canonicalStudio.error}</Empty.Description>
 			</Empty.Header>
 			<Empty.Content>
 				<Button onclick={() => location.reload()}>

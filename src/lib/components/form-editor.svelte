@@ -1,41 +1,31 @@
 <script lang="ts">
-  import { editorContext } from "$lib/app/studio.ts";
   import { canonicalStudio } from "$lib/app/canonical-studio.svelte.ts";
   import { goto } from "$app/navigation";
-  import { FormEditor } from "@jthum/framework/svelte/studio";
-  import { runtime, session } from "$lib/app/session.svelte.ts";
-  import { workflowSummary, workflowsForForm } from "$lib/app/relations.ts";
-  import { normalizeField } from "$lib/runtime/model.ts";
-  import type { FormActions, FormDraft } from "@jthum/framework/svelte/studio";
+  import { FormEditor, ruleSummary } from "@jthum/framework/svelte/studio";
+  import { session } from "$lib/app/session.svelte.ts";
+  import type { FormDraft } from "@jthum/framework/svelte/studio";
   import { uniqueKey } from "$lib/runtime/ids.ts";
   import RecordForm from "./record-form.svelte";
-  let { form, canonical = false }: { form: FormDraft; canonical?: boolean } = $props();
-  const context = $derived(
-    canonical && canonicalStudio.context
-      ? canonicalStudio.context
-      : editorContext(session.resolvedSpec),
-  );
-  const legacyActions: FormActions = {
-    save: draft => runtime().upsertForm(draft),
-    remove: key => runtime().deleteForm(key),
-    prepareField: normalizeField,
-  };
-  const actions = $derived(canonical ? canonicalStudio.formActions() : legacyActions);
+  let { form }: { form: FormDraft } = $props();
+  const context = $derived(canonicalStudio.context!);
+  const actions = $derived(canonicalStudio.formActions());
+  const relatedRules = $derived(context.rules.filter(rule =>
+    rule.trigger?.key === "form.submitted" && rule.trigger.config?.form === form.key
+  ));
   async function createRule(draft: FormDraft) {
     const label = `Handle ${draft.label.trim() || form.label}`;
     const key = uniqueKey(label, context.rules.map(rule => rule.key));
     const rule = { key, label, input: { values: { value: "object" as const } }, trigger: { key: "form.submitted", config: { form: form.key } }, steps: [] };
-    if (canonical) await canonicalStudio.createRule(rule);
-    else await runtime().upsertWorkflow(rule);
+    await canonicalStudio.createRule(rule);
     await goto(`/build/automations/${key}`);
   }
 </script>
 <FormEditor {form} {context}
   {actions}
   onDeleted={() => goto("/build/forms")} onCreateRule={createRule}
-  relatedRules={workflowsForForm(session.resolvedSpec, form.key)}
+  {relatedRules}
   ruleHref={rule => `/build/automations/${rule.key}`}
-  describeRule={rule => workflowSummary(rule, session.resolvedSpec)}
+  describeRule={rule => ruleSummary(rule, context)}
 >
   {#snippet previewContent(preview)}
     <RecordForm type={session.resolvedSpec?.types.find(type => type.key === preview.collection?.key)}

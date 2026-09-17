@@ -1,10 +1,10 @@
 <script lang="ts">
 	import { page } from "$app/state";
-	import { runtime, session } from "$lib/app/session.svelte.ts";
+	import { session } from "$lib/app/session.svelte.ts";
 	import { canonicalStudio } from "$lib/app/canonical-studio.svelte.ts";
 	import PageCanvas from "$lib/components/page-canvas.svelte";
 	import { resolvePage } from "$lib/runtime/blocks.ts";
-	import { pageBlocks, pageDefinition } from "$lib/app/pages.ts";
+	import { pageDefinition } from "$lib/app/pages.ts";
 	import type { PageDefinition } from "@jthum/framework/spec";
 
 	const pageKey = $derived(page.params.page ?? "");
@@ -18,17 +18,8 @@
 				: undefined,
 	);
 	const startEditing = $derived(page.url.searchParams.get("edit") === "1");
-	const queryView = (key: string) => runtime().queryView(key);
-	const upsertPage = (draft: PageDefinition) =>
-		canonicalStudio.spec
-			? canonicalStudio.pageActions().save(draft)
-			: runtime().upsertPage({
-					id: draft.id,
-					key: draft.key,
-					label: draft.label,
-					meta: draft.meta,
-					blocks: pageBlocks(draft.layout),
-				});
+	const queryView = (key: string) => canonicalStudio.queryView(key);
+	const upsertPage = (draft: PageDefinition) => canonicalStudio.pageActions().save(draft);
 </script>
 
 {#if current}
@@ -37,7 +28,7 @@
 		title={current.label}
 		{startEditing}
 		spec={session.resolvedSpec}
-		revision={session.revision}
+		revision={canonicalStudio.revision}
 		{queryView}
 		{upsertPage}
 	/>

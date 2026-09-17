@@ -1,9 +1,7 @@
 <script lang="ts">
 	import { goto } from "$app/navigation";
-	import { workflowKind, workflowSummary } from "$lib/app/relations.ts";
-	import { runtime, session } from "$lib/app/session.svelte.ts";
 	import { canonicalStudio } from "$lib/app/canonical-studio.svelte.ts";
-	import { NameDialog } from "@jthum/framework/svelte/studio";
+	import { NameDialog, ruleSummary } from "@jthum/framework/svelte/studio";
 	import type { NewRuleDraft } from "@jthum/framework/svelte/studio";
 	import { PageHeader } from "@jthum/framework/svelte/studio";
 	import { Badge } from "@jthum/framework/svelte/ui/badge";
@@ -14,11 +12,10 @@
 	import PlusIcon from "@lucide/svelte/icons/plus";
 	import WorkflowIcon from "@lucide/svelte/icons/workflow";
 
-	const spec = $derived(session.resolvedSpec);
-	const workflows = $derived(canonicalStudio.context?.rules ?? spec?.workflows ?? []);
-	const types = $derived(canonicalStudio.context?.collections ?? spec?.types ?? []);
-	const manualWorkflows = $derived(workflows.filter((workflow) => workflowKind(workflow) === "manual"));
-	const automaticWorkflows = $derived(workflows.filter((workflow) => workflowKind(workflow) === "automatic"));
+	const workflows = $derived(canonicalStudio.context?.rules ?? []);
+	const types = $derived(canonicalStudio.context?.collections ?? []);
+	const manualWorkflows = $derived(workflows.filter((workflow) => !workflow.trigger));
+	const automaticWorkflows = $derived(workflows.filter((workflow) => workflow.trigger));
 
 	let createKind = $state<"manual" | "automatic">("automatic");
 	let open = $state(false);
@@ -39,8 +36,7 @@
 			expose: createKind === "manual" ? ["ui", "agent"] : undefined,
 			steps: [],
 		};
-		if (canonicalStudio.context) await canonicalStudio.createRule(draft);
-		else await runtime().upsertWorkflow(draft);
+		await canonicalStudio.createRule(draft);
 		await goto(`/build/automations/${key}`);
 	}
 </script>
@@ -85,7 +81,7 @@
 									{workflow.label}
 									<Badge variant="secondary">Manual</Badge>
 								</Card.Title>
-								<Card.Description>{workflowSummary(workflow, spec)}</Card.Description>
+								<Card.Description>{ruleSummary(workflow, canonicalStudio.context!)}</Card.Description>
 							</Card.Header>
 						</Card.Root>
 					</a>
@@ -103,7 +99,7 @@
 									{workflow.label}
 									<Badge variant="outline">When</Badge>
 								</Card.Title>
-								<Card.Description>{workflowSummary(workflow, spec)}</Card.Description>
+								<Card.Description>{ruleSummary(workflow, canonicalStudio.context!)}</Card.Description>
 							</Card.Header>
 						</Card.Root>
 					</a>

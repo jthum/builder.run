@@ -12,7 +12,7 @@
 	import BoxIcon from "@lucide/svelte/icons/box";
 	import PlusIcon from "@lucide/svelte/icons/plus";
 
-	const types = $derived(canonicalStudio.context?.collections ?? session.resolvedSpec?.types ?? []);
+	const types = $derived(canonicalStudio.context?.collections ?? []);
 	const space = $derived(spaceLabel(session.space?.name));
 	let open = $state(false);
 </script>

@@ -24,8 +24,10 @@ import { installCollectionStarters } from "$lib/app/collection-starters.ts";
 
 class CanonicalStudioState {
   context = $state.raw<EditorContext | null>(null);
+  spaceContext = $state.raw<EditorContext | null>(null);
   spec = $state.raw<Spec | null>(null);
   schemas = $state.raw<ViewAuthoringSchemas>({});
+  spaceSchemas = $state.raw<ViewAuthoringSchemas>({});
   pending = $state(false);
   error = $state<string | null>(null);
   revision = $state(0);
@@ -36,17 +38,24 @@ class CanonicalStudioState {
     const token = ++this.generation;
     if (!runtime) {
       this.context = null;
+      this.spaceContext = null;
       this.spec = null;
       this.schemas = {};
+      this.spaceSchemas = {};
       return;
     }
     this.pending = true;
     try {
-      const loaded = await loadEditorContext(runtime.appClient);
+      const [loaded, space] = await Promise.all([
+        loadEditorContext(runtime.appClient),
+        loadEditorContext(runtime.spaceClient),
+      ]);
       if (token !== this.generation || runtime !== session.framework) return;
       const shared = new Set(loaded.spec.sources.map((source) => source.key));
       this.spec = loaded.spec;
       this.schemas = loaded.schemas;
+      this.spaceSchemas = space.schemas;
+      this.spaceContext = space.context;
       this.context = {
         ...loaded.context,
         collections: loaded.context.collections.map((collection) => ({
@@ -69,6 +78,15 @@ class CanonicalStudioState {
     if (!runtime) throw new Error("The Framework runtime is not ready.");
     return createCollectionActions(runtime.appClient, {
       schemas: this.schemas,
+      onChange: () => this.refresh(),
+    });
+  }
+
+  spaceActions(): CollectionActions {
+    const runtime = session.framework;
+    if (!runtime) throw new Error("The Framework runtime is not ready.");
+    return createCollectionActions(runtime.spaceClient, {
+      schemas: this.spaceSchemas,
       onChange: () => this.refresh(),
     });
   }
@@ -108,6 +126,13 @@ class CanonicalStudioState {
         page.key !== "home" && page.meta?.path !== "/" && !isStudioManaged(page.meta),
       onChange: () => this.refresh(),
     });
+  }
+
+  async queryView(key: string): Promise<Array<Record<string, unknown>>> {
+    const runtime = session.framework;
+    if (!runtime) throw new Error("The Framework runtime is not ready.");
+    const result = await runtime.appClient.queryView(key);
+    return result.data.rows.map((row) => ({ id: row.id, ...row.values }));
   }
 
   async createRule(draft: NewRuleDraft) {

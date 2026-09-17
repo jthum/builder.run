@@ -1,6 +1,5 @@
 <script lang="ts">
 	import { goto } from "$app/navigation";
-	import { runtime, session } from "$lib/app/session.svelte.ts";
 	import { canonicalStudio } from "$lib/app/canonical-studio.svelte.ts";
 	import { OptionSelect } from "@jthum/framework/svelte/studio";
 	import TemplateLibraryDialog from "$lib/components/template-library-dialog.svelte";
@@ -54,8 +53,7 @@
 	let pageIndex = $state(0);
 	let pending = $state(false);
 
-	const types = $derived(session.resolvedSpec?.types ?? []);
-	const visibleTypes = $derived(canonicalStudio.context?.collections ?? types);
+	const visibleTypes = $derived(canonicalStudio.context?.collections ?? []);
 	const chosen = $derived(typeTemplates.find((item) => item.key === selected));
 	const filtered = $derived.by(() => {
 		const needle = query.trim().toLowerCase();
@@ -105,8 +103,7 @@
 		pending = true;
 		try {
 			const draft = typeDraftFromTemplate(name, template, visibleTypes as never);
-			const type = canonicalStudio.context
-				? await canonicalStudio.createCollection({
+			const type = await canonicalStudio.createCollection({
 						key: draft.key,
 						label: draft.label,
 						fields: draft.fields.map((field) => ({
@@ -119,8 +116,7 @@
 							values: field.values,
 							target: field.target,
 						})),
-					})
-				: await runtime().upsertType(draft as never);
+					});
 			toast.success(`${type.label} is ready`);
 			open = false;
 			await goto(`/build/types/${type.key}`);
