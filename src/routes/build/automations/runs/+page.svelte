@@ -3,12 +3,13 @@
   import { goto } from "$app/navigation";
   import { session } from "$lib/app/session.svelte.ts";
   import { installApprovalExample } from "$lib/framework/approval-example.ts";
-  import { ExecutionInspector, ExecutionList, RuleLauncher, PageHeader, OptionSelect } from "@jthum/framework/svelte/studio";
+  import { ExecutionInspector, ExecutionList, RuleLauncher, RuleEditor, ruleDraftFromDefinition, ruleDefinitionFromDraft, PageHeader, OptionSelect } from "@jthum/framework/svelte/studio";
+  import type { RuleDraft, EditorContext } from "@jthum/framework/svelte/studio";
   import * as Alert from "@jthum/framework/svelte/ui/alert";
   import { Button } from "@jthum/framework/svelte/ui/button";
   import { Spinner } from "@jthum/framework/svelte/ui/spinner";
   import type { ActorRequest, RuleExecutionDetails, RuleExecutionSummary } from "@jthum/framework/kernel";
-  import type { RuleDefinition } from "@jthum/framework/spec";
+  import type { RuleDefinition, Spec } from "@jthum/framework/spec";
 
   const client = $derived(session.framework?.appClient);
   const runId = $derived(page.url.searchParams.get("run"));
@@ -24,7 +25,10 @@
   let historyPage = $state(0);
   let hasMore = $state(false);
   let generation = 0;
+  let editing = $state(false);
+  let canonicalSpec = $state.raw<Spec | null>(null);
   const selected = $derived(rules.find(rule => rule.key === selectedKey));
+  const context = $derived<EditorContext>({ collections: [], views: [], forms: [], rules: canonicalSpec ? rules.map(rule => ruleDraftFromDefinition(rule, canonicalSpec!)) : [] });
   const limit = 20;
 
   async function refresh() {
@@ -42,6 +46,7 @@
       ]);
       if (token !== generation || active !== client) return;
       workspaceName = workspace.name;
+      canonicalSpec = workspace.spec;
       rules = workspace.spec.rules;
       executions = history.slice(0, limit);
       hasMore = history.length > limit;
@@ -78,6 +83,20 @@
     } catch (cause) { error = cause instanceof Error ? cause.message : "Unable to install the example."; }
     finally { pending = false; }
   }
+  async function saveRule(draft: RuleDraft) {
+    if (!client) throw new Error("The runtime is not open.");
+    const workspace = await client.getWorkspace();
+    const rule = ruleDefinitionFromDraft(draft, workspace.spec);
+    await client.applySpec({ ...workspace.spec, rules: workspace.spec.rules.map(item => item.id === rule.id ? rule : item) });
+    editing = false;
+    await refresh();
+  }
+  async function removeRule(key: string) {
+    if (!client) throw new Error("The runtime is not open.");
+    const workspace = await client.getWorkspace();
+    await client.applySpec({ ...workspace.spec, rules: workspace.spec.rules.filter(rule => rule.key !== key) });
+    editing = false; selectedKey = ""; await refresh();
+  }
 </script>
 
 <div class="mx-auto flex w-full max-w-4xl flex-col gap-6">
@@ -98,7 +117,13 @@
         <Button variant="outline" disabled={pending} onclick={example}>Try approval example</Button>
         <Button variant="outline" disabled={pending} onclick={refresh}>Refresh</Button>
       </div>
-      {#if selected}{#key selected.id}<RuleLauncher rule={selected} {client} onStarted={selectRun} />{/key}{/if}
+      {#if selected && canonicalSpec}
+        {#if selected.meta?.example === "durable_approval"}<div class="flex gap-2"><Button variant="outline" onclick={() => editing = !editing}>{editing ? "Close editor" : "Edit preview workflow"}</Button></div>{/if}
+        {#if editing && selected.meta?.example === "durable_approval"}
+          <Alert.Root><Alert.Title>Canonical workflow authoring</Alert.Title><Alert.Description>Edits here affect future runs only; existing runs retain their saved workflow. This preview exposes independent workflow steps, not Host business-record authoring.</Alert.Description></Alert.Root>
+          {#key selected.id}<RuleEditor rule={ruleDraftFromDefinition(selected, canonicalSpec)} {context} actorRequests actions={{ save: saveRule, remove: removeRule }} onDeleted={refresh} />{/key}
+        {:else}{#key selected.id}<RuleLauncher rule={selected} {client} onStarted={selectRun} />{/key}{/if}
+      {/if}
       <ExecutionList {executions} {hasMore} {pending} page={historyPage} onPage={next => historyPage = next} onSelect={selectRun} />
     {/if}
   {:else}<p class="flex items-center gap-2 text-sm text-muted-foreground"><Spinner />Opening the runtime…</p>{/if}

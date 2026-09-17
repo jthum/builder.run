@@ -4,6 +4,10 @@ import { createWorkspaceClient } from "@jthum/framework/client";
 import { createKernelSqlitePersistence } from "./sqlite.ts";
 import { createNodeGateway } from "$lib/runtime/persistence/sqlite/node-gateway.ts";
 import { installApprovalExample } from "./approval-example.ts";
+import {
+  ruleDraftFromDefinition,
+  ruleDefinitionFromDraft,
+} from "@jthum/framework/svelte/studio/adapters";
 
 describe("Framework approval UI contract", () => {
   it.each([true, false])(
@@ -38,6 +42,17 @@ describe("Framework approval UI contract", () => {
         const rule = await installApprovalExample(client);
         expect(rule.key).toBe(approved ? "approval_example_2" : "approval_example");
         expect((await installApprovalExample(client)).id).toBe(rule.id);
+        const workspace = await client.getWorkspace();
+        const draft = ruleDraftFromDefinition(rule, workspace.spec);
+        const wait = draft.steps.find((step) => "wait" in step);
+        if (!wait || !("wait" in wait) || !wait.wait.request)
+          throw new Error("Missing request step");
+        wait.wait.request.label = "Review the laptop request";
+        const authored = ruleDefinitionFromDraft(draft, workspace.spec);
+        await client.applySpec({
+          ...workspace.spec,
+          rules: workspace.spec.rules.map((item) => (item.id === authored.id ? authored : item)),
+        });
         await expect(client.startRule(rule.key, { input: {} })).rejects.toMatchObject({
           code: "VALIDATION.INVALID_INPUT",
         });
@@ -62,6 +77,7 @@ describe("Framework approval UI contract", () => {
         client = await createWorkspaceClient(kernel, context);
         expect((await client.listRuleExecutions()).map((run) => run.id)).toEqual([paused.id]);
         const [request] = await client.listActorRequests(paused.id);
+        expect(request?.label).toBe("Review the laptop request");
         await expect(
           client.respondToActorRequest(paused.id, request!.id, {}),
         ).rejects.toMatchObject({ code: "VALIDATION.INVALID_INPUT" });
