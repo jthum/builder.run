@@ -4,11 +4,11 @@ import {
   type KernelOptions,
   type Workspace,
 } from "@jthum/framework/kernel";
-import { MemoryPersistenceAdapter } from "@jthum/framework/persistence";
+import type { Spec } from "@jthum/framework/spec";
 import type { AppSpec, TypeDef } from "$lib/runtime/model.ts";
 import { projectFrameworkSpec, type FrameworkProjectionGap } from "./projection.ts";
 
-export interface BuilderKernelBootstrapInput {
+export interface BuilderKernelSeed {
   readonly spaceName: string;
   readonly appName: string;
   readonly user: { readonly name: string; readonly email?: string };
@@ -16,27 +16,28 @@ export interface BuilderKernelBootstrapInput {
   readonly appSpec: AppSpec;
   /** Shared Type definitions installed in the Space and bound into the App. */
   readonly sharedTypes: readonly TypeDef[];
-  readonly kernel?: Omit<KernelOptions, "persistence"> & {
-    readonly persistence?: KernelOptions["persistence"];
-  };
 }
 
-export interface BuilderKernelIdentity {
+export interface BuilderSessionRef {
   readonly spaceId: string;
   readonly appId: string;
   readonly actorId: string;
 }
 
-export interface OpenBuilderKernelInput {
-  readonly identity: BuilderKernelIdentity;
+export interface CreateBuilderKernelInput extends BuilderKernelSeed {
   readonly kernel: KernelOptions;
 }
 
-export interface StartBuilderKernelInput {
+export interface ResumeBuilderKernelInput {
+  readonly session: BuilderSessionRef;
   readonly kernel: KernelOptions;
-  readonly seed: Omit<BuilderKernelBootstrapInput, "kernel">;
+}
+
+export interface OpenBuilderKernelInput {
+  readonly kernel: KernelOptions;
+  readonly seed: BuilderKernelSeed;
   /** Optional local UI preference; catalog identity remains authoritative. */
-  readonly preferred?: Partial<BuilderKernelIdentity>;
+  readonly preferred?: Partial<BuilderSessionRef>;
 }
 
 export interface BuilderKernelInstance {
@@ -45,47 +46,43 @@ export interface BuilderKernelInstance {
   readonly app: Workspace;
   readonly spaceContext: ExecutionContext;
   readonly appContext: ExecutionContext;
-  readonly identity: BuilderKernelIdentity;
+  readonly session: BuilderSessionRef;
 }
 
-export interface BuilderKernelBootstrap extends BuilderKernelInstance {
+export interface CreatedBuilderKernel extends BuilderKernelInstance {
   /** Deliberate capabilities waiting on later framework phases. */
   readonly gaps: readonly FrameworkProjectionGap[];
 }
 
-export interface BuilderKernelStart extends BuilderKernelInstance {
-  readonly created: boolean;
-  readonly gaps: readonly FrameworkProjectionGap[];
-}
+export type OpenedBuilderKernel =
+  | (CreatedBuilderKernel & { readonly isNew: true })
+  | (BuilderKernelInstance & { readonly isNew: false });
 
 /**
- * Boots the Builder Space/App topology on the Framework Kernel.
+ * Creates the Builder Space/App topology on the Framework Kernel.
  *
- * This is the executable Phase 4 seam, not an importer for the legacy Builder database. A
- * persistence/migration adapter can preserve existing records separately when the UI switches.
+ * This seeds the canonical Framework database and never reads the old Builder database.
  */
-export async function bootstrapBuilderKernel(
-  input: BuilderKernelBootstrapInput,
-): Promise<BuilderKernelBootstrap> {
-  const kernel = await Kernel.open({
-    ...input.kernel,
-    persistence: input.kernel?.persistence ?? new MemoryPersistenceAdapter(),
+export async function createBuilderKernel(
+  input: CreateBuilderKernelInput,
+): Promise<CreatedBuilderKernel> {
+  const spaceProjection = projectFrameworkSpec(input.spaceSpec, { sharedTypes: [] });
+  const appProjection = projectFrameworkSpec(input.appSpec, {
+    sharedTypes: input.sharedTypes,
   });
+  assertSharedTypesProjected(input.sharedTypes, spaceProjection.spec, appProjection.spec);
+  const kernel = await Kernel.open(input.kernel);
   try {
-    const bootstrap = await kernel.createRootWorkspace({
+    const root = await kernel.createRootWorkspace({
       name: input.spaceName,
       user: input.user,
     });
     const spaceContext = {
-      workspaceId: bootstrap.workspace.id,
-      actorId: bootstrap.user.id,
+      workspaceId: root.workspace.id,
+      actorId: root.user.id,
     };
-    const created = await kernel.createWorkspace(spaceContext, { name: input.appName });
-    const appContext = { ...spaceContext, workspaceId: created.workspace.id };
-    const spaceProjection = projectFrameworkSpec(input.spaceSpec, { sharedTypes: [] });
-    const appProjection = projectFrameworkSpec(input.appSpec, {
-      sharedTypes: input.sharedTypes,
-    });
+    const child = await kernel.createWorkspace(spaceContext, { name: input.appName });
+    const appContext = { ...spaceContext, workspaceId: child.workspace.id };
     const space = await kernel.applySpec(spaceContext, spaceProjection.spec);
     const app = await kernel.applySpec(appContext, appProjection.spec);
     for (const type of input.sharedTypes) {
@@ -101,10 +98,10 @@ export async function bootstrapBuilderKernel(
       app,
       spaceContext,
       appContext,
-      identity: {
+      session: {
         spaceId: space.id,
         appId: app.id,
-        actorId: bootstrap.user.id,
+        actorId: root.user.id,
       },
       gaps: [...spaceProjection.gaps, ...appProjection.gaps],
     };
@@ -114,13 +111,13 @@ export async function bootstrapBuilderKernel(
   }
 }
 
-/** Reopens an existing Builder topology from the host's local login/session identity. */
-export async function openBuilderKernel(
-  input: OpenBuilderKernelInput,
+/** Resumes an existing Builder topology from an exact host-owned session reference. */
+export async function resumeBuilderKernel(
+  input: ResumeBuilderKernelInput,
 ): Promise<BuilderKernelInstance> {
   const kernel = await Kernel.open(input.kernel);
   try {
-    const { spaceId, appId, actorId } = input.identity;
+    const { spaceId, appId, actorId } = input.session;
     const spaceContext = await kernel.resolveContext({ workspaceId: spaceId, actorId });
     const appContext = await kernel.resolveContext({ workspaceId: appId, actorId });
     const [space, app, actor] = await Promise.all([
@@ -136,7 +133,7 @@ export async function openBuilderKernel(
       !actor ||
       actor.rootId !== space.id
     ) {
-      throw new Error("Builder Kernel identity does not resolve to one Space and App.");
+      throw new Error("Builder session does not resolve to one Space and App.");
     }
     return {
       kernel,
@@ -144,7 +141,7 @@ export async function openBuilderKernel(
       app,
       spaceContext,
       appContext,
-      identity: { spaceId: space.id, appId: app.id, actorId: actor.id },
+      session: { spaceId: space.id, appId: app.id, actorId: actor.id },
     };
   } catch (error) {
     await kernel.close();
@@ -152,48 +149,57 @@ export async function openBuilderKernel(
   }
 }
 
-/** Opens the existing local Builder topology, seeding it only when the catalog is empty. */
-export async function startBuilderKernel(
-  input: StartBuilderKernelInput,
-): Promise<BuilderKernelStart> {
-  const identity = await discoverBuilderIdentity(input.kernel, input.preferred);
-  if (identity) {
+/** Opens the local Builder topology, creating it only when the catalog is empty. */
+export async function openBuilderKernel(
+  input: OpenBuilderKernelInput,
+): Promise<OpenedBuilderKernel> {
+  const session = await findBuilderSession(input.kernel, input.preferred);
+  if (session) {
     return {
-      ...(await openBuilderKernel({ identity, kernel: input.kernel })),
-      created: false,
-      gaps: [],
+      ...(await resumeBuilderKernel({ session, kernel: input.kernel })),
+      isNew: false,
     };
   }
-  const created = await bootstrapBuilderKernel({ ...input.seed, kernel: input.kernel });
-  return { ...created, created: true };
+  const created = await createBuilderKernel({ ...input.seed, kernel: input.kernel });
+  return { ...created, isNew: true };
 }
 
-async function discoverBuilderIdentity(
+async function findBuilderSession(
   options: KernelOptions,
-  preferred: Partial<BuilderKernelIdentity> | undefined,
-): Promise<BuilderKernelIdentity | null> {
-  const session = await options.persistence.open();
+  preferred: Partial<BuilderSessionRef> | undefined,
+): Promise<BuilderSessionRef | null> {
+  const persistence = await options.persistence.open();
   try {
-    const roots = await session.catalog.listRootWorkspaces();
+    const roots = await persistence.catalog.listRootWorkspaces();
     if (!roots.length) return null;
     const space = roots.find((workspace) => workspace.id === preferred?.spaceId) ?? roots.at(0)!;
-    const users = (await session.catalog.listActorsByOrigin(space.id)).filter(
+    const users = (await persistence.catalog.listActorsByOrigin(space.id)).filter(
       (actor) => actor.kind === "user",
     );
     const actor = users.find((candidate) => candidate.id === preferred?.actorId) ?? users.at(0);
     if (!actor) throw new Error(`Builder Space ${space.id} has no locally issued user.`);
     const memberOf = new Set(
-      (await session.catalog.listMembershipsForActor(actor.id)).map(
+      (await persistence.catalog.listMembershipsForActor(actor.id)).map(
         (membership) => membership.workspaceId,
       ),
     );
-    const apps = (await session.catalog.listChildWorkspaces(space.id)).filter((workspace) =>
+    const apps = (await persistence.catalog.listChildWorkspaces(space.id)).filter((workspace) =>
       memberOf.has(workspace.id),
     );
     const app = apps.find((workspace) => workspace.id === preferred?.appId) ?? apps.at(0);
     if (!app) throw new Error(`Builder Space ${space.id} has no accessible App.`);
     return { spaceId: space.id, appId: app.id, actorId: actor.id };
   } finally {
-    await session.close();
+    await persistence.close();
+  }
+}
+
+function assertSharedTypesProjected(sharedTypes: readonly TypeDef[], space: Spec, app: Spec): void {
+  const collections = new Set(space.collections.map((collection) => collection.id));
+  const sources = new Set(app.sources.map((source) => source.id));
+  for (const type of sharedTypes) {
+    if (!collections.has(type.id) || !sources.has(type.id)) {
+      throw new Error(`Shared Type ${type.key} must project from the Space into the App.`);
+    }
   }
 }

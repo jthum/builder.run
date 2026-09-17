@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vite-plus/test";
 import { normalizeSpec } from "$lib/runtime/model.ts";
 import { createNodeGateway } from "$lib/runtime/persistence/sqlite/node-gateway.ts";
-import { openBuilderKernel, startBuilderKernel } from "./bootstrap.ts";
+import { openBuilderKernel, resumeBuilderKernel } from "./bootstrap.ts";
 import { createKernelSqlitePersistence } from "./sqlite.ts";
 
 describe("Builder Framework vertical slice", () => {
@@ -76,12 +76,13 @@ describe("Builder Framework vertical slice", () => {
       appSpec,
       sharedTypes: [contact],
     };
-    const instance = await startBuilderKernel({
+    const instance = await openBuilderKernel({
       kernel: { persistence },
       seed,
     });
 
-    expect(instance.created).toBe(true);
+    expect(instance.isNew).toBe(true);
+    if (!instance.isNew) throw new Error("Expected a newly seeded Builder Kernel");
     expect(instance.gaps).toEqual([]);
     const ada = await instance.kernel.createRecord(instance.spaceContext, "contact", {
       name: "Ada",
@@ -108,27 +109,56 @@ describe("Builder Framework vertical slice", () => {
     expect(await instance.kernel.listRecords(instance.appContext, "invoice")).toHaveLength(1);
     await instance.kernel.close();
 
-    const reopened = await startBuilderKernel({
+    const reopened = await openBuilderKernel({
       kernel: { persistence },
       seed,
     });
-    expect(reopened.created).toBe(false);
+    expect(reopened.isNew).toBe(false);
     expect(await reopened.kernel.listRecords(reopened.spaceContext, "contact")).toHaveLength(1);
     expect(await reopened.kernel.listRecords(reopened.appContext, "invoice")).toHaveLength(1);
-    expect(reopened.identity).toEqual(instance.identity);
+    expect(reopened.session).toEqual(instance.session);
     await reopened.kernel.close();
 
     await expect(
-      openBuilderKernel({
-        identity: { ...instance.identity, appId: instance.identity.spaceId },
+      resumeBuilderKernel({
+        session: { ...instance.session, appId: instance.session.spaceId },
         kernel: { persistence },
       }),
     ).rejects.toThrow("does not resolve to one Space and App");
-    const recovered = await openBuilderKernel({
-      identity: instance.identity,
+    const recovered = await resumeBuilderKernel({
+      session: instance.session,
       kernel: { persistence },
     });
     await recovered.kernel.close();
+    await gateway.wipe();
+  });
+
+  it("validates a seed before writing a partial topology", async () => {
+    expect.hasAssertions();
+    const gateway = createNodeGateway();
+    const persistence = createKernelSqlitePersistence(gateway, "invalid-seed-test");
+    const contact = normalizeSpec({
+      key: "shared",
+      types: { contact: { fields: { name: "text" } } },
+    }).types[0]!;
+
+    await expect(
+      openBuilderKernel({
+        kernel: { persistence },
+        seed: {
+          spaceName: "Personal Space",
+          appName: "Empty",
+          user: { name: "Jane" },
+          spaceSpec: normalizeSpec({ key: "personal_space" }),
+          appSpec: normalizeSpec({ key: "empty" }),
+          sharedTypes: [contact],
+        },
+      }),
+    ).rejects.toThrow("must project from the Space into the App");
+
+    const session = await persistence.open();
+    await expect(session.catalog.listRootWorkspaces()).resolves.toEqual([]);
+    await session.close();
     await gateway.wipe();
   });
 });
