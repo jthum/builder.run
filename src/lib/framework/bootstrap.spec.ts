@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vite-plus/test";
 import { normalizeSpec } from "$lib/runtime/model.ts";
 import { createNodeGateway } from "$lib/runtime/persistence/sqlite/node-gateway.ts";
-import { bootstrapBuilderKernel, openBuilderKernel } from "./bootstrap.ts";
+import { openBuilderKernel, startBuilderKernel } from "./bootstrap.ts";
 import { createKernelSqlitePersistence } from "./sqlite.ts";
 
 describe("Builder Framework vertical slice", () => {
@@ -68,16 +68,20 @@ describe("Builder Framework vertical slice", () => {
     });
     const gateway = createNodeGateway();
     const persistence = createKernelSqlitePersistence(gateway, "builder-slice-test");
-    const instance = await bootstrapBuilderKernel({
+    const seed = {
       spaceName: "Personal Space",
       appName: "Billing",
       user: { name: "Jane" },
       spaceSpec,
       appSpec,
       sharedTypes: [contact],
+    };
+    const instance = await startBuilderKernel({
       kernel: { persistence },
+      seed,
     });
 
+    expect(instance.created).toBe(true);
     expect(instance.gaps).toEqual([]);
     const ada = await instance.kernel.createRecord(instance.spaceContext, "contact", {
       name: "Ada",
@@ -104,10 +108,11 @@ describe("Builder Framework vertical slice", () => {
     expect(await instance.kernel.listRecords(instance.appContext, "invoice")).toHaveLength(1);
     await instance.kernel.close();
 
-    const reopened = await openBuilderKernel({
-      identity: instance.identity,
+    const reopened = await startBuilderKernel({
       kernel: { persistence },
+      seed,
     });
+    expect(reopened.created).toBe(false);
     expect(await reopened.kernel.listRecords(reopened.spaceContext, "contact")).toHaveLength(1);
     expect(await reopened.kernel.listRecords(reopened.appContext, "invoice")).toHaveLength(1);
     expect(reopened.identity).toEqual(instance.identity);

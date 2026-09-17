@@ -32,6 +32,13 @@ export interface OpenBuilderKernelInput {
   readonly kernel: KernelOptions;
 }
 
+export interface StartBuilderKernelInput {
+  readonly kernel: KernelOptions;
+  readonly seed: Omit<BuilderKernelBootstrapInput, "kernel">;
+  /** Optional local UI preference; catalog identity remains authoritative. */
+  readonly preferred?: Partial<BuilderKernelIdentity>;
+}
+
 export interface BuilderKernelInstance {
   readonly kernel: Kernel;
   readonly space: Workspace;
@@ -43,6 +50,11 @@ export interface BuilderKernelInstance {
 
 export interface BuilderKernelBootstrap extends BuilderKernelInstance {
   /** Deliberate capabilities waiting on later framework phases. */
+  readonly gaps: readonly FrameworkProjectionGap[];
+}
+
+export interface BuilderKernelStart extends BuilderKernelInstance {
+  readonly created: boolean;
   readonly gaps: readonly FrameworkProjectionGap[];
 }
 
@@ -137,5 +149,51 @@ export async function openBuilderKernel(
   } catch (error) {
     await kernel.close();
     throw error;
+  }
+}
+
+/** Opens the existing local Builder topology, seeding it only when the catalog is empty. */
+export async function startBuilderKernel(
+  input: StartBuilderKernelInput,
+): Promise<BuilderKernelStart> {
+  const identity = await discoverBuilderIdentity(input.kernel, input.preferred);
+  if (identity) {
+    return {
+      ...(await openBuilderKernel({ identity, kernel: input.kernel })),
+      created: false,
+      gaps: [],
+    };
+  }
+  const created = await bootstrapBuilderKernel({ ...input.seed, kernel: input.kernel });
+  return { ...created, created: true };
+}
+
+async function discoverBuilderIdentity(
+  options: KernelOptions,
+  preferred: Partial<BuilderKernelIdentity> | undefined,
+): Promise<BuilderKernelIdentity | null> {
+  const session = await options.persistence.open();
+  try {
+    const roots = await session.catalog.listRootWorkspaces();
+    if (!roots.length) return null;
+    const space = roots.find((workspace) => workspace.id === preferred?.spaceId) ?? roots.at(0)!;
+    const users = (await session.catalog.listActorsByOrigin(space.id)).filter(
+      (actor) => actor.kind === "user",
+    );
+    const actor = users.find((candidate) => candidate.id === preferred?.actorId) ?? users.at(0);
+    if (!actor) throw new Error(`Builder Space ${space.id} has no locally issued user.`);
+    const memberOf = new Set(
+      (await session.catalog.listMembershipsForActor(actor.id)).map(
+        (membership) => membership.workspaceId,
+      ),
+    );
+    const apps = (await session.catalog.listChildWorkspaces(space.id)).filter((workspace) =>
+      memberOf.has(workspace.id),
+    );
+    const app = apps.find((workspace) => workspace.id === preferred?.appId) ?? apps.at(0);
+    if (!app) throw new Error(`Builder Space ${space.id} has no accessible App.`);
+    return { spaceId: space.id, appId: app.id, actorId: actor.id };
+  } finally {
+    await session.close();
   }
 }
