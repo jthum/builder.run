@@ -4,7 +4,7 @@
 	import AutomationValueInput, { type AutomationReferenceOption } from "$lib/components/automation-value-input.svelte";
 	import AutomationValueMapEditor from "$lib/components/automation-value-map-editor.svelte";
 	import AppSelect from "$lib/components/app-select.svelte";
-	import { reorderAtVerticalTarget, startVerticalDrag, type VerticalDragSession, type VerticalDropTarget } from "$lib/app/drag.ts";
+	import { reorderAtVerticalTarget, startVerticalDrag, type VerticalDragSession, type VerticalDropTarget } from "@jthum/framework/svelte/studio";
 	import * as Collapsible from "@jthum/framework/svelte/ui/collapsible";
 	import * as Command from "@jthum/framework/svelte/ui/command";
 	import { Button } from "@jthum/framework/svelte/ui/button";

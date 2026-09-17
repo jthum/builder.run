@@ -6,7 +6,7 @@
 	import { studioGroupOrder, studioItems } from "$lib/app/studio.ts";
 	import AppSettingsDialog from "$lib/components/app-settings-dialog.svelte";
 	import SidebarNavGroup from "$lib/components/sidebar-nav-group.svelte";
-	import NameDialog from "$lib/components/name-dialog.svelte";
+	import { NameDialog } from "@jthum/framework/svelte/studio";
 	import NewAppDialog from "$lib/components/new-app-dialog.svelte";
 	import ProfileDialog from "$lib/components/profile-dialog.svelte";
 	import SpaceSettingsDialog from "$lib/components/space-settings-dialog.svelte";

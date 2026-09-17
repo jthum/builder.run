@@ -7,11 +7,11 @@
 		startVerticalDrag,
 		type VerticalDragSession,
 		verticalDropTarget,
-	} from "$lib/app/drag.ts";
+	} from "@jthum/framework/svelte/studio";
 	import AppSelect from "$lib/components/app-select.svelte";
 	import FieldConditionControl from "$lib/components/field-condition-control.svelte";
 	import LifecycleEditor from "$lib/components/lifecycle-editor.svelte";
-	import PageHeader from "$lib/components/page-header.svelte";
+	import { PageHeader } from "@jthum/framework/svelte/studio";
 	import StatusPill from "$lib/components/status-pill.svelte";
 	import * as AlertDialog from "@jthum/framework/svelte/ui/alert-dialog";
 	import { Badge } from "@jthum/framework/svelte/ui/badge";

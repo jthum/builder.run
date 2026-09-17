@@ -5,12 +5,12 @@
 		startVerticalDrag,
 		type VerticalDragSession,
 		verticalDropTarget,
-	} from "$lib/app/drag.ts";
+	} from "@jthum/framework/svelte/studio";
 	import { columnLabel, fieldKindLabel } from "$lib/app/labels.ts";
 	import { runtime, session } from "$lib/app/session.svelte.ts";
 	import AppSelect from "$lib/components/app-select.svelte";
-	import EditorActions from "$lib/components/editor-actions.svelte";
-	import PageHeader from "$lib/components/page-header.svelte";
+	import { EditorActions } from "@jthum/framework/svelte/studio";
+	import { PageHeader } from "@jthum/framework/svelte/studio";
 	import RecordTable from "$lib/components/record-table.svelte";
 	import * as AlertDialog from "@jthum/framework/svelte/ui/alert-dialog";
 	import { Badge } from "@jthum/framework/svelte/ui/badge";

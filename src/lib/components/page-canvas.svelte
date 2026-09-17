@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { goto } from "$app/navigation";
-	import PageHeader from "$lib/components/page-header.svelte";
+	import { PageHeader } from "@jthum/framework/svelte/studio";
 	import Block from "$lib/components/block.svelte";
 	import BlockPicker from "$lib/components/block-picker.svelte";
 	import BlockSettings from "$lib/components/block-settings.svelte";

@@ -1,8 +1,8 @@
 <script lang="ts">
 	import { goto } from "$app/navigation";
-	import { startVerticalDrag, type VerticalDragSession } from "$lib/app/drag.ts";
-	import NameDialog from "$lib/components/name-dialog.svelte";
-	import PageHeader from "$lib/components/page-header.svelte";
+	import { startVerticalDrag, type VerticalDragSession } from "@jthum/framework/svelte/studio";
+	import { NameDialog } from "@jthum/framework/svelte/studio";
+	import { PageHeader } from "@jthum/framework/svelte/studio";
 	import * as AlertDialog from "@jthum/framework/svelte/ui/alert-dialog";
 	import { Badge } from "@jthum/framework/svelte/ui/badge";
 	import { Button } from "@jthum/framework/svelte/ui/button";

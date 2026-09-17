@@ -1,6 +1,6 @@
 <script lang="ts">
 	import AppSelect from "$lib/components/app-select.svelte";
-	import PageHeader from "$lib/components/page-header.svelte";
+	import { PageHeader } from "@jthum/framework/svelte/studio";
 	import BlockLibraryItem from "$lib/components/block-library-item.svelte";
 	import { Badge } from "@jthum/framework/svelte/ui/badge";
 	import { Button } from "@jthum/framework/svelte/ui/button";

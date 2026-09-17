@@ -2,7 +2,7 @@
 	import { page } from "$app/state";
 	import { addLabel, typeByKey } from "$lib/app/labels.ts";
 	import { runtime, session } from "$lib/app/session.svelte.ts";
-	import PageHeader from "$lib/components/page-header.svelte";
+	import { PageHeader } from "@jthum/framework/svelte/studio";
 	import RecordTable from "$lib/components/record-table.svelte";
 	import { Button } from "@jthum/framework/svelte/ui/button";
 	import PlusIcon from "@lucide/svelte/icons/plus";

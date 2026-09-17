@@ -6,8 +6,8 @@
 	import AutomationStepList from "$lib/components/automation-step-list.svelte";
 	import AutomationValueMapEditor from "$lib/components/automation-value-map-editor.svelte";
 	import AppSelect from "$lib/components/app-select.svelte";
-	import EditorActions from "$lib/components/editor-actions.svelte";
-	import PageHeader from "$lib/components/page-header.svelte";
+	import { EditorActions } from "@jthum/framework/svelte/studio";
+	import { PageHeader } from "@jthum/framework/svelte/studio";
 	import StatusPill from "$lib/components/status-pill.svelte";
 	import * as AlertDialog from "@jthum/framework/svelte/ui/alert-dialog";
 	import * as Alert from "@jthum/framework/svelte/ui/alert";

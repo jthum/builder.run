@@ -1,8 +1,8 @@
 <script lang="ts">
 	import { goto } from "$app/navigation";
 	import { session, runtime } from "$lib/app/session.svelte.ts";
-	import NameDialog from "$lib/components/name-dialog.svelte";
-	import PageHeader from "$lib/components/page-header.svelte";
+	import { NameDialog } from "@jthum/framework/svelte/studio";
+	import { PageHeader } from "@jthum/framework/svelte/studio";
 	import { Badge } from "@jthum/framework/svelte/ui/badge";
 	import { Button } from "@jthum/framework/svelte/ui/button";
 	import * as Card from "@jthum/framework/svelte/ui/card";

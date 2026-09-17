@@ -2,7 +2,7 @@
 	import { spaceLabel } from "$lib/app/labels.ts";
 	import { session } from "$lib/app/session.svelte.ts";
 	import NewTypeDialog from "$lib/components/new-type-dialog.svelte";
-	import PageHeader from "$lib/components/page-header.svelte";
+	import { PageHeader } from "@jthum/framework/svelte/studio";
 	import { Badge } from "@jthum/framework/svelte/ui/badge";
 	import { Button } from "@jthum/framework/svelte/ui/button";
 	import * as Card from "@jthum/framework/svelte/ui/card";

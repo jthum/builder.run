@@ -5,15 +5,15 @@
 		startVerticalDrag,
 		type VerticalDragSession,
 		verticalDropTarget,
-	} from "$lib/app/drag.ts";
+	} from "@jthum/framework/svelte/studio";
 	import { fieldKindLabel } from "$lib/app/labels.ts";
 	import { workflowsForForm, workflowSummary } from "$lib/app/relations.ts";
 	import { runtime, session } from "$lib/app/session.svelte.ts";
 	import AppSelect from "$lib/components/app-select.svelte";
-	import EditorActions from "$lib/components/editor-actions.svelte";
+	import { EditorActions } from "@jthum/framework/svelte/studio";
 	import FormInputSheet from "$lib/components/form-input-sheet.svelte";
 	import FormPurposePicker from "$lib/components/form-purpose-picker.svelte";
-	import PageHeader from "$lib/components/page-header.svelte";
+	import { PageHeader } from "@jthum/framework/svelte/studio";
 	import RecordForm from "$lib/components/record-form.svelte";
 	import StatusPill from "$lib/components/status-pill.svelte";
 	import * as AlertDialog from "@jthum/framework/svelte/ui/alert-dialog";

@@ -2,7 +2,7 @@
 	import { session } from "$lib/app/session.svelte.ts";
 	import { studioItems } from "$lib/app/studio.ts";
 	import DeleteAppDialog from "$lib/components/delete-app-dialog.svelte";
-	import PageHeader from "$lib/components/page-header.svelte";
+	import { PageHeader } from "@jthum/framework/svelte/studio";
 	import { Button } from "@jthum/framework/svelte/ui/button";
 	import * as Card from "@jthum/framework/svelte/ui/card";
 

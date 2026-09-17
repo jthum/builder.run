@@ -3,7 +3,7 @@
 	import { page } from "$app/state";
 	import { addLabel, recordTitle } from "$lib/app/labels.ts";
 	import { runtime, session } from "$lib/app/session.svelte.ts";
-	import PageHeader from "$lib/components/page-header.svelte";
+	import { PageHeader } from "@jthum/framework/svelte/studio";
 	import RecordForm from "$lib/components/record-form.svelte";
 	import { implicitCreateFormKey } from "$lib/runtime/defaults.ts";
 	import { parseTypeRef } from "$lib/runtime/model.ts";

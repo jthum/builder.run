@@ -5,7 +5,7 @@
 	import { applicableWorkflows, reverseRelations } from "$lib/app/relations.ts";
 	import { runtime, session } from "$lib/app/session.svelte.ts";
 	import FormattedValue from "$lib/components/formatted-value.svelte";
-	import PageHeader from "$lib/components/page-header.svelte";
+	import { PageHeader } from "@jthum/framework/svelte/studio";
 	import RecordForm from "$lib/components/record-form.svelte";
 	import RecordTable from "$lib/components/record-table.svelte";
 	import * as AlertDialog from "@jthum/framework/svelte/ui/alert-dialog";
