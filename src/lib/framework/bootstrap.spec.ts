@@ -85,20 +85,20 @@ describe("Builder Framework vertical slice", () => {
     expect(instance.isNew).toBe(true);
     if (!instance.isNew) throw new Error("Expected a newly seeded Builder Kernel");
     expect(instance.gaps).toEqual([]);
-    const ada = await instance.kernel.createRecord(instance.spaceContext, "contact", {
+    const ada = await instance.spaceClient.createRecord("contact", {
       name: "Ada",
     });
-    const submitted = await instance.kernel.submitForm(instance.appContext, "create_invoice", {
+    const submitted = await instance.appClient.submitForm("create_invoice", {
       values: { number: "INV-1", contact: ada.id },
     });
     expect(submitted).toMatchObject({
       mode: "create",
       record: { values: { number: "INV-1", contact: ada.id } },
     });
-    expect((await instance.kernel.queryView(instance.appContext, "invoices")).data.rows).toEqual([
+    expect((await instance.appClient.queryView("invoices")).data.rows).toEqual([
       expect.objectContaining({ values: { number: "INV-1", contact_name: "Ada" } }),
     ]);
-    expect(await instance.kernel.getPage(instance.appContext, "home")).toMatchObject({
+    expect(await instance.appClient.getPage("home")).toMatchObject({
       layout: [
         {
           kind: "group",
@@ -106,8 +106,8 @@ describe("Builder Framework vertical slice", () => {
         },
       ],
     });
-    expect(await instance.kernel.listRecords(instance.spaceContext, "contact")).toHaveLength(1);
-    expect(await instance.kernel.listRecords(instance.appContext, "invoice")).toHaveLength(1);
+    expect(await instance.spaceClient.listRecords("contact")).toHaveLength(1);
+    expect(await instance.appClient.listRecords("invoice")).toHaveLength(1);
     await instance.kernel.close();
 
     const reopened = await openBuilderKernel({
@@ -115,8 +115,8 @@ describe("Builder Framework vertical slice", () => {
       seed,
     });
     expect(reopened.isNew).toBe(false);
-    expect(await reopened.kernel.listRecords(reopened.spaceContext, "contact")).toHaveLength(1);
-    expect(await reopened.kernel.listRecords(reopened.appContext, "invoice")).toHaveLength(1);
+    expect(await reopened.spaceClient.listRecords("contact")).toHaveLength(1);
+    expect(await reopened.appClient.listRecords("invoice")).toHaveLength(1);
     expect(reopened.selection).toEqual(instance.selection);
     expect(reopened.actorId).toBe(instance.actorId);
     await reopened.kernel.close();
@@ -131,6 +131,7 @@ describe("Builder Framework vertical slice", () => {
     ).rejects.toThrow("does not resolve to one Space and App");
     const recovered = await resolveBuilderApp(serverKernel, instance.selection, instance.actorId);
     expect(recovered.selection).toEqual(instance.selection);
+    expect((await recovered.appClient.queryView("invoices")).data.rows).toHaveLength(1);
     await serverKernel.close();
     await gateway.wipe();
   });

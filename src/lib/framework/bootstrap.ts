@@ -5,6 +5,7 @@ import {
   type Workspace,
 } from "@jthum/framework/kernel";
 import type { Spec } from "@jthum/framework/spec";
+import { createWorkspaceClient, type WorkspaceClient } from "@jthum/framework/client";
 import type { AppSpec, TypeDef } from "$lib/runtime/model.ts";
 import { projectFrameworkSpec, type FrameworkProjectionGap } from "./projection.ts";
 
@@ -36,6 +37,8 @@ export interface OpenBuilderKernelInput {
 }
 
 export interface BuilderAppContext {
+  readonly spaceClient: WorkspaceClient;
+  readonly appClient: WorkspaceClient;
   readonly space: Workspace;
   readonly app: Workspace;
   readonly spaceContext: ExecutionContext;
@@ -93,6 +96,8 @@ export async function createBuilderKernel(
     }
     return {
       kernel,
+      spaceClient: await createWorkspaceClient(kernel, spaceContext),
+      appClient: await createWorkspaceClient(kernel, appContext),
       space,
       app,
       spaceContext,
@@ -135,6 +140,8 @@ export async function resolveBuilderApp(
     throw new Error("Builder selection does not resolve to one Space and App for this Actor.");
   }
   return {
+    spaceClient: await createWorkspaceClient(kernel, spaceContext),
+    appClient: await createWorkspaceClient(kernel, appContext),
     space,
     app,
     spaceContext,
