@@ -1,11 +1,12 @@
 <script lang="ts">
+  import { editorContext } from "$lib/app/studio.ts";
   import { goto } from "$app/navigation";
   import { CollectionEditor } from "@jthum/framework/svelte/studio";
   import { defaultCollectionLabel } from "$lib/app/labels.ts";
   import { runtime, session } from "$lib/app/session.svelte.ts";
   import type { TypeDef } from "$lib/runtime/model.ts";
   let { type }: { type: TypeDef } = $props();
-  const context = $derived({ collections: session.resolvedSpec?.types ?? [], views: session.resolvedSpec?.views ?? [], forms: session.resolvedSpec?.forms ?? [], rules: session.resolvedSpec?.workflows ?? [] });
+  const context = $derived(editorContext(session.resolvedSpec));
 </script>
 
 <CollectionEditor collection={type} {context} {defaultCollectionLabel}

@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { editorContext } from "$lib/app/studio.ts";
   import { goto } from "$app/navigation";
   import { FormEditor } from "@jthum/framework/svelte/studio";
   import { runtime, session } from "$lib/app/session.svelte.ts";
@@ -7,7 +8,7 @@
   import { uniqueKey } from "$lib/runtime/ids.ts";
   import RecordForm from "./record-form.svelte";
   let { form }: { form: FormDef } = $props();
-  const context = $derived({ collections: session.resolvedSpec?.types ?? [], views: session.resolvedSpec?.views ?? [], forms: session.resolvedSpec?.forms ?? [], rules: session.resolvedSpec?.workflows ?? [] });
+  const context = $derived(editorContext(session.resolvedSpec));
   async function createRule(draft: FormDef) {
     const label = `Handle ${draft.label.trim() || form.label}`;
     const key = uniqueKey(label, context.rules.map(rule => rule.key));
