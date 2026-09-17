@@ -88,7 +88,11 @@ export async function createRuntime(input: CreateRuntimeInput): Promise<CreatedR
       workspaceId: root.workspace.id,
       actorId: root.user.id,
     };
-    const space = await kernel.applySpec(spaceContext, spaceProjection.spec);
+    await kernel.applySpec(spaceContext, spaceProjection.spec);
+    const space = await kernel.updateWorkspaceAccess(spaceContext, {
+      members: ["read", "create", "update", "delete", "manage"],
+      others: ["read"],
+    });
     const appRuntime = await createProjectedApp(
       kernel,
       spaceContext,

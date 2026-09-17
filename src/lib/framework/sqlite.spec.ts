@@ -72,6 +72,11 @@ describe("Framework SQLite persistence", () => {
           parentId: null,
           rootId: "A000000000000004",
           name: "Rolled back",
+          access: {
+            members: ["read", "create", "update", "delete", "manage"],
+            others: [],
+          },
+          policy: { spawn: true, createActors: true, reshare: false },
           spec: {
             id: "A000000000000005",
             key: "rolled_back",
