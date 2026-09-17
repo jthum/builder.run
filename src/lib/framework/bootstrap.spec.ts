@@ -2,7 +2,7 @@ import { describe, expect, it } from "vite-plus/test";
 import { normalizeSpec } from "$lib/runtime/model.ts";
 import { createNodeGateway } from "$lib/runtime/persistence/sqlite/node-gateway.ts";
 import { Kernel } from "@jthum/framework/kernel";
-import { createApp, listApps, openRuntime, resolveApp } from "./bootstrap.ts";
+import { createApp, deleteApp, listApps, openRuntime, renameApp, resolveApp } from "./bootstrap.ts";
 import { createKernelSqlitePersistence } from "./sqlite.ts";
 
 describe("Framework vertical slice", () => {
@@ -98,6 +98,8 @@ describe("Framework vertical slice", () => {
       expect.objectContaining({ id: instance.app.id, name: "Billing" }),
       expect.objectContaining({ id: emptyApp.app.id, name: "Empty" }),
     ]);
+    const renamed = await renameApp(instance.kernel, emptyApp, "Notes");
+    expect(renamed.app).toMatchObject({ id: emptyApp.app.id, name: "Notes" });
     const ada = await instance.spaceClient.createRecord("contact", {
       name: "Ada",
     });
@@ -132,6 +134,14 @@ describe("Framework vertical slice", () => {
     expect(await reopened.appClient.listRecords("invoice")).toHaveLength(1);
     expect(reopened.selection).toEqual(instance.selection);
     expect(reopened.actorId).toBe(instance.actorId);
+    const fallback = await deleteApp(reopened.kernel, reopened.spaceContext, emptyApp.app.id);
+    expect(fallback.selection.appId).toBe(instance.app.id);
+    expect(await listApps(reopened.kernel, reopened.spaceContext)).toEqual([
+      expect.objectContaining({ id: instance.app.id, name: "Billing" }),
+    ]);
+    await expect(
+      deleteApp(reopened.kernel, reopened.spaceContext, instance.app.id),
+    ).rejects.toThrow("retain at least one App");
     await reopened.kernel.close();
 
     const serverKernel = await Kernel.open({ persistence });

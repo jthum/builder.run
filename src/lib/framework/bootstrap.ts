@@ -147,6 +147,44 @@ export async function listApps(
   return children.filter((workspace) => memberOf.has(workspace.id));
 }
 
+/** Renames the selected App and returns a freshly resolved context. */
+export async function renameApp(
+  kernel: Kernel,
+  context: AppContext,
+  name: string,
+): Promise<AppContext> {
+  await kernel.renameWorkspace(context.appContext, { name });
+  return resolveApp(kernel, context.selection, context.actorId);
+}
+
+/**
+ * Deletes one App and resolves a deterministic sibling selection.
+ * Builder host policy always retains at least one App; the Kernel itself only
+ * enforces safe leaf-Workspace deletion.
+ */
+export async function deleteApp(
+  kernel: Kernel,
+  spaceContext: ExecutionContext,
+  appId: string,
+): Promise<AppContext> {
+  const apps = await listApps(kernel, spaceContext);
+  if (apps.length <= 1) throw new Error("A Space must retain at least one App.");
+  const target = apps.find((app) => app.id === appId);
+  if (!target) throw new Error(`App ${appId} is unavailable in this Space.`);
+  const selected = await resolveApp(
+    kernel,
+    { spaceId: spaceContext.workspaceId, appId: target.id },
+    spaceContext.actorId,
+  );
+  await kernel.deleteWorkspace(selected.appContext);
+  const fallback = apps.find((app) => app.id !== target.id)!;
+  return resolveApp(
+    kernel,
+    { spaceId: spaceContext.workspaceId, appId: fallback.id },
+    spaceContext.actorId,
+  );
+}
+
 /** Resolves the Space/App convention for an Actor on an already-open Kernel. */
 export async function resolveApp(
   kernel: Kernel,
