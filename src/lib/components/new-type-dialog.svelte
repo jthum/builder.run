@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { goto } from "$app/navigation";
 	import { runtime, session } from "$lib/app/session.svelte.ts";
+	import { canonicalStudio } from "$lib/app/canonical-studio.svelte.ts";
 	import { OptionSelect } from "@jthum/framework/svelte/studio";
 	import TemplateLibraryDialog from "$lib/components/template-library-dialog.svelte";
 	import { Badge } from "@jthum/framework/svelte/ui/badge";
@@ -54,6 +55,7 @@
 	let pending = $state(false);
 
 	const types = $derived(session.resolvedSpec?.types ?? []);
+	const visibleTypes = $derived(canonicalStudio.context?.collections ?? types);
 	const chosen = $derived(typeTemplates.find((item) => item.key === selected));
 	const filtered = $derived.by(() => {
 		const needle = query.trim().toLowerCase();
@@ -102,8 +104,23 @@
 		const name = template?.label ?? "Untitled type";
 		pending = true;
 		try {
-			const draft = typeDraftFromTemplate(name, template, types);
-			const type = await runtime().upsertType(draft as never);
+			const draft = typeDraftFromTemplate(name, template, visibleTypes as never);
+			const type = canonicalStudio.context
+				? await canonicalStudio.createCollection({
+						key: draft.key,
+						label: draft.label,
+						fields: draft.fields.map((field) => ({
+							id: field.id ?? "",
+							key: field.key,
+							label: field.label ?? labelFromKey(field.key),
+							type: field.type,
+							required: field.required,
+							default: field.default,
+							values: field.values,
+							target: field.target,
+						})),
+					})
+				: await runtime().upsertType(draft as never);
 			toast.success(`${type.label} is ready`);
 			open = false;
 			await goto(`/build/types/${type.key}`);

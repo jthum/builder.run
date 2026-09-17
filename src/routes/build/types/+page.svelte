@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { spaceLabel } from "$lib/app/labels.ts";
 	import { session } from "$lib/app/session.svelte.ts";
+	import { canonicalStudio } from "$lib/app/canonical-studio.svelte.ts";
 	import NewTypeDialog from "$lib/components/new-type-dialog.svelte";
 	import { PageHeader } from "@jthum/framework/svelte/studio";
 	import { Badge } from "@jthum/framework/svelte/ui/badge";
@@ -11,7 +12,7 @@
 	import BoxIcon from "@lucide/svelte/icons/box";
 	import PlusIcon from "@lucide/svelte/icons/plus";
 
-	const types = $derived(session.resolvedSpec?.types ?? []);
+	const types = $derived(canonicalStudio.context?.collections ?? session.resolvedSpec?.types ?? []);
 	const space = $derived(spaceLabel(session.space?.name));
 	let open = $state(false);
 </script>

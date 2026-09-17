@@ -1,7 +1,13 @@
 import { Host, type HostSnapshot } from "$lib/runtime/host.ts";
 import type { Actor, AppSpec, TypeDef } from "$lib/runtime/model.ts";
 import type { SpaceAccent } from "$lib/runtime/platform.ts";
-import { openRuntime, type OpenedRuntime } from "$lib/framework/bootstrap.ts";
+import {
+  deleteApp as deleteFrameworkApp,
+  openRuntime,
+  renameApp as renameFrameworkApp,
+  resolveProjectedApp,
+  type OpenedRuntime,
+} from "$lib/framework/bootstrap.ts";
 import { LOCAL_BROWSER_ENVIRONMENT } from "@jthum/framework/kernel";
 import { createKernelSqlitePersistence } from "$lib/framework/sqlite.ts";
 import { openSqlGateway } from "$lib/runtime/persistence/sqlite/gateway.ts";
@@ -90,6 +96,41 @@ function publish(runtime: LiveRuntime) {
   clearStorageLockReload();
 }
 
+async function alignFrameworkApp(runtime: LiveRuntime): Promise<void> {
+  const snapshot = runtime.host.snapshot();
+  const aligned = await resolveProjectedApp(
+    runtime.framework.kernel,
+    runtime.framework.spaceContext,
+    {
+      name: snapshot.app.name,
+      spec: snapshot.app.spec,
+      sharedTypes: snapshot.sharedTypes,
+    },
+  );
+  runtime.framework = { ...runtime.framework, ...aligned };
+  session.framework = runtime.framework;
+}
+
+async function reopenFramework(runtime: LiveRuntime): Promise<void> {
+  const snapshot = runtime.host.snapshot();
+  await runtime.framework.kernel.close();
+  runtime.framework = await openRuntime({
+    kernel: {
+      environment: { ...LOCAL_BROWSER_ENVIRONMENT, durableRuleExecution: true },
+      persistence: createKernelSqlitePersistence(await openSqlGateway()),
+    },
+    seed: {
+      spaceName: snapshot.space.name,
+      appName: snapshot.app.name,
+      user: { name: snapshot.actor.name, email: snapshot.actor.email },
+      spaceSpec: snapshot.space.spec,
+      appSpec: snapshot.app.spec,
+      sharedTypes: snapshot.sharedTypes,
+    },
+  });
+  session.framework = runtime.framework;
+}
+
 function publishSnapshot(snapshot: HostSnapshot) {
   session.diagnostics = {
     backend: snapshot.backend,
@@ -127,7 +168,7 @@ export function boot(): Promise<void> {
     try {
       const host = await Host.open();
       const snapshot = host.snapshot();
-      const framework = await openRuntime({
+      let framework = await openRuntime({
         kernel: {
           environment: { ...LOCAL_BROWSER_ENVIRONMENT, durableRuleExecution: true },
           persistence: createKernelSqlitePersistence(await openSqlGateway()),
@@ -148,6 +189,7 @@ export function boot(): Promise<void> {
         unsub: () => {},
         stopMcp: () => mcp.stop(),
       };
+      await alignFrameworkApp(live);
       publish(live);
     } catch (error) {
       if (isStorageLocked(error) && takeStorageLockReload()) {
@@ -170,26 +212,45 @@ export function runtime(): Host {
 /** App-shell commands stay behind this boundary while their implementation moves to the Framework. */
 export async function selectApp(id: string): Promise<void> {
   await runtime().switchApp(id);
+  if (live) await alignFrameworkApp(live);
 }
 
 export async function createApp(name: string, template?: string | null): Promise<void> {
   await runtime().createApp(name, template);
+  if (live) await alignFrameworkApp(live);
 }
 
 export async function renameApp(name: string): Promise<void> {
   await runtime().renameApp(name);
+  if (!live) return;
+  await alignFrameworkApp(live);
+  const aligned = await renameFrameworkApp(live.framework.kernel, live.framework, name);
+  live.framework = { ...live.framework, ...aligned };
+  session.framework = live.framework;
 }
 
 export async function deleteApp(id: string): Promise<void> {
+  if (live && live.host.app().id === id) {
+    await alignFrameworkApp(live);
+    const fallback = await deleteFrameworkApp(
+      live.framework.kernel,
+      live.framework.spaceContext,
+      live.framework.app.id,
+    );
+    live.framework = { ...live.framework, ...fallback };
+  }
   await runtime().deleteApp(id);
+  if (live) await alignFrameworkApp(live);
 }
 
 export async function selectSpace(id: string): Promise<void> {
   await runtime().switchSpace(id);
+  if (live) await reopenFramework(live);
 }
 
 export async function createSpace(name: string): Promise<void> {
   await runtime().createSpace(name);
+  if (live) await reopenFramework(live);
 }
 
 export function configureWebMcpAppToolMode(mode: WebMcpAppToolMode): void {

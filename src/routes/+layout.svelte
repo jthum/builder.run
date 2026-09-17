@@ -5,6 +5,7 @@
 	import { applySpaceAccent } from "$lib/app/color.ts";
 	import { breadcrumbFor } from "$lib/app/labels.ts";
 	import { boot, session } from "$lib/app/session.svelte.ts";
+	import { canonicalStudio } from "$lib/app/canonical-studio.svelte.ts";
 	import AppSidebar from "$lib/components/app-sidebar.svelte";
 	import * as Breadcrumb from "@jthum/framework/svelte/ui/breadcrumb";
 	import * as Sidebar from "@jthum/framework/svelte/ui/sidebar";
@@ -34,6 +35,10 @@
 	);
 	$effect(() => {
 		applySpaceAccent(session.accent);
+	});
+	$effect(() => {
+		void session.framework;
+		void canonicalStudio.refresh();
 	});
 </script>
 

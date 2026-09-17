@@ -2,7 +2,15 @@ import { describe, expect, it } from "vite-plus/test";
 import { normalizeSpec } from "$lib/runtime/model.ts";
 import { createNodeGateway } from "$lib/runtime/persistence/sqlite/node-gateway.ts";
 import { Kernel } from "@jthum/framework/kernel";
-import { createApp, deleteApp, listApps, openRuntime, renameApp, resolveApp } from "./bootstrap.ts";
+import {
+  createApp,
+  deleteApp,
+  listApps,
+  openRuntime,
+  renameApp,
+  resolveApp,
+  resolveProjectedApp,
+} from "./bootstrap.ts";
 import { createKernelSqlitePersistence } from "./sqlite.ts";
 
 describe("Framework vertical slice", () => {
@@ -94,6 +102,12 @@ describe("Framework vertical slice", () => {
     expect(emptyApp.app.spec.sources).toEqual([
       expect.objectContaining({ id: contact.id, key: "contact" }),
     ]);
+    const sameEmptyApp = await resolveProjectedApp(instance.kernel, instance.spaceContext, {
+      name: "A different display name does not duplicate identity",
+      spec: emptyAppSpec,
+      sharedTypes: [contact],
+    });
+    expect(sameEmptyApp.app.id).toBe(emptyApp.app.id);
     expect(await listApps(instance.kernel, instance.spaceContext)).toEqual([
       expect.objectContaining({ id: instance.app.id, name: "Billing" }),
       expect.objectContaining({ id: emptyApp.app.id, name: "Empty" }),
@@ -185,6 +199,38 @@ describe("Framework vertical slice", () => {
     const session = await persistence.open();
     await expect(session.catalog.listRootWorkspaces()).resolves.toEqual([]);
     await session.close();
+    await gateway.wipe();
+  });
+
+  it("opens the Space and App selected by stable Spec identity", async () => {
+    const gateway = createNodeGateway();
+    const persistence = createKernelSqlitePersistence(gateway, "space-selection-test");
+    const firstSeed = {
+      spaceName: "Personal Space",
+      appName: "Projects",
+      user: { name: "Jane" },
+      spaceSpec: normalizeSpec({ key: "personal_space", label: "Personal Space" }),
+      appSpec: normalizeSpec({ key: "projects", label: "Projects" }),
+      sharedTypes: [],
+    };
+    const secondSeed = {
+      spaceName: "Client Space",
+      appName: "CRM",
+      user: { name: "Sam" },
+      spaceSpec: normalizeSpec({ key: "client_space", label: "Client Space" }),
+      appSpec: normalizeSpec({ key: "crm", label: "CRM" }),
+      sharedTypes: [],
+    };
+
+    const first = await openRuntime({ kernel: { persistence }, seed: firstSeed });
+    await first.kernel.close();
+    const second = await openRuntime({ kernel: { persistence }, seed: secondSeed });
+    expect(second.space.spec.id).toBe(secondSeed.spaceSpec.id);
+    expect(second.app.spec.id).toBe(secondSeed.appSpec.id);
+    await second.kernel.close();
+    const reopenedFirst = await openRuntime({ kernel: { persistence }, seed: firstSeed });
+    expect(reopenedFirst.selection).toEqual(first.selection);
+    await reopenedFirst.kernel.close();
     await gateway.wipe();
   });
 });

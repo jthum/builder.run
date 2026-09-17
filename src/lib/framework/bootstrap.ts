@@ -147,6 +147,24 @@ export async function listApps(
   return children.filter((workspace) => memberOf.has(workspace.id));
 }
 
+/** Resolve (or create) the canonical App that carries one projected Builder Spec identity. */
+export async function resolveProjectedApp(
+  kernel: Kernel,
+  spaceContext: ExecutionContext,
+  input: AppSeed,
+): Promise<AppContext> {
+  const projection = projectFrameworkSpec(input.spec, { sharedTypes: input.sharedTypes });
+  const apps = await listApps(kernel, spaceContext);
+  const existing = apps.find((app) => app.spec.id === projection.spec.id);
+  if (existing)
+    return resolveApp(
+      kernel,
+      { spaceId: spaceContext.workspaceId, appId: existing.id },
+      spaceContext.actorId,
+    );
+  return createApp(kernel, spaceContext, input);
+}
+
 /** Renames the selected App and returns a freshly resolved context. */
 export async function renameApp(
   kernel: Kernel,
@@ -223,13 +241,37 @@ export async function resolveApp(
 
 /** Opens the local topology, creating it only when the catalog is empty. */
 export async function openRuntime(input: OpenRuntimeInput): Promise<OpenedRuntime> {
-  const startup = await findStartup(input.kernel, input.preferredSelection, input.preferredActorId);
+  const startup = await findStartup(
+    input.kernel,
+    input.seed,
+    input.preferredSelection,
+    input.preferredActorId,
+  );
   if (startup) {
     const kernel = await Kernel.open(input.kernel);
     try {
+      if (!startup.selection.appId) {
+        const spaceContext = {
+          workspaceId: startup.selection.spaceId,
+          actorId: startup.actorId,
+        };
+        return {
+          kernel,
+          ...(await createApp(kernel, spaceContext, {
+            name: input.seed.appName,
+            spec: input.seed.appSpec,
+            sharedTypes: input.seed.sharedTypes,
+          })),
+          isNew: false,
+        };
+      }
       return {
         kernel,
-        ...(await resolveApp(kernel, startup.selection, startup.actorId)),
+        ...(await resolveApp(
+          kernel,
+          { spaceId: startup.selection.spaceId, appId: startup.selection.appId },
+          startup.actorId,
+        )),
         isNew: false,
       };
     } catch (error) {
@@ -243,15 +285,21 @@ export async function openRuntime(input: OpenRuntimeInput): Promise<OpenedRuntim
 
 async function findStartup(
   options: KernelOptions,
+  seed: RuntimeSeed,
   preferredSelection: Partial<AppSelection> | undefined,
   preferredActorId: string | undefined,
-): Promise<{ readonly selection: AppSelection; readonly actorId: string } | null> {
+): Promise<{
+  readonly selection: { readonly spaceId: string; readonly appId?: string };
+  readonly actorId: string;
+} | null> {
   const persistence = await options.persistence.open();
   try {
     const roots = await persistence.catalog.listRootWorkspaces();
     if (!roots.length) return null;
     const space =
-      roots.find((workspace) => workspace.id === preferredSelection?.spaceId) ?? roots.at(0)!;
+      roots.find((workspace) => workspace.id === preferredSelection?.spaceId) ??
+      roots.find((workspace) => workspace.spec.id === seed.spaceSpec.id);
+    if (!space) return null;
     const users = (await persistence.catalog.listActorsByOrigin(space.id)).filter(
       (actor) => actor.kind === "user",
     );
@@ -265,10 +313,11 @@ async function findStartup(
     const apps = (await persistence.catalog.listChildWorkspaces(space.id)).filter((workspace) =>
       memberOf.has(workspace.id),
     );
-    const app = apps.find((workspace) => workspace.id === preferredSelection?.appId) ?? apps.at(0);
-    if (!app) throw new Error(`Space ${space.id} has no accessible App.`);
+    const app =
+      apps.find((workspace) => workspace.id === preferredSelection?.appId) ??
+      apps.find((workspace) => workspace.spec.id === seed.appSpec.id);
     return {
-      selection: { spaceId: space.id, appId: app.id },
+      selection: { spaceId: space.id, ...(app ? { appId: app.id } : {}) },
       actorId: actor.id,
     };
   } finally {
