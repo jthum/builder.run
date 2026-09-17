@@ -1,5 +1,5 @@
 <script lang="ts">
-	import AppSelect from "$lib/components/app-select.svelte";
+	import { OptionSelect } from "@jthum/framework/svelte/studio";
 	import AutomationValueInput, { type AutomationReferenceOption } from "$lib/components/automation-value-input.svelte";
 	import { Button } from "@jthum/framework/svelte/ui/button";
 	import { Input } from "@jthum/framework/svelte/ui/input";
@@ -56,7 +56,7 @@
 		{@const keyDefinition = keys.find((item) => item.value === key)}
 		<div class="grid min-w-0 grid-cols-[minmax(0,0.85fr)_minmax(0,1.15fr)_auto] items-center gap-2">
 			{#if keys.length}
-				<AppSelect
+				<OptionSelect
 					value={key}
 					onValueChange={(next) => replaceKey(key, next)}
 					options={[
@@ -69,13 +69,13 @@
 				<Input value={key} oninput={(event) => replaceKey(key, event.currentTarget.value)} placeholder={keyPlaceholder} />
 			{/if}
 			{#if keyDefinition?.type === "enum"}
-				<AppSelect
+				<OptionSelect
 					value={String(value ?? "")}
 					onValueChange={(next) => replaceValue(key, next)}
 					options={(keyDefinition.values ?? []).map((item) => ({ value: item, label: item }))}
 				/>
 			{:else if keyDefinition?.type === "boolean"}
-				<AppSelect
+				<OptionSelect
 					value={String(value ?? "")}
 					onValueChange={(next) => replaceValue(key, next === "true")}
 					options={[

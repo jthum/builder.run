@@ -1,5 +1,5 @@
 <script lang="ts">
-	import AppSelect from "$lib/components/app-select.svelte";
+	import { OptionSelect } from "@jthum/framework/svelte/studio";
 	import FieldConditionControl from "$lib/components/field-condition-control.svelte";
 	import StatusPill from "$lib/components/status-pill.svelte";
 	import { Button } from "@jthum/framework/svelte/ui/button";
@@ -275,19 +275,19 @@
 				{#if kind === "reference"}
 					<Field.Field>
 						<Field.Label>Links to</Field.Label>
-						<AppSelect bind:value={target} options={types.map((type) => ({ value: type.key, label: type.label }))} placeholder="Select a record type" />
+						<OptionSelect bind:value={target} options={types.map((type) => ({ value: type.key, label: type.label }))} placeholder="Select a record type" />
 					</Field.Field>
 				{/if}
 				{#if capability.presentations.length}
 					<Field.Field>
 						<Field.Label>Presentation</Field.Label>
-						<AppSelect bind:value={presentation} options={presentationOptions} />
+						<OptionSelect bind:value={presentation} options={presentationOptions} />
 					</Field.Field>
 				{/if}
 				{#if capability.formats.length}
 					<Field.Field>
 						<Field.Label>Format</Field.Label>
-						<AppSelect bind:value={format} options={formatOptions} />
+						<OptionSelect bind:value={format} options={formatOptions} />
 					</Field.Field>
 				{/if}
 				{#if format === "currency"}
@@ -303,7 +303,7 @@
 							{#each choices as value (value)}
 								<div class="grid grid-cols-[minmax(0,1fr)_9rem] items-center gap-3 rounded-xl border p-2">
 									<StatusPill path={normalizedKey || "choice"} {value} tone={valueSemantics[value] ?? "neutral"} />
-									<AppSelect value={valueSemantics[value] ?? "neutral"} options={semanticOptions} onValueChange={(semantic) => (valueSemantics = { ...valueSemantics, [value]: semantic as ValueSemantic })} />
+									<OptionSelect value={valueSemantics[value] ?? "neutral"} options={semanticOptions} onValueChange={(semantic) => (valueSemantics = { ...valueSemantics, [value]: semantic as ValueSemantic })} />
 								</div>
 							{/each}
 						</div>

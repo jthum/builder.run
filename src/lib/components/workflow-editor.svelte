@@ -5,7 +5,7 @@
 	import AutomationPredicateEditor from "$lib/components/automation-predicate-editor.svelte";
 	import AutomationStepList from "$lib/components/automation-step-list.svelte";
 	import AutomationValueMapEditor from "$lib/components/automation-value-map-editor.svelte";
-	import AppSelect from "$lib/components/app-select.svelte";
+	import { OptionSelect } from "@jthum/framework/svelte/studio";
 	import { EditorActions } from "@jthum/framework/svelte/studio";
 	import { PageHeader } from "@jthum/framework/svelte/studio";
 	import StatusPill from "$lib/components/status-pill.svelte";
@@ -325,15 +325,15 @@
 						{#if kind === "automatic" && !triggerCustom}
 							<Field.Field>
 								<Field.Label>Event</Field.Label>
-								<AppSelect value={triggerEvent} onValueChange={setTriggerEvent} options={[{ value: "created", label: "A record is added" }, { value: "changed", label: "A record changes" }, { value: "field", label: "A field changes" }, { value: "deleted", label: "A record is deleted" }, { value: "form", label: "A form is submitted" }]} />
+								<OptionSelect value={triggerEvent} onValueChange={setTriggerEvent} options={[{ value: "created", label: "A record is added" }, { value: "changed", label: "A record changes" }, { value: "field", label: "A field changes" }, { value: "deleted", label: "A record is deleted" }, { value: "form", label: "A form is submitted" }]} />
 							</Field.Field>
 						{/if}
 						<Field.Field>
 							<Field.Label>{kind === "manual" ? "Show on" : triggerEvent === "form" ? "Form" : "Watch"}</Field.Label>
 							{#if kind === "automatic" && triggerEvent === "form"}
-								<AppSelect value={triggerForm} onValueChange={setTriggerForm} options={forms.map((form) => ({ value: form.key, label: form.label }))} placeholder="Select a form" />
+								<OptionSelect value={triggerForm} onValueChange={setTriggerForm} options={forms.map((form) => ({ value: form.key, label: form.label }))} placeholder="Select a form" />
 							{:else}
-								<AppSelect value={inputType} onValueChange={setInputType} options={types.map((type) => ({ value: type.key, label: type.label }))} disabled={!inputEditable} />
+								<OptionSelect value={inputType} onValueChange={setInputType} options={types.map((type) => ({ value: type.key, label: type.label }))} disabled={!inputEditable} />
 							{/if}
 							{#if !inputEditable && !formTrigger}<Field.Description>Structured inputs are preserved from the spec.</Field.Description>{/if}
 						</Field.Field>
@@ -343,7 +343,7 @@
 								<Field.Field><Field.Label>Trigger configuration</Field.Label><AutomationValueMapEditor values={triggerConfig} onValuesChange={(config) => (triggerConfig = config)} keyPlaceholder="Setting" /></Field.Field>
 							{:else}
 								{#if triggerEvent === "field"}
-									<Field.Field><Field.Label>Field</Field.Label><AppSelect bind:value={triggerField} options={(inputTypeDef?.fields ?? []).map((field) => ({ value: field.key, label: field.label }))} placeholder="Select a field" /></Field.Field>
+									<Field.Field><Field.Label>Field</Field.Label><OptionSelect bind:value={triggerField} options={(inputTypeDef?.fields ?? []).map((field) => ({ value: field.key, label: field.label }))} placeholder="Select a field" /></Field.Field>
 								{/if}
 							{/if}
 						{/if}

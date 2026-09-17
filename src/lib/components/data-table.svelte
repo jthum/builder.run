@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { isStatusPath, semanticDotClass, statusDotClass } from "$lib/app/labels.ts";
-	import AppSelect from "$lib/components/app-select.svelte";
+	import { OptionSelect } from "@jthum/framework/svelte/studio";
 	import { cellValue, compareRows, rowId, type DataTableColumn } from "$lib/components/data-table.ts";
 	import { Badge } from "@jthum/framework/svelte/ui/badge";
 	import { Button } from "@jthum/framework/svelte/ui/button";
@@ -553,7 +553,7 @@
 			{#if sorted.length > 0}
 				<div class="flex items-center gap-2">
 					<span class="text-sm text-muted-foreground">Rows</span>
-					<AppSelect
+					<OptionSelect
 						bind:value={pageSizeKey}
 						options={[
 							{ value: "10", label: "10" },

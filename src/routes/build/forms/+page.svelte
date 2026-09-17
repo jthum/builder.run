@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { goto } from "$app/navigation";
 	import { runtime, session } from "$lib/app/session.svelte.ts";
-	import AppSelect from "$lib/components/app-select.svelte";
+	import { OptionSelect } from "@jthum/framework/svelte/studio";
 	import { FormPurposePicker } from "@jthum/framework/svelte/studio";
 	import { PageHeader } from "@jthum/framework/svelte/studio";
 	import { Badge } from "@jthum/framework/svelte/ui/badge";
@@ -138,7 +138,7 @@
 					{#if mode !== "standalone"}
 						<Field.Field>
 							<Field.Label>Record type</Field.Label>
-							<AppSelect
+							<OptionSelect
 								bind:value={typeKey}
 								options={types.map((type) => ({ value: type.key, label: type.label }))}
 							/>

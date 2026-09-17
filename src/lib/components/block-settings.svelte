@@ -1,5 +1,5 @@
 <script lang="ts">
-	import AppSelect from "$lib/components/app-select.svelte";
+	import { OptionSelect } from "@jthum/framework/svelte/studio";
 	import { Button } from "@jthum/framework/svelte/ui/button";
 	import * as Field from "@jthum/framework/svelte/ui/field";
 	import { Input } from "@jthum/framework/svelte/ui/input";
@@ -71,31 +71,31 @@
 										oninput={(event) => (config[input.key] = event.currentTarget.valueAsNumber)}
 									/>
 								{:else if input.type === "view"}
-									<AppSelect
+									<OptionSelect
 										bind:value={config[input.key] as string}
 										options={spec ? blockInputOptions(spec, input, config) : []}
 										placeholder="Select a view"
 									/>
 								{:else if input.type === "form"}
-									<AppSelect
+									<OptionSelect
 										bind:value={config[input.key] as string}
 										options={spec ? blockInputOptions(spec, input, config) : []}
 										placeholder="Select a form"
 									/>
 								{:else if input.type === "rule"}
-									<AppSelect
+									<OptionSelect
 										bind:value={config[input.key] as string}
 										options={spec ? blockInputOptions(spec, input, config) : []}
 										placeholder="Select a rule"
 									/>
 								{:else if input.type === "field"}
-									<AppSelect
+									<OptionSelect
 										bind:value={config[input.key] as string}
 										options={spec ? blockInputOptions(spec, input, config) : []}
 										placeholder="Select a field"
 									/>
 								{:else if input.type === "select"}
-									<AppSelect
+									<OptionSelect
 										bind:value={config[input.key] as string}
 										options={spec ? blockInputOptions(spec, input, config) : []}
 										placeholder="Select"

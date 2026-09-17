@@ -1,5 +1,5 @@
 <script lang="ts">
-	import AppSelect from "$lib/components/app-select.svelte";
+	import { OptionSelect } from "@jthum/framework/svelte/studio";
 	import AutomationPredicateEditor from "$lib/components/automation-predicate-editor.svelte";
 	import AutomationValueInput, { type AutomationReferenceOption } from "$lib/components/automation-value-input.svelte";
 	import { Button } from "@jthum/framework/svelte/ui/button";
@@ -187,7 +187,7 @@
 <Card.Root size="sm">
 	<Card.Header class="flex flex-row items-center gap-2">
 		<div class="w-full max-w-36">
-			<AppSelect
+			<OptionSelect
 				value={kind}
 				onValueChange={setKind}
 				options={[
@@ -206,7 +206,7 @@
 	<Card.Content class="flex min-w-0 flex-col gap-3">
 		{#if kind === "condition" && condition}
 			<div class="grid min-w-0 gap-2 sm:grid-cols-2">
-				<AppSelect
+				<OptionSelect
 					value={fieldKey}
 					onValueChange={setField}
 					options={[
@@ -217,7 +217,7 @@
 					]}
 					placeholder="Field"
 				/>
-				<AppSelect
+				<OptionSelect
 					value={conditionOperator}
 					onValueChange={setOperator}
 					options={[
@@ -236,14 +236,14 @@
 			{:else if conditionOperator === "in"}
 				<Input value={conditionValue} oninput={(event) => setValue(event.currentTarget.value)} placeholder="Comma-separated values" />
 			{:else if field?.type === "enum"}
-				<AppSelect
+				<OptionSelect
 					value={conditionValue}
 					onValueChange={setValue}
 					options={(field.values ?? []).map((value) => ({ value, label: labelFromKey(value) }))}
 					placeholder="Value"
 				/>
 			{:else if field?.type === "boolean"}
-				<AppSelect
+				<OptionSelect
 					value={conditionValue}
 					onValueChange={setValue}
 					options={[

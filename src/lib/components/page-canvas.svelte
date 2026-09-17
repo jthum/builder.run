@@ -2,7 +2,8 @@
 	import { goto } from "$app/navigation";
 	import { PageHeader } from "@jthum/framework/svelte/studio";
 	import Block from "$lib/components/block.svelte";
-	import BlockPicker from "$lib/components/block-picker.svelte";
+	import { BlockPicker } from "@jthum/framework/svelte/studio";
+	import { blocks, blockCategories, preloadBlock } from "$lib/blocks/registry.ts";
 	import BlockSettings from "$lib/components/block-settings.svelte";
 	import { Badge } from "@jthum/framework/svelte/ui/badge";
 	import { Button } from "@jthum/framework/svelte/ui/button";
@@ -508,5 +509,5 @@
 	{/if}
 </div>
 
-<BlockPicker bind:open={pickerOpen} onPick={pickBlock} />
+<BlockPicker bind:open={pickerOpen} {blocks} categories={blockCategories} onPreview={preloadBlock} onPick={pickBlock} />
 <BlockSettings bind:open={sheetOpen} node={editingBlock} {spec} onSave={saveBlock} />

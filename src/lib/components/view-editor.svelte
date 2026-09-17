@@ -8,7 +8,7 @@
 	} from "@jthum/framework/svelte/studio";
 	import { columnLabel, fieldKindLabel } from "$lib/app/labels.ts";
 	import { runtime, session } from "$lib/app/session.svelte.ts";
-	import AppSelect from "$lib/components/app-select.svelte";
+	import { OptionSelect } from "@jthum/framework/svelte/studio";
 	import { EditorActions } from "@jthum/framework/svelte/studio";
 	import { PageHeader } from "@jthum/framework/svelte/studio";
 	import RecordTable from "$lib/components/record-table.svelte";
@@ -640,7 +640,7 @@
 				</Field.Field>
 				<Field.Field>
 					<Field.Label>Show records of</Field.Label>
-					<AppSelect
+					<OptionSelect
 						bind:value={source}
 						options={types.map((item) => ({ value: item.key, label: item.label }))}
 					/>
@@ -753,20 +753,20 @@
 									>
 										<GripVerticalIcon class="size-4" />
 									</button>
-									<AppSelect
+									<OptionSelect
 										bind:value={clause.field}
 										options={(sourceType?.fields ?? []).map((field) => ({
 											value: field.key,
 											label: field.label,
 										}))}
 									/>
-									<AppSelect
+									<OptionSelect
 										bind:value={clause.op}
 										options={FILTER_OPS.map((item) => ({ value: item.value, label: item.label }))}
 									/>
 									{#if needsValue(clause.op)}
 										{#if def?.type === "enum" && clause.op !== "contains" && clause.op !== "in"}
-											<AppSelect
+											<OptionSelect
 												bind:value={clause.value}
 												options={(def.values ?? []).map((value) => ({
 													value,
@@ -774,7 +774,7 @@
 												}))}
 											/>
 										{:else if def?.type === "boolean"}
-											<AppSelect
+											<OptionSelect
 												bind:value={clause.value}
 												options={[
 													{ value: "true", label: "Yes" },
@@ -782,7 +782,7 @@
 												]}
 											/>
 										{:else if def?.type === "reference" && clause.op !== "contains" && clause.op !== "in"}
-											<AppSelect
+											<OptionSelect
 												bind:value={clause.value}
 												options={[
 													{ value: RECORD_ID_TOKEN, label: "This record" },
@@ -937,7 +937,7 @@
 						{#if summarize}
 							<Field.Field>
 								<Field.Label>Group by</Field.Label>
-								<AppSelect
+								<OptionSelect
 									value={groupBy}
 									onValueChange={setGroupBy}
 									options={(sourceType?.fields ?? []).map((field) => ({
@@ -995,7 +995,7 @@
 											</Field.Field>
 											<Field.Field>
 												<Field.Label>Calculation</Field.Label>
-												<AppSelect
+												<OptionSelect
 													value={measure.op}
 													onValueChange={(value) => setMeasureOp(index, value as ViewMeasure["op"])}
 													options={[
@@ -1044,7 +1044,7 @@
 										{:else if measure.op !== "count"}
 											<Field.Field>
 												<Field.Label>Number field</Field.Label>
-												<AppSelect
+												<OptionSelect
 													value={measure.field ?? ""}
 													onValueChange={(value) => updateMeasure(index, { field: value })}
 													options={numericFields.map((field) => ({ value: field.key, label: field.label }))}
@@ -1104,7 +1104,7 @@
 									>
 										<GripVerticalIcon class="size-4" />
 									</button>
-									<AppSelect bind:value={row.field} options={sortFieldOptions(row.field)} />
+									<OptionSelect bind:value={row.field} options={sortFieldOptions(row.field)} />
 									<ToggleGroup.Root type="single" bind:value={row.dir} variant="outline">
 										<ToggleGroup.Item value="asc">{dirs.asc}</ToggleGroup.Item>
 										<ToggleGroup.Item value="desc">{dirs.desc}</ToggleGroup.Item>

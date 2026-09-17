@@ -1,5 +1,5 @@
 <script lang="ts">
-	import AppSelect from "$lib/components/app-select.svelte";
+	import { OptionSelect } from "@jthum/framework/svelte/studio";
 	import { Badge } from "@jthum/framework/svelte/ui/badge";
 	import * as Field from "@jthum/framework/svelte/ui/field";
 	import { Input } from "@jthum/framework/svelte/ui/input";
@@ -91,7 +91,7 @@
 			<div class="mt-3 grid gap-2 sm:grid-cols-3">
 				<Field.Field>
 					<Field.Label>Field</Field.Label>
-					<AppSelect
+					<OptionSelect
 						value={leaf.field}
 						options={choices.map((field) => ({ value: field.key, label: field.label }))}
 						onValueChange={setSource}
@@ -99,7 +99,7 @@
 				</Field.Field>
 				<Field.Field>
 					<Field.Label>Match</Field.Label>
-					<AppSelect
+					<OptionSelect
 						value={leaf.op ?? "eq"}
 						options={operators}
 						onValueChange={(op) => update({ op: op as FilterOp })}
@@ -109,13 +109,13 @@
 					<Field.Field>
 						<Field.Label>Value</Field.Label>
 						{#if source?.type === "enum"}
-							<AppSelect
+							<OptionSelect
 								value={String(leaf.value ?? "")}
 								options={(source.values ?? []).map((item) => ({ value: item, label: item.replaceAll("_", " ") }))}
 								onValueChange={(next) => update({ value: next })}
 							/>
 						{:else if source?.type === "boolean"}
-							<AppSelect
+							<OptionSelect
 								value={String(leaf.value ?? true)}
 								options={[{ value: "true", label: "Yes" }, { value: "false", label: "No" }]}
 								onValueChange={(next) => update({ value: next === "true" })}

@@ -9,7 +9,7 @@
 	import { fieldKindLabel } from "$lib/app/labels.ts";
 	import { workflowsForForm, workflowSummary } from "$lib/app/relations.ts";
 	import { runtime, session } from "$lib/app/session.svelte.ts";
-	import AppSelect from "$lib/components/app-select.svelte";
+	import { OptionSelect } from "@jthum/framework/svelte/studio";
 	import { EditorActions } from "@jthum/framework/svelte/studio";
 	import FormInputSheet from "$lib/components/form-input-sheet.svelte";
 	import { FormPurposePicker } from "@jthum/framework/svelte/studio";
@@ -289,7 +289,7 @@
 				{#if mode !== "standalone"}
 					<Field.Field>
 						<Field.Label>Record type</Field.Label>
-						<AppSelect
+						<OptionSelect
 							bind:value={typeKey}
 							options={types.map((type) => ({ value: type.key, label: type.label }))}
 						/>

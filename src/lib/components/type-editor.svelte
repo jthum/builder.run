@@ -8,7 +8,7 @@
 		type VerticalDragSession,
 		verticalDropTarget,
 	} from "@jthum/framework/svelte/studio";
-	import AppSelect from "$lib/components/app-select.svelte";
+	import { OptionSelect } from "@jthum/framework/svelte/studio";
 	import FieldConditionControl from "$lib/components/field-condition-control.svelte";
 	import LifecycleEditor from "$lib/components/lifecycle-editor.svelte";
 	import { PageHeader } from "@jthum/framework/svelte/studio";
@@ -785,7 +785,7 @@
 				{#if fieldType === "reference"}
 					<Field.Field>
 						<Field.Label>Links to</Field.Label>
-						<AppSelect bind:value={fieldTarget} options={targetOptions} placeholder="Select a record type" />
+						<OptionSelect bind:value={fieldTarget} options={targetOptions} placeholder="Select a record type" />
 						<Field.Description>
 							{#if targetOptions.length}
 								The other record type this field points at.
@@ -799,14 +799,14 @@
 					{#if selectedCapability.presentations.length}
 						<Field.Field>
 							<Field.Label>Presentation</Field.Label>
-							<AppSelect bind:value={fieldPresentation} options={presentationOptions} />
+							<OptionSelect bind:value={fieldPresentation} options={presentationOptions} />
 							<Field.Description>{presentationCapability?.description ?? "Choose how people enter and see this value."}</Field.Description>
 						</Field.Field>
 					{/if}
 					{#if selectedCapability.formats.length}
 						<Field.Field>
 							<Field.Label>Format</Field.Label>
-							<AppSelect bind:value={fieldFormat} options={formatOptions} />
+							<OptionSelect bind:value={fieldFormat} options={formatOptions} />
 							<Field.Description>Give the stored value additional meaning.</Field.Description>
 						</Field.Field>
 					{/if}
@@ -820,7 +820,7 @@
 									<div class="min-w-0">
 										<StatusPill path={fieldKey || slugify(fieldLabel) || "choice"} {value} tone={fieldValueSemantics[value] ?? "neutral"} />
 									</div>
-									<AppSelect value={fieldValueSemantics[value] ?? "neutral"} options={semanticOptions} onValueChange={(semantic) => setChoiceSemantic(value, semantic)} />
+									<OptionSelect value={fieldValueSemantics[value] ?? "neutral"} options={semanticOptions} onValueChange={(semantic) => setChoiceSemantic(value, semantic)} />
 								</div>
 							{/each}
 						</div>
@@ -838,7 +838,7 @@
 					{#if presentationVariantOptions.length}
 						<Field.Field>
 							<Field.Label>Style</Field.Label>
-							<AppSelect bind:value={fieldRatingVariant} options={presentationVariantOptions} />
+							<OptionSelect bind:value={fieldRatingVariant} options={presentationVariantOptions} />
 							<Field.Description>{presentationCapability?.variants?.find((variant) => variant.value === fieldRatingVariant)?.description}</Field.Description>
 						</Field.Field>
 					{/if}

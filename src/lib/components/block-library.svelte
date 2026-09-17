@@ -1,5 +1,5 @@
 <script lang="ts">
-	import AppSelect from "$lib/components/app-select.svelte";
+	import { OptionSelect } from "@jthum/framework/svelte/studio";
 	import { PageHeader } from "@jthum/framework/svelte/studio";
 	import BlockLibraryItem from "$lib/components/block-library-item.svelte";
 	import { Badge } from "@jthum/framework/svelte/ui/badge";
@@ -54,7 +54,7 @@
 
 	<div class="lg:grid lg:grid-cols-[13rem_minmax(0,1fr)] lg:gap-8">
 		<div class="mb-5 lg:hidden">
-			<AppSelect
+			<OptionSelect
 				value={category}
 				options={categoryOptions}
 				onValueChange={(value) => (category = value as BlockCategory)}

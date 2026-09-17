@@ -2,7 +2,7 @@
 	import { goto } from "$app/navigation";
 	import { spaceLabel } from "$lib/app/labels.ts";
 	import { createApp, session } from "$lib/app/session.svelte.ts";
-	import AppSelect from "$lib/components/app-select.svelte";
+	import { OptionSelect } from "@jthum/framework/svelte/studio";
 	import TemplateLibraryDialog from "$lib/components/template-library-dialog.svelte";
 	import { Badge } from "@jthum/framework/svelte/ui/badge";
 	import { Button } from "@jthum/framework/svelte/ui/button";
@@ -165,7 +165,7 @@
 							<InputGroup.Addon><SearchIcon /></InputGroup.Addon>
 							<InputGroup.Input value={query} oninput={(event) => search(event.currentTarget.value)} placeholder="Search templates…" autofocus />
 						</InputGroup.Root>
-						<AppSelect value={sort} onValueChange={(value) => { sort = value; pageIndex = 0; }} options={sortOptions} class="w-40 bg-card" />
+						<OptionSelect value={sort} onValueChange={(value) => { sort = value; pageIndex = 0; }} options={sortOptions} class="w-40 bg-card" />
 		</div>
 	{/snippet}
 						<div class="grid gap-3 md:grid-cols-2">

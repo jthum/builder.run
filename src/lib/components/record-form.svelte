@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { addLabel, recordTitle } from "$lib/app/labels.ts";
 	import { runtime, session } from "$lib/app/session.svelte.ts";
-	import AppSelect from "$lib/components/app-select.svelte";
+	import { OptionSelect } from "@jthum/framework/svelte/studio";
 	import ReferencePicker from "$lib/components/reference-picker.svelte";
 	import RatingInput from "$lib/components/rating-input.svelte";
 	import * as Alert from "@jthum/framework/svelte/ui/alert";
@@ -196,7 +196,7 @@
 							disabled={!state.enabled}
 						/>
 					{:else if widget === "select"}
-						<AppSelect
+						<OptionSelect
 							bind:value={values[field.key] as string}
 							options={(refOptions[field.key] ?? []).map((option) => ({
 								value: option.id,

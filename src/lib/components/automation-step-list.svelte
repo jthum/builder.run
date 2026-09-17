@@ -3,7 +3,7 @@
 	import AutomationStepList from "$lib/components/automation-step-list.svelte";
 	import AutomationValueInput, { type AutomationReferenceOption } from "$lib/components/automation-value-input.svelte";
 	import AutomationValueMapEditor from "$lib/components/automation-value-map-editor.svelte";
-	import AppSelect from "$lib/components/app-select.svelte";
+	import { OptionSelect } from "@jthum/framework/svelte/studio";
 	import { reorderAtVerticalTarget, startVerticalDrag, type VerticalDragSession, type VerticalDropTarget } from "@jthum/framework/svelte/studio";
 	import * as Collapsible from "@jthum/framework/svelte/ui/collapsible";
 	import * as Command from "@jthum/framework/svelte/ui/command";
@@ -454,7 +454,7 @@
 					{#each Object.entries(valuesFor(step)) as [fieldKey, value] (fieldKey)}
 						{@const field = contextFields.find((item) => item.key === fieldKey)}
 						<div class="grid min-w-0 grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] items-center gap-2">
-							<AppSelect
+							<OptionSelect
 								value={fieldKey}
 								onValueChange={(next) => replace(index, setAssignment(step, fieldKey, next, value))}
 								options={[
@@ -468,13 +468,13 @@
 									{value.$ref}
 								</div>
 							{:else if field?.type === "enum"}
-								<AppSelect
+								<OptionSelect
 									value={displayValue(value)}
 									onValueChange={(next) => replace(index, setAssignment(step, fieldKey, fieldKey, next))}
 									options={(field.values ?? []).map((item) => ({ value: item, label: labelFromKey(item) }))}
 								/>
 							{:else if field?.type === "boolean"}
-								<AppSelect
+								<OptionSelect
 									value={displayValue(value)}
 									onValueChange={(next) => replace(index, setAssignment(step, fieldKey, fieldKey, next === "true"))}
 									options={[
@@ -513,7 +513,7 @@
 				<Field.Group>
 					<Field.Field>
 						<Field.Label>Record type</Field.Label>
-						<AppSelect
+						<OptionSelect
 							value={String(step.effect.params?.type ?? "")}
 							onValueChange={(next) => replace(index, setCreateType(step, next))}
 							options={types.map((type) => ({ value: type.key, label: type.label }))}
@@ -536,7 +536,7 @@
 				<Field.Group>
 					<Field.Field>
 						<Field.Label>Query</Field.Label>
-						<AppSelect
+						<OptionSelect
 							value={querySource(step)}
 							onValueChange={(source) => replace(index, setQuerySource(step, source))}
 							options={[
@@ -558,7 +558,7 @@
 				<AutomationValueMapEditor values={step.compute.assign} onValuesChange={(assign) => replace(index, { ...step, compute: { assign } })} keyPlaceholder="Variable name" references={referencesBefore(index)} />
 			{:else if "invoke" in step}
 				<Field.Group>
-					<Field.Field><Field.Label>Workflow</Field.Label><AppSelect value={step.invoke.workflow} onValueChange={(next) => replace(index, { ...step, invoke: { ...step.invoke, workflow: next } })} options={workflows.map((workflow) => ({ value: workflow.key, label: workflow.label }))} placeholder="Workflow" /></Field.Field>
+					<Field.Field><Field.Label>Workflow</Field.Label><OptionSelect value={step.invoke.workflow} onValueChange={(next) => replace(index, { ...step, invoke: { ...step.invoke, workflow: next } })} options={workflows.map((workflow) => ({ value: workflow.key, label: workflow.label }))} placeholder="Workflow" /></Field.Field>
 					<Field.Field><Field.Label>Inputs</Field.Label><AutomationValueMapEditor values={step.invoke.input ?? {}} onValuesChange={(input) => replace(index, { ...step, invoke: { ...step.invoke, input } })} keyPlaceholder="Input name" references={referencesBefore(index)} /></Field.Field>
 					<Field.Field><Field.Label>Result name</Field.Label><Input value={step.invoke.as ?? ""} oninput={(event) => replace(index, { ...step, invoke: { ...step.invoke, as: event.currentTarget.value || undefined } })} placeholder="Optional variable name" /></Field.Field>
 				</Field.Group>
@@ -632,7 +632,7 @@
 						<Field.Field><Field.Label>List reference</Field.Label><AutomationValueInput value={step.foreach.source} onValueChange={(next) => replace(index, { ...step, foreach: { ...step.foreach, source: isBinding(next) ? next : binding(String(next)) } })} references={referencesBefore(index)} placeholder="=vars.records" /></Field.Field>
 						<Field.Field><Field.Label>Item name</Field.Label><Input value={step.foreach.as ?? "item"} oninput={(event) => replace(index, { ...step, foreach: { ...step.foreach, as: event.currentTarget.value || undefined } })} /></Field.Field>
 						<Field.Field><Field.Label>Maximum items</Field.Label><Input type="number" min="1" value={step.foreach.max ?? ""} oninput={(event) => replace(index, { ...step, foreach: { ...step.foreach, max: event.currentTarget.value ? Math.max(1, Math.trunc(event.currentTarget.valueAsNumber || 1)) : undefined } })} placeholder="1000" /></Field.Field>
-						<Field.Field><Field.Label>On failure</Field.Label><AppSelect value={step.foreach.on_item_failure ?? "stop"} onValueChange={(next) => replace(index, { ...step, foreach: { ...step.foreach, on_item_failure: next as "stop" | "continue" } })} options={[{ value: "stop", label: "Stop workflow" }, { value: "continue", label: "Continue" }]} /></Field.Field>
+						<Field.Field><Field.Label>On failure</Field.Label><OptionSelect value={step.foreach.on_item_failure ?? "stop"} onValueChange={(next) => replace(index, { ...step, foreach: { ...step.foreach, on_item_failure: next as "stop" | "continue" } })} options={[{ value: "stop", label: "Stop workflow" }, { value: "continue", label: "Continue" }]} /></Field.Field>
 					</Field.Group>
 					<div class="flex min-w-0 flex-col gap-3 rounded-xl bg-chart-2/5 p-3 ring-1 ring-chart-2/12">
 						<p class="text-xs font-semibold">For each item, run</p>
@@ -645,7 +645,7 @@
 						<Field.Field><Field.Label>Times</Field.Label><AutomationValueInput value={step.repeat.times} onValueChange={(next) => replace(index, { ...step, repeat: { ...step.repeat, times: typeof next === "number" || isBinding(next) ? next : countValue(String(next)) } })} references={referencesBefore(index)} type="number" /></Field.Field>
 						<Field.Field><Field.Label>Index name</Field.Label><Input value={step.repeat.as ?? "index"} oninput={(event) => replace(index, { ...step, repeat: { ...step.repeat, as: event.currentTarget.value || undefined } })} /></Field.Field>
 						<Field.Field><Field.Label>Maximum repeats</Field.Label><Input type="number" min="1" value={step.repeat.max ?? ""} oninput={(event) => replace(index, { ...step, repeat: { ...step.repeat, max: event.currentTarget.value ? Math.max(1, Math.trunc(event.currentTarget.valueAsNumber || 1)) : undefined } })} placeholder="1000" /></Field.Field>
-						<Field.Field><Field.Label>On failure</Field.Label><AppSelect value={step.repeat.on_item_failure ?? "stop"} onValueChange={(next) => replace(index, { ...step, repeat: { ...step.repeat, on_item_failure: next as "stop" | "continue" } })} options={[{ value: "stop", label: "Stop workflow" }, { value: "continue", label: "Continue" }]} /></Field.Field>
+						<Field.Field><Field.Label>On failure</Field.Label><OptionSelect value={step.repeat.on_item_failure ?? "stop"} onValueChange={(next) => replace(index, { ...step, repeat: { ...step.repeat, on_item_failure: next as "stop" | "continue" } })} options={[{ value: "stop", label: "Stop workflow" }, { value: "continue", label: "Continue" }]} /></Field.Field>
 					</Field.Group>
 					<div class="flex min-w-0 flex-col gap-3 rounded-xl bg-chart-2/5 p-3 ring-1 ring-chart-2/12">
 						<p class="text-xs font-semibold">On every repetition, run</p>
@@ -654,7 +654,7 @@
 				</div>
 			{:else if "parallel" in step}
 				<div class="flex min-w-0 flex-col gap-4">
-					<Field.Field><Field.Label>Continue when</Field.Label><AppSelect value={step.parallel.join ?? "all"} onValueChange={(join) => replace(index, { ...step, parallel: { ...step.parallel, join: join as "all" | "any" } })} options={[{ value: "all", label: "All branches finish" }, { value: "any", label: "Any branch finishes" }]} /></Field.Field>
+					<Field.Field><Field.Label>Continue when</Field.Label><OptionSelect value={step.parallel.join ?? "all"} onValueChange={(join) => replace(index, { ...step, parallel: { ...step.parallel, join: join as "all" | "any" } })} options={[{ value: "all", label: "All branches finish" }, { value: "any", label: "Any branch finishes" }]} /></Field.Field>
 					{#each step.parallel.branches as branch, branchIndex (branchIndex)}
 						<div class="flex min-w-0 flex-col gap-3 rounded-xl bg-chart-4/4 p-3 ring-1 ring-chart-4/12">
 							<div class="flex items-center gap-2">
@@ -684,7 +684,7 @@
 				<p class="text-xs text-muted-foreground">Deletes the current {inputTypeDef?.label?.toLowerCase() ?? "record"}.</p>
 			{:else if "effect" in step}
 				<Field.Group>
-					<Field.Field><Field.Label>Effect</Field.Label><AppSelect value={step.effect.key} onValueChange={(key) => replace(index, { ...step, effect: { ...step.effect, key } })} options={[...registeredEffects.map((effect) => ({ value: effect.key, label: effect.label })), ...(registeredEffects.some((effect) => effect.key === step.effect.key) ? [] : [{ value: step.effect.key, label: labelFromKey(step.effect.key) }])]} placeholder="Effect" /></Field.Field>
+					<Field.Field><Field.Label>Effect</Field.Label><OptionSelect value={step.effect.key} onValueChange={(key) => replace(index, { ...step, effect: { ...step.effect, key } })} options={[...registeredEffects.map((effect) => ({ value: effect.key, label: effect.label })), ...(registeredEffects.some((effect) => effect.key === step.effect.key) ? [] : [{ value: step.effect.key, label: labelFromKey(step.effect.key) }])]} placeholder="Effect" /></Field.Field>
 					<Field.Field><Field.Label>Parameters</Field.Label><AutomationValueMapEditor values={isObject(step.effect.params) ? step.effect.params : {}} onValuesChange={(params) => replace(index, setEffectParams(step, params))} references={referencesBefore(index)} /></Field.Field>
 				</Field.Group>
 			{/if}
@@ -712,7 +712,7 @@
 							</div>
 							<Field.Field>
 								<Field.Label>On rollback</Field.Label>
-								<AppSelect
+								<OptionSelect
 									value={step.effect.compensate?.key ?? ""}
 									onValueChange={(key) => replace(index, setCompensation(step, key))}
 									options={[

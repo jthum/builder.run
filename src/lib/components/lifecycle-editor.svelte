@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { runtime } from "$lib/app/session.svelte.ts";
-	import AppSelect from "$lib/components/app-select.svelte";
+	import { OptionSelect } from "@jthum/framework/svelte/studio";
 	import { Badge } from "@jthum/framework/svelte/ui/badge";
 	import { Button } from "@jthum/framework/svelte/ui/button";
 	import * as Card from "@jthum/framework/svelte/ui/card";
@@ -132,11 +132,11 @@
 			<Field.Group>
 				<Field.Field>
 					<Field.Label>State field</Field.Label>
-					<AppSelect value={field} options={fieldOptions} onValueChange={selectField} />
+					<OptionSelect value={field} options={fieldOptions} onValueChange={selectField} />
 				</Field.Field>
 				<Field.Field>
 					<Field.Label>Initial state</Field.Label>
-					<AppSelect bind:value={initial} options={stateOptions} />
+					<OptionSelect bind:value={initial} options={stateOptions} />
 					<Field.Description>Every new record starts here.</Field.Description>
 				</Field.Field>
 				<Field.FieldSet>
@@ -183,7 +183,7 @@
 							</Field.FieldSet>
 							<Field.Field>
 								<Field.Label>Moves to</Field.Label>
-								<AppSelect value={transition.to} options={stateOptions} onValueChange={(to) => updateTransition(transition.localId, { to, from: transition.from.filter((source) => source !== to) })} />
+								<OptionSelect value={transition.to} options={stateOptions} onValueChange={(to) => updateTransition(transition.localId, { to, from: transition.from.filter((source) => source !== to) })} />
 							</Field.Field>
 						</Card.Content>
 					</Card.Root>
