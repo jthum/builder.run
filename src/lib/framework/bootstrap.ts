@@ -8,7 +8,7 @@ import { MemoryPersistenceAdapter } from "@jthum/framework/persistence";
 import type { AppSpec, TypeDef } from "$lib/runtime/model.ts";
 import { projectFrameworkSpec, type FrameworkProjectionGap } from "./projection.ts";
 
-export interface BootstrapBuilderFrameworkInput {
+export interface BuilderKernelBootstrapInput {
   readonly spaceName: string;
   readonly appName: string;
   readonly user: { readonly name: string; readonly email?: string };
@@ -21,7 +21,7 @@ export interface BootstrapBuilderFrameworkInput {
   };
 }
 
-export interface BuilderFrameworkHost {
+export interface BuilderKernelInstance {
   readonly kernel: Kernel;
   readonly space: Workspace;
   readonly app: Workspace;
@@ -37,9 +37,9 @@ export interface BuilderFrameworkHost {
  * This is the executable Phase 4 seam, not an importer for the legacy Builder database. A
  * persistence/migration adapter can preserve existing records separately when the UI switches.
  */
-export async function bootstrapBuilderFramework(
-  input: BootstrapBuilderFrameworkInput,
-): Promise<BuilderFrameworkHost> {
+export async function bootstrapBuilderKernel(
+  input: BuilderKernelBootstrapInput,
+): Promise<BuilderKernelInstance> {
   const kernel = await Kernel.open({
     ...input.kernel,
     persistence: input.kernel?.persistence ?? new MemoryPersistenceAdapter(),

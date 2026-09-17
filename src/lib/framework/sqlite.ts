@@ -9,7 +9,8 @@ import type {
   SqlGateway,
 } from "$lib/runtime/persistence/sqlite/gateway.ts";
 
-export const FRAMEWORK_DATABASE = "builder-framework";
+export const BUILDER_KERNEL_DATABASE = "builder-framework";
+const activeDatabases = new WeakMap<SqlGateway, Set<string>>();
 
 /**
  * Uses Builder's environment-specific SQLite gateway as Framework persistence.
@@ -18,20 +19,47 @@ export const FRAMEWORK_DATABASE = "builder-framework";
  * transaction ordering and the small difference between the two SQL interfaces; it does not
  * depend on Builder's legacy Host, catalog, or record services.
  */
-export function createFrameworkSqlitePersistence(
+export function createKernelSqlitePersistence(
   gateway: SqlGateway,
-  databaseName = FRAMEWORK_DATABASE,
+  databaseName = BUILDER_KERNEL_DATABASE,
 ): SqlitePersistenceAdapter {
   return new SqlitePersistenceAdapter(async () => {
-    const connection = await gateway.open(databaseName);
-    return new GatewaySqliteDatabase(connection);
+    acquireDatabase(gateway, databaseName);
+    try {
+      const connection = await gateway.open(databaseName);
+      return new GatewaySqliteDatabase(connection, () => {
+        releaseDatabase(gateway, databaseName);
+      });
+    } catch (error) {
+      releaseDatabase(gateway, databaseName);
+      throw error;
+    }
   });
+}
+
+function acquireDatabase(gateway: SqlGateway, name: string): void {
+  const names = activeDatabases.get(gateway) ?? new Set<string>();
+  if (names.has(name)) {
+    throw new Error("Builder Kernel SQLite persistence already has an active session.");
+  }
+  names.add(name);
+  activeDatabases.set(gateway, names);
+}
+
+function releaseDatabase(gateway: SqlGateway, name: string): void {
+  const names = activeDatabases.get(gateway);
+  names?.delete(name);
+  if (names?.size === 0) activeDatabases.delete(gateway);
 }
 
 class GatewaySqliteDatabase implements SqliteDatabase {
   private queue: Promise<unknown> = Promise.resolve();
+  private closed = false;
 
-  constructor(private readonly connection: BuilderSqlConnection) {}
+  constructor(
+    private readonly connection: BuilderSqlConnection,
+    private readonly release: () => void,
+  ) {}
 
   execute(sql: string): Promise<void> {
     return this.enqueue(() => this.connection.exec(sql));
@@ -72,7 +100,15 @@ class GatewaySqliteDatabase implements SqliteDatabase {
   }
 
   close(): Promise<void> {
-    return this.enqueue(() => this.connection.close());
+    return this.enqueue(async () => {
+      if (this.closed) return;
+      try {
+        await this.connection.close();
+      } finally {
+        this.closed = true;
+        this.release();
+      }
+    });
   }
 
   private enqueue<T>(work: () => Promise<T>): Promise<T> {

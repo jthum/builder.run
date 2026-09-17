@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vite-plus/test";
 import { normalizeSpec } from "$lib/runtime/model.ts";
-import { bootstrapBuilderFramework } from "./bootstrap.ts";
+import { bootstrapBuilderKernel } from "./bootstrap.ts";
 
 describe("Builder Framework vertical slice", () => {
   it("runs shared records, an app Form, View, and Page on the Framework Kernel", async () => {
@@ -64,7 +64,7 @@ describe("Builder Framework vertical slice", () => {
         },
       },
     });
-    const host = await bootstrapBuilderFramework({
+    const instance = await bootstrapBuilderKernel({
       spaceName: "Personal Space",
       appName: "Billing",
       user: { name: "Jane" },
@@ -73,19 +73,21 @@ describe("Builder Framework vertical slice", () => {
       sharedTypes: [contact],
     });
 
-    expect(host.gaps).toEqual([]);
-    const ada = await host.kernel.createRecord(host.spaceContext, "contact", { name: "Ada" });
-    const submitted = await host.kernel.submitForm(host.appContext, "create_invoice", {
+    expect(instance.gaps).toEqual([]);
+    const ada = await instance.kernel.createRecord(instance.spaceContext, "contact", {
+      name: "Ada",
+    });
+    const submitted = await instance.kernel.submitForm(instance.appContext, "create_invoice", {
       values: { number: "INV-1", contact: ada.id },
     });
     expect(submitted).toMatchObject({
       mode: "create",
       record: { values: { number: "INV-1", contact: ada.id } },
     });
-    expect((await host.kernel.queryView(host.appContext, "invoices")).data.rows).toEqual([
+    expect((await instance.kernel.queryView(instance.appContext, "invoices")).data.rows).toEqual([
       expect.objectContaining({ values: { number: "INV-1", contact_name: "Ada" } }),
     ]);
-    expect(await host.kernel.getPage(host.appContext, "home")).toMatchObject({
+    expect(await instance.kernel.getPage(instance.appContext, "home")).toMatchObject({
       layout: [
         {
           kind: "group",
@@ -93,8 +95,8 @@ describe("Builder Framework vertical slice", () => {
         },
       ],
     });
-    expect(await host.kernel.listRecords(host.spaceContext, "contact")).toHaveLength(1);
-    expect(await host.kernel.listRecords(host.appContext, "invoice")).toHaveLength(1);
-    await host.kernel.close();
+    expect(await instance.kernel.listRecords(instance.spaceContext, "contact")).toHaveLength(1);
+    expect(await instance.kernel.listRecords(instance.appContext, "invoice")).toHaveLength(1);
+    await instance.kernel.close();
   });
 });

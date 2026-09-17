@@ -1,13 +1,13 @@
 import { Kernel } from "@jthum/framework/kernel";
 import { describe, expect, it } from "vite-plus/test";
 import { createNodeGateway } from "$lib/runtime/persistence/sqlite/node-gateway.ts";
-import { createFrameworkSqlitePersistence } from "./sqlite.ts";
+import { createKernelSqlitePersistence } from "./sqlite.ts";
 
 describe("Framework SQLite persistence", () => {
   it("persists the Framework catalog and records through Builder's gateway", async () => {
     expect.hasAssertions();
     const gateway = createNodeGateway();
-    const persistence = createFrameworkSqlitePersistence(gateway);
+    const persistence = createKernelSqlitePersistence(gateway);
     const first = await Kernel.open({ persistence });
     const bootstrap = await first.createRootWorkspace({
       name: "Personal Space",
@@ -61,7 +61,7 @@ describe("Framework SQLite persistence", () => {
   it("rolls back the whole framework transaction when work fails", async () => {
     expect.hasAssertions();
     const gateway = createNodeGateway();
-    const persistence = createFrameworkSqlitePersistence(gateway, "rollback-test");
+    const persistence = createKernelSqlitePersistence(gateway, "rollback-test");
     const session = await persistence.open();
 
     await expect(
@@ -93,6 +93,22 @@ describe("Framework SQLite persistence", () => {
     expect(await session.catalog.getWorkspace("A000000000000004")).toBeNull();
 
     await session.close();
+    await gateway.wipe();
+  });
+
+  it("owns one active gateway session and can reopen after close", async () => {
+    expect.hasAssertions();
+    const gateway = createNodeGateway();
+    const persistence = createKernelSqlitePersistence(gateway, "session-test");
+    const competing = createKernelSqlitePersistence(gateway, "session-test");
+    const first = await persistence.open();
+
+    await expect(competing.open()).rejects.toThrow("already has an active session");
+    await first.close();
+
+    const second = await persistence.open();
+    await expect(second.catalog.listRootWorkspaces()).resolves.toEqual([]);
+    await second.close();
     await gateway.wipe();
   });
 });
