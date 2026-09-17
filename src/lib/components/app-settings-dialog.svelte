@@ -23,7 +23,7 @@
 			return;
 		}
 		if (initialized) return;
-		name = session.snapshot?.app.name ?? "";
+		name = session.app?.name ?? "";
 		section = "general";
 		initialized = true;
 	});
@@ -69,7 +69,7 @@
 	</Tabs.Content>
 	{#snippet actions()}
 		<Button type="button" variant="outline" onclick={() => setOpen(false)}>Cancel</Button>
-		<Button type="submit" disabled={pending || !name.trim() || name.trim() === session.snapshot?.app.name}>
+		<Button type="submit" disabled={pending || !name.trim() || name.trim() === session.app?.name}>
 			{#if pending}<Spinner data-icon="inline-start" />{/if}
 			Save
 		</Button>

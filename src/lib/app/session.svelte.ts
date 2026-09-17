@@ -15,11 +15,25 @@ import {
   type WebMcpAppToolMode,
 } from "$lib/runtime/webmcp.ts";
 
+export interface AppSummary {
+  readonly id: string;
+  readonly name: string;
+}
+
+export interface SpaceSummary {
+  readonly id: string;
+  readonly name: string;
+}
+
 class SessionState {
   ready = $state(false);
   host = $state.raw<Host | null>(null);
   framework = $state.raw<OpenedRuntime | null>(null);
   snapshot = $state.raw<HostSnapshot | null>(null);
+  app = $state.raw<AppSummary | null>(null);
+  apps = $state.raw<readonly AppSummary[]>([]);
+  space = $state.raw<SpaceSummary | null>(null);
+  spaces = $state.raw<readonly SpaceSummary[]>([]);
   error = $state<string | null>(null);
   revision = $state(0);
   webmcp = $state(false);
@@ -47,17 +61,25 @@ hot?.dispose(() => {
 function publish(runtime: LiveRuntime) {
   runtime.unsub?.();
   runtime.unsub = runtime.host.subscribe(() => {
-    session.snapshot = runtime.host.snapshot();
+    publishSnapshot(runtime.host.snapshot());
     session.revision += 1;
   });
   session.host = runtime.host;
   session.framework = runtime.framework;
-  session.snapshot = runtime.host.snapshot();
+  publishSnapshot(runtime.host.snapshot());
   session.webmcp = webmcpSupported();
   session.webmcpToolMode = getWebMcpAppToolMode();
   session.ready = true;
   session.error = null;
   clearStorageLockReload();
+}
+
+function publishSnapshot(snapshot: HostSnapshot) {
+  session.snapshot = snapshot;
+  session.app = { id: snapshot.app.id, name: snapshot.app.name };
+  session.apps = snapshot.apps;
+  session.space = { id: snapshot.space.id, name: snapshot.space.name };
+  session.spaces = snapshot.spaces;
 }
 
 function adoptLive(runtime: LiveRuntime) {
@@ -152,6 +174,10 @@ export function configureWebMcpAppToolMode(mode: WebMcpAppToolMode): void {
 export async function wipeAllLocalData(): Promise<void> {
   await session.framework?.kernel.close();
   session.framework = null;
+  session.app = null;
+  session.apps = [];
+  session.space = null;
+  session.spaces = [];
   if (session.host) {
     await session.host.resetLocalData();
   } else {

@@ -10,7 +10,7 @@
 	let appId = $state("");
 	let name = $state("");
 	let pending = $state(false);
-	const app = $derived(session.snapshot?.app);
+	const app = $derived(session.app);
 	const changed = $derived(Boolean(name.trim()) && name.trim() !== app?.name);
 
 	$effect(() => {

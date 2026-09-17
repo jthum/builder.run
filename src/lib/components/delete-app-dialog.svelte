@@ -10,8 +10,8 @@
 
 	let { open = $bindable(false) }: { open?: boolean } = $props();
 
-	const app = $derived(session.snapshot?.app);
-	const last = $derived((session.snapshot?.apps.length ?? 0) <= 1);
+	const app = $derived(session.app);
+	const last = $derived(session.apps.length <= 1);
 
 	let typed = $state("");
 	let pending = $state(false);

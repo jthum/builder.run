@@ -45,7 +45,7 @@
 	const spec = $derived(snap?.spec);
 	const path = $derived(page.url.pathname);
 	const studio = $derived(path.startsWith("/build") || path.startsWith("/library") || path.startsWith("/diagnostics"));
-	const space = $derived(spaceLabel(snap?.space.name));
+	const space = $derived(spaceLabel(session.space?.name));
 
 	const views = $derived(spec ? featuredViews(spec) : []);
 	const types = $derived(spec?.types ?? []);
@@ -54,9 +54,9 @@
 	const navPages = $derived(spec ? authoredNavPages(spec) : []);
 	const pageGroups = $derived(groupPagesByFolder(navPages));
 	const appChoices = $derived(
-		[...(snap?.apps ?? [])].sort((left, right) => {
-			if (left.id === snap?.app.id) return -1;
-			if (right.id === snap?.app.id) return 1;
+		[...session.apps].sort((left, right) => {
+			if (left.id === session.app?.id) return -1;
+			if (right.id === session.app?.id) return 1;
 			return left.name.localeCompare(right.name);
 		}),
 	);
@@ -99,7 +99,7 @@
 
 	async function switchApp(id: string) {
 		appMenuOpen = false;
-		if (id === snap?.app.id) return;
+		if (id === session.app?.id) return;
 		await selectApp(id);
 	}
 
@@ -166,7 +166,7 @@
 									<LayersIcon />
 								</div>
 								<div class="grid flex-1 text-start text-sm leading-tight">
-									<span class="truncate font-medium">{snap?.app.name}</span>
+									<span class="truncate font-medium">{session.app?.name}</span>
 									<span class="truncate text-xs text-muted-foreground group-hover/menu-button:text-muted-foreground">{space}</span>
 								</div>
 								<ChevronsUpDownIcon class="ms-auto" />
@@ -183,7 +183,7 @@
 										<Command.Item value={`${app.name} ${app.id}`} onSelect={() => switchApp(app.id)} class="[&>.cn-command-item-indicator]:hidden">
 											<div class="flex size-7 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary"><LayersIcon /></div>
 											<span class="truncate">{app.name}</span>
-											{#if app.id === snap?.app.id}<CheckIcon class="ms-auto" />{/if}
+											{#if app.id === session.app?.id}<CheckIcon class="ms-auto" />{/if}
 										</Command.Item>
 									{/each}
 								</Command.Group>
@@ -374,10 +374,10 @@
 								Spaces
 							</DropdownMenu.SubTrigger>
 							<DropdownMenu.SubContent class="min-w-48">
-								{#each snap?.spaces ?? [] as item (item.id)}
+								{#each session.spaces as item (item.id)}
 									<DropdownMenu.Item onSelect={() => selectSpace(item.id)}>
 										<span class="truncate">{spaceLabel(item.name)}</span>
-										{#if item.id === snap?.space.id}
+										{#if item.id === session.space?.id}
 											<CheckIcon class="ms-auto" />
 										{/if}
 									</DropdownMenu.Item>

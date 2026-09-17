@@ -70,7 +70,7 @@
 	let pageIndex = $state(0);
 	let pending = $state(false);
 
-	const space = $derived(spaceLabel(session.snapshot?.space.name));
+	const space = $derived(spaceLabel(session.space?.name));
 	const chosen = $derived(sampleApps.find((sample) => sample.key === selected));
 	const categoryCounts = $derived(Object.fromEntries(templateCategories.map((item) => [item.key, sampleApps.filter((sample) => sample.category === item.key).length])));
 	const filtered = $derived.by(() => {
