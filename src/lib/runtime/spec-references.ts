@@ -316,7 +316,7 @@ function walkPage(
     const definition = blockByKey(block.block);
     if (!definition || !block.config) return;
     for (const input of blockInputs(definition).filter((item) => item.type === "field")) {
-      const sourceValue = block.config[input.source ?? "view"];
+      const sourceValue = block.config[input.dependsOn ?? "view"];
       const sourceKey = typeof sourceValue === "string" ? sourceValue : "";
       const source = sourceTypeForView(spec, sourceKey);
       if (!source || typeof block.config[input.key] !== "string") continue;

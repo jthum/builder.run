@@ -33,7 +33,7 @@ const BLOCK_TITLE_INPUT: BlockInput = {
 };
 
 /** Effective inputs shared by the UI, agent discovery, defaults, and validation. */
-export function blockInputs(block: BlockDefinition): BlockInput[] {
+export function blockInputs(block: BlockDefinition): readonly BlockInput[] {
   return block.inputs.some((input) => input.type === "view" || input.type === "form")
     ? [BLOCK_TITLE_INPUT, ...block.inputs]
     : block.inputs;
@@ -55,16 +55,16 @@ export function blockInputOptions(
   if (input.type === "form") {
     return spec.forms.map((form) => ({ value: form.key, label: form.label }));
   }
-  if (input.type === "workflow") {
+  if (input.type === "rule") {
     return spec.workflows
       .filter((workflow) => workflow.expose?.includes("ui") && !workflow.trigger)
       .map((workflow) => ({ value: workflow.key, label: workflow.label }));
   }
-  if (input.type === "select") return input.options ?? [];
+  if (input.type === "select") return [...(input.options ?? [])];
   if (input.type !== "field") return [];
-  const source = input.source ?? "view";
-  const viewKey = typeof config[source] === "string" ? config[source] : "";
-  return fieldsMatching(fieldsForView(spec, viewKey), input.of).map((field) => ({
+  const dependency = input.dependsOn ?? "view";
+  const viewKey = typeof config[dependency] === "string" ? config[dependency] : "";
+  return fieldsMatching(fieldsForView(spec, viewKey), input.fieldKind).map((field) => ({
     value: field.key,
     label: field.label,
   }));
@@ -91,9 +91,9 @@ export function describeBlock(
       ...(input.description ? { description: input.description } : {}),
       ...(input.required ? { required: true } : {}),
       ...(input.default !== undefined ? { default: input.default } : {}),
-      ...(input.of ? { accepts: input.of } : {}),
-      ...(input.source ? { source: input.source } : {}),
-      ...(["view", "form", "workflow", "field", "select"].includes(input.type)
+      ...(input.fieldKind ? { fieldKind: input.fieldKind } : {}),
+      ...(input.dependsOn ? { dependsOn: input.dependsOn } : {}),
+      ...(["view", "form", "rule", "field", "select"].includes(input.type)
         ? { options: blockInputOptions(spec, input, config) }
         : {}),
     })),
@@ -153,7 +153,7 @@ export function configureBlockConfig(
     if (input.type === "boolean" && typeof value !== "boolean") {
       throw new Error(`Block "${block.key}" config.${input.key} must be true or false`);
     }
-    if (["view", "form", "workflow", "field", "select"].includes(input.type)) {
+    if (["view", "form", "rule", "field", "select"].includes(input.type)) {
       const selected = configuredText(value);
       if (!options.some((option) => option.value === selected)) {
         throw new Error(
@@ -209,7 +209,7 @@ export function defaultRowHeight(blocks: PageLayoutNode[]): PageRowHeight | unde
     const candidate =
       block.kind === "group"
         ? (rowHeight(block.min_height) ?? defaultRowHeight(block.blocks))
-        : blockByKey(block.block)?.defaultRowHeight;
+        : blockByKey(block.block)?.defaultHeight;
     if (candidate && (!preferred || ROW_HEIGHT_RANK[candidate] > ROW_HEIGHT_RANK[preferred])) {
       preferred = candidate;
     }
@@ -371,6 +371,7 @@ export function fieldsMatching(fields: FieldDef[], of?: BlockFieldKind): FieldDe
       },
     ];
   }
+  if (of === "choice") return fields.filter((field) => field.type === "enum");
   return fields.filter((field) => field.type === of);
 }
 
@@ -434,10 +435,10 @@ export function defaultBlockConfig(block: BlockDefinition, spec: AppSpec): Recor
   for (const input of block.inputs) {
     if (input.type === "view") config[input.key] = firstView;
     else if (input.type === "form") config[input.key] = firstForm;
-    else if (input.type === "workflow") config[input.key] = firstWorkflow;
+    else if (input.type === "rule") config[input.key] = firstWorkflow;
     else if (input.type === "boolean") config[input.key] = Boolean(input.default);
     else if (input.type === "field") {
-      config[input.key] = fieldsMatching(fields, input.of)[0]?.key ?? "";
+      config[input.key] = fieldsMatching(fields, input.fieldKind)[0]?.key ?? "";
     } else if (input.type === "select") {
       config[input.key] = input.default ?? input.options?.[0]?.value ?? "";
     } else config[input.key] = input.default ?? "";

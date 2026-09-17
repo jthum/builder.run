@@ -6,17 +6,17 @@ export default {
   description: "Shows volume moving through ordered stages.",
   category: "charts",
   order: 50,
-  defaultRowHeight: "m",
+  defaultHeight: "m",
   inputs: [
     { key: "view", label: "View", type: "view", required: true },
     {
       key: "stage",
       label: "Stage field",
       type: "field",
-      of: "any",
-      source: "view",
+      fieldKind: "any",
+      dependsOn: "view",
       required: true,
     },
-    { key: "value", label: "Value field", type: "field", of: "number", source: "view" },
+    { key: "value", label: "Value field", type: "field", fieldKind: "number", dependsOn: "view" },
   ],
 } satisfies BlockDefinition;

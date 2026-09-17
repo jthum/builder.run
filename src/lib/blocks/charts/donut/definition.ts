@@ -6,17 +6,17 @@ export default {
   description: "Share of a whole from a view.",
   category: "charts",
   order: 80,
-  defaultRowHeight: "m",
+  defaultHeight: "m",
   inputs: [
     { key: "view", label: "View", type: "view", required: true },
     {
       key: "category",
       label: "Group by",
       type: "field",
-      of: "enum",
-      source: "view",
+      fieldKind: "choice",
+      dependsOn: "view",
       required: true,
     },
-    { key: "value", label: "Value field", type: "field", of: "number", source: "view" },
+    { key: "value", label: "Value field", type: "field", fieldKind: "number", dependsOn: "view" },
   ],
 } satisfies BlockDefinition;

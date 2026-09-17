@@ -6,17 +6,17 @@ export default {
   description: "A number over time from a view.",
   category: "charts",
   order: 70,
-  defaultRowHeight: "m",
+  defaultHeight: "m",
   inputs: [
     { key: "view", label: "View", type: "view", required: true },
     {
       key: "category",
       label: "Date field",
       type: "field",
-      of: "date",
-      source: "view",
+      fieldKind: "date",
+      dependsOn: "view",
       required: true,
     },
-    { key: "value", label: "Value field", type: "field", of: "number", source: "view" },
+    { key: "value", label: "Value field", type: "field", fieldKind: "number", dependsOn: "view" },
   ],
 } satisfies BlockDefinition;

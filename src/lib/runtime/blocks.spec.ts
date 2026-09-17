@@ -163,7 +163,7 @@ describe("page blocks", () => {
       expect.arrayContaining([
         expect.objectContaining({
           key: "category",
-          source: "view",
+          dependsOn: "view",
           options: [
             { value: "submission", label: "Submission" },
             { value: "overall_score", label: "Overall Score" },
@@ -171,7 +171,7 @@ describe("page blocks", () => {
         }),
         expect.objectContaining({
           key: "value",
-          accepts: "number",
+          fieldKind: "number",
           options: [{ value: "overall_score", label: "Overall Score" }],
         }),
       ]),

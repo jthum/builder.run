@@ -82,7 +82,7 @@
 										options={spec ? blockInputOptions(spec, input, config) : []}
 										placeholder="Select a form"
 									/>
-								{:else if input.type === "workflow"}
+								{:else if input.type === "rule"}
 									<AppSelect
 										bind:value={config[input.key] as string}
 										options={spec ? blockInputOptions(spec, input, config) : []}

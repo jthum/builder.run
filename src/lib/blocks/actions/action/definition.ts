@@ -7,7 +7,7 @@ export default {
   category: "actions",
   order: 20,
   inputs: [
-    { key: "workflow", label: "Workflow", type: "workflow", required: true },
+    { key: "workflow", label: "Workflow", type: "rule", required: true },
     { key: "label", label: "Label", type: "text", default: "Run" },
   ],
 } satisfies BlockDefinition;

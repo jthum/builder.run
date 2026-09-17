@@ -6,10 +6,17 @@ export default {
   description: "Shows the intensity of records across calendar days.",
   category: "charts",
   order: 70,
-  defaultRowHeight: "m",
+  defaultHeight: "m",
   inputs: [
     { key: "view", label: "View", type: "view", required: true },
-    { key: "date", label: "Date field", type: "field", of: "date", source: "view", required: true },
-    { key: "value", label: "Value field", type: "field", of: "number", source: "view" },
+    {
+      key: "date",
+      label: "Date field",
+      type: "field",
+      fieldKind: "date",
+      dependsOn: "view",
+      required: true,
+    },
+    { key: "value", label: "Value field", type: "field", fieldKind: "number", dependsOn: "view" },
   ],
 } satisfies BlockDefinition;

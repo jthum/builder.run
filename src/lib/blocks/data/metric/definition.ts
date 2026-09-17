@@ -14,7 +14,7 @@ export default {
       type: "text",
       description: "Optional context shown below the value.",
     },
-    { key: "value", label: "Value field", type: "field", of: "number", source: "view" },
-    { key: "date", label: "Date field", type: "field", of: "date", source: "view" },
+    { key: "value", label: "Value field", type: "field", fieldKind: "number", dependsOn: "view" },
+    { key: "date", label: "Date field", type: "field", fieldKind: "date", dependsOn: "view" },
   ],
 } satisfies BlockDefinition;

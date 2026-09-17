@@ -1,44 +1,23 @@
-import type { AppSpec, PageRowHeight } from "$lib/runtime/model.ts";
+import type { AppSpec } from "$lib/runtime/model.ts";
+import type {
+  BlockDefinition as PortableBlockDefinition,
+  BlockFieldKind,
+  BlockInputDefinition,
+  BlockInputType,
+} from "@jthum/framework/blocks";
 import type { Component } from "svelte";
 
 export type BlockCategory = "highlights" | "content" | "data" | "charts" | "actions";
-
-export type BlockInputType =
-  | "text"
-  | "textarea"
-  | "number"
-  | "boolean"
-  | "view"
-  | "form"
-  | "workflow"
-  | "field"
-  | "select";
-
-export type BlockFieldKind = "number" | "date" | "enum" | "any";
-
-export interface BlockInput {
-  key: string;
-  label: string;
-  type: BlockInputType;
-  description?: string;
-  required?: boolean;
-  default?: unknown;
-  of?: BlockFieldKind;
-  /** Key of the input that selects the source for a field input. */
-  source?: string;
-  options?: Array<{ value: string; label: string }>;
-}
-
-export interface BlockDefinition {
-  key: string;
-  label: string;
-  description: string;
-  category: BlockCategory;
-  order?: number;
-  /** Used when a grid row is automatic and the block needs plot space. */
-  defaultRowHeight?: PageRowHeight;
-  inputs: BlockInput[];
-}
+export type { BlockFieldKind, BlockInputType };
+export type BlockInput = BlockInputDefinition;
+export type BlockDefinition = Omit<
+  PortableBlockDefinition,
+  "category" | "description" | "inputs"
+> & {
+  readonly category: BlockCategory;
+  readonly description: string;
+  readonly inputs: readonly BlockInput[];
+};
 
 export interface BlockProps {
   config: Record<string, unknown>;
