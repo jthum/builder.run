@@ -10,6 +10,7 @@ import {
   type SpecMeta,
   type ViewDefinition,
 } from "@jthum/framework/spec";
+import { ruleDefinitionFromDraft, type RuleDraft } from "@jthum/framework/svelte/studio/adapters";
 import { inValues, normalizeFilters } from "$lib/runtime/filters.ts";
 import { labelFromKey, slugify } from "$lib/runtime/ids.ts";
 import type {
@@ -292,14 +293,7 @@ export function projectFrameworkSpec(
       },
     ];
   });
-  if (input.workflows.length) {
-    gaps.push({
-      path: "workflows",
-      code: "RULES.NOT_PROJECTED",
-      message: "Workflows move when the Framework Rule primitive lands in Phase 5.",
-    });
-  }
-  const spec: Spec = {
+  const baseSpec: Spec = {
     version: 2,
     id: input.id,
     key: input.key,
@@ -321,8 +315,26 @@ export function projectFrameworkSpec(
       meta: pageMeta(page.meta, page.icon, page.folder, page.path),
       layout: page.blocks.map((block, index) => projectPageNode(block, [index])),
     })),
-    rules: [],
+    rules: input.workflows.map((workflow) => ({
+      id: workflow.id,
+      key: workflow.key,
+      label: workflow.label,
+      steps: [],
+    })),
   };
+  const rules = input.workflows.flatMap((workflow, index) => {
+    try {
+      return [ruleDefinitionFromDraft(workflow as RuleDraft, baseSpec)];
+    } catch (error) {
+      gaps.push({
+        path: `workflows.${index}`,
+        code: "RULE.PROJECTION_FAILED",
+        message: error instanceof Error ? error.message : "The Rule cannot be projected.",
+      });
+      return [];
+    }
+  });
+  const spec: Spec = { ...baseSpec, rules };
   assertValidSpec(spec);
   return { spec, gaps };
 }

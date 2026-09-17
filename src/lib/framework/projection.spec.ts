@@ -40,7 +40,7 @@ describe("Framework projection", () => {
     expect(assertFrameworkProjectionReady(projection)).toBe(projection.spec);
   });
 
-  it("projects grouped measures and reports only capabilities not yet represented", () => {
+  it("projects grouped measures and structured Rules", () => {
     expect.hasAssertions();
     const contact = contactType();
     const input = appSpec(contact);
@@ -61,7 +61,7 @@ describe("Framework projection", () => {
     ];
 
     const projection = projectFrameworkSpec(input, { sharedTypes: [contact] });
-    expect(projection.gaps.map((gap) => gap.code)).toEqual(["RULES.NOT_PROJECTED"]);
+    expect(projection.gaps).toEqual([]);
     expect(projection.spec.views[0]).toMatchObject({
       query: {
         aggregate: {
@@ -70,20 +70,22 @@ describe("Framework projection", () => {
         },
       },
     });
-    expect(() => assertFrameworkProjectionReady(projection)).toThrow("RULES.NOT_PROJECTED");
+    expect(projection.spec.rules[0]).toMatchObject({
+      id: "workflow-notify",
+      key: "notify",
+      enabled: true,
+      steps: [],
+    });
+    expect(assertFrameworkProjectionReady(projection)).toBe(projection.spec);
   });
 
   it("projects every current template and reports only deliberate phase gaps", () => {
     expect.hasAssertions();
-    const allowed = new Set(["RULES.NOT_PROJECTED"]);
     for (const sample of sampleApps) {
       const projection = projectFrameworkSpec(sample.spec, {
         sharedTypes: sample.exposedTypes ?? [],
       });
-      expect(
-        projection.gaps.filter((gap) => !allowed.has(gap.code)),
-        sample.key,
-      ).toEqual([]);
+      expect(projection.gaps, sample.key).toEqual([]);
       expect(projection.spec.key).toBe(sample.spec.key);
     }
   });
