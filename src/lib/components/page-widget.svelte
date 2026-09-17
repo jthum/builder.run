@@ -18,7 +18,7 @@
 
 	const widget = $derived(block.kind === "widget" ? block.widget : "");
 	const values = $derived(block.kind === "widget" ? (block.values ?? {}) : {});
-	const spec = $derived(previewSpec ?? session.snapshot?.spec);
+	const spec = $derived(previewSpec ?? session.resolvedSpec);
 </script>
 
 {#key widget}

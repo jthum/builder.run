@@ -11,8 +11,8 @@
 	import BoxIcon from "@lucide/svelte/icons/box";
 	import PlusIcon from "@lucide/svelte/icons/plus";
 
-	const types = $derived(session.snapshot?.spec.types ?? []);
-	const space = $derived(spaceLabel(session.snapshot?.space.name));
+	const types = $derived(session.resolvedSpec?.types ?? []);
+	const space = $derived(spaceLabel(session.space?.name));
 	let open = $state(false);
 </script>
 

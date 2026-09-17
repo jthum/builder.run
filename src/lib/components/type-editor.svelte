@@ -73,7 +73,7 @@
 		}),
 	);
 
-	const spec = $derived(session.snapshot?.spec);
+	const spec = $derived(session.resolvedSpec);
 	const targets = $derived(spec?.types ?? []);
 	const targetOptions = $derived(
 		targets

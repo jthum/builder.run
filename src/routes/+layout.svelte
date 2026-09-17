@@ -24,16 +24,16 @@
 
 	const crumbs = $derived(
 		page.url.pathname === "/"
-			? [{ label: session.snapshot?.app.name ?? "Home" }]
-			: breadcrumbFor(page.url.pathname, session.snapshot?.spec),
+			? [{ label: session.app?.name ?? "Home" }]
+			: breadcrumbFor(page.url.pathname, session.resolvedSpec),
 	);
 	const docTitle = $derived(
 		page.url.pathname === "/"
-			? `${session.snapshot?.app.name ?? "builder.run"}`
-			: `${crumbs.at(-1)?.label ?? "builder.run"} · ${session.snapshot?.app.name ?? "builder.run"}`,
+			? `${session.app?.name ?? "builder.run"}`
+			: `${crumbs.at(-1)?.label ?? "builder.run"} · ${session.app?.name ?? "builder.run"}`,
 	);
 	$effect(() => {
-		applySpaceAccent(session.snapshot?.space.appearance?.accent);
+		applySpaceAccent(session.accent);
 	});
 </script>
 

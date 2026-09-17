@@ -27,7 +27,7 @@
 	import { flip } from "svelte/animate";
 	import { toast } from "svelte-sonner";
 
-	const spec = $derived(session.snapshot?.spec);
+	const spec = $derived(session.resolvedSpec);
 	const authoredPages = $derived(spec ? authoredNavPages(spec) : []);
 	let orderedPages = $state<PageDef[]>([]);
 	let syncedPageOrder = "";

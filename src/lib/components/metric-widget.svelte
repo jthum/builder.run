@@ -27,7 +27,7 @@
 		href?: string;
 	} = $props();
 
-	const hue = $derived(toneFromAccent(session.snapshot?.space.appearance?.accent).hue);
+	const hue = $derived(toneFromAccent(session.accent).hue);
 	const color = $derived(chartPalette(hue, 1)[0] ?? "currentColor");
 	const total = $derived.by(() => {
 		if (!rows) return 0;

@@ -8,7 +8,7 @@
 	import PlusIcon from "@lucide/svelte/icons/plus";
 
 	const viewKey = $derived(page.params.view);
-	const spec = $derived(session.snapshot?.spec);
+	const spec = $derived(session.resolvedSpec);
 	const view = $derived(spec?.views.find((item) => item.key === viewKey));
 	const type = $derived(typeByKey(spec, view?.source));
 	let rows = $state<Array<Record<string, unknown>> | null>(null);

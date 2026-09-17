@@ -7,7 +7,7 @@
 	import * as Card from "$lib/components/ui/card/index.js";
 
 	let deleteOpen = $state(false);
-	const appName = $derived(session.snapshot?.app.name ?? "this app");
+	const appName = $derived(session.app?.name ?? "this app");
 </script>
 
 <div class="flex flex-col gap-8">

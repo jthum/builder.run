@@ -29,7 +29,7 @@
 	import { toast } from "svelte-sonner";
 
 	let { workflow }: { workflow: WorkflowDef } = $props();
-	const spec = $derived(session.snapshot?.spec);
+	const spec = $derived(session.resolvedSpec);
 	const types = $derived(spec?.types ?? []);
 	const forms = $derived(spec?.forms ?? []);
 	const workflows = $derived(spec?.workflows ?? []);

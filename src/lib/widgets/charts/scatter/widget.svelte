@@ -21,7 +21,7 @@
 			label: labelField ? asLabel(cellValue(item, labelField)) : `Record ${index + 1}`,
 		})),
 	);
-	const hue = $derived(toneFromAccent(session.snapshot?.space.appearance?.accent).hue);
+	const hue = $derived(toneFromAccent(session.accent).hue);
 	const color = $derived(chartPalette(hue, 1)[0]);
 	let hover = $state<{ x: number; y: number; text: string } | null>(null);
 

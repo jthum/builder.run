@@ -3,7 +3,7 @@
 	import { session } from "$lib/app/session.svelte.ts";
 	import WorkflowEditor from "$lib/components/workflow-editor.svelte";
 
-	const workflow = $derived(session.snapshot?.spec.workflows.find((item) => item.key === page.params.workflow));
+	const workflow = $derived(session.resolvedSpec?.workflows.find((item) => item.key === page.params.workflow));
 </script>
 
 {#if workflow}

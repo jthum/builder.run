@@ -9,7 +9,7 @@
 	import { parseTypeRef } from "$lib/runtime/model.ts";
 
 	const typeKey = $derived(page.params.type ?? "");
-	const spec = $derived(session.snapshot?.spec);
+	const spec = $derived(session.resolvedSpec);
 	const type = $derived(spec?.types.find((item) => item.key === typeKey));
 	const form = $derived(spec?.forms.find((item) => item.key === implicitCreateFormKey(typeKey)));
 	const defaults = $derived(Object.fromEntries(page.url.searchParams.entries()));

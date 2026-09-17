@@ -55,7 +55,7 @@
 		exposedValues?: Record<string, string>;
 	} = $props();
 
-	const type = $derived(typeByKey(session.snapshot?.spec, typeKey) as TypeDef | undefined);
+	const type = $derived(typeByKey(session.resolvedSpec, typeKey) as TypeDef | undefined);
 	const aggregated = $derived(Boolean(view.group_by));
 	const add = $derived(createLabel ?? (type ? addLabel(type) : "Add"));
 	const columns = $derived.by((): DataTableColumn[] => {

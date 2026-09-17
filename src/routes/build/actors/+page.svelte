@@ -6,7 +6,7 @@
 	import * as Table from "$lib/components/ui/table/index.js";
 	import { labelFromKey } from "$lib/runtime/ids.ts";
 
-	const actors = $derived(session.snapshot?.space.actors ?? []);
+	const actors = $derived(session.actors);
 </script>
 
 <div class="flex flex-col gap-4">

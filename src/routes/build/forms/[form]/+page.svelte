@@ -3,7 +3,7 @@
 	import { session } from "$lib/app/session.svelte.ts";
 	import FormEditor from "$lib/components/form-editor.svelte";
 
-	const form = $derived(session.snapshot?.spec.forms.find((item) => item.key === page.params.form));
+	const form = $derived(session.resolvedSpec?.forms.find((item) => item.key === page.params.form));
 </script>
 
 {#if form}

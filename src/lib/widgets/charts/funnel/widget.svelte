@@ -18,7 +18,7 @@
 		})),
 	);
 	const maximum = $derived(Math.max(...stages.map((stage) => stage.value), 1));
-	const hue = $derived(toneFromAccent(session.snapshot?.space.appearance?.accent).hue);
+	const hue = $derived(toneFromAccent(session.accent).hue);
 	const colors = $derived(chartPalette(hue, Math.max(stages.length, 1)));
 </script>
 

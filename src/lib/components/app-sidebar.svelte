@@ -41,8 +41,7 @@
 
 	let { ref = $bindable(null), ...restProps }: ComponentProps<typeof Sidebar.Root> = $props();
 
-	const snap = $derived(session.snapshot);
-	const spec = $derived(snap?.spec);
+	const spec = $derived(session.resolvedSpec);
 	const path = $derived(page.url.pathname);
 	const studio = $derived(path.startsWith("/build") || path.startsWith("/library") || path.startsWith("/diagnostics"));
 	const space = $derived(spaceLabel(session.space?.name));
@@ -88,9 +87,9 @@
 		"/diagnostics": SearchIcon,
 	};
 
-	const appTone = $derived(toneFromAccent(snap?.space.appearance?.accent));
-	const actorTone = $derived(toneFromName(snap?.actor.name ?? "You"));
-	const initial = $derived(initialsFromName(snap?.actor.name ?? "You"));
+	const appTone = $derived(toneFromAccent(session.accent));
+	const actorTone = $derived(toneFromName(session.actor?.name ?? "You"));
+	const initial = $derived(initialsFromName(session.actor?.name ?? "You"));
 
 	function setAppMenuOpen(value: boolean) {
 		appMenuOpen = value;
@@ -342,8 +341,8 @@
 									</Avatar.Fallback>
 								</Avatar.Root>
 								<div class="grid flex-1 text-start text-sm leading-tight">
-									<span class="truncate font-medium">{snap?.actor.name}</span>
-									<span class="truncate text-xs text-muted-foreground group-hover/menu-button:text-muted-foreground">{snap?.actor.email || space}</span>
+									<span class="truncate font-medium">{session.actor?.name}</span>
+									<span class="truncate text-xs text-muted-foreground group-hover/menu-button:text-muted-foreground">{session.actor?.email || space}</span>
 								</div>
 								<ChevronsUpDownIcon class="ms-auto" />
 							</Sidebar.MenuButton>
@@ -353,8 +352,8 @@
 						<DropdownMenu.Group>
 							<DropdownMenu.Label class="font-normal">
 								<div class="flex flex-col">
-									<span class="font-medium">{snap?.actor.name}</span>
-									<span class="text-xs text-muted-foreground">{snap?.actor.email || "No email yet"}</span>
+									<span class="font-medium">{session.actor?.name}</span>
+									<span class="text-xs text-muted-foreground">{session.actor?.email || "No email yet"}</span>
 								</div>
 							</DropdownMenu.Label>
 						</DropdownMenu.Group>

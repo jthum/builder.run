@@ -53,7 +53,7 @@
 	let pageIndex = $state(0);
 	let pending = $state(false);
 
-	const types = $derived(session.snapshot?.spec.types ?? []);
+	const types = $derived(session.resolvedSpec?.types ?? []);
 	const chosen = $derived(typeTemplates.find((item) => item.key === selected));
 	const filtered = $derived.by(() => {
 		const needle = query.trim().toLowerCase();

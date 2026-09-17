@@ -12,7 +12,7 @@
 	import PlusIcon from "@lucide/svelte/icons/plus";
 	import WorkflowIcon from "@lucide/svelte/icons/workflow";
 
-	const spec = $derived(session.snapshot?.spec);
+	const spec = $derived(session.resolvedSpec);
 	const workflows = $derived(spec?.workflows ?? []);
 	const types = $derived(spec?.types ?? []);
 	const manualWorkflows = $derived(workflows.filter((workflow) => workflowKind(workflow) === "manual"));

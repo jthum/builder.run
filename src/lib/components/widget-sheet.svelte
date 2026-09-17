@@ -20,7 +20,7 @@
 		onSave: (values: Record<string, unknown>) => void;
 	} = $props();
 
-	const spec = $derived(session.snapshot?.spec);
+	const spec = $derived(session.resolvedSpec);
 	const def = $derived(block?.kind === "widget" ? widgetByKey(block.widget) : undefined);
 	let values = $state<Record<string, unknown>>({});
 

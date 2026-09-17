@@ -17,7 +17,7 @@
 	import PlusIcon from "@lucide/svelte/icons/plus";
 	import { toast } from "svelte-sonner";
 
-	const spec = $derived(session.snapshot?.spec);
+	const spec = $derived(session.resolvedSpec);
 	const types = $derived(spec?.types ?? []);
 	const forms = $derived(spec?.forms ?? []);
 	const custom = $derived(forms.filter((form) => !form.implicit));

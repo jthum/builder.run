@@ -28,7 +28,7 @@
 
 	const typeKey = $derived(page.params.type ?? "");
 	const id = $derived(page.params.id ?? "");
-	const spec = $derived(session.snapshot?.spec);
+	const spec = $derived(session.resolvedSpec);
 	const type = $derived(spec?.types.find((item) => item.key === typeKey));
 	const form = $derived(spec?.forms.find((item) => item.key === implicitEditFormKey(typeKey)));
 	const related = $derived(spec && typeKey ? reverseRelations(spec, typeKey) : []);

@@ -42,16 +42,16 @@
 				<Card.Description>Records live in SQLite tables on this device.</Card.Description>
 			</Card.Header>
 			<Card.Content class="flex flex-col gap-2">
-				<Badge>{session.snapshot?.engine} · {session.snapshot?.backend}</Badge>
-				{#if session.snapshot?.catalog}
+				<Badge>{session.diagnostics?.engine} · {session.diagnostics?.backend}</Badge>
+				{#if session.diagnostics?.catalog}
 					<div class="text-sm">
 						<div class="font-medium">Control</div>
 						<div class="text-muted-foreground">
-							{session.snapshot.catalog.database}: {session.snapshot.catalog.tables.join(", ") || "no tables yet"}
+							{session.diagnostics.catalog.database}: {session.diagnostics.catalog.tables.join(", ") || "no tables yet"}
 						</div>
 					</div>
 				{/if}
-				{#each session.snapshot?.stores ?? [] as store (store.key)}
+				{#each session.diagnostics?.stores ?? [] as store (store.key)}
 					<div class="text-sm">
 						<div class="font-medium">{store.key === "space" ? store.label : "This app"}</div>
 						<div class="text-muted-foreground">
@@ -80,7 +80,7 @@
 				<Card.Title>Signed in as</Card.Title>
 				<Card.Description>The local person using the app.</Card.Description>
 			</Card.Header>
-			<Card.Content class="text-sm">{session.snapshot?.actor.name}</Card.Content>
+			<Card.Content class="text-sm">{session.actor?.name}</Card.Content>
 		</Card.Root>
 	</div>
 	<Card.Root>

@@ -13,8 +13,8 @@
 	let format = $state<"yaml" | "json">("yaml");
 	let draft = $state("");
 	const sharedDependencies = $derived(
-		session.snapshot
-			? sharedTypeDependencies(session.snapshot.app.spec, session.snapshot.sharedTypes)
+		session.authoredSpec
+			? sharedTypeDependencies(session.authoredSpec, [...session.sharedTypes])
 			: [],
 	);
 

@@ -12,7 +12,7 @@
 	import PlusIcon from "@lucide/svelte/icons/plus";
 	import TableIcon from "@lucide/svelte/icons/table";
 
-	const spec = $derived(session.snapshot?.spec);
+	const spec = $derived(session.resolvedSpec);
 	const types = $derived(spec?.types ?? []);
 	const views = $derived(spec?.views ?? []);
 	const custom = $derived(views.filter((view) => !view.implicit));

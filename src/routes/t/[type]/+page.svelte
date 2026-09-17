@@ -9,7 +9,7 @@
 	import PlusIcon from "@lucide/svelte/icons/plus";
 
 	const typeKey = $derived(page.params.type ?? "");
-	const spec = $derived(session.snapshot?.spec);
+	const spec = $derived(session.resolvedSpec);
 	const type = $derived(spec?.types.find((item) => item.key === typeKey));
 	const view = $derived(
 		spec?.views.find((item) => item.key === implicitViewKey(typeKey)) ??

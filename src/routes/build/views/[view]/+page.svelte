@@ -3,7 +3,7 @@
 	import { session } from "$lib/app/session.svelte.ts";
 	import ViewEditor from "$lib/components/view-editor.svelte";
 
-	const view = $derived(session.snapshot?.spec.views.find((item) => item.key === page.params.view));
+	const view = $derived(session.resolvedSpec?.views.find((item) => item.key === page.params.view));
 </script>
 
 {#if view}

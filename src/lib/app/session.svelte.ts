@@ -1,4 +1,6 @@
 import { Host, type HostSnapshot } from "$lib/runtime/host.ts";
+import type { Actor, AppSpec, TypeDef } from "$lib/runtime/model.ts";
+import type { SpaceAccent } from "$lib/runtime/platform.ts";
 import { openRuntime, type OpenedRuntime } from "$lib/framework/bootstrap.ts";
 import { createKernelSqlitePersistence } from "$lib/framework/sqlite.ts";
 import { openSqlGateway } from "$lib/runtime/persistence/sqlite/gateway.ts";
@@ -25,15 +27,28 @@ export interface SpaceSummary {
   readonly name: string;
 }
 
+export interface RuntimeDiagnostics {
+  readonly backend: string;
+  readonly engine: string;
+  readonly stores: HostSnapshot["stores"];
+  readonly catalog: HostSnapshot["catalog"];
+}
+
 class SessionState {
   ready = $state(false);
   host = $state.raw<Host | null>(null);
   framework = $state.raw<OpenedRuntime | null>(null);
-  snapshot = $state.raw<HostSnapshot | null>(null);
+  diagnostics = $state.raw<RuntimeDiagnostics | null>(null);
   app = $state.raw<AppSummary | null>(null);
   apps = $state.raw<readonly AppSummary[]>([]);
   space = $state.raw<SpaceSummary | null>(null);
   spaces = $state.raw<readonly SpaceSummary[]>([]);
+  resolvedSpec = $state.raw<AppSpec | undefined>(undefined);
+  authoredSpec = $state.raw<AppSpec | undefined>(undefined);
+  sharedTypes = $state.raw<readonly TypeDef[]>([]);
+  actor = $state.raw<Actor | null>(null);
+  actors = $state.raw<readonly Actor[]>([]);
+  accent = $state<SpaceAccent>("blue");
   error = $state<string | null>(null);
   revision = $state(0);
   webmcp = $state(false);
@@ -75,11 +90,22 @@ function publish(runtime: LiveRuntime) {
 }
 
 function publishSnapshot(snapshot: HostSnapshot) {
-  session.snapshot = snapshot;
+  session.diagnostics = {
+    backend: snapshot.backend,
+    engine: snapshot.engine,
+    stores: snapshot.stores,
+    catalog: snapshot.catalog,
+  };
   session.app = { id: snapshot.app.id, name: snapshot.app.name };
   session.apps = snapshot.apps;
   session.space = { id: snapshot.space.id, name: snapshot.space.name };
   session.spaces = snapshot.spaces;
+  session.resolvedSpec = snapshot.spec;
+  session.authoredSpec = snapshot.app.spec;
+  session.sharedTypes = snapshot.sharedTypes;
+  session.actor = snapshot.actor;
+  session.actors = snapshot.space.actors;
+  session.accent = snapshot.space.appearance?.accent ?? "blue";
 }
 
 function adoptLive(runtime: LiveRuntime) {
@@ -174,10 +200,17 @@ export function configureWebMcpAppToolMode(mode: WebMcpAppToolMode): void {
 export async function wipeAllLocalData(): Promise<void> {
   await session.framework?.kernel.close();
   session.framework = null;
+  session.diagnostics = null;
   session.app = null;
   session.apps = [];
   session.space = null;
   session.spaces = [];
+  session.resolvedSpec = undefined;
+  session.authoredSpec = undefined;
+  session.sharedTypes = [];
+  session.actor = null;
+  session.actors = [];
+  session.accent = "blue";
   if (session.host) {
     await session.host.resetLocalData();
   } else {

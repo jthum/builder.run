@@ -75,7 +75,7 @@
 	type SortRow = { field: string; dir: SortDirection };
 	type MeasureRow = ViewMeasure & { key: string };
 
-	const types = $derived(session.snapshot?.spec.types ?? []);
+	const types = $derived(session.resolvedSpec?.types ?? []);
 
 	let label = $state("");
 	let source = $state("");
@@ -548,7 +548,7 @@
 	}
 
 	async function duplicate() {
-		const taken = session.snapshot?.spec.views.map((item) => item.key) ?? [];
+		const taken = session.resolvedSpec?.views.map((item) => item.key) ?? [];
 		const key = uniqueKey(view.key, taken, "view");
 		await runtime().upsertView({
 			key,

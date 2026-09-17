@@ -40,7 +40,7 @@
 	let hidden = $state(new Set<string>());
 	let hover = $state<{ x: number; y: number; text: string } | null>(null);
 
-	const hue = $derived(toneFromAccent(session.snapshot?.space.appearance?.accent).hue);
+	const hue = $derived(toneFromAccent(session.accent).hue);
 	const grouped = $derived.by((): GroupedChart => {
 		if (!rows?.length || !category) return { categories: [], series: [] };
 		return groupChart(rows, {

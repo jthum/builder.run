@@ -38,7 +38,7 @@
 
 	let { form }: { form: FormDef } = $props();
 
-	const spec = $derived(session.snapshot?.spec);
+	const spec = $derived(session.resolvedSpec);
 	const types = $derived(spec?.types ?? []);
 	const workflows = $derived(spec?.workflows ?? []);
 

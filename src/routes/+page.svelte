@@ -15,10 +15,10 @@
 	import WalletIcon from "@lucide/svelte/icons/wallet";
 	import type { Component } from "svelte";
 
-	const spec = $derived(session.snapshot?.spec);
+	const spec = $derived(session.resolvedSpec);
 	const blank = $derived(spec ? isBlankApp(spec) : true);
-	const appName = $derived(session.snapshot?.app.name ?? "Home");
-	const hello = $derived(greeting(session.snapshot?.actor.name));
+	const appName = $derived(session.app?.name ?? "Home");
+	const hello = $derived(greeting(session.actor?.name));
 	const home = $derived(spec ? resolveHomePage(spec) : null);
 
 	const templateIcons: Record<string, Component> = {

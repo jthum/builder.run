@@ -41,8 +41,8 @@
 			return;
 		}
 		if (initialized) return;
-		name = session.snapshot?.actor.name ?? "";
-		email = session.snapshot?.actor.email ?? "";
+		name = session.actor?.name ?? "";
+		email = session.actor?.email ?? "";
 		appearance = userPrefersMode.current;
 		initialAppearance = appearance;
 		section = "general";

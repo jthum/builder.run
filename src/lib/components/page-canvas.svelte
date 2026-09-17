@@ -60,7 +60,7 @@
 		startEditing?: boolean;
 	} = $props();
 
-	const spec = $derived(session.snapshot?.spec);
+	const spec = $derived(session.resolvedSpec);
 	let editing = $state(false);
 	let draft = $state<PageBlock[]>([]);
 	let draftPageKey = "";

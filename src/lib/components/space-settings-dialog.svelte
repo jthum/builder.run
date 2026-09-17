@@ -42,9 +42,9 @@
 			return;
 		}
 		if (initialized) return;
-		name = spaceLabel(session.snapshot?.space.name);
+		name = spaceLabel(session.space?.name);
 		typedTools = session.webmcpToolMode === "typed";
-		accent = session.snapshot?.space.appearance?.accent ?? "blue";
+		accent = session.accent;
 		initialAccent = accent;
 		section = "general";
 		committed = false;
