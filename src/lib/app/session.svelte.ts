@@ -1,7 +1,5 @@
 import { Host, type HostSnapshot } from "$lib/runtime/host.ts";
-import type { Workspace } from "@jthum/framework/kernel";
-import type { WorkspaceClient } from "@jthum/framework/client";
-import { openBuilderKernel, type OpenedBuilderKernel } from "$lib/framework/bootstrap.ts";
+import { openRuntime, type OpenedRuntime } from "$lib/framework/bootstrap.ts";
 import { createKernelSqlitePersistence } from "$lib/framework/sqlite.ts";
 import { openSqlGateway } from "$lib/runtime/persistence/sqlite/gateway.ts";
 import {
@@ -20,8 +18,7 @@ import {
 class SessionState {
   ready = $state(false);
   host = $state.raw<Host | null>(null);
-  framework = $state.raw<OpenedBuilderKernel | null>(null);
-  frameworkApp = $state.raw<Workspace | null>(null);
+  framework = $state.raw<OpenedRuntime | null>(null);
   snapshot = $state.raw<HostSnapshot | null>(null);
   error = $state<string | null>(null);
   revision = $state(0);
@@ -33,7 +30,7 @@ export const session = new SessionState();
 
 type LiveRuntime = {
   host: Host;
-  framework: OpenedBuilderKernel;
+  framework: OpenedRuntime;
   unsub: () => void;
   stopMcp: () => void;
 };
@@ -55,7 +52,6 @@ function publish(runtime: LiveRuntime) {
   });
   session.host = runtime.host;
   session.framework = runtime.framework;
-  session.frameworkApp = runtime.framework.app;
   session.snapshot = runtime.host.snapshot();
   session.webmcp = webmcpSupported();
   session.webmcpToolMode = getWebMcpAppToolMode();
@@ -82,7 +78,7 @@ export function boot(): Promise<void> {
     try {
       const host = await Host.open();
       const snapshot = host.snapshot();
-      const framework = await openBuilderKernel({
+      const framework = await openRuntime({
         kernel: {
           persistence: createKernelSqlitePersistence(await openSqlGateway()),
         },
@@ -121,18 +117,6 @@ export function runtime(): Host {
   return session.host;
 }
 
-export function appClient(): WorkspaceClient {
-  if (!session.framework) throw new Error("builder.run framework runtime is not ready");
-  return session.framework.appClient;
-}
-
-export async function refreshFrameworkApp(): Promise<Workspace> {
-  const workspace = await appClient().getWorkspace();
-  session.frameworkApp = workspace;
-  session.revision += 1;
-  return workspace;
-}
-
 export function configureWebMcpAppToolMode(mode: WebMcpAppToolMode): void {
   setWebMcpAppToolMode(mode);
   session.webmcpToolMode = mode;
@@ -143,7 +127,6 @@ export function configureWebMcpAppToolMode(mode: WebMcpAppToolMode): void {
 export async function wipeAllLocalData(): Promise<void> {
   await session.framework?.kernel.close();
   session.framework = null;
-  session.frameworkApp = null;
   if (session.host) {
     await session.host.resetLocalData();
   } else {

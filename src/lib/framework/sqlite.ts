@@ -9,7 +9,7 @@ import type {
   SqlGateway,
 } from "$lib/runtime/persistence/sqlite/gateway.ts";
 
-export const BUILDER_KERNEL_DATABASE = "builder-framework";
+export const RUNTIME_DATABASE = "builder-framework";
 const leasedDatabaseNames = new WeakMap<SqlGateway, Set<string>>();
 
 /**
@@ -21,7 +21,7 @@ const leasedDatabaseNames = new WeakMap<SqlGateway, Set<string>>();
  */
 export function createKernelSqlitePersistence(
   gateway: SqlGateway,
-  databaseName = BUILDER_KERNEL_DATABASE,
+  databaseName = RUNTIME_DATABASE,
 ): SqlitePersistenceAdapter {
   return new SqlitePersistenceAdapter(async () => {
     acquireDatabaseLease(gateway, databaseName);

@@ -2,12 +2,7 @@ import { describe, expect, it } from "vite-plus/test";
 import { normalizeSpec } from "$lib/runtime/model.ts";
 import { createNodeGateway } from "$lib/runtime/persistence/sqlite/node-gateway.ts";
 import { Kernel } from "@jthum/framework/kernel";
-import {
-  createBuilderApp,
-  listBuilderApps,
-  openBuilderKernel,
-  resolveBuilderApp,
-} from "./bootstrap.ts";
+import { createApp, listApps, openRuntime, resolveApp } from "./bootstrap.ts";
 import { createKernelSqlitePersistence } from "./sqlite.ts";
 
 describe("Builder Framework vertical slice", () => {
@@ -82,7 +77,7 @@ describe("Builder Framework vertical slice", () => {
       appSpec,
       sharedTypes: [contact],
     };
-    const instance = await openBuilderKernel({
+    const instance = await openRuntime({
       kernel: { persistence },
       seed,
     });
@@ -91,7 +86,7 @@ describe("Builder Framework vertical slice", () => {
     if (!instance.isNew) throw new Error("Expected a newly seeded Builder Kernel");
     expect(instance.gaps).toEqual([]);
     const emptyAppSpec = normalizeSpec({ key: "empty", label: "Empty" });
-    const emptyApp = await createBuilderApp(instance.kernel, instance.spaceContext, {
+    const emptyApp = await createApp(instance.kernel, instance.spaceContext, {
       name: "Empty",
       spec: emptyAppSpec,
       sharedTypes: [contact],
@@ -99,7 +94,7 @@ describe("Builder Framework vertical slice", () => {
     expect(emptyApp.app.spec.sources).toEqual([
       expect.objectContaining({ id: contact.id, key: "contact" }),
     ]);
-    expect(await listBuilderApps(instance.kernel, instance.spaceContext)).toEqual([
+    expect(await listApps(instance.kernel, instance.spaceContext)).toEqual([
       expect.objectContaining({ id: instance.app.id, name: "Billing" }),
       expect.objectContaining({ id: emptyApp.app.id, name: "Empty" }),
     ]);
@@ -128,7 +123,7 @@ describe("Builder Framework vertical slice", () => {
     expect(await instance.appClient.listRecords("invoice")).toHaveLength(1);
     await instance.kernel.close();
 
-    const reopened = await openBuilderKernel({
+    const reopened = await openRuntime({
       kernel: { persistence },
       seed,
     });
@@ -141,13 +136,13 @@ describe("Builder Framework vertical slice", () => {
 
     const serverKernel = await Kernel.open({ persistence });
     await expect(
-      resolveBuilderApp(
+      resolveApp(
         serverKernel,
         { ...instance.selection, appId: instance.selection.spaceId },
         instance.actorId,
       ),
     ).rejects.toThrow("does not resolve to one Space and App");
-    const recovered = await resolveBuilderApp(serverKernel, instance.selection, instance.actorId);
+    const recovered = await resolveApp(serverKernel, instance.selection, instance.actorId);
     expect(recovered.selection).toEqual(instance.selection);
     expect((await recovered.appClient.queryView("invoices")).data.rows).toHaveLength(1);
     await serverKernel.close();
@@ -164,7 +159,7 @@ describe("Builder Framework vertical slice", () => {
     }).types[0]!;
 
     await expect(
-      openBuilderKernel({
+      openRuntime({
         kernel: { persistence },
         seed: {
           spaceName: "Personal Space",

@@ -9,7 +9,7 @@ import { createWorkspaceClient, type WorkspaceClient } from "@jthum/framework/cl
 import type { AppSpec, TypeDef } from "$lib/runtime/model.ts";
 import { projectFrameworkSpec, type FrameworkProjectionGap } from "./projection.ts";
 
-export interface BuilderKernelSeed {
+export interface RuntimeSeed {
   readonly spaceName: string;
   readonly appName: string;
   readonly user: { readonly name: string; readonly email?: string };
@@ -19,7 +19,7 @@ export interface BuilderKernelSeed {
   readonly sharedTypes: readonly TypeDef[];
 }
 
-export interface BuilderAppSeed {
+export interface AppSeed {
   readonly name: string;
   readonly spec: AppSpec;
   /** Existing Space Types this App consumes through Attachments. */
@@ -31,19 +31,19 @@ export interface AppSelection {
   readonly appId: string;
 }
 
-export interface CreateBuilderKernelInput extends BuilderKernelSeed {
+export interface CreateRuntimeInput extends RuntimeSeed {
   readonly kernel: KernelOptions;
 }
 
-export interface OpenBuilderKernelInput {
+export interface OpenRuntimeInput {
   readonly kernel: KernelOptions;
-  readonly seed: BuilderKernelSeed;
+  readonly seed: RuntimeSeed;
   /** Optional local UI preferences; the persisted catalog remains authoritative. */
   readonly preferredSelection?: Partial<AppSelection>;
   readonly preferredActorId?: string;
 }
 
-export interface BuilderAppContext {
+export interface AppContext {
   readonly spaceClient: WorkspaceClient;
   readonly appClient: WorkspaceClient;
   readonly space: Workspace;
@@ -54,27 +54,25 @@ export interface BuilderAppContext {
   readonly actorId: string;
 }
 
-export interface BuilderKernelInstance extends BuilderAppContext {
+export interface AppRuntime extends AppContext {
   readonly kernel: Kernel;
 }
 
-export interface CreatedBuilderKernel extends BuilderKernelInstance {
+export interface CreatedRuntime extends AppRuntime {
   /** Deliberate capabilities waiting on later framework phases. */
   readonly gaps: readonly FrameworkProjectionGap[];
 }
 
-export type OpenedBuilderKernel =
-  | (CreatedBuilderKernel & { readonly isNew: true })
-  | (BuilderKernelInstance & { readonly isNew: false });
+export type OpenedRuntime =
+  | (CreatedRuntime & { readonly isNew: true })
+  | (AppRuntime & { readonly isNew: false });
 
 /**
  * Creates the Builder Space/App topology on the Framework Kernel.
  *
  * This seeds the canonical Framework database and never reads the old Builder database.
  */
-export async function createBuilderKernel(
-  input: CreateBuilderKernelInput,
-): Promise<CreatedBuilderKernel> {
+export async function createRuntime(input: CreateRuntimeInput): Promise<CreatedRuntime> {
   const spaceProjection = projectFrameworkSpec(input.spaceSpec, { sharedTypes: [] });
   const appProjection = projectFrameworkSpec(input.appSpec, {
     sharedTypes: input.sharedTypes,
@@ -91,7 +89,7 @@ export async function createBuilderKernel(
       actorId: root.user.id,
     };
     const space = await kernel.applySpec(spaceContext, spaceProjection.spec);
-    const appRuntime = await createProjectedBuilderApp(
+    const appRuntime = await createProjectedApp(
       kernel,
       spaceContext,
       space,
@@ -111,16 +109,16 @@ export async function createBuilderKernel(
 }
 
 /** Creates one Builder App as a child Workspace with explicit shared-Type Attachments. */
-export async function createBuilderApp(
+export async function createApp(
   kernel: Kernel,
   spaceContext: ExecutionContext,
-  input: BuilderAppSeed,
-): Promise<BuilderAppContext> {
+  input: AppSeed,
+): Promise<AppContext> {
   const space = await kernel.getWorkspace(spaceContext);
   if (!space?.isRoot) throw new Error("Builder Apps must be created inside a Space.");
   const projection = projectFrameworkSpec(input.spec, { sharedTypes: input.sharedTypes });
   assertSharedTypesProjected(input.sharedTypes, space.spec, projection.spec);
-  return createProjectedBuilderApp(
+  return createProjectedApp(
     kernel,
     spaceContext,
     space,
@@ -131,7 +129,7 @@ export async function createBuilderApp(
 }
 
 /** Lists the child Workspaces the current Actor can select as Builder Apps. */
-export async function listBuilderApps(
+export async function listApps(
   kernel: Kernel,
   spaceContext: ExecutionContext,
 ): Promise<readonly Workspace[]> {
@@ -146,11 +144,11 @@ export async function listBuilderApps(
 }
 
 /** Resolves Builder's Space/App convention for an Actor on an already-open Kernel. */
-export async function resolveBuilderApp(
+export async function resolveApp(
   kernel: Kernel,
   selection: AppSelection,
   actorId: string,
-): Promise<BuilderAppContext> {
+): Promise<AppContext> {
   const { spaceId, appId } = selection;
   const spaceContext = await kernel.resolveContext({ workspaceId: spaceId, actorId });
   const appContext = await kernel.resolveContext({ workspaceId: appId, actorId });
@@ -182,20 +180,14 @@ export async function resolveBuilderApp(
 }
 
 /** Opens the local Builder topology, creating it only when the catalog is empty. */
-export async function openBuilderKernel(
-  input: OpenBuilderKernelInput,
-): Promise<OpenedBuilderKernel> {
-  const startup = await findBuilderStartup(
-    input.kernel,
-    input.preferredSelection,
-    input.preferredActorId,
-  );
+export async function openRuntime(input: OpenRuntimeInput): Promise<OpenedRuntime> {
+  const startup = await findStartup(input.kernel, input.preferredSelection, input.preferredActorId);
   if (startup) {
     const kernel = await Kernel.open(input.kernel);
     try {
       return {
         kernel,
-        ...(await resolveBuilderApp(kernel, startup.selection, startup.actorId)),
+        ...(await resolveApp(kernel, startup.selection, startup.actorId)),
         isNew: false,
       };
     } catch (error) {
@@ -203,11 +195,11 @@ export async function openBuilderKernel(
       throw error;
     }
   }
-  const created = await createBuilderKernel({ ...input.seed, kernel: input.kernel });
+  const created = await createRuntime({ ...input.seed, kernel: input.kernel });
   return { ...created, isNew: true };
 }
 
-async function findBuilderStartup(
+async function findStartup(
   options: KernelOptions,
   preferredSelection: Partial<AppSelection> | undefined,
   preferredActorId: string | undefined,
@@ -252,14 +244,14 @@ function assertSharedTypesProjected(sharedTypes: readonly TypeDef[], space: Spec
   }
 }
 
-async function createProjectedBuilderApp(
+async function createProjectedApp(
   kernel: Kernel,
   spaceContext: ExecutionContext,
   space: Workspace,
   name: string,
   sharedTypes: readonly TypeDef[],
   spec: Spec,
-): Promise<BuilderAppContext> {
+): Promise<AppContext> {
   const child = await kernel.createWorkspace(spaceContext, { name });
   const appContext = { ...spaceContext, workspaceId: child.workspace.id };
   const app = await kernel.applySpec(appContext, spec);
