@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vite-plus/test";
 import { normalizeSpec } from "$lib/runtime/model.ts";
 import { createNodeGateway } from "$lib/runtime/persistence/sqlite/node-gateway.ts";
-import { openBuilderKernel, resumeBuilderKernel } from "./bootstrap.ts";
+import { Kernel } from "@jthum/framework/kernel";
+import { openBuilderKernel, resolveBuilderApp } from "./bootstrap.ts";
 import { createKernelSqlitePersistence } from "./sqlite.ts";
 
 describe("Builder Framework vertical slice", () => {
@@ -116,20 +117,21 @@ describe("Builder Framework vertical slice", () => {
     expect(reopened.isNew).toBe(false);
     expect(await reopened.kernel.listRecords(reopened.spaceContext, "contact")).toHaveLength(1);
     expect(await reopened.kernel.listRecords(reopened.appContext, "invoice")).toHaveLength(1);
-    expect(reopened.session).toEqual(instance.session);
+    expect(reopened.selection).toEqual(instance.selection);
+    expect(reopened.actorId).toBe(instance.actorId);
     await reopened.kernel.close();
 
+    const serverKernel = await Kernel.open({ persistence });
     await expect(
-      resumeBuilderKernel({
-        session: { ...instance.session, appId: instance.session.spaceId },
-        kernel: { persistence },
-      }),
+      resolveBuilderApp(
+        serverKernel,
+        { ...instance.selection, appId: instance.selection.spaceId },
+        instance.actorId,
+      ),
     ).rejects.toThrow("does not resolve to one Space and App");
-    const recovered = await resumeBuilderKernel({
-      session: instance.session,
-      kernel: { persistence },
-    });
-    await recovered.kernel.close();
+    const recovered = await resolveBuilderApp(serverKernel, instance.selection, instance.actorId);
+    expect(recovered.selection).toEqual(instance.selection);
+    await serverKernel.close();
     await gateway.wipe();
   });
 

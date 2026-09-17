@@ -18,35 +18,34 @@ export interface BuilderKernelSeed {
   readonly sharedTypes: readonly TypeDef[];
 }
 
-export interface BuilderSessionRef {
+export interface AppSelection {
   readonly spaceId: string;
   readonly appId: string;
-  readonly actorId: string;
 }
 
 export interface CreateBuilderKernelInput extends BuilderKernelSeed {
   readonly kernel: KernelOptions;
 }
 
-export interface ResumeBuilderKernelInput {
-  readonly session: BuilderSessionRef;
-  readonly kernel: KernelOptions;
-}
-
 export interface OpenBuilderKernelInput {
   readonly kernel: KernelOptions;
   readonly seed: BuilderKernelSeed;
-  /** Optional local UI preference; catalog identity remains authoritative. */
-  readonly preferred?: Partial<BuilderSessionRef>;
+  /** Optional local UI preferences; the persisted catalog remains authoritative. */
+  readonly preferredSelection?: Partial<AppSelection>;
+  readonly preferredActorId?: string;
 }
 
-export interface BuilderKernelInstance {
-  readonly kernel: Kernel;
+export interface BuilderAppContext {
   readonly space: Workspace;
   readonly app: Workspace;
   readonly spaceContext: ExecutionContext;
   readonly appContext: ExecutionContext;
-  readonly session: BuilderSessionRef;
+  readonly selection: AppSelection;
+  readonly actorId: string;
+}
+
+export interface BuilderKernelInstance extends BuilderAppContext {
+  readonly kernel: Kernel;
 }
 
 export interface CreatedBuilderKernel extends BuilderKernelInstance {
@@ -98,11 +97,11 @@ export async function createBuilderKernel(
       app,
       spaceContext,
       appContext,
-      session: {
+      selection: {
         spaceId: space.id,
         appId: app.id,
-        actorId: root.user.id,
       },
+      actorId: root.user.id,
       gaps: [...spaceProjection.gaps, ...appProjection.gaps],
     };
   } catch (error) {
@@ -111,72 +110,81 @@ export async function createBuilderKernel(
   }
 }
 
-/** Resumes an existing Builder topology from an exact host-owned session reference. */
-export async function resumeBuilderKernel(
-  input: ResumeBuilderKernelInput,
-): Promise<BuilderKernelInstance> {
-  const kernel = await Kernel.open(input.kernel);
-  try {
-    const { spaceId, appId, actorId } = input.session;
-    const spaceContext = await kernel.resolveContext({ workspaceId: spaceId, actorId });
-    const appContext = await kernel.resolveContext({ workspaceId: appId, actorId });
-    const [space, app, actor] = await Promise.all([
-      kernel.getWorkspace(spaceContext),
-      kernel.getWorkspace(appContext),
-      kernel.getActor(spaceContext, actorId),
-    ]);
-    if (
-      !space?.isRoot ||
-      !app ||
-      app.isRoot ||
-      app.parentId !== space.id ||
-      !actor ||
-      actor.rootId !== space.id
-    ) {
-      throw new Error("Builder session does not resolve to one Space and App.");
-    }
-    return {
-      kernel,
-      space,
-      app,
-      spaceContext,
-      appContext,
-      session: { spaceId: space.id, appId: app.id, actorId: actor.id },
-    };
-  } catch (error) {
-    await kernel.close();
-    throw error;
+/** Resolves Builder's Space/App convention for an Actor on an already-open Kernel. */
+export async function resolveBuilderApp(
+  kernel: Kernel,
+  selection: AppSelection,
+  actorId: string,
+): Promise<BuilderAppContext> {
+  const { spaceId, appId } = selection;
+  const spaceContext = await kernel.resolveContext({ workspaceId: spaceId, actorId });
+  const appContext = await kernel.resolveContext({ workspaceId: appId, actorId });
+  const [space, app, actor] = await Promise.all([
+    kernel.getWorkspace(spaceContext),
+    kernel.getWorkspace(appContext),
+    kernel.getActor(spaceContext, actorId),
+  ]);
+  if (
+    !space?.isRoot ||
+    !app ||
+    app.isRoot ||
+    app.parentId !== space.id ||
+    !actor ||
+    actor.rootId !== space.id
+  ) {
+    throw new Error("Builder selection does not resolve to one Space and App for this Actor.");
   }
+  return {
+    space,
+    app,
+    spaceContext,
+    appContext,
+    selection: { spaceId: space.id, appId: app.id },
+    actorId: actor.id,
+  };
 }
 
 /** Opens the local Builder topology, creating it only when the catalog is empty. */
 export async function openBuilderKernel(
   input: OpenBuilderKernelInput,
 ): Promise<OpenedBuilderKernel> {
-  const session = await findBuilderSession(input.kernel, input.preferred);
-  if (session) {
-    return {
-      ...(await resumeBuilderKernel({ session, kernel: input.kernel })),
-      isNew: false,
-    };
+  const startup = await findBuilderStartup(
+    input.kernel,
+    input.preferredSelection,
+    input.preferredActorId,
+  );
+  if (startup) {
+    const kernel = await Kernel.open(input.kernel);
+    try {
+      return {
+        kernel,
+        ...(await resolveBuilderApp(kernel, startup.selection, startup.actorId)),
+        isNew: false,
+      };
+    } catch (error) {
+      await kernel.close();
+      throw error;
+    }
   }
   const created = await createBuilderKernel({ ...input.seed, kernel: input.kernel });
   return { ...created, isNew: true };
 }
 
-async function findBuilderSession(
+async function findBuilderStartup(
   options: KernelOptions,
-  preferred: Partial<BuilderSessionRef> | undefined,
-): Promise<BuilderSessionRef | null> {
+  preferredSelection: Partial<AppSelection> | undefined,
+  preferredActorId: string | undefined,
+): Promise<{ readonly selection: AppSelection; readonly actorId: string } | null> {
   const persistence = await options.persistence.open();
   try {
     const roots = await persistence.catalog.listRootWorkspaces();
     if (!roots.length) return null;
-    const space = roots.find((workspace) => workspace.id === preferred?.spaceId) ?? roots.at(0)!;
+    const space =
+      roots.find((workspace) => workspace.id === preferredSelection?.spaceId) ?? roots.at(0)!;
     const users = (await persistence.catalog.listActorsByOrigin(space.id)).filter(
       (actor) => actor.kind === "user",
     );
-    const actor = users.find((candidate) => candidate.id === preferred?.actorId) ?? users.at(0);
+    const actor = users.find((candidate) => candidate.id === preferredActorId) ?? users.at(0);
     if (!actor) throw new Error(`Builder Space ${space.id} has no locally issued user.`);
     const memberOf = new Set(
       (await persistence.catalog.listMembershipsForActor(actor.id)).map(
@@ -186,9 +194,12 @@ async function findBuilderSession(
     const apps = (await persistence.catalog.listChildWorkspaces(space.id)).filter((workspace) =>
       memberOf.has(workspace.id),
     );
-    const app = apps.find((workspace) => workspace.id === preferred?.appId) ?? apps.at(0);
+    const app = apps.find((workspace) => workspace.id === preferredSelection?.appId) ?? apps.at(0);
     if (!app) throw new Error(`Builder Space ${space.id} has no accessible App.`);
-    return { spaceId: space.id, appId: app.id, actorId: actor.id };
+    return {
+      selection: { spaceId: space.id, appId: app.id },
+      actorId: actor.id,
+    };
   } finally {
     await persistence.close();
   }
