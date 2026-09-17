@@ -2,7 +2,12 @@ import { describe, expect, it } from "vite-plus/test";
 import { normalizeSpec } from "$lib/runtime/model.ts";
 import { createNodeGateway } from "$lib/runtime/persistence/sqlite/node-gateway.ts";
 import { Kernel } from "@jthum/framework/kernel";
-import { openBuilderKernel, resolveBuilderApp } from "./bootstrap.ts";
+import {
+  createBuilderApp,
+  listBuilderApps,
+  openBuilderKernel,
+  resolveBuilderApp,
+} from "./bootstrap.ts";
 import { createKernelSqlitePersistence } from "./sqlite.ts";
 
 describe("Builder Framework vertical slice", () => {
@@ -85,6 +90,19 @@ describe("Builder Framework vertical slice", () => {
     expect(instance.isNew).toBe(true);
     if (!instance.isNew) throw new Error("Expected a newly seeded Builder Kernel");
     expect(instance.gaps).toEqual([]);
+    const emptyAppSpec = normalizeSpec({ key: "empty", label: "Empty" });
+    const emptyApp = await createBuilderApp(instance.kernel, instance.spaceContext, {
+      name: "Empty",
+      spec: emptyAppSpec,
+      sharedTypes: [contact],
+    });
+    expect(emptyApp.app.spec.sources).toEqual([
+      expect.objectContaining({ id: contact.id, key: "contact" }),
+    ]);
+    expect(await listBuilderApps(instance.kernel, instance.spaceContext)).toEqual([
+      expect.objectContaining({ id: instance.app.id, name: "Billing" }),
+      expect.objectContaining({ id: emptyApp.app.id, name: "Empty" }),
+    ]);
     const ada = await instance.spaceClient.createRecord("contact", {
       name: "Ada",
     });

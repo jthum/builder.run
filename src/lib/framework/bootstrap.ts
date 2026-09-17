@@ -19,6 +19,13 @@ export interface BuilderKernelSeed {
   readonly sharedTypes: readonly TypeDef[];
 }
 
+export interface BuilderAppSeed {
+  readonly name: string;
+  readonly spec: AppSpec;
+  /** Existing Space Types this App consumes through Attachments. */
+  readonly sharedTypes: readonly TypeDef[];
+}
+
 export interface AppSelection {
   readonly spaceId: string;
   readonly appId: string;
@@ -83,36 +90,59 @@ export async function createBuilderKernel(
       workspaceId: root.workspace.id,
       actorId: root.user.id,
     };
-    const child = await kernel.createWorkspace(spaceContext, { name: input.appName });
-    const appContext = { ...spaceContext, workspaceId: child.workspace.id };
     const space = await kernel.applySpec(spaceContext, spaceProjection.spec);
-    const app = await kernel.applySpec(appContext, appProjection.spec);
-    for (const type of input.sharedTypes) {
-      await kernel.createAttachment(spaceContext, {
-        collectionKey: type.key,
-        targetId: app.id,
-        sourceId: type.id,
-      });
-    }
+    const appRuntime = await createProjectedBuilderApp(
+      kernel,
+      spaceContext,
+      space,
+      input.appName,
+      input.sharedTypes,
+      appProjection.spec,
+    );
     return {
       kernel,
-      spaceClient: await createWorkspaceClient(kernel, spaceContext),
-      appClient: await createWorkspaceClient(kernel, appContext),
-      space,
-      app,
-      spaceContext,
-      appContext,
-      selection: {
-        spaceId: space.id,
-        appId: app.id,
-      },
-      actorId: root.user.id,
+      ...appRuntime,
       gaps: [...spaceProjection.gaps, ...appProjection.gaps],
     };
   } catch (error) {
     await kernel.close();
     throw error;
   }
+}
+
+/** Creates one Builder App as a child Workspace with explicit shared-Type Attachments. */
+export async function createBuilderApp(
+  kernel: Kernel,
+  spaceContext: ExecutionContext,
+  input: BuilderAppSeed,
+): Promise<BuilderAppContext> {
+  const space = await kernel.getWorkspace(spaceContext);
+  if (!space?.isRoot) throw new Error("Builder Apps must be created inside a Space.");
+  const projection = projectFrameworkSpec(input.spec, { sharedTypes: input.sharedTypes });
+  assertSharedTypesProjected(input.sharedTypes, space.spec, projection.spec);
+  return createProjectedBuilderApp(
+    kernel,
+    spaceContext,
+    space,
+    input.name,
+    input.sharedTypes,
+    projection.spec,
+  );
+}
+
+/** Lists the child Workspaces the current Actor can select as Builder Apps. */
+export async function listBuilderApps(
+  kernel: Kernel,
+  spaceContext: ExecutionContext,
+): Promise<readonly Workspace[]> {
+  const space = await kernel.getWorkspace(spaceContext);
+  if (!space?.isRoot) throw new Error("Builder Apps must be listed from a Space.");
+  const [children, memberships] = await Promise.all([
+    kernel.listChildWorkspaces(spaceContext, space.id),
+    kernel.listMembershipsForActor(spaceContext, spaceContext.actorId),
+  ]);
+  const memberOf = new Set(memberships.map((membership) => membership.workspaceId));
+  return children.filter((workspace) => memberOf.has(workspace.id));
 }
 
 /** Resolves Builder's Space/App convention for an Actor on an already-open Kernel. */
@@ -220,4 +250,34 @@ function assertSharedTypesProjected(sharedTypes: readonly TypeDef[], space: Spec
       throw new Error(`Shared Type ${type.key} must project from the Space into the App.`);
     }
   }
+}
+
+async function createProjectedBuilderApp(
+  kernel: Kernel,
+  spaceContext: ExecutionContext,
+  space: Workspace,
+  name: string,
+  sharedTypes: readonly TypeDef[],
+  spec: Spec,
+): Promise<BuilderAppContext> {
+  const child = await kernel.createWorkspace(spaceContext, { name });
+  const appContext = { ...spaceContext, workspaceId: child.workspace.id };
+  const app = await kernel.applySpec(appContext, spec);
+  for (const type of sharedTypes) {
+    await kernel.createAttachment(spaceContext, {
+      collectionKey: type.key,
+      targetId: app.id,
+      sourceId: type.id,
+    });
+  }
+  return {
+    spaceClient: await createWorkspaceClient(kernel, spaceContext),
+    appClient: await createWorkspaceClient(kernel, appContext),
+    space,
+    app,
+    spaceContext,
+    appContext,
+    selection: { spaceId: space.id, appId: app.id },
+    actorId: spaceContext.actorId,
+  };
 }
