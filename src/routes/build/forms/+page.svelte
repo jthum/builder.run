@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { goto } from "$app/navigation";
 	import { runtime, session } from "$lib/app/session.svelte.ts";
+	import { canonicalStudio } from "$lib/app/canonical-studio.svelte.ts";
 	import { OptionSelect } from "@jthum/framework/svelte/studio";
 	import { FormPurposePicker } from "@jthum/framework/svelte/studio";
 	import { PageHeader } from "@jthum/framework/svelte/studio";
@@ -12,27 +13,28 @@
 	import * as Field from "@jthum/framework/svelte/ui/field";
 	import { Input } from "@jthum/framework/svelte/ui/input";
 	import { slugify } from "$lib/runtime/ids.ts";
-	import type { FormDef } from "$lib/runtime/model.ts";
+	import type { FormDraft } from "@jthum/framework/svelte/studio";
 	import FormInputIcon from "@lucide/svelte/icons/form-input";
 	import PlusIcon from "@lucide/svelte/icons/plus";
 	import { toast } from "svelte-sonner";
 
 	const spec = $derived(session.resolvedSpec);
-	const types = $derived(spec?.types ?? []);
-	const forms = $derived(spec?.forms ?? []);
+	const types = $derived(canonicalStudio.context?.collections ?? spec?.types ?? []);
+	const recordTypes = $derived(types.filter((type) => !type.expose));
+	const forms = $derived(canonicalStudio.context?.forms ?? spec?.forms ?? []);
 	const custom = $derived(forms.filter((form) => !form.implicit));
 	const builtin = $derived(forms.filter((form) => form.implicit));
 
 	let open = $state(false);
 	let name = $state("");
-	let mode = $state<FormDef["mode"]>("standalone");
+	let mode = $state<FormDraft["mode"]>("standalone");
 	let typeKey = $state("");
 	let pending = $state(false);
 
 	function openCreate() {
 		name = "";
 		mode = "standalone";
-		typeKey = types[0]?.key ?? "";
+		typeKey = recordTypes[0]?.key ?? "";
 		open = true;
 	}
 
@@ -43,15 +45,28 @@
 		pending = true;
 		try {
 			const key = slugify(label);
-			const type = types.find((item) => item.key === typeKey);
-			await runtime().upsertForm({
-				key,
-				label,
-				mode,
-				...(mode === "standalone"
-					? { inputs: [{ key: "name", label: "Name", type: "text" as const }] }
-					: { type: typeKey, fields: type?.fields.map((field) => field.key) ?? [] }),
-			});
+			const type = recordTypes.find((item) => item.key === typeKey);
+			if (canonicalStudio.context) {
+				const actions = canonicalStudio.formActions();
+				await actions.save({
+					id: "",
+					key,
+					label,
+					mode,
+					...(mode === "standalone"
+						? { inputs: [actions.prepareField("name", { label: "Name", type: "text" })] }
+						: { type: typeKey, fields: type?.fields.map((field) => field.key) ?? [] }),
+				});
+			} else {
+				await runtime().upsertForm({
+					key,
+					label,
+					mode,
+					...(mode === "standalone"
+						? { inputs: [{ key: "name", label: "Name", type: "text" as const }] }
+						: { type: typeKey, fields: type?.fields.map((field) => field.key) ?? [] }),
+				});
+			}
 			open = false;
 			await goto(`/build/forms/${key}`);
 		} catch (error) {
@@ -134,13 +149,13 @@
 			</Dialog.Header>
 			<Dialog.Body>
 				<Field.Group>
-					<FormPurposePicker bind:value={mode} disableRecordForms={!types.length} />
+				<FormPurposePicker bind:value={mode} disableRecordForms={!recordTypes.length} />
 					{#if mode !== "standalone"}
 						<Field.Field>
 							<Field.Label>Record type</Field.Label>
 							<OptionSelect
 								bind:value={typeKey}
-								options={types.map((type) => ({ value: type.key, label: type.label }))}
+								options={recordTypes.map((type) => ({ value: type.key, label: type.label }))}
 							/>
 						</Field.Field>
 					{/if}
