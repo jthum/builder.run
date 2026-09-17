@@ -2,7 +2,7 @@
 	import { goto } from "$app/navigation";
 	import { runtime, session } from "$lib/app/session.svelte.ts";
 	import AppSelect from "$lib/components/app-select.svelte";
-	import FormPurposePicker from "$lib/components/form-purpose-picker.svelte";
+	import { FormPurposePicker } from "@jthum/framework/svelte/studio";
 	import { PageHeader } from "@jthum/framework/svelte/studio";
 	import { Badge } from "@jthum/framework/svelte/ui/badge";
 	import { Button } from "@jthum/framework/svelte/ui/button";

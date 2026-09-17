@@ -3,3 +3,26 @@
 @import "shadcn-svelte/tailwind.css";
 @import "@fontsource-variable/inter";
 @import "@jthum/framework/svelte/theme.css";
+
+:root {
+  --app-hue: 264;
+  --app-accent: oklch(0.55 0.18 264);
+  --starter-crm: oklch(0.58 0.2 304);
+  --starter-projects: oklch(0.59 0.16 155);
+  --starter-finance: oklch(0.68 0.16 72);
+  --starter-content: oklch(0.62 0.18 25);
+}
+
+.dark {
+  --starter-crm: oklch(0.72 0.16 304);
+  --starter-projects: oklch(0.72 0.14 155);
+  --starter-finance: oklch(0.78 0.14 72);
+  --starter-content: oklch(0.72 0.15 25);
+}
+
+@theme inline {
+  --color-starter-crm: var(--starter-crm);
+  --color-starter-projects: var(--starter-projects);
+  --color-starter-finance: var(--starter-finance);
+  --color-starter-content: var(--starter-content);
+}

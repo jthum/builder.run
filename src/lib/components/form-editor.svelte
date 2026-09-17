@@ -12,7 +12,7 @@
 	import AppSelect from "$lib/components/app-select.svelte";
 	import { EditorActions } from "@jthum/framework/svelte/studio";
 	import FormInputSheet from "$lib/components/form-input-sheet.svelte";
-	import FormPurposePicker from "$lib/components/form-purpose-picker.svelte";
+	import { FormPurposePicker } from "@jthum/framework/svelte/studio";
 	import { PageHeader } from "@jthum/framework/svelte/studio";
 	import RecordForm from "$lib/components/record-form.svelte";
 	import StatusPill from "$lib/components/status-pill.svelte";
