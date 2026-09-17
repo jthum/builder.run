@@ -5,10 +5,14 @@
 	import { authoredNavPages } from "$lib/runtime/blocks.ts";
 	import { pageBlocks, pageDefinition } from "$lib/app/pages.ts";
 	import type { PageDefinition } from "@jthum/framework/spec";
+	import { isStudioManaged } from "@jthum/framework/svelte/studio";
 
 	const definitions = $derived(
 		canonicalStudio.spec
-			? canonicalStudio.spec.pages.filter((page) => page.key !== "home" && page.meta?.path !== "/")
+			? canonicalStudio.spec.pages.filter(
+					(page) =>
+						page.key !== "home" && page.meta?.path !== "/" && !isStudioManaged(page.meta),
+				)
 			: session.resolvedSpec
 				? authoredNavPages(session.resolvedSpec).map(pageDefinition)
 				: [],

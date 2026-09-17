@@ -6,6 +6,7 @@ import {
   createPageActions,
   createRule,
   createRuleActions,
+  isStudioManaged,
   createViewActions,
   loadEditorContext,
   type CollectionActions,
@@ -19,6 +20,7 @@ import {
   type ViewAuthoringSchemas,
 } from "@jthum/framework/svelte/studio";
 import type { Spec } from "@jthum/framework/spec";
+import { installCollectionStarters } from "$lib/app/collection-starters.ts";
 
 class CanonicalStudioState {
   context = $state.raw<EditorContext | null>(null);
@@ -102,7 +104,8 @@ class CanonicalStudioState {
     const runtime = session.framework;
     if (!runtime) throw new Error("The Framework runtime is not ready.");
     return createPageActions(runtime.appClient, {
-      include: (page) => page.key !== "home" && page.meta?.path !== "/",
+      include: (page) =>
+        page.key !== "home" && page.meta?.path !== "/" && !isStudioManaged(page.meta),
       onChange: () => this.refresh(),
     });
   }
@@ -119,10 +122,10 @@ class CanonicalStudioState {
   async createCollection(draft: NewCollectionDraft) {
     const runtime = session.framework;
     if (!runtime) throw new Error("The Framework runtime is not ready.");
-    const collection = await createCollection(runtime.appClient, draft, {
-      schemas: this.schemas,
-      onChange: () => this.refresh(),
-    });
+    const collection = await createCollection(runtime.appClient, draft, { schemas: this.schemas });
+    const loaded = await loadEditorContext(runtime.appClient);
+    await installCollectionStarters(runtime.appClient, collection, loaded.schemas);
+    await this.refresh();
     return collection;
   }
 }
