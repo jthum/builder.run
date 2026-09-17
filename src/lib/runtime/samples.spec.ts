@@ -1,20 +1,20 @@
 import { describe, expect, it } from "vite-plus/test";
 import { Host } from "./host.ts";
 import { sampleApps } from "./samples.ts";
-import { configurePageRows } from "./widgets.ts";
-import type { PageBlock } from "./model.ts";
+import { configurePageRows } from "./blocks.ts";
+import type { PageLayoutNode } from "./model.ts";
 
-function expectWideWidgetsUseOneColumn(blocks: PageBlock[]): void {
+function expectWideBlocksUseOneColumn(blocks: PageLayoutNode[]): void {
   for (const block of blocks) {
     if (block.kind !== "group") continue;
     if (
       block.blocks.some(
-        (child) => child.kind === "widget" && (child.widget === "table" || child.widget === "form"),
+        (child) => child.kind === "block" && (child.block === "table" || child.block === "form"),
       )
     ) {
       expect(block.columns).toBe(1);
     }
-    expectWideWidgetsUseOneColumn(block.blocks);
+    expectWideBlocksUseOneColumn(block.blocks);
   }
 }
 
@@ -36,7 +36,7 @@ describe("starter app templates", () => {
       }
       for (const page of sample.spec.pages) {
         expect(() => configurePageRows(spec, page.blocks)).not.toThrow();
-        expectWideWidgetsUseOneColumn(page.blocks);
+        expectWideBlocksUseOneColumn(page.blocks);
       }
       expect(sample.spec.pages.some((page) => page.key === "home" && !page.implicit)).toBe(true);
     });

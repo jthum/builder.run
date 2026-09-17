@@ -15,7 +15,7 @@
 	import { uniqueKey } from "$lib/runtime/ids.ts";
 	import type { AppSpec, PageDef } from "$lib/runtime/model.ts";
 	import { pageIconEntry, pageIconList, type PageIconKey } from "$lib/runtime/page-icons.ts";
-	import { authoredNavPages, groupPagesByFolder, moveAuthoredPage, pageHref } from "$lib/runtime/widgets.ts";
+	import { authoredNavPages, groupPagesByFolder, moveAuthoredPage, pageHref } from "$lib/runtime/blocks.ts";
 	import EllipsisIcon from "@lucide/svelte/icons/ellipsis";
 	import ArrowRightIcon from "@lucide/svelte/icons/arrow-right";
 	import FolderIcon from "@lucide/svelte/icons/folder";
@@ -79,15 +79,15 @@
 		createOpen = true;
 	}
 
-	function pageCounts(page: PageDef): { sections: number; widgets: number } {
-		const widgetsIn = (blocks: NonNullable<PageDef["blocks"]>): number =>
+	function pageCounts(page: PageDef): { sections: number; blocks: number } {
+		const blocksIn = (blocks: NonNullable<PageDef["blocks"]>): number =>
 			blocks.reduce(
-				(count, block) => count + (block.kind === "group" ? widgetsIn(block.blocks) : 1),
+				(count, block) => count + (block.kind === "group" ? blocksIn(block.blocks) : 1),
 				0,
 			);
 		return {
 			sections: page.blocks?.filter((block) => block.kind === "group").length ?? 0,
-			widgets: widgetsIn(page.blocks ?? []),
+			blocks: blocksIn(page.blocks ?? []),
 		};
 	}
 
@@ -341,8 +341,8 @@
 								<a href={pageHref(item)} class="min-w-0 flex-1 rounded-md px-1 outline-none focus-visible:ring-2 focus-visible:ring-ring">
 									<div class="font-medium">{item.label}</div>
 									<div class="text-sm text-muted-foreground">
-										{counts.sections} {counts.sections === 1 ? "section" : "sections"} · {counts.widgets}
-										{counts.widgets === 1 ? "widget" : "widgets"}
+										{counts.sections} {counts.sections === 1 ? "section" : "sections"} · {counts.blocks}
+										{counts.blocks === 1 ? "block" : "blocks"}
 									</div>
 								</a>
 								<Button variant="ghost" size="sm" class="hidden sm:inline-flex" href={pageHref(item)}>

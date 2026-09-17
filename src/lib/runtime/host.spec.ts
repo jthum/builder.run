@@ -537,8 +537,8 @@ types:
     await host.upsertPage({
       key: "project_overview",
       blocks: [
-        { kind: "widget", widget: "table", values: { view: "project_list" } },
-        { kind: "widget", widget: "form", values: { form: "project_create" } },
+        { kind: "block", block: "table", config: { view: "project_list" } },
+        { kind: "block", block: "form", config: { form: "project_create" } },
       ],
     });
 
@@ -560,10 +560,10 @@ types:
     expect(host.app().spec.pages.find((page) => page.key === "project_overview")?.blocks).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
-          blocks: [expect.objectContaining({ values: { view: "engagement_list" } })],
+          blocks: [expect.objectContaining({ config: { view: "engagement_list" } })],
         }),
         expect.objectContaining({
-          blocks: [expect.objectContaining({ values: { form: "engagement_create" } })],
+          blocks: [expect.objectContaining({ config: { form: "engagement_create" } })],
         }),
       ]),
     );
@@ -1097,7 +1097,7 @@ types:
         {
           kind: "group",
           columns: 1,
-          blocks: [{ kind: "widget", widget: "table", values: { view: "client_list" } }],
+          blocks: [{ kind: "block", block: "table", config: { view: "client_list" } }],
         },
       ],
     });
@@ -1107,13 +1107,13 @@ types:
       {
         kind: "group",
         columns: 1,
-        blocks: [{ kind: "widget", widget: "table", values: { view: "client_list" } }],
+        blocks: [{ kind: "block", block: "table", config: { view: "client_list" } }],
       },
     ]);
 
     const updated = await host.upsertPage({
       key: "clients",
-      blocks: [{ kind: "widget", widget: "heading", values: { title: "Clients" } }],
+      blocks: [{ kind: "block", block: "heading", config: { title: "Clients" } }],
     });
     expect(updated.icon).toBe("table");
   });
@@ -1140,7 +1140,7 @@ types:
         {
           kind: "group",
           columns: 1,
-          blocks: { kind: "widget", widget: "heading", values: { title: "Diagnostics" } } as never,
+          blocks: { kind: "block", block: "heading", config: { title: "Diagnostics" } } as never,
         },
       ],
     });
@@ -1148,12 +1148,12 @@ types:
       {
         kind: "group",
         columns: 1,
-        blocks: [{ kind: "widget", widget: "heading", values: { title: "Diagnostics" } }],
+        blocks: [{ kind: "block", block: "heading", config: { title: "Diagnostics" } }],
       },
     ]);
   });
 
-  it("validates widget contracts before replacing a full spec", async () => {
+  it("validates block contracts before replacing a full spec", async () => {
     expect.hasAssertions();
     const host = await Host.open();
     await host.upsertType({ key: "note", fields: { title: "text" } });
@@ -1171,15 +1171,15 @@ types:
           board: {
             blocks: [
               {
-                kind: "widget",
-                widget: "kanban",
-                values: { view: "task_list", field: "points" },
+                kind: "block",
+                block: "kanban",
+                config: { view: "task_list", field: "points" },
               },
             ],
           },
         },
       }),
-    ).rejects.toThrow('Widget "kanban" values.field cannot be "points". Valid options: status.');
+    ).rejects.toThrow('Block "kanban" config.field cannot be "points". Valid options: status.');
     expect(host.resolvedSpec().types.some((type) => type.key === "note")).toBe(true);
     expect(host.resolvedSpec().types.some((type) => type.key === "task")).toBe(false);
   });
@@ -1191,7 +1191,7 @@ types:
       {
         kind: "group" as const,
         columns: 1,
-        blocks: [{ kind: "widget" as const, widget: "heading", values: { title: "Overview" } }],
+        blocks: [{ kind: "block" as const, block: "heading", config: { title: "Overview" } }],
       },
     ];
     await host.upsertPage({ key: "overview", label: "Overview", blocks });

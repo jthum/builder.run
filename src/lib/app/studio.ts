@@ -31,8 +31,8 @@ export const studioItems = [
     group: "Behaviour",
   },
   {
-    href: "/library/widgets",
-    label: "Widgets",
+    href: "/library/blocks",
+    label: "Blocks",
     description: "Browse the visual building blocks available for pages.",
     group: "Library",
   },

@@ -1,15 +1,15 @@
 <script lang="ts">
 	import { goto } from "$app/navigation";
 	import PageHeader from "$lib/components/page-header.svelte";
-	import PageWidget from "$lib/components/page-widget.svelte";
-	import WidgetPicker from "$lib/components/widget-picker.svelte";
-	import WidgetSheet from "$lib/components/widget-sheet.svelte";
+	import Block from "$lib/components/block.svelte";
+	import BlockPicker from "$lib/components/block-picker.svelte";
+	import BlockSettings from "$lib/components/block-settings.svelte";
 	import { Badge } from "$lib/components/ui/badge/index.js";
 	import { Button } from "$lib/components/ui/button/index.js";
 	import * as Card from "$lib/components/ui/card/index.js";
 	import * as DropdownMenu from "$lib/components/ui/dropdown-menu/index.js";
 	import * as Empty from "$lib/components/ui/empty/index.js";
-	import type { AppSpec, PageBlock, PageDef, PageRowHeight } from "$lib/runtime/model.ts";
+	import type { AppSpec, PageLayoutNode, PageDef, PageRowHeight } from "$lib/runtime/model.ts";
 	import {
 		appendInGroup,
 		blockAt,
@@ -25,10 +25,10 @@
 		setBlock,
 		setGroupColumns,
 		setGroupMinHeight,
-		widgetBlock,
-		widgetLabel,
-		type WidgetDef,
-	} from "$lib/runtime/widgets.ts";
+		createBlockNode,
+		blockLabel,
+		type BlockDefinition,
+	} from "$lib/runtime/blocks.ts";
 	import ArrowDownIcon from "@lucide/svelte/icons/arrow-down";
 	import ArrowLeftIcon from "@lucide/svelte/icons/arrow-left";
 	import ArrowRightIcon from "@lucide/svelte/icons/arrow-right";
@@ -68,7 +68,7 @@
 	} = $props();
 
 	let editing = $state(false);
-	let draft = $state<PageBlock[]>([]);
+	let draft = $state<PageLayoutNode[]>([]);
 	let draftPageKey = "";
 	let pickerOpen = $state(false);
 	let insertPath = $state<number[] | null>(null);
@@ -112,9 +112,9 @@
 		})();
 	});
 
-	function blockFrom(blocks: PageBlock[], path: number[]): PageBlock | null {
+	function blockFrom(blocks: PageLayoutNode[], path: number[]): PageLayoutNode | null {
 		let list = blocks;
-		let found: PageBlock | undefined;
+		let found: PageLayoutNode | undefined;
 		for (const index of path) {
 			found = list[index];
 			if (!found) return null;
@@ -123,7 +123,7 @@
 		return found ?? null;
 	}
 
-	async function persist(next: PageBlock[]) {
+	async function persist(next: PageLayoutNode[]) {
 		draft = next;
 		draftPageKey = current.key;
 		editing = true;
@@ -134,7 +134,7 @@
 				key: current.key,
 				label: current.label,
 				path: current.path,
-				blocks: JSON.parse(JSON.stringify(next)) as PageBlock[],
+				blocks: JSON.parse(JSON.stringify(next)) as PageLayoutNode[],
 				implicit: false,
 			});
 		} catch (err) {
@@ -166,12 +166,12 @@
 		pickerOpen = true;
 	}
 
-	async function pickWidget(widget: WidgetDef) {
+	async function pickBlock(block: BlockDefinition) {
 		if (!spec) return;
-		const nextBlock = widgetBlock(widget, spec);
+		const nextBlock = createBlockNode(block, spec);
 		const path = insertPath;
 		insertPath = null;
-		let next: PageBlock[];
+		let next: PageLayoutNode[];
 		let createdPath: number[];
 		if (!path?.length) {
 			createdPath = [live.length, 0];
@@ -198,11 +198,11 @@
 		sheetOpen = true;
 	}
 
-	async function saveWidget(values: Record<string, unknown>) {
+	async function saveBlock(config: Record<string, unknown>) {
 		if (!editingPath) return;
 		const currentBlock = blockFrom(live, editingPath);
-		if (currentBlock?.kind !== "widget") return;
-		await persist(setBlock(live, editingPath, { ...currentBlock, values }));
+		if (currentBlock?.kind !== "block") return;
+		await persist(setBlock(live, editingPath, { ...currentBlock, config }));
 		editingPath = null;
 	}
 
@@ -222,7 +222,7 @@
 		await persist(moveSibling(live, index, to));
 	}
 
-	async function moveWidget(groupIndex: number, from: number, to: number) {
+	async function moveBlock(groupIndex: number, from: number, to: number) {
 		await persist(moveInGroup(live, groupIndex, from, to));
 	}
 
@@ -289,7 +289,7 @@
 				<Empty.Media variant="icon"><LayersIcon /></Empty.Media>
 				<Empty.Title>Empty page</Empty.Title>
 				<Empty.Description>
-					{editing ? "Add a section, then choose the widgets it should contain." : "Edit this page to add widgets."}
+					{editing ? "Add a section, then choose the blocks it should contain." : "Edit this page to add blocks."}
 				</Empty.Description>
 			</Empty.Header>
 			{#if editing}
@@ -327,7 +327,7 @@
 					<Card.Header class="gap-0">
 						<Card.Title>Section {index + 1}</Card.Title>
 						<Card.Description>
-							{countLabel(block.blocks.length, "widget")} · {gridChoices.find((item) => item.columns === (block.columns ?? 1))?.label ?? "Full width"}
+							{countLabel(block.blocks.length, "block")} · {gridChoices.find((item) => item.columns === (block.columns ?? 1))?.label ?? "Full width"}
 						</Card.Description>
 						<Card.Action class="flex flex-wrap items-center justify-end gap-1">
 							<DropdownMenu.Root>
@@ -399,13 +399,13 @@
 							class="flex h-full flex-col overflow-hidden rounded-xl bg-surface-chrome p-1 {groupHeightClass(block)}"
 						>
 								<div class="flex min-h-9 items-center justify-between gap-2 px-2 py-1">
-									<Badge variant="outline">{widgetLabel(child)}</Badge>
+									<Badge variant="outline">{blockLabel(child)}</Badge>
 									<div class="flex items-center gap-0.5">
 									<Button
 										size="icon-xs"
 										variant="ghost"
 										disabled={childIndex === 0}
-										onclick={() => moveWidget(index, childIndex, childIndex - 1)}
+										onclick={() => moveBlock(index, childIndex, childIndex - 1)}
 									>
 										<ArrowLeftIcon />
 										<span class="sr-only">Move left</span>
@@ -414,7 +414,7 @@
 										size="icon-xs"
 										variant="ghost"
 										disabled={childIndex === block.blocks.length - 1}
-										onclick={() => moveWidget(index, childIndex, childIndex + 1)}
+										onclick={() => moveBlock(index, childIndex, childIndex + 1)}
 									>
 										<ArrowRightIcon />
 										<span class="sr-only">Move right</span>
@@ -428,12 +428,12 @@
 										onclick={() => remove([index, childIndex])}
 									>
 										<Trash2Icon />
-										<span class="sr-only">Remove {widgetLabel(child)}</span>
+										<span class="sr-only">Remove {blockLabel(child)}</span>
 									</Button>
 									</div>
 								</div>
 							<div class="flex min-h-0 flex-1 flex-col rounded-lg bg-background p-3">
-								<PageWidget block={child} rows={viewRows} ready={rowsReady} {spec} />
+								<Block node={child} rows={viewRows} ready={rowsReady} {spec} />
 							</div>
 						</div>
 					{/each}
@@ -441,10 +441,10 @@
 							type="button"
 							class="flex min-h-28 items-center justify-center gap-2 rounded-xl border border-dashed text-sm text-muted-foreground hover:bg-muted/40 hover:text-foreground"
 							onclick={() => openPicker([index])}
-							data-testid="add-widget-slot"
+							data-testid="add-block-slot"
 						>
 							<PlusIcon class="size-4" />
-								Add widget
+								Add block
 							</button>
 						</div>
 					</Card.Content>
@@ -453,7 +453,7 @@
 				<div class="{gridClass(block.columns ?? 1)} items-stretch {groupHeightClass(block)}">
 					{#each block.blocks as child, childIndex (`${index}-${childIndex}`)}
 						<div class="flex h-full min-h-0 flex-col {groupHeightClass(block)}">
-							<PageWidget block={child} rows={viewRows} ready={rowsReady} {spec} />
+							<Block node={child} rows={viewRows} ready={rowsReady} {spec} />
 						</div>
 					{/each}
 				</div>
@@ -466,7 +466,7 @@
 			>
 				{#if editing}
 					<div class="flex min-h-9 items-center justify-between gap-2 px-2 py-1">
-						<Badge variant="outline">{widgetLabel(block)}</Badge>
+						<Badge variant="outline">{blockLabel(block)}</Badge>
 						<div class="flex items-center gap-0.5">
 						<Button size="xs" variant="ghost" onclick={() => openSheet([index])}>Edit</Button>
 						<Button size="icon-xs" variant="ghost" onclick={() => remove([index])}>
@@ -477,7 +477,7 @@
 					</div>
 				{/if}
 				<div class={editing ? "flex min-h-0 flex-1 flex-col rounded-lg bg-background p-3" : "h-full min-h-0"}>
-					<PageWidget {block} rows={viewRows} ready={rowsReady} {spec} />
+					<Block node={block} rows={viewRows} ready={rowsReady} {spec} />
 				</div>
 			</div>
 		{/if}
@@ -508,5 +508,5 @@
 	{/if}
 </div>
 
-<WidgetPicker bind:open={pickerOpen} onPick={pickWidget} />
-<WidgetSheet bind:open={sheetOpen} block={editingBlock} {spec} onSave={saveWidget} />
+<BlockPicker bind:open={pickerOpen} onPick={pickBlock} />
+<BlockSettings bind:open={sheetOpen} node={editingBlock} {spec} onSave={saveBlock} />

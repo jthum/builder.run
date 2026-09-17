@@ -11,7 +11,7 @@ It describes things such as:
 - Types and fields
 - Views
 - Forms
-- Pages and widgets
+- Pages and blocks
 - Automations (Workflows)
 - exposure to humans and agents
 
@@ -122,9 +122,9 @@ Submission data is transient unless a workflow deliberately stores it. This keep
 
 Standalone forms may define an optional success title and description under `submit.success`. This is presentation only; it does not alter delivery or persistence semantics.
 
-## Pages and widgets
+## Pages and blocks
 
-A **Page** is a user-facing application surface composed from widgets.
+A **Page** is a user-facing application surface composed from blocks.
 
 Pages are deliberately first-class navigation. They are not merely generated CRUD screens.
 
@@ -136,9 +136,9 @@ The official library is organised into five user-facing groups:
 - **Charts** — bar, line, donut, stacked-bar, funnel, scatter, and activity heatmap visualisations;
 - **Actions** — forms, workflow buttons, and compact quick-action groups.
 
-Widgets reuse other primitives instead of inventing their own data model. A table or chart, for example, is backed by a View.
+Blocks reuse other primitives instead of inventing their own data model. A table or chart, for example, is backed by a View.
 
-The registry keeps each widget's small declarative definition separate from its Svelte renderer. Definitions are available immediately to editors, validation, and agents; renderers are loaded only when a page uses them. This lets the official library grow without putting every widget implementation—or a heavy dependency used by one widget—into the initial page bundle.
+The registry keeps each block's small declarative definition separate from its Svelte component. Definitions are available immediately to editors, validation, and agents; components are loaded only when a page uses them. This lets the official library grow without putting every block implementation—or a heavy dependency used by one block—into the initial page bundle.
 
 Pages can be organised into folders when an app needs navigation hierarchy.
 

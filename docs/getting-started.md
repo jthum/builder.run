@@ -41,7 +41,7 @@ The useful sequence is:
 1. Define the **Types** the app needs.
 2. Add fields and relationships.
 3. Create useful **Views** over those records.
-4. Compose **Pages** from widgets backed by those views.
+4. Compose **Pages** from blocks backed by those views.
 5. Add **Automations** when the app needs explicit behaviour.
 6. Use the app immediately; there is no separate code-generation or rebuild step.
 

@@ -33,7 +33,7 @@ import {
   type SpecReference,
 } from "./spec-references.ts";
 import { scalarString } from "./values.ts";
-import { configurePageRows, normalizePageRows } from "./widgets.ts";
+import { configurePageRows, normalizePageRows } from "./blocks.ts";
 
 export interface SpecChange {
   id: string;

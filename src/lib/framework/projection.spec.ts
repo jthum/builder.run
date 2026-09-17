@@ -167,9 +167,9 @@ function appSpec(contact: TypeDef): AppSpec {
             blocks: [
               {
                 id: "block-invoice-table",
-                kind: "widget",
-                widget: "table",
-                values: { view: "invoice_list" },
+                kind: "block",
+                block: "table",
+                config: { view: "invoice_list" },
               },
             ],
           },

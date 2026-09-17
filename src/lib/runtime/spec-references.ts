@@ -2,14 +2,14 @@ import type {
   AppSpec,
   FieldCondition,
   FilterClause,
-  PageBlock,
+  PageLayoutNode,
   TypeDef,
   WorkflowDef,
   WorkflowStep,
 } from "./model.ts";
 import { cloneSpec } from "./model.ts";
 import type { AutomationEffectCall, AutomationValue } from "./automation/model.ts";
-import { widgetByKey, widgetInputs } from "./widgets.ts";
+import { blockByKey, blockInputs } from "./blocks.ts";
 
 export interface SpecReference {
   owner: "type" | "view" | "form" | "workflow" | "page";
@@ -132,14 +132,14 @@ export function findTypeReferences(spec: AppSpec, typeKey: string): SpecReferenc
     });
   }
   for (const page of spec.pages) {
-    visitPageWidgets(page.blocks, (block, path) => {
-      const view = typeof block.values?.view === "string" ? block.values.view : undefined;
-      const form = typeof block.values?.form === "string" ? block.values.form : undefined;
+    visitPageBlocks(page.blocks, (block, path) => {
+      const view = typeof block.config?.view === "string" ? block.config.view : undefined;
+      const form = typeof block.config?.form === "string" ? block.config.form : undefined;
       if (view && sourceTypeForView(spec, view) === typeKey) {
-        add("page", page.key, `pages.${page.key}.${path}.values.view`, `Page “${page.label}” view`);
+        add("page", page.key, `pages.${page.key}.${path}.config.view`, `Page “${page.label}” view`);
       }
       if (form && sourceTypeForForm(spec, form) === typeKey) {
-        add("page", page.key, `pages.${page.key}.${path}.values.form`, `Page “${page.label}” form`);
+        add("page", page.key, `pages.${page.key}.${path}.config.form`, `Page “${page.label}” form`);
       }
     });
   }
@@ -194,15 +194,15 @@ export function rewriteTypeReferences(spec: AppSpec, from: string, to: string): 
     });
   }
   for (const page of next.pages) {
-    visitPageWidgets(page.blocks, (block) => {
-      if (generatedView && block.values?.view === `${from}_list`) {
-        block.values.view = `${to}_list`;
+    visitPageBlocks(page.blocks, (block) => {
+      if (generatedView && block.config?.view === `${from}_list`) {
+        block.config.view = `${to}_list`;
       }
-      if (generatedCreateForm && block.values?.form === `${from}_create`) {
-        block.values.form = `${to}_create`;
+      if (generatedCreateForm && block.config?.form === `${from}_create`) {
+        block.config.form = `${to}_create`;
       }
-      if (generatedEditForm && block.values?.form === `${from}_edit`) {
-        block.values.form = `${to}_edit`;
+      if (generatedEditForm && block.config?.form === `${from}_edit`) {
+        block.config.form = `${to}_edit`;
       }
     });
   }
@@ -302,7 +302,7 @@ function walkPage(
   spec: AppSpec,
   pageKey: string,
   pageLabel: string,
-  blocks: PageBlock[],
+  blocks: PageLayoutNode[],
   walk: FieldWalk,
   prefix = "blocks",
 ): void {
@@ -313,21 +313,21 @@ function walkPage(
       walkPage(spec, pageKey, pageLabel, block.blocks, walk, `${path}.blocks`);
       return;
     }
-    const widget = widgetByKey(block.widget);
-    if (!widget || !block.values) return;
-    for (const input of widgetInputs(widget).filter((item) => item.type === "field")) {
-      const sourceValue = block.values[input.source ?? "view"];
+    const definition = blockByKey(block.block);
+    if (!definition || !block.config) return;
+    for (const input of blockInputs(definition).filter((item) => item.type === "field")) {
+      const sourceValue = block.config[input.source ?? "view"];
       const sourceKey = typeof sourceValue === "string" ? sourceValue : "";
       const source = sourceTypeForView(spec, sourceKey);
-      if (!source || typeof block.values[input.key] !== "string") continue;
-      block.values[input.key] = fieldPath(
+      if (!source || typeof block.config[input.key] !== "string") continue;
+      block.config[input.key] = fieldPath(
         spec,
         source,
-        String(block.values[input.key]),
+        String(block.config[input.key]),
         walk,
         owner,
-        `${path}.values.${input.key}`,
-        "widget field",
+        `${path}.config.${input.key}`,
+        "block field",
       );
     }
   });
@@ -574,14 +574,14 @@ function visitEffects(
   });
 }
 
-function visitPageWidgets(
-  blocks: PageBlock[],
-  visit: (block: Extract<PageBlock, { kind: "widget" }>, path: string) => void,
+function visitPageBlocks(
+  blocks: PageLayoutNode[],
+  visit: (block: Extract<PageLayoutNode, { kind: "block" }>, path: string) => void,
   prefix = "blocks",
 ): void {
   blocks.forEach((block, index) => {
     const path = `${prefix}[${index}]`;
-    if (block.kind === "group") visitPageWidgets(block.blocks, visit, `${path}.blocks`);
+    if (block.kind === "group") visitPageBlocks(block.blocks, visit, `${path}.blocks`);
     else visit(block, path);
   });
 }

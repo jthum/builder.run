@@ -93,19 +93,19 @@ Judging Dashboard
 [ Table: review queue ]
 ```
 
-The current chart widgets include **bar**, **donut**, **line**, **stacked bar**, **funnel**, **scatter**, and **activity heatmap**. Use them where the underlying data naturally supports the visualisation rather than adding charts only for decoration.
+The current chart blocks include **bar**, **donut**, **line**, **stacked bar**, **funnel**, **scatter**, and **activity heatmap**. Use them where the underlying data naturally supports the visualisation rather than adding charts only for decoration.
 
-### Growing the official widget library
+### Growing the official block library
 
-Every official widget lives in its own folder under `src/lib/widgets`. A widget has three independently useful parts:
+Every official block lives in its own folder under `src/lib/blocks`. A block has three independently useful parts:
 
 - `definition.ts` describes its stable key, category, configuration inputs, and editor copy;
-- `widget.svelte` renders it;
+- `block.svelte` renders it;
 - `preview.ts` provides deterministic example configuration and optional mock context for the Library.
 
-Folders may be nested to keep a large library navigable. The registry discovers all three files recursively, so a new widget does not require another central switch statement. Keep the definition lightweight: it is loaded for discovery and validation. Renderers and previews are independent lazy imports. A renderer may import specialised libraries; those dependencies are fetched only when that widget is rendered, while dependencies shared by several loaded widgets are deduplicated by the module graph.
+Folders may be nested to keep a large library navigable. The registry discovers all three files recursively, so a new block does not require another central switch statement. Keep the definition lightweight: it is loaded for discovery and validation. Block components and previews are independent lazy imports. A component may import specialised libraries; those dependencies are fetched only when that block is displayed, while dependencies shared by several loaded blocks are deduplicated by the module graph.
 
-Use `/library/widgets` to browse the complete installed widget library with deterministic preview data. The official catalog is bundled, but each preview and renderer is loaded only when its category is opened. Registry sources share a small normalized contract so trusted catalogs can be added later without coupling the page builder to their storage or packaging; arbitrary remote code is not loaded.
+Use `/library/blocks` to browse the complete installed block library with deterministic preview data. The official catalog is bundled, but each preview and component is loaded only when its category is opened. Registry sources share a small normalized contract so trusted catalogs can be added later without coupling the page builder to their storage or packaging; arbitrary remote code is not loaded.
 
 Pages may also be organised into folders when the app needs explicit navigation hierarchy.
 

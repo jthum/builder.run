@@ -648,7 +648,7 @@
 				<Field.Field orientation="horizontal" class="justify-between rounded-xl border bg-muted/30 p-3 sm:col-span-2">
 					<div class="flex flex-col gap-0.5">
 						<Field.Label for="featured">{featured ? "Shown in the app menu" : "Hidden from the app menu"}</Field.Label>
-						<Field.Description>{featured ? "People can open this view from the app navigation." : "The view remains available to widgets, rules, and agents."}</Field.Description>
+						<Field.Description>{featured ? "People can open this view from the app navigation." : "The view remains available to blocks, rules, and agents."}</Field.Description>
 					</div>
 					<Switch bind:checked={featured} id="featured" />
 				</Field.Field>

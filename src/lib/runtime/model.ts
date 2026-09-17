@@ -186,15 +186,22 @@ export type WorkflowDef = AutomationDefinition;
 
 export type PageRowHeight = "s" | "m" | "l" | "xl";
 
-export type PageBlock =
-  | { id?: string; kind: "widget"; widget: string; values?: Record<string, unknown> }
-  | {
-      id?: string;
-      kind: "group";
-      columns?: number;
-      min_height?: PageRowHeight;
-      blocks: PageBlock[];
-    };
+export interface PageBlockNode {
+  id?: string;
+  kind: "block";
+  block: string;
+  config?: Record<string, unknown>;
+}
+
+export interface PageGroupNode {
+  id?: string;
+  kind: "group";
+  columns?: number;
+  min_height?: PageRowHeight;
+  blocks: PageLayoutNode[];
+}
+
+export type PageLayoutNode = PageBlockNode | PageGroupNode;
 
 export interface PageDef extends SpecNode {
   key: string;
@@ -202,17 +209,17 @@ export interface PageDef extends SpecNode {
   path?: string;
   folder?: string;
   icon?: string;
-  blocks: PageBlock[];
+  blocks: PageLayoutNode[];
   implicit?: boolean;
 }
 
 /** Assigns identity once while preserving IDs through edits and reordering. */
-export function ensurePageBlockIds(blocks: readonly PageBlock[]): PageBlock[] {
+export function ensurePageNodeIds(blocks: readonly PageLayoutNode[]): PageLayoutNode[] {
   return blocks.map((block) => {
     const currentId = block.id;
     const id = currentId && isSpecId(currentId) ? currentId : createSpecId();
     return block.kind === "group"
-      ? { ...block, id, blocks: ensurePageBlockIds(block.blocks) }
+      ? { ...block, id, blocks: ensurePageNodeIds(block.blocks) }
       : { ...block, id };
   });
 }
@@ -1002,7 +1009,7 @@ export function normalizeSpec(input: SpecDraft | AppSpec, existing?: AppSpec): A
     ).map(normalizeWorkflow),
     pages: (namedList(input.pages as never, existing?.pages as never) as PageDef[]).map((page) => ({
       ...page,
-      blocks: ensurePageBlockIds(page.blocks ?? []),
+      blocks: ensurePageNodeIds(page.blocks ?? []),
     })),
   };
   for (const view of spec.views) {
@@ -1048,7 +1055,10 @@ function assertUniqueSpecIds(spec: AppSpec): void {
   }
 }
 
-function visitPageBlocks(blocks: readonly PageBlock[], visit: (block: PageBlock) => void): void {
+function visitPageBlocks(
+  blocks: readonly PageLayoutNode[],
+  visit: (block: PageLayoutNode) => void,
+): void {
   for (const block of blocks) {
     visit(block);
     if (block.kind === "group") visitPageBlocks(block.blocks, visit);

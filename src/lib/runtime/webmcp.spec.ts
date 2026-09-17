@@ -398,12 +398,12 @@ describe("webmcp bridge", () => {
         {
           kind: "group",
           columns: 1,
-          blocks: [{ kind: "widget", widget: "heading", values: { title: "Diagnostics" } }],
+          blocks: [{ kind: "block", block: "heading", config: { title: "Diagnostics" } }],
         },
       ],
     });
     expect(JSON.parse(String(nested)).error).toBeUndefined();
-    expect(JSON.parse(String(nested)).blocks[0].blocks[0].widget).toBe("heading");
+    expect(JSON.parse(String(nested)).blocks[0].blocks[0].block).toBe("heading");
     const unwrapped = await upsert.execute({
       key: "diag_unwrapped",
       label: "Diagnostic Unwrapped",
@@ -412,18 +412,18 @@ describe("webmcp bridge", () => {
         {
           kind: "group",
           columns: 1,
-          blocks: { kind: "widget", widget: "heading", values: { title: "Diagnostics" } },
+          blocks: { kind: "block", block: "heading", config: { title: "Diagnostics" } },
         },
       ],
     });
     expect(JSON.parse(String(unwrapped)).error).toBeUndefined();
     expect(JSON.parse(String(unwrapped)).blocks[0].blocks).toMatchObject([
-      { kind: "widget", widget: "heading", values: { title: "Diagnostics" } },
+      { kind: "block", block: "heading", config: { title: "Diagnostics" } },
     ]);
     bridge.stop();
   });
 
-  it("describes widget fields and validates agent-authored chart and board values", async () => {
+  it("describes block fields and validates agent-authored chart and board values", async () => {
     expect.hasAssertions();
     const host = await Host.open();
     await host.upsertType({
@@ -439,9 +439,7 @@ describe("webmcp bridge", () => {
     await bridge.flush();
 
     const description = JSON.parse(
-      String(
-        await registry.tools.get("get_widgets")!.execute({ widget: "bar", view: "task_list" }),
-      ),
+      String(await registry.tools.get("get_blocks")!.execute({ block: "bar", view: "task_list" })),
     );
     expect(
       description.inputs.find((input: { key: string }) => input.key === "category").options,
@@ -464,11 +462,11 @@ describe("webmcp bridge", () => {
               columns: 2,
               blocks: [
                 {
-                  kind: "widget",
-                  widget: "bar",
-                  values: { view: "task_list", category: "status", value: "points" },
+                  kind: "block",
+                  block: "bar",
+                  config: { view: "task_list", category: "status", value: "points" },
                 },
-                { kind: "widget", widget: "kanban", values: { view: "task_list" } },
+                { kind: "block", block: "kanban", config: { view: "task_list" } },
               ],
             },
           ],
@@ -476,20 +474,20 @@ describe("webmcp bridge", () => {
       ),
     );
     expect(page.error).toBeUndefined();
-    expect(page.blocks[0].blocks[1].values).toEqual({ view: "task_list", field: "status" });
+    expect(page.blocks[0].blocks[1].config).toEqual({ view: "task_list", field: "status" });
 
     const invalid = JSON.parse(
       String(
         await registry.tools.get("upsert_page")!.execute({
           key: "bad_board",
           blocks: [
-            { kind: "widget", widget: "kanban", values: { view: "task_list", field: "points" } },
+            { kind: "block", block: "kanban", config: { view: "task_list", field: "points" } },
           ],
         }),
       ),
     );
     expect(invalid.error).toBe(
-      'Widget "kanban" values.field cannot be "points". Valid options: status.',
+      'Block "kanban" config.field cannot be "points". Valid options: status.',
     );
     bridge.stop();
   });

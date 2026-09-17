@@ -1,0 +1,8 @@
+import { projectPreview } from "$lib/blocks/preview-fixtures.ts";
+
+export default projectPreview({
+  view: "all_tasks",
+  title: "Scheduled effort",
+  date: "due_date",
+  value: "estimate",
+});

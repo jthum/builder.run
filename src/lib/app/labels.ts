@@ -255,7 +255,7 @@ export function breadcrumbFor(path: string, spec?: AppSpec): Crumb[] {
   if (parts[0] === "library") {
     return [
       { label: "Edit app", href: "/build" },
-      { label: "Library", href: "/library/widgets" },
+      { label: "Library", href: "/library/blocks" },
       ...(parts[1] ? [{ label: labelFromKey(parts[1]) }] : []),
     ];
   }

@@ -3,7 +3,7 @@
 	import { runtime, session } from "$lib/app/session.svelte.ts";
 	import PageCanvas from "$lib/components/page-canvas.svelte";
 	import type { PageDef } from "$lib/runtime/model.ts";
-	import { resolvePage } from "$lib/runtime/widgets.ts";
+	import { resolvePage } from "$lib/runtime/blocks.ts";
 
 	const pageKey = $derived(page.params.page ?? "");
 	const spec = $derived(session.resolvedSpec);

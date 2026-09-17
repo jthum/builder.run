@@ -4,7 +4,7 @@ import {
   type FieldDefinition,
   type FormDefinition,
   type JsonValue,
-  type PageLayoutNode,
+  type PageLayoutNode as FrameworkPageLayoutNode,
   type SourceFilter,
   type Spec,
   type SpecMeta,
@@ -16,7 +16,7 @@ import type {
   FieldCondition as AppFieldCondition,
   FieldDef,
   FilterClause,
-  PageBlock,
+  PageLayoutNode as AppPageLayoutNode,
   TypeDef,
 } from "$lib/runtime/model.ts";
 
@@ -447,15 +447,18 @@ function resolveFieldPath(
   return ids;
 }
 
-function projectPageNode(block: PageBlock, path: readonly number[]): PageLayoutNode {
+function projectPageNode(
+  block: AppPageLayoutNode,
+  path: readonly number[],
+): FrameworkPageLayoutNode {
   const id = requireDefinitionId(block.id, `pages.layout.${path.join(".")}`);
-  if (block.kind === "widget")
+  if (block.kind === "block")
     return {
       id,
       kind: "block",
-      block: block.widget,
-      ...(block.values
-        ? { config: jsonObject(block.values, `pages.layout.${path.join(".")}`) }
+      block: block.block,
+      ...(block.config
+        ? { config: jsonObject(block.config, `pages.layout.${path.join(".")}`) }
         : {}),
     };
   return {

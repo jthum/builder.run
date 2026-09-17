@@ -7,7 +7,7 @@ import {
   type TypeDef,
   type ViewDef,
 } from "./model.ts";
-import { firstViewKey, normalizePageRows } from "./widgets.ts";
+import { firstViewKey, normalizePageRows } from "./blocks.ts";
 
 const implicitIds = new Map<string, string>();
 
@@ -94,7 +94,7 @@ export function defaultPageFor(type: TypeDef): PageDef {
       {
         kind: "group",
         columns: 1,
-        blocks: [{ kind: "widget", widget: "table", values: { view: implicitViewKey(type.key) } }],
+        blocks: [{ kind: "block", block: "table", config: { view: implicitViewKey(type.key) } }],
       },
     ],
     implicit: true,

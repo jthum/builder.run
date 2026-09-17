@@ -1,3 +1,0 @@
-import { projectPreview } from "$lib/widgets/preview-fixtures.ts";
-
-export default projectPreview({ workflow: "complete_project", label: "Complete project" });

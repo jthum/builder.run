@@ -78,16 +78,16 @@ function referenceSpec() {
       overview: {
         blocks: [
           {
-            kind: "widget",
-            widget: "bar",
-            values: { view: "projects", category: "client.name", value: "budget" },
+            kind: "block",
+            block: "bar",
+            config: { view: "projects", category: "client.name", value: "budget" },
           },
         ],
       },
       client_home: {
         blocks: [
-          { kind: "widget", widget: "table", values: { view: "client_list" } },
-          { kind: "widget", widget: "form", values: { form: "client_create" } },
+          { kind: "block", block: "table", config: { view: "client_list" } },
+          { kind: "block", block: "form", config: { form: "client_create" } },
         ],
       },
     },
@@ -105,12 +105,12 @@ describe("spec references", () => {
         expect.stringContaining("field condition"),
         expect.stringContaining("column"),
         expect.stringContaining("trigger"),
-        expect.stringContaining("widget field"),
+        expect.stringContaining("block field"),
       ]),
     );
   });
 
-  it("rewrites direct, related, widget, and workflow field references", () => {
+  it("rewrites direct, related, block, and workflow field references", () => {
     const renamed = rewriteFieldReferences(referenceSpec(), "client", "name", "legal_name");
     const view = renamed.views.find((item) => item.key === "projects")!;
     const workflow = renamed.workflows.find((item) => item.key === "update_client")!;
@@ -123,7 +123,7 @@ describe("spec references", () => {
     expect(renamed.forms[0]?.fields).toEqual(["legal_name"]);
     expect(renamed.types[0]?.fields[1]?.visible_when).toMatchObject({ field: "legal_name" });
     expect(renamed.pages[0]?.blocks[0]).toMatchObject({
-      values: { view: "projects", category: "client.legal_name", value: "budget" },
+      config: { view: "projects", category: "client.legal_name", value: "budget" },
     });
     expect(workflow.trigger?.key).toBe("client.legal_name.changed");
     expect(JSON.stringify(workflow.steps)).toContain("vars.client.legal_name");
@@ -147,8 +147,8 @@ describe("spec references", () => {
     expect(renamed.workflows[0]?.trigger?.key).toBe("customer.name.changed");
     expect(JSON.stringify(renamed.workflows[0]?.steps)).toContain('"type":"customer"');
     expect(renamed.pages[1]?.blocks).toMatchObject([
-      { values: { view: "customer_list" } },
-      { values: { form: "customer_create" } },
+      { config: { view: "customer_list" } },
+      { config: { form: "customer_create" } },
     ]);
   });
 
@@ -162,8 +162,8 @@ describe("spec references", () => {
       pages: {
         overview: {
           blocks: [
-            { kind: "widget", widget: "table", values: { view: "project_list" } },
-            { kind: "widget", widget: "form", values: { form: "project_create" } },
+            { kind: "block", block: "table", config: { view: "project_list" } },
+            { kind: "block", block: "form", config: { form: "project_create" } },
           ],
         },
       },
@@ -173,8 +173,8 @@ describe("spec references", () => {
     expect(renamed.views[0]).toMatchObject({ key: "project_list", source: "engagement" });
     expect(renamed.forms[0]).toMatchObject({ key: "project_create", type: "engagement" });
     expect(renamed.pages[0]?.blocks).toMatchObject([
-      { values: { view: "project_list" } },
-      { values: { form: "project_create" } },
+      { config: { view: "project_list" } },
+      { config: { form: "project_create" } },
     ]);
   });
 });

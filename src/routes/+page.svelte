@@ -8,7 +8,7 @@
 	import * as Card from "$lib/components/ui/card/index.js";
 	import type { PageDef } from "$lib/runtime/model.ts";
 	import { sampleApps, templateCategories } from "$lib/runtime/samples.ts";
-	import { resolveHomePage } from "$lib/runtime/widgets.ts";
+	import { resolveHomePage } from "$lib/runtime/blocks.ts";
 	import BriefcaseIcon from "@lucide/svelte/icons/briefcase";
 	import LayersIcon from "@lucide/svelte/icons/layers";
 	import PlusIcon from "@lucide/svelte/icons/plus";

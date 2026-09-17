@@ -13,7 +13,7 @@ import {
 import { sampleApps } from "./samples.ts";
 import { PAGE_ICON_KEYS } from "./page-icons.ts";
 import { specFromText } from "./serialize.ts";
-import { describeWidget, widgets } from "./widgets.ts";
+import { describeBlock, blocks } from "./blocks.ts";
 
 export type ToolSurface = "builder" | "app";
 export type WebMcpAppToolMode = "compact" | "typed";
@@ -433,41 +433,41 @@ export function buildTools(host: Host, options: BuildToolsOptions = {}): ToolDef
       execute: () => host.resolvedSpec(),
     },
     {
-      name: "get_widgets",
-      title: "Inspect page widgets",
+      name: "get_blocks",
+      title: "Inspect page blocks",
       description:
-        "Discover page widgets and their configuration contract. Call without widget to list or search widgets. Pass a widget key for its inputs. Also pass view for exact compatible field options before calling upsert_page.",
+        "Discover page blocks and their configuration contract. Call without block to list or search blocks. Pass a block key for its inputs. Also pass view for exact compatible field options before calling upsert_page.",
       inputSchema: {
         type: "object",
         properties: {
-          widget: { type: "string", description: "Widget key to inspect" },
+          block: { type: "string", description: "Block key to inspect" },
           view: {
             type: "string",
             description: "Optional View key used to resolve compatible field inputs",
           },
-          query: { type: "string", description: "Optional text search when listing widgets" },
+          query: { type: "string", description: "Optional text search when listing blocks" },
           category: {
             type: "string",
-            enum: ["content", "data", "actions"],
-            description: "Optional category filter when listing widgets",
+            enum: ["highlights", "content", "data", "charts", "actions"],
+            description: "Optional category filter when listing blocks",
           },
         },
         additionalProperties: false,
       },
       annotations: { readOnlyHint: true },
-      execute: ({ widget, view, query, category }) => {
-        const key = asText(widget);
+      execute: ({ block, view, query, category }) => {
+        const key = asText(block);
         if (!key) {
           const needle = asText(query).trim().toLowerCase();
           const categoryKey = asText(category);
-          const matching = widgets.filter((item) => {
+          const matching = blocks.filter((item) => {
             if (categoryKey && item.category !== categoryKey) return false;
             if (!needle) return true;
             return `${item.key} ${item.label} ${item.description}`.toLowerCase().includes(needle);
           });
           return {
             total: matching.length,
-            widgets: matching.slice(0, 25).map((item) => ({
+            blocks: matching.slice(0, 25).map((item) => ({
               key: item.key,
               label: item.label,
               description: item.description,
@@ -475,8 +475,8 @@ export function buildTools(host: Host, options: BuildToolsOptions = {}): ToolDef
             })),
             next:
               matching.length > 25
-                ? "Refine query or category, then call get_widgets with a widget key and optional view key."
-                : "Call get_widgets with a widget key and, for data widgets, a view key.",
+                ? "Refine query or category, then call get_blocks with a block key and optional view key."
+                : "Call get_blocks with a block key and, for data blocks, a view key.",
           };
         }
         const spec = host.resolvedSpec();
@@ -487,7 +487,7 @@ export function buildTools(host: Host, options: BuildToolsOptions = {}): ToolDef
             views: spec.views.map((item) => item.key),
           };
         }
-        return describeWidget(spec, key, viewKey ? { view: viewKey } : {});
+        return describeBlock(spec, key, viewKey ? { view: viewKey } : {});
       },
     },
     {
@@ -953,7 +953,7 @@ export function buildTools(host: Host, options: BuildToolsOptions = {}): ToolDef
       name: "upsert_page",
       title: "Create or update a page",
       description:
-        'Create or update a page of grids and widgets. Call get_widgets first to discover widget keys, required values, and compatible fields. Widget values are validated against that contract. Optional folder groups it in the app menu. Optional icon is one of: page, dashboard, table, chart, line, donut, board, calendar, list, inbox, people, money, time. If icon is omitted when creating a page, a one-time default is inferred from its widgets; later edits do not change it. A group nests children in a blocks array even when there is only one widget. columns is how many widgets sit side by side; unused columns stay empty. Example: upsert_page({ key: "board", icon: "board", path: "/board", blocks: [{ kind: "group", columns: 1, blocks: [{ kind: "widget", widget: "table", values: { view: "active_projects" } }] }] }).',
+        'Create or update a page of grids and blocks. Call get_blocks first to discover block keys, required configuration, and compatible fields. Block configuration is validated against that contract. Optional folder groups it in the app menu. Optional icon is one of: page, dashboard, table, chart, line, donut, board, calendar, list, inbox, people, money, time. If icon is omitted when creating a page, a one-time default is inferred from its blocks; later edits do not change it. A group nests children in a blocks array even when there is only one block. columns is how many blocks sit side by side; unused columns stay empty. Example: upsert_page({ key: "board", icon: "board", path: "/board", blocks: [{ kind: "group", columns: 1, blocks: [{ kind: "block", block: "table", config: { view: "active_projects" } }] }] }).',
       inputSchema: {
         type: "object",
         properties: {
@@ -970,16 +970,16 @@ export function buildTools(host: Host, options: BuildToolsOptions = {}): ToolDef
           blocks: {
             type: "array",
             description:
-              "Page layout. A group nests children in a blocks array — always an array, even for one widget.",
+              "Page layout. A group nests children in a blocks array — always an array, even for one block.",
             items: {
               type: "object",
               properties: {
-                kind: { type: "string", enum: ["widget", "group"] },
-                widget: { type: "string" },
-                values: { type: "object" },
+                kind: { type: "string", enum: ["block", "group"] },
+                block: { type: "string" },
+                config: { type: "object" },
                 columns: {
                   type: "number",
-                  description: "Widgets side by side in this group (1–4). Unused cells stay empty.",
+                  description: "Blocks side by side in this group (1–4). Unused cells stay empty.",
                 },
                 blocks: { type: "array", items: { type: "object" } },
               },

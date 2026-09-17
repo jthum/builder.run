@@ -15,7 +15,7 @@ They let an agent inspect and mould the application model, including operations 
 - create an app;
 - add or update Types and fields;
 - add or update Views;
-- compose Pages and widgets;
+- compose Pages and blocks;
 - create or change Forms and Workflows.
 
 The exact tool set follows the implementation, but the important distinction is that these tools operate on **the application definition**.
@@ -59,9 +59,9 @@ The human UI and WebMCP tools should not implement separate business logic.
 
 Both call into the same application runtime services, so validation, persistence, references, and Workflow execution behave consistently whichever surface initiated the operation.
 
-Page widgets follow the same rule. An agent can call `get_widgets` with a widget key and optional View key to discover required inputs and compatible fields. The same widget registry drives the human editor, agent discovery, safe defaults, and `upsert_page` validation, so adding a widget does not require a separate agent-specific contract.
+Page blocks follow the same rule. An agent can call `get_blocks` with a block key and optional View key to discover required inputs and compatible fields. The same block registry drives the human editor, agent discovery, safe defaults, and `upsert_page` validation, so adding a block does not require a separate agent-specific contract.
 
-Structured workflows are discoverable in the same way. `get_automation_primitives` returns the canonical composition shapes, registered condition and effect keys, their parameter contracts, and the active runtime capability profile. Agents should inspect it before `upsert_workflow` rather than guessing a widget- or domain-specific workflow shape.
+Structured workflows are discoverable in the same way. `get_automation_primitives` returns the canonical composition shapes, registered condition and effect keys, their parameter contracts, and the active runtime capability profile. Agents should inspect it before `upsert_workflow` rather than guessing a block- or domain-specific workflow shape.
 
 WebMCP is therefore best understood as a **projection of the live spec**, not a second API.
 

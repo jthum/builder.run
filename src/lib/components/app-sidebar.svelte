@@ -36,7 +36,7 @@
 	import WorkflowIcon from "@lucide/svelte/icons/workflow";
 	import type { PageDef, TypeDef } from "$lib/runtime/model.ts";
 	import { pageIconEntry } from "$lib/runtime/page-icons.ts";
-	import { authoredNavPages, groupPagesByFolder, pageHref } from "$lib/runtime/widgets.ts";
+	import { authoredNavPages, groupPagesByFolder, pageHref } from "$lib/runtime/blocks.ts";
 	import type { Component, ComponentProps } from "svelte";
 
 	let { ref = $bindable(null), ...restProps }: ComponentProps<typeof Sidebar.Root> = $props();
@@ -83,7 +83,7 @@
 		"/build/actors": UsersIcon,
 		"/build/settings": SettingsIcon,
 		"/build/spec": FileTextIcon,
-		"/library/widgets": LibraryIcon,
+		"/library/blocks": LibraryIcon,
 		"/diagnostics": SearchIcon,
 	};
 

@@ -249,9 +249,9 @@ export const sampleApps: SampleApp[] = [
               columns: 1,
               blocks: [
                 {
-                  kind: "widget",
-                  widget: "heading",
-                  values: {
+                  kind: "block",
+                  block: "heading",
+                  config: {
                     title: "Delivery overview",
                     description:
                       "A live view of active client work, priorities, and team capacity.",
@@ -264,27 +264,27 @@ export const sampleApps: SampleApp[] = [
               columns: 3,
               blocks: [
                 {
-                  kind: "widget",
-                  widget: "stat",
-                  values: {
+                  kind: "block",
+                  block: "stat",
+                  config: {
                     view: "active_projects",
                     title: "Active projects",
                     description: "Client work currently in delivery",
                   },
                 },
                 {
-                  kind: "widget",
-                  widget: "stat",
-                  values: {
+                  kind: "block",
+                  block: "stat",
+                  config: {
                     view: "blocked_tasks",
                     title: "Blocked tasks",
                     description: "Items that need attention",
                   },
                 },
                 {
-                  kind: "widget",
-                  widget: "metric",
-                  values: {
+                  kind: "block",
+                  block: "metric",
+                  config: {
                     view: "project_portfolio",
                     value: "budget",
                     date: "due_date",
@@ -300,9 +300,9 @@ export const sampleApps: SampleApp[] = [
               min_height: "m",
               blocks: [
                 {
-                  kind: "widget",
-                  widget: "donut",
-                  values: {
+                  kind: "block",
+                  block: "donut",
+                  config: {
                     view: "tasks_by_status",
                     category: "status",
                     value: "task_count",
@@ -310,9 +310,9 @@ export const sampleApps: SampleApp[] = [
                   },
                 },
                 {
-                  kind: "widget",
-                  widget: "bar",
-                  values: {
+                  kind: "block",
+                  block: "bar",
+                  config: {
                     view: "tasks_by_status",
                     category: "status",
                     value: "estimated_hours",
@@ -327,9 +327,9 @@ export const sampleApps: SampleApp[] = [
               min_height: "m",
               blocks: [
                 {
-                  kind: "widget",
-                  widget: "leaderboard",
-                  values: {
+                  kind: "block",
+                  block: "leaderboard",
+                  config: {
                     view: "all_tasks",
                     title: "Largest pieces of work",
                     label_field: "title",
@@ -339,9 +339,9 @@ export const sampleApps: SampleApp[] = [
                   },
                 },
                 {
-                  kind: "widget",
-                  widget: "timeline",
-                  values: {
+                  kind: "block",
+                  block: "timeline",
+                  config: {
                     view: "all_tasks",
                     title: "Upcoming delivery",
                     description: "Milestones ordered by due date",
@@ -360,9 +360,9 @@ export const sampleApps: SampleApp[] = [
               min_height: "m",
               blocks: [
                 {
-                  kind: "widget",
-                  widget: "kanban",
-                  values: { view: "all_tasks", field: "status", title: "Delivery board" },
+                  kind: "block",
+                  block: "kanban",
+                  config: { view: "all_tasks", field: "status", title: "Delivery board" },
                 },
               ],
             },
@@ -371,14 +371,14 @@ export const sampleApps: SampleApp[] = [
               columns: 1,
               blocks: [
                 {
-                  kind: "widget",
-                  widget: "table",
-                  values: { view: "active_projects", title: "Active projects" },
+                  kind: "block",
+                  block: "table",
+                  config: { view: "active_projects", title: "Active projects" },
                 },
                 {
-                  kind: "widget",
-                  widget: "form",
-                  values: { form: "quick_task", title: "Add a task" },
+                  kind: "block",
+                  block: "form",
+                  config: { form: "quick_task", title: "Add a task" },
                 },
               ],
             },
@@ -772,9 +772,9 @@ export const sampleApps: SampleApp[] = [
               columns: 1,
               blocks: [
                 {
-                  kind: "widget",
-                  widget: "heading",
-                  values: {
+                  kind: "block",
+                  block: "heading",
+                  config: {
                     title: "Spend overview",
                     description:
                       "Review incoming requests and understand where the budget is going.",
@@ -787,27 +787,27 @@ export const sampleApps: SampleApp[] = [
               columns: 3,
               blocks: [
                 {
-                  kind: "widget",
-                  widget: "stat",
-                  values: {
+                  kind: "block",
+                  block: "stat",
+                  config: {
                     view: "approval_queue",
                     title: "Awaiting approval",
                     description: "Submitted requests ready to review",
                   },
                 },
                 {
-                  kind: "widget",
-                  widget: "stat",
-                  values: {
+                  kind: "block",
+                  block: "stat",
+                  config: {
                     view: "paid_expenses",
                     title: "Paid expenses",
                     description: "Requests settled and complete",
                   },
                 },
                 {
-                  kind: "widget",
-                  widget: "metric",
-                  values: {
+                  kind: "block",
+                  block: "metric",
+                  config: {
                     view: "all_expenses",
                     value: "amount",
                     date: "spent_on",
@@ -823,9 +823,9 @@ export const sampleApps: SampleApp[] = [
               min_height: "m",
               blocks: [
                 {
-                  kind: "widget",
-                  widget: "donut",
-                  values: {
+                  kind: "block",
+                  block: "donut",
+                  config: {
                     view: "expenses_by_status",
                     category: "status",
                     value: "total_amount",
@@ -833,9 +833,9 @@ export const sampleApps: SampleApp[] = [
                   },
                 },
                 {
-                  kind: "widget",
-                  widget: "bar",
-                  values: {
+                  kind: "block",
+                  block: "bar",
+                  config: {
                     view: "expenses_by_category",
                     category: "category",
                     value: "total_amount",
@@ -850,9 +850,9 @@ export const sampleApps: SampleApp[] = [
               min_height: "m",
               blocks: [
                 {
-                  kind: "widget",
-                  widget: "leaderboard",
-                  values: {
+                  kind: "block",
+                  block: "leaderboard",
+                  config: {
                     view: "all_expenses",
                     title: "Largest requests",
                     label_field: "title",
@@ -862,9 +862,9 @@ export const sampleApps: SampleApp[] = [
                   },
                 },
                 {
-                  kind: "widget",
-                  widget: "timeline",
-                  values: {
+                  kind: "block",
+                  block: "timeline",
+                  config: {
                     view: "all_expenses",
                     title: "Recent spend",
                     description: "Requests ordered by spend date",
@@ -882,14 +882,14 @@ export const sampleApps: SampleApp[] = [
               columns: 1,
               blocks: [
                 {
-                  kind: "widget",
-                  widget: "table",
-                  values: { view: "approval_queue", title: "Approval queue" },
+                  kind: "block",
+                  block: "table",
+                  config: { view: "approval_queue", title: "Approval queue" },
                 },
                 {
-                  kind: "widget",
-                  widget: "form",
-                  values: { form: "submit_expense_form", title: "Submit an expense" },
+                  kind: "block",
+                  block: "form",
+                  config: { form: "submit_expense_form", title: "Submit an expense" },
                 },
               ],
             },
@@ -1186,9 +1186,9 @@ export const sampleApps: SampleApp[] = [
               columns: 1,
               blocks: [
                 {
-                  kind: "widget",
-                  widget: "heading",
-                  values: {
+                  kind: "block",
+                  block: "heading",
+                  config: {
                     title: "Business overview",
                     description:
                       "Keep client delivery healthy and see what is outstanding at a glance.",
@@ -1201,27 +1201,27 @@ export const sampleApps: SampleApp[] = [
               columns: 3,
               blocks: [
                 {
-                  kind: "widget",
-                  widget: "stat",
-                  values: {
+                  kind: "block",
+                  block: "stat",
+                  config: {
                     view: "active_projects",
                     title: "Active projects",
                     description: "Client engagements currently moving",
                   },
                 },
                 {
-                  kind: "widget",
-                  widget: "stat",
-                  values: {
+                  kind: "block",
+                  block: "stat",
+                  config: {
                     view: "overdue_invoices",
                     title: "Overdue invoices",
                     description: "Payments that need follow-up",
                   },
                 },
                 {
-                  kind: "widget",
-                  widget: "metric",
-                  values: {
+                  kind: "block",
+                  block: "metric",
+                  config: {
                     view: "all_invoices",
                     value: "amount",
                     date: "issued_on",
@@ -1237,9 +1237,9 @@ export const sampleApps: SampleApp[] = [
               min_height: "m",
               blocks: [
                 {
-                  kind: "widget",
-                  widget: "donut",
-                  values: {
+                  kind: "block",
+                  block: "donut",
+                  config: {
                     view: "invoice_totals_by_status",
                     category: "status",
                     value: "total_amount",
@@ -1247,9 +1247,9 @@ export const sampleApps: SampleApp[] = [
                   },
                 },
                 {
-                  kind: "widget",
-                  widget: "line",
-                  values: {
+                  kind: "block",
+                  block: "line",
+                  config: {
                     view: "all_invoices",
                     category: "issued_on",
                     value: "amount",
@@ -1264,9 +1264,9 @@ export const sampleApps: SampleApp[] = [
               min_height: "m",
               blocks: [
                 {
-                  kind: "widget",
-                  widget: "leaderboard",
-                  values: {
+                  kind: "block",
+                  block: "leaderboard",
+                  config: {
                     view: "all_invoices",
                     title: "Largest invoices",
                     label_field: "number",
@@ -1276,9 +1276,9 @@ export const sampleApps: SampleApp[] = [
                   },
                 },
                 {
-                  kind: "widget",
-                  widget: "timeline",
-                  values: {
+                  kind: "block",
+                  block: "timeline",
+                  config: {
                     view: "all_invoices",
                     title: "Invoice timeline",
                     description: "Invoices ordered by due date",
@@ -1297,9 +1297,9 @@ export const sampleApps: SampleApp[] = [
               min_height: "m",
               blocks: [
                 {
-                  kind: "widget",
-                  widget: "kanban",
-                  values: { view: "all_projects", field: "status", title: "Project pipeline" },
+                  kind: "block",
+                  block: "kanban",
+                  config: { view: "all_projects", field: "status", title: "Project pipeline" },
                 },
               ],
             },
@@ -1308,14 +1308,14 @@ export const sampleApps: SampleApp[] = [
               columns: 1,
               blocks: [
                 {
-                  kind: "widget",
-                  widget: "table",
-                  values: { view: "unpaid_invoices", title: "Awaiting payment" },
+                  kind: "block",
+                  block: "table",
+                  config: { view: "unpaid_invoices", title: "Awaiting payment" },
                 },
                 {
-                  kind: "widget",
-                  widget: "form",
-                  values: { form: "create_invoice", title: "Create an invoice" },
+                  kind: "block",
+                  block: "form",
+                  config: { form: "create_invoice", title: "Create an invoice" },
                 },
               ],
             },

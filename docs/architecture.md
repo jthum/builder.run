@@ -100,7 +100,7 @@ No server is required for application data in this runtime.
 
 The spec does not merely describe a mock UI.
 
-Types become real SQLite tables. Fields become columns. Views become runtime queries. Pages compose widgets. Workflows execute application behaviour.
+Types become real SQLite tables. Fields become columns. Views become runtime queries. Pages compose blocks. Workflows execute application behaviour.
 
 When the spec evolves, the runtime reconciles its materialised state.
 

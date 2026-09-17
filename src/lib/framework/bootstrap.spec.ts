@@ -61,7 +61,7 @@ describe("Framework vertical slice", () => {
             {
               kind: "group",
               columns: 1,
-              blocks: [{ kind: "widget", widget: "table", values: { view: "invoices" } }],
+              blocks: [{ kind: "block", block: "table", config: { view: "invoices" } }],
             },
           ],
         },
