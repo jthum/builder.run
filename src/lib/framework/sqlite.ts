@@ -2,7 +2,7 @@ import { SqlitePersistenceAdapter } from "@jthum/framework/sqlite";
 import type { SqliteConnection, SqliteDatabase, SqliteParameters } from "@jthum/framework/sqlite";
 import type { SqlConnection, SqlGateway } from "$lib/runtime/persistence/sqlite/gateway.ts";
 
-export const RUNTIME_DATABASE = "framework-runtime";
+export const RUNTIME_DATABASE = "runtime.db";
 const leasedDatabaseNames = new WeakMap<SqlGateway, Set<string>>();
 
 /**
