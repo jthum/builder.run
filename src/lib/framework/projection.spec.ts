@@ -40,7 +40,7 @@ describe("Framework projection", () => {
     expect(assertFrameworkProjectionReady(projection)).toBe(projection.spec);
   });
 
-  it("reports capabilities that are not represented instead of silently dropping behavior", () => {
+  it("projects grouped measures and reports only capabilities not yet represented", () => {
     expect.hasAssertions();
     const contact = contactType();
     const input = appSpec(contact);
@@ -61,18 +61,21 @@ describe("Framework projection", () => {
     ];
 
     const projection = projectFrameworkSpec(input, { sharedTypes: [contact] });
-    expect(projection.gaps.map((gap) => gap.code)).toEqual([
-      "VIEW.AGGREGATION_UNSUPPORTED",
-      "RULES.NOT_PROJECTED",
-    ]);
-    expect(() => assertFrameworkProjectionReady(projection)).toThrow(
-      "VIEW.AGGREGATION_UNSUPPORTED",
-    );
+    expect(projection.gaps.map((gap) => gap.code)).toEqual(["RULES.NOT_PROJECTED"]);
+    expect(projection.spec.views[0]).toMatchObject({
+      query: {
+        aggregate: {
+          group: { path: ["field-status"], as: "status" },
+          measures: [{ as: "total", operation: "count" }],
+        },
+      },
+    });
+    expect(() => assertFrameworkProjectionReady(projection)).toThrow("RULES.NOT_PROJECTED");
   });
 
   it("projects every current template and reports only deliberate phase gaps", () => {
     expect.hasAssertions();
-    const allowed = new Set(["VIEW.AGGREGATION_UNSUPPORTED", "RULES.NOT_PROJECTED"]);
+    const allowed = new Set(["RULES.NOT_PROJECTED"]);
     for (const sample of sampleApps) {
       const projection = projectFrameworkSpec(sample.spec, {
         sharedTypes: sample.exposedTypes ?? [],

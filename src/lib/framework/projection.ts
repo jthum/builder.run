@@ -8,6 +8,7 @@ import {
   type SourceFilter,
   type Spec,
   type SpecMeta,
+  type ViewDefinition,
 } from "@jthum/framework/spec";
 import { inValues, normalizeFilters } from "$lib/runtime/filters.ts";
 import { labelFromKey, slugify } from "$lib/runtime/ids.ts";
@@ -129,30 +130,37 @@ export function projectFrameworkSpec(
       });
       return [];
     }
-    if (view.group_by || view.measures) {
-      gaps.push({
-        path,
-        code: "VIEW.AGGREGATION_UNSUPPORTED",
-        message: "Grouped and aggregate Views wait for Source aggregation capabilities.",
-      });
-      return [];
-    }
-    const select = view.fields.flatMap((field, fieldIndex) => {
-      const fieldPath = resolveFieldPath(type, field, allTypes);
-      if (!fieldPath) {
-        gaps.push({
-          path: `${path}.fields.${fieldIndex}`,
-          code: "VIEW.FIELD_UNRESOLVED",
-          message: `View path ${field} cannot be resolved.`,
+    const aggregated = Boolean(view.group_by);
+    const select = aggregated
+      ? []
+      : view.fields.flatMap((field, fieldIndex) => {
+          const fieldPath = resolveFieldPath(type, field, allTypes);
+          if (!fieldPath) {
+            gaps.push({
+              path: `${path}.fields.${fieldIndex}`,
+              code: "VIEW.FIELD_UNRESOLVED",
+              message: `View path ${field} cannot be resolved.`,
+            });
+            return [];
+          }
+          return [
+            { path: fieldPath, as: slugify(field.replaceAll(".", "_")) || `field_${fieldIndex}` },
+          ];
+        });
+    const parameters: NonNullable<ViewDefinition["parameters"]>[number][] = [];
+    const filters = normalizeFilters(view.where).flatMap((filter, filterIndex) => {
+      const projected = projectSourceFilter(type, filter, allTypes);
+      if (filter.value === "$record.id" && projected && "path" in projected) {
+        parameters.push({
+          key: "record_id",
+          label: "Current record",
+          path: projected.path,
+          operator: projected.operator,
+          required: true,
+          source: "context",
         });
         return [];
       }
-      return [
-        { path: fieldPath, as: slugify(field.replaceAll(".", "_")) || `field_${fieldIndex}` },
-      ];
-    });
-    const filters = normalizeFilters(view.where).flatMap((filter, filterIndex) => {
-      const projected = projectSourceFilter(type, filter, allTypes);
       if (projected) return [projected];
       gaps.push({
         path: `${path}.where.${filterIndex}`,
@@ -161,16 +169,107 @@ export function projectFrameworkSpec(
       });
       return [];
     });
-    const sort = Object.entries(view.order_by ?? {}).flatMap(([field, direction]) => {
-      const fieldPath = resolveFieldPath(type, field, allTypes);
-      if (fieldPath) return [{ path: fieldPath, direction }];
-      gaps.push({
-        path: `${path}.order_by.${field}`,
-        code: "VIEW.SORT_UNRESOLVED",
-        message: `Sort path ${field} cannot be projected.`,
+    for (const field of view.expose ?? []) {
+      const parameterPath = resolveFieldPath(type, field, allTypes);
+      if (!parameterPath) {
+        gaps.push({
+          path: `${path}.expose.${field}`,
+          code: "VIEW.PARAMETER_UNRESOLVED",
+          message: `Exposed filter ${field} cannot be projected.`,
+        });
+        continue;
+      }
+      parameters.push({
+        key: slugify(field.replaceAll(".", "_")),
+        label: labelFromKey(field.split(".").at(-1) ?? field),
+        path: parameterPath,
       });
-      return [];
-    });
+    }
+    const groupAlias = view.group_by ? slugify(view.group_by.replaceAll(".", "_")) : "";
+    const aggregateAliases = new Set([
+      view.group_by ?? "",
+      groupAlias,
+      ...Object.keys(view.measures ?? {}),
+    ]);
+    const sourceSort: NonNullable<NonNullable<ViewDefinition["query"]>["sort"]>[number][] = [];
+    const aggregateSort: NonNullable<
+      NonNullable<NonNullable<ViewDefinition["query"]>["aggregate"]>["sort"]
+    >[number][] = [];
+    for (const [field, direction] of Object.entries(view.order_by ?? {})) {
+      if (aggregated && aggregateAliases.has(field)) {
+        aggregateSort.push({ key: field === view.group_by ? groupAlias : field, direction });
+        continue;
+      }
+      const fieldPath = resolveFieldPath(type, field, allTypes);
+      if (fieldPath) sourceSort.push({ path: fieldPath, direction });
+      else
+        gaps.push({
+          path: `${path}.order_by.${field}`,
+          code: "VIEW.SORT_UNRESOLVED",
+          message: `Sort path ${field} cannot be projected.`,
+        });
+    }
+    let aggregate: NonNullable<NonNullable<ViewDefinition["query"]>["aggregate"]> | undefined;
+    if (view.group_by) {
+      const groupPath = resolveFieldPath(type, view.group_by, allTypes);
+      if (!groupPath) {
+        gaps.push({
+          path: `${path}.group_by`,
+          code: "VIEW.GROUP_UNRESOLVED",
+          message: `Group path ${view.group_by} cannot be projected.`,
+        });
+        return [];
+      }
+      const measures = Object.entries(view.measures ?? {}).flatMap(([alias, measure]) => {
+        const measurePath = measure.field
+          ? resolveFieldPath(type, measure.field, allTypes)
+          : undefined;
+        const measurePaths = measure.fields?.map((field) =>
+          resolveFieldPath(type, field, allTypes),
+        );
+        if (
+          measure.op !== "count" &&
+          !measurePath &&
+          !(measure.op === "avg" && measurePaths?.length && measurePaths.every(Boolean))
+        ) {
+          gaps.push({
+            path: `${path}.measures.${alias}`,
+            code: "VIEW.MEASURE_UNRESOLVED",
+            message: `Measure ${alias} has unresolved fields.`,
+          });
+          return [];
+        }
+        return [
+          {
+            as: alias,
+            label: labelFromKey(alias),
+            operation: measure.op,
+            ...(measurePath ? { path: measurePath } : {}),
+            ...(measure.op === "avg" && measurePaths?.length
+              ? { paths: measurePaths as string[][] }
+              : {}),
+          },
+        ];
+      });
+      if (!measures.length) {
+        gaps.push({
+          path: `${path}.measures`,
+          code: "VIEW.MEASURES_REQUIRED",
+          message: "Grouped Views need at least one measure.",
+        });
+        return [];
+      }
+      aggregate = {
+        group: {
+          path: groupPath,
+          as: groupAlias,
+          label: labelFromKey(view.group_by),
+          ...groupLabelPath(type, view.group_by, allTypes),
+        },
+        measures,
+        ...(aggregateSort.length ? { sort: aggregateSort } : {}),
+      };
+    }
     return [
       {
         id: view.id,
@@ -178,14 +277,16 @@ export function projectFrameworkSpec(
         label: view.label,
         ...(view.meta ? { meta: view.meta } : {}),
         source: view.source,
+        ...(parameters.length ? { parameters } : {}),
         query: {
           ...(filters.length === 1
             ? { filter: filters[0] }
             : filters.length
               ? { filter: { all: filters } }
               : {}),
-          ...(sort.length ? { sort } : {}),
+          ...(sourceSort.length ? { sort: sourceSort } : {}),
           ...(select.length ? { select } : {}),
+          ...(aggregate ? { aggregate } : {}),
           ...(view.limit ? { limit: view.limit } : {}),
         },
       },
@@ -445,6 +546,22 @@ function resolveFieldPath(
     }
   }
   return ids;
+}
+
+function groupLabelPath(
+  root: TypeDef,
+  fieldKey: string,
+  types: ReadonlyMap<string, TypeDef>,
+): { labelPath?: string[] } {
+  if (fieldKey.includes(".")) return {};
+  const field = root.fields.find((candidate) => candidate.key === fieldKey);
+  if (field?.type !== "reference") return {};
+  const target = types.get(field.target?.split(".").at(-1) ?? "");
+  const title =
+    target?.fields.find((candidate) =>
+      ["name", "title", "number", "email"].includes(candidate.key),
+    ) ?? target?.fields[0];
+  return title ? { labelPath: [field.id, title.id] } : {};
 }
 
 function projectPageNode(
