@@ -24,7 +24,9 @@
   async function createRule(draft: FormDraft) {
     const label = `Handle ${draft.label.trim() || form.label}`;
     const key = uniqueKey(label, context.rules.map(rule => rule.key));
-    await runtime().upsertWorkflow({ key, label, input: { values: { value: "object" } }, trigger: { key: "form.submitted", config: { form: form.key } }, steps: [] });
+    const rule = { key, label, input: { values: { value: "object" as const } }, trigger: { key: "form.submitted", config: { form: form.key } }, steps: [] };
+    if (canonical) await canonicalStudio.createRule(rule);
+    else await runtime().upsertWorkflow(rule);
     await goto(`/build/automations/${key}`);
   }
 </script>

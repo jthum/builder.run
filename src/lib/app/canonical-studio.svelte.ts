@@ -3,12 +3,16 @@ import {
   createCollection,
   createCollectionActions,
   createFormActions,
+  createRule,
+  createRuleActions,
   createViewActions,
   loadEditorContext,
   type CollectionActions,
   type EditorContext,
   type FormActions,
   type NewCollectionDraft,
+  type NewRuleDraft,
+  type RuleActions,
   type ViewActions,
   type ViewAuthoringSchemas,
 } from "@jthum/framework/svelte/studio";
@@ -79,6 +83,24 @@ class CanonicalStudioState {
     if (!runtime) throw new Error("The Framework runtime is not ready.");
     return createFormActions(runtime.appClient, {
       sources: this.context?.collections ?? [],
+      onChange: () => this.refresh(),
+    });
+  }
+
+  ruleActions(): RuleActions {
+    const runtime = session.framework;
+    if (!runtime) throw new Error("The Framework runtime is not ready.");
+    return createRuleActions(runtime.appClient, {
+      schemas: this.schemas,
+      onChange: () => this.refresh(),
+    });
+  }
+
+  async createRule(draft: NewRuleDraft) {
+    const runtime = session.framework;
+    if (!runtime) throw new Error("The Framework runtime is not ready.");
+    return createRule(runtime.appClient, draft, {
+      schemas: this.schemas,
       onChange: () => this.refresh(),
     });
   }

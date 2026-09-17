@@ -2,7 +2,9 @@
 	import { goto } from "$app/navigation";
 	import { workflowKind, workflowSummary } from "$lib/app/relations.ts";
 	import { runtime, session } from "$lib/app/session.svelte.ts";
+	import { canonicalStudio } from "$lib/app/canonical-studio.svelte.ts";
 	import { NameDialog } from "@jthum/framework/svelte/studio";
+	import type { NewRuleDraft } from "@jthum/framework/svelte/studio";
 	import { PageHeader } from "@jthum/framework/svelte/studio";
 	import { Badge } from "@jthum/framework/svelte/ui/badge";
 	import { Button } from "@jthum/framework/svelte/ui/button";
@@ -13,8 +15,8 @@
 	import WorkflowIcon from "@lucide/svelte/icons/workflow";
 
 	const spec = $derived(session.resolvedSpec);
-	const workflows = $derived(spec?.workflows ?? []);
-	const types = $derived(spec?.types ?? []);
+	const workflows = $derived(canonicalStudio.context?.rules ?? spec?.workflows ?? []);
+	const types = $derived(canonicalStudio.context?.collections ?? spec?.types ?? []);
 	const manualWorkflows = $derived(workflows.filter((workflow) => workflowKind(workflow) === "manual"));
 	const automaticWorkflows = $derived(workflows.filter((workflow) => workflowKind(workflow) === "automatic"));
 
@@ -29,14 +31,16 @@
 	async function create(name: string) {
 		const key = slugify(name);
 		const typeKey = types[0]?.key;
-		await runtime().upsertWorkflow({
+		const draft: NewRuleDraft = {
 			key,
 			label: name,
 			input: typeKey ? { [typeKey]: { record: typeKey } } : undefined,
 			trigger: createKind === "automatic" && typeKey ? { key: `${typeKey}.changed` } : undefined,
 			expose: createKind === "manual" ? ["ui", "agent"] : undefined,
 			steps: [],
-		});
+		};
+		if (canonicalStudio.context) await canonicalStudio.createRule(draft);
+		else await runtime().upsertWorkflow(draft);
 		await goto(`/build/automations/${key}`);
 	}
 </script>
