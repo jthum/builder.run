@@ -1,12 +1,14 @@
 <script lang="ts">
 	import { greeting, isBlankApp } from "$lib/app/labels.ts";
 	import { openNewApp, runtime, session } from "$lib/app/session.svelte.ts";
+	import { canonicalStudio } from "$lib/app/canonical-studio.svelte.ts";
 	import PageCanvas from "$lib/components/page-canvas.svelte";
 	import { PageHeader } from "@jthum/framework/svelte/studio";
 	import { Badge } from "@jthum/framework/svelte/ui/badge";
 	import { Button } from "@jthum/framework/svelte/ui/button";
 	import * as Card from "@jthum/framework/svelte/ui/card";
-	import type { PageDef } from "$lib/runtime/model.ts";
+	import type { PageDefinition } from "@jthum/framework/spec";
+	import { pageBlocks, pageDefinition } from "$lib/app/pages.ts";
 	import { sampleApps, templateCategories } from "$lib/runtime/samples.ts";
 	import { resolveHomePage } from "$lib/runtime/blocks.ts";
 	import BriefcaseIcon from "@lucide/svelte/icons/briefcase";
@@ -17,12 +19,34 @@
 	import type { Component } from "svelte";
 
 	const spec = $derived(session.resolvedSpec);
-	const blank = $derived(spec ? isBlankApp(spec) : true);
+	const blank = $derived(
+		canonicalStudio.spec
+			? canonicalStudio.spec.collections.length === 0 && canonicalStudio.spec.views.length === 0
+			: spec
+				? isBlankApp(spec)
+				: true,
+	);
 	const appName = $derived(session.app?.name ?? "Home");
 	const hello = $derived(greeting(session.actor?.name));
-	const home = $derived(spec ? resolveHomePage(spec) : null);
+	const legacyHome = $derived(spec ? resolveHomePage(spec) : null);
+	const home = $derived(
+		canonicalStudio.spec
+			? canonicalStudio.spec.pages.find((page) => page.key === "home" || page.meta?.path === "/")
+			: legacyHome
+				? pageDefinition(legacyHome)
+				: null,
+	);
 	const queryView = (key: string) => runtime().queryView(key);
-	const upsertPage = (draft: Partial<PageDef> & { key: string }) => runtime().upsertPage(draft);
+	const upsertPage = (draft: PageDefinition) =>
+		canonicalStudio.spec
+			? canonicalStudio.pageActions().save(draft)
+			: runtime().upsertPage({
+					id: draft.id,
+					key: draft.key,
+					label: draft.label,
+					meta: draft.meta,
+					blocks: pageBlocks(draft.layout),
+				});
 
 	const templateIcons: Record<string, Component> = {
 		freelance_crm: UsersIcon,

@@ -6,11 +6,11 @@
   import { blocks, blockCategories, preloadBlock } from "$lib/blocks/registry.ts";
   import type { BlockDefinition } from "$lib/blocks/types.ts";
   import { blockInputs, blockInputOptions, collectViewKeys, defaultBlockConfig } from "$lib/runtime/blocks.ts";
-  import type { AppSpec, PageDef } from "$lib/runtime/model.ts";
-  import { pageBlocks, pageDefinition } from "$lib/app/pages.ts";
+  import type { AppSpec } from "$lib/runtime/model.ts";
+  import { pageBlocks } from "$lib/app/pages.ts";
 
   let { page, title, description, editable = true, startEditing = false, spec, revision, queryView, upsertPage }: {
-    page: PageDef;
+    page: PageDefinition;
     title: string;
     description?: string;
     editable?: boolean;
@@ -18,16 +18,15 @@
     spec?: AppSpec;
     revision: number;
     queryView: (key: string) => Promise<Array<Record<string, unknown>>>;
-    upsertPage: (draft: Partial<PageDef> & { key: string }) => Promise<PageDef>;
+    upsertPage: (draft: PageDefinition) => Promise<unknown>;
   } = $props();
 
-  const definition = $derived(pageDefinition(page));
   let rows = $state<Record<string, Array<Record<string, unknown>>>>({});
   let ready = $state(false);
 
   $effect(() => {
     void revision;
-    const keys = collectViewKeys(page.blocks ?? []);
+    const keys = collectViewKeys(pageBlocks(page.layout));
     let cancelled = false;
     ready = false;
     void Promise.all(keys.map(async key => {
@@ -40,17 +39,12 @@
   });
 
   async function save(next: PageDefinition) {
-    await upsertPage({
-      ...page,
-      ...(page.id === "pg_home" ? { id: undefined } : {}),
-      blocks: pageBlocks(next.layout),
-      implicit: false,
-    });
+    await upsertPage(next);
   }
 </script>
 
 {#key `${spec?.id}:${page.key}`}
-<PageEditor page={definition} {title} {description} {editable} {startEditing}
+<PageEditor {page} {title} {description} {editable} {startEditing}
   {blocks} categories={blockCategories} onPreview={preloadBlock}
   getConfig={block => spec ? defaultBlockConfig(block as BlockDefinition, spec) as SpecMeta : {}}
   getInputs={block => blockInputs(block as BlockDefinition)}

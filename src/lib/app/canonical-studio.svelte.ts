@@ -3,6 +3,7 @@ import {
   createCollection,
   createCollectionActions,
   createFormActions,
+  createPageActions,
   createRule,
   createRuleActions,
   createViewActions,
@@ -12,6 +13,7 @@ import {
   type FormActions,
   type NewCollectionDraft,
   type NewRuleDraft,
+  type PageActions,
   type RuleActions,
   type ViewActions,
   type ViewAuthoringSchemas,
@@ -92,6 +94,15 @@ class CanonicalStudioState {
     if (!runtime) throw new Error("The Framework runtime is not ready.");
     return createRuleActions(runtime.appClient, {
       schemas: this.schemas,
+      onChange: () => this.refresh(),
+    });
+  }
+
+  pageActions(): PageActions {
+    const runtime = session.framework;
+    if (!runtime) throw new Error("The Framework runtime is not ready.");
+    return createPageActions(runtime.appClient, {
+      include: (page) => page.key !== "home" && page.meta?.path !== "/",
       onChange: () => this.refresh(),
     });
   }
