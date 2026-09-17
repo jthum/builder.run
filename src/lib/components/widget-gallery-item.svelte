@@ -31,7 +31,7 @@
 						block={{ ...block, values: preview.values }}
 						rows={preview.rows ?? {}}
 						ready
-						previewSpec={preview.spec}
+						spec={preview.spec}
 					/>
 				</div>
 			{:else}

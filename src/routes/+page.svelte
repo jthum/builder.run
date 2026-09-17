@@ -1,11 +1,12 @@
 <script lang="ts">
 	import { greeting, isBlankApp } from "$lib/app/labels.ts";
-	import { openNewApp, session } from "$lib/app/session.svelte.ts";
+	import { openNewApp, runtime, session } from "$lib/app/session.svelte.ts";
 	import PageCanvas from "$lib/components/page-canvas.svelte";
 	import PageHeader from "$lib/components/page-header.svelte";
 	import { Badge } from "$lib/components/ui/badge/index.js";
 	import { Button } from "$lib/components/ui/button/index.js";
 	import * as Card from "$lib/components/ui/card/index.js";
+	import type { PageDef } from "$lib/runtime/model.ts";
 	import { sampleApps, templateCategories } from "$lib/runtime/samples.ts";
 	import { resolveHomePage } from "$lib/runtime/widgets.ts";
 	import BriefcaseIcon from "@lucide/svelte/icons/briefcase";
@@ -20,6 +21,8 @@
 	const appName = $derived(session.app?.name ?? "Home");
 	const hello = $derived(greeting(session.actor?.name));
 	const home = $derived(spec ? resolveHomePage(spec) : null);
+	const queryView = (key: string) => runtime().queryView(key);
+	const upsertPage = (draft: Partial<PageDef> & { key: string }) => runtime().upsertPage(draft);
 
 	const templateIcons: Record<string, Component> = {
 		freelance_crm: UsersIcon,
@@ -77,5 +80,13 @@
 		</div>
 	</div>
 {:else if home}
-	<PageCanvas page={home} title={hello} description={`A snapshot of ${appName}.`} />
+	<PageCanvas
+		page={home}
+		title={hello}
+		description={`A snapshot of ${appName}.`}
+		spec={session.resolvedSpec}
+		revision={session.revision}
+		{queryView}
+		{upsertPage}
+	/>
 {/if}

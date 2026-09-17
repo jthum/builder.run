@@ -21,7 +21,7 @@ export default defineConfig({
     format: "es",
   },
   staged: {
-    "*": "vp fmt --write",
+    "*.{js,ts,tsx,vue,svelte}": "vp check --fix",
   },
   fmt: {},
   lint: {

@@ -1,5 +1,4 @@
 <script lang="ts">
-	import { session } from "$lib/app/session.svelte.ts";
 	import AppSelect from "$lib/components/app-select.svelte";
 	import { Button } from "$lib/components/ui/button/index.js";
 	import * as Field from "$lib/components/ui/field/index.js";
@@ -7,20 +6,21 @@
 	import * as Sheet from "$lib/components/ui/sheet/index.js";
 	import { Switch } from "$lib/components/ui/switch/index.js";
 	import { Textarea } from "$lib/components/ui/textarea/index.js";
-	import type { PageBlock } from "$lib/runtime/model.ts";
+	import type { AppSpec, PageBlock } from "$lib/runtime/model.ts";
 	import { widgetByKey, widgetInputOptions, widgetInputs } from "$lib/runtime/widgets.ts";
 
 	let {
 		open = $bindable(false),
 		block = null,
+		spec,
 		onSave,
 	}: {
 		open?: boolean;
 		block?: PageBlock | null;
+		spec?: AppSpec;
 		onSave: (values: Record<string, unknown>) => void;
 	} = $props();
 
-	const spec = $derived(session.resolvedSpec);
 	const def = $derived(block?.kind === "widget" ? widgetByKey(block.widget) : undefined);
 	let values = $state<Record<string, unknown>>({});
 

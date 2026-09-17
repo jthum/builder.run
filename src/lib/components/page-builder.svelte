@@ -1,7 +1,6 @@
 <script lang="ts">
 	import { goto } from "$app/navigation";
 	import { startVerticalDrag, type VerticalDragSession } from "$lib/app/drag.ts";
-	import { runtime, session } from "$lib/app/session.svelte.ts";
 	import NameDialog from "$lib/components/name-dialog.svelte";
 	import PageHeader from "$lib/components/page-header.svelte";
 	import * as AlertDialog from "$lib/components/ui/alert-dialog/index.js";
@@ -14,7 +13,7 @@
 	import * as Field from "$lib/components/ui/field/index.js";
 	import { Input } from "$lib/components/ui/input/index.js";
 	import { uniqueKey } from "$lib/runtime/ids.ts";
-	import type { PageDef } from "$lib/runtime/model.ts";
+	import type { AppSpec, PageDef } from "$lib/runtime/model.ts";
 	import { pageIconEntry, pageIconList, type PageIconKey } from "$lib/runtime/page-icons.ts";
 	import { authoredNavPages, groupPagesByFolder, moveAuthoredPage, pageHref } from "$lib/runtime/widgets.ts";
 	import EllipsisIcon from "@lucide/svelte/icons/ellipsis";
@@ -27,7 +26,19 @@
 	import { flip } from "svelte/animate";
 	import { toast } from "svelte-sonner";
 
-	const spec = $derived(session.resolvedSpec);
+	type PageDraft = Partial<PageDef> & { key: string };
+
+	let {
+		spec,
+		upsertPage,
+		deletePage,
+		replacePages,
+	}: {
+		spec?: AppSpec;
+		upsertPage: (draft: PageDraft) => Promise<PageDef>;
+		deletePage: (key: string) => Promise<void>;
+		replacePages: (pages: PageDef[]) => Promise<void>;
+	} = $props();
 	const authoredPages = $derived(spec ? authoredNavPages(spec) : []);
 	let orderedPages = $state<PageDef[]>([]);
 	let syncedPageOrder = "";
@@ -95,7 +106,7 @@
 		pending = true;
 		try {
 			if (editingPage) {
-				await runtime().upsertPage({
+				await upsertPage({
 					key: editingPage.key,
 					label: name,
 					icon: createIcon,
@@ -111,7 +122,7 @@
 				spec.pages.map((page) => page.key),
 				"page",
 			);
-			await runtime().upsertPage({
+			await upsertPage({
 				key,
 				label: name,
 				icon: createIcon,
@@ -127,7 +138,7 @@
 	}
 
 	async function setFolder(page: PageDef, folder: string) {
-		await runtime().upsertPage({
+		await upsertPage({
 			key: page.key,
 			label: page.label,
 			icon: page.icon,
@@ -137,7 +148,7 @@
 	}
 
 	async function setIcon(page: PageDef, icon: PageIconKey) {
-		await runtime().upsertPage({
+		await upsertPage({
 			key: page.key,
 			label: page.label,
 			icon,
@@ -159,7 +170,7 @@
 
 	async function remove() {
 		if (!removePage) return;
-		await runtime().deletePage(removePage.key);
+		await deletePage(removePage.key);
 		toast.success("Page deleted");
 		removePage = null;
 	}
@@ -217,7 +228,7 @@
 				const next = [...pages];
 				dragSession = null;
 				dragKey = null;
-				await runtime().replaceAuthoredPages(next);
+				await replacePages(next);
 			},
 			onCancel: () => {
 				dragSession = null;

@@ -1,6 +1,5 @@
 <script lang="ts">
 	import { goto } from "$app/navigation";
-	import { runtime, session } from "$lib/app/session.svelte.ts";
 	import PageHeader from "$lib/components/page-header.svelte";
 	import PageWidget from "$lib/components/page-widget.svelte";
 	import WidgetPicker from "$lib/components/widget-picker.svelte";
@@ -10,7 +9,7 @@
 	import * as Card from "$lib/components/ui/card/index.js";
 	import * as DropdownMenu from "$lib/components/ui/dropdown-menu/index.js";
 	import * as Empty from "$lib/components/ui/empty/index.js";
-	import type { PageBlock, PageDef, PageRowHeight } from "$lib/runtime/model.ts";
+	import type { AppSpec, PageBlock, PageDef, PageRowHeight } from "$lib/runtime/model.ts";
 	import {
 		appendInGroup,
 		blockAt,
@@ -52,15 +51,22 @@
 		description,
 		editable = true,
 		startEditing = false,
+		spec,
+		revision,
+		queryView,
+		upsertPage,
 	}: {
 		page: PageDef;
 		title: string;
 		description?: string;
 		editable?: boolean;
 		startEditing?: boolean;
+		spec?: AppSpec;
+		revision: number;
+		queryView: (key: string) => Promise<Array<Record<string, unknown>>>;
+		upsertPage: (draft: Partial<PageDef> & { key: string }) => Promise<PageDef>;
 	} = $props();
 
-	const spec = $derived(session.resolvedSpec);
 	let editing = $state(false);
 	let draft = $state<PageBlock[]>([]);
 	let draftPageKey = "";
@@ -79,7 +85,7 @@
 	});
 
 	$effect(() => {
-		void session.revision;
+		void revision;
 		void current.key;
 		if (!editing || draftPageKey !== current.key) {
 			draft = normalizePage(current).blocks;
@@ -88,14 +94,14 @@
 	});
 
 	$effect(() => {
-		void session.revision;
+		void revision;
 		const blocks = live;
 		rowsReady = false;
 		void (async () => {
 			const next: Record<string, Array<Record<string, unknown>>> = {};
 			for (const key of collectViewKeys(blocks)) {
 				try {
-					next[key] = await runtime().queryView(key);
+					next[key] = await queryView(key);
 				} catch (err) {
 					console.warn("Couldn't load view", key, err);
 					next[key] = [];
@@ -123,7 +129,7 @@
 		editing = true;
 		if (!spec) return;
 		try {
-			await runtime().upsertPage({
+			await upsertPage({
 				...(current.id && current.id !== "pg_home" ? { id: current.id } : {}),
 				key: current.key,
 				label: current.label,
@@ -427,7 +433,7 @@
 									</div>
 								</div>
 							<div class="flex min-h-0 flex-1 flex-col rounded-lg bg-background p-3">
-								<PageWidget block={child} rows={viewRows} ready={rowsReady} />
+								<PageWidget block={child} rows={viewRows} ready={rowsReady} {spec} />
 							</div>
 						</div>
 					{/each}
@@ -447,7 +453,7 @@
 				<div class="{gridClass(block.columns ?? 1)} items-stretch {groupHeightClass(block)}">
 					{#each block.blocks as child, childIndex (`${index}-${childIndex}`)}
 						<div class="flex h-full min-h-0 flex-col {groupHeightClass(block)}">
-							<PageWidget block={child} rows={viewRows} ready={rowsReady} />
+							<PageWidget block={child} rows={viewRows} ready={rowsReady} {spec} />
 						</div>
 					{/each}
 				</div>
@@ -471,7 +477,7 @@
 					</div>
 				{/if}
 				<div class={editing ? "flex min-h-0 flex-1 flex-col rounded-lg bg-background p-3" : "h-full min-h-0"}>
-					<PageWidget {block} rows={viewRows} ready={rowsReady} />
+					<PageWidget {block} rows={viewRows} ready={rowsReady} {spec} />
 				</div>
 			</div>
 		{/if}
@@ -503,4 +509,4 @@
 </div>
 
 <WidgetPicker bind:open={pickerOpen} onPick={pickWidget} />
-<WidgetSheet bind:open={sheetOpen} block={editingBlock} onSave={saveWidget} />
+<WidgetSheet bind:open={sheetOpen} block={editingBlock} {spec} onSave={saveWidget} />

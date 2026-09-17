@@ -1,5 +1,4 @@
 <script lang="ts">
-	import { session } from "$lib/app/session.svelte.ts";
 	import { Skeleton } from "$lib/components/ui/skeleton/index.js";
 	import type { AppSpec, PageBlock } from "$lib/runtime/model.ts";
 	import { loadWidgetRenderer } from "$lib/widgets/registry.ts";
@@ -8,17 +7,16 @@
 		block,
 		rows,
 		ready = true,
-		previewSpec,
+		spec,
 	}: {
 		block: PageBlock;
 		rows: Record<string, Array<Record<string, unknown>>>;
 		ready?: boolean;
-		previewSpec?: AppSpec;
+		spec?: AppSpec;
 	} = $props();
 
 	const widget = $derived(block.kind === "widget" ? block.widget : "");
 	const values = $derived(block.kind === "widget" ? (block.values ?? {}) : {});
-	const spec = $derived(previewSpec ?? session.resolvedSpec);
 </script>
 
 {#key widget}
