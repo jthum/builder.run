@@ -1,8 +1,7 @@
 import { Host, type HostSnapshot } from "$lib/runtime/host.ts";
 import type { Actor, AppSpec, TypeDef } from "$lib/runtime/model.ts";
 import { SPACE_ACCENT_KEYS, type SpaceAccent } from "$lib/runtime/platform.ts";
-import { sampleApps } from "$lib/runtime/samples.ts";
-import { seedTemplateRecords } from "$lib/app/template-records.ts";
+import { seedApp } from "$lib/app/app-templates.ts";
 import { readSelection, writeSelection } from "$lib/app/selection.ts";
 import {
   deleteApp as deleteFrameworkApp,
@@ -10,7 +9,6 @@ import {
   openRuntime,
   resolveApp,
   renameApp as renameFrameworkApp,
-  resolveProjectedApp,
   type OpenedRuntime,
 } from "$lib/framework/bootstrap.ts";
 import { LOCAL_BROWSER_ENVIRONMENT } from "@jthum/framework/kernel";
@@ -131,22 +129,6 @@ async function publishFrameworkPreferences(runtime: LiveRuntime): Promise<void> 
     const value = accent.accent;
     if (SPACE_ACCENT_KEYS.includes(value as SpaceAccent)) session.accent = value as SpaceAccent;
   }
-}
-
-async function alignFrameworkApp(runtime: LiveRuntime): Promise<void> {
-  const snapshot = runtime.host.snapshot();
-  const aligned = await resolveProjectedApp(
-    runtime.framework.kernel,
-    runtime.framework.spaceContext,
-    {
-      name: snapshot.app.name,
-      spec: snapshot.app.spec,
-      sharedTypes: snapshot.sharedTypes,
-    },
-  );
-  runtime.framework = { ...runtime.framework, ...aligned };
-  session.framework = runtime.framework;
-  await publishFrameworkPreferences(runtime);
 }
 
 async function reopenFramework(runtime: LiveRuntime): Promise<void> {
@@ -313,12 +295,12 @@ export async function selectApp(id: string): Promise<void> {
 }
 
 export async function createApp(name: string, template?: string | null): Promise<void> {
-  await runtime().createApp(name, template);
-  if (live) {
-    await alignFrameworkApp(live);
-    const sample = sampleApps.find((item) => item.key === template);
-    if (sample) await seedTemplateRecords(live.framework, sample);
-  }
+  if (!live) throw new Error("The Framework runtime is not ready.");
+  const app = await seedApp(live.framework, name, template);
+  live.framework = { ...live.framework, ...app };
+  session.framework = live.framework;
+  await publishFrameworkPreferences(live);
+  session.revision += 1;
 }
 
 export async function renameApp(name: string): Promise<void> {
