@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { page } from "$app/state";
 	import { addLabel, collectionLabel } from "$lib/app/labels.ts";
-	import { runtime, session } from "$lib/app/session.svelte.ts";
+	import { canonicalStudio } from "$lib/app/canonical-studio.svelte.ts";
 	import { PageHeader } from "@jthum/framework/svelte/studio";
 	import RecordTable from "$lib/components/record-table.svelte";
 	import { Button } from "@jthum/framework/svelte/ui/button";
@@ -9,20 +9,19 @@
 	import PlusIcon from "@lucide/svelte/icons/plus";
 
 	const typeKey = $derived(page.params.type ?? "");
-	const spec = $derived(session.resolvedSpec);
-	const type = $derived(spec?.types.find((item) => item.key === typeKey));
+	const type = $derived(canonicalStudio.context?.collections.find((item) => item.key === typeKey));
 	const view = $derived(
-		spec?.views.find((item) => item.key === implicitViewKey(typeKey)) ??
-			spec?.views.find((item) => item.source === typeKey),
+		canonicalStudio.context?.views.find((item) => item.key === implicitViewKey(typeKey)) ??
+			canonicalStudio.context?.views.find((item) => item.source === typeKey),
 	);
 	let rows = $state<Array<Record<string, unknown>> | null>(null);
 
 	$effect(() => {
-		void session.revision;
+		void canonicalStudio.revision;
 		void typeKey;
 		rows = null;
 		if (!view) return;
-		void runtime()
+		void canonicalStudio
 			.queryView(view.key)
 			.then((result) => {
 				rows = result;

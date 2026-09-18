@@ -11,16 +11,15 @@
 		formatMoney,
 		isAmountPath,
 		isStatusPath,
-		typeByKey,
 	} from "$lib/app/labels.ts";
-	import { runtime, session } from "$lib/app/session.svelte.ts";
+	import { canonicalStudio } from "$lib/app/canonical-studio.svelte.ts";
 	import type { DataTableColumn } from "$lib/components/data-table.ts";
 	import DataTable from "$lib/components/data-table.svelte";
 	import FormattedValue from "$lib/components/formatted-value.svelte";
 	import ViewExposeBar from "$lib/components/view-expose-bar.svelte";
 	import * as AlertDialog from "@jthum/framework/svelte/ui/alert-dialog";
 	import * as Table from "@jthum/framework/svelte/ui/table";
-	import type { FieldDef, TypeDef, ViewDef } from "$lib/runtime/model.ts";
+	import type { CollectionDraft, FieldDraft, ViewDraft } from "@jthum/framework/svelte/studio";
 	import { toast } from "svelte-sonner";
 
 	let {
@@ -40,7 +39,7 @@
 		exposedValues = $bindable({}),
 	}: {
 		rows: Array<Record<string, unknown>> | null;
-		view: ViewDef;
+		view: ViewDraft;
 		typeKey: string;
 		createHref?: string;
 		createLabel?: string;
@@ -51,11 +50,11 @@
 		actionHref?: string;
 		actionLabel?: string;
 		onCreate?: () => void;
-		exposedFields?: FieldDef[];
+		exposedFields?: FieldDraft[];
 		exposedValues?: Record<string, string>;
 	} = $props();
 
-	const type = $derived(typeByKey(session.resolvedSpec, typeKey) as TypeDef | undefined);
+	const type = $derived(canonicalStudio.context?.collections.find((item) => item.key === typeKey));
 	const aggregated = $derived(Boolean(view.group_by));
 	const add = $derived(createLabel ?? (type ? addLabel(type) : "Add"));
 	const columns = $derived.by((): DataTableColumn[] => {
@@ -109,7 +108,7 @@
 		pending = [];
 		for (const row of targets) {
 			const id = String(row.id ?? "");
-			if (id) await runtime().remove(typeKey, id);
+			if (id) await canonicalStudio.deleteRecord(typeKey, id);
 		}
 		toast.success(targets.length > 1 ? `Deleted ${targets.length}` : "Deleted");
 	}

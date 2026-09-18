@@ -135,6 +135,110 @@ class CanonicalStudioState {
     return result.data.rows.map((row) => ({ id: row.id, ...row.values }));
   }
 
+  async queryViewWith(
+    key: string,
+    parameters: Record<string, string> = {},
+  ): Promise<Array<Record<string, unknown>>> {
+    const runtime = session.framework;
+    if (!runtime) throw new Error("The Framework runtime is not ready.");
+    const result = await runtime.appClient.queryView(key, { parameters });
+    return result.data.rows.map((row) => ({ id: row.id, ...row.values }));
+  }
+
+  async getRecord(collectionKey: string, id: string): Promise<Record<string, unknown> | null> {
+    const client = this.recordClient(collectionKey);
+    const record = await client.getRecord(collectionKey, id);
+    return record ? this.recordValue(record) : null;
+  }
+
+  async listRecords(collectionKey: string): Promise<Array<Record<string, unknown>>> {
+    const collection = this.context?.collections.find((item) => item.key === collectionKey);
+    const runtime = session.framework;
+    if (!runtime || !collection) throw new Error(`Collection ${collectionKey} is unavailable.`);
+    if (collection.expose) {
+      const result = await runtime.appClient.querySource(collectionKey);
+      return result.rows.map((row) => ({ id: row.id, ...row.values }));
+    }
+    return (await runtime.appClient.listRecords(collectionKey)).map((record) =>
+      this.recordValue(record),
+    );
+  }
+
+  async createRecord(
+    collectionKey: string,
+    values: Record<string, unknown>,
+  ): Promise<Record<string, unknown>> {
+    const record = await this.recordClient(collectionKey).createRecord(
+      collectionKey,
+      values as never,
+    );
+    this.revision += 1;
+    return this.recordValue(record);
+  }
+
+  async updateRecord(
+    collectionKey: string,
+    id: string,
+    values: Record<string, unknown>,
+  ): Promise<Record<string, unknown>> {
+    const record = await this.recordClient(collectionKey).updateRecord(
+      collectionKey,
+      id,
+      values as never,
+    );
+    this.revision += 1;
+    return this.recordValue(record);
+  }
+
+  async deleteRecord(collectionKey: string, id: string): Promise<void> {
+    await this.recordClient(collectionKey).deleteRecord(collectionKey, id);
+    this.revision += 1;
+  }
+
+  async submitForm(
+    key: string,
+    values: Record<string, unknown>,
+    recordId?: string,
+  ): Promise<Record<string, unknown> | null> {
+    const runtime = session.framework;
+    if (!runtime) throw new Error("The Framework runtime is not ready.");
+    const result = await runtime.appClient.submitForm(key, {
+      values: values as never,
+      ...(recordId ? { recordId } : {}),
+    });
+    this.revision += 1;
+    return result.mode === "standalone" ? null : this.recordValue(result.record);
+  }
+
+  async runRule(key: string, input: Record<string, unknown>): Promise<void> {
+    const runtime = session.framework;
+    if (!runtime) throw new Error("The Framework runtime is not ready.");
+    await runtime.appClient.runRule(key, input as never);
+    this.revision += 1;
+  }
+
+  private recordClient(collectionKey: string) {
+    const runtime = session.framework;
+    if (!runtime) throw new Error("The Framework runtime is not ready.");
+    const collection = this.context?.collections.find((item) => item.key === collectionKey);
+    if (!collection) throw new Error(`Collection ${collectionKey} is unavailable.`);
+    return collection.expose ? runtime.spaceClient : runtime.appClient;
+  }
+
+  private recordValue(record: {
+    id: string;
+    values: Readonly<Record<string, unknown>>;
+    createdAt: string;
+    updatedAt: string;
+  }): Record<string, unknown> {
+    return {
+      id: record.id,
+      ...record.values,
+      created_at: record.createdAt,
+      updated_at: record.updatedAt,
+    };
+  }
+
   async createRule(draft: NewRuleDraft) {
     const runtime = session.framework;
     if (!runtime) throw new Error("The Framework runtime is not ready.");

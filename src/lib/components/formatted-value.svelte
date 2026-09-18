@@ -2,7 +2,7 @@
 	import { formatCell, isStatusPath } from "$lib/app/labels.ts";
 	import RatingValue from "$lib/components/rating-value.svelte";
 	import StatusPill from "$lib/components/status-pill.svelte";
-	import type { TypeDef } from "$lib/runtime/model.ts";
+	import type { CollectionDraft } from "@jthum/framework/svelte/studio";
 	import { cn } from "$lib/utils.ts";
 
 	let {
@@ -19,7 +19,7 @@
 		value: unknown;
 		href?: string;
 		badge?: boolean;
-		type?: TypeDef;
+		type?: CollectionDraft;
 		maximumFractionDigits?: number;
 		clamp?: boolean;
 		ratingMax?: number;
@@ -43,7 +43,7 @@
 	const fullText = $derived(clamp && typeof value === "string" ? value : undefined);
 
 	function formatFieldValue(
-		field: TypeDef["fields"][number] | undefined,
+		field: CollectionDraft["fields"][number] | undefined,
 		path: string,
 		value: unknown,
 		maximumFractionDigits?: number,

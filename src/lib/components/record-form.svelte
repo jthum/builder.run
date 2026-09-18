@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { addLabel, recordTitle } from "$lib/app/labels.ts";
-	import { runtime, session } from "$lib/app/session.svelte.ts";
+	import { canonicalStudio } from "$lib/app/canonical-studio.svelte.ts";
 	import { OptionSelect } from "@jthum/framework/svelte/studio";
 	import ReferencePicker from "$lib/components/reference-picker.svelte";
 	import RatingInput from "$lib/components/rating-input.svelte";
@@ -12,9 +12,9 @@
 	import { Spinner } from "@jthum/framework/svelte/ui/spinner";
 	import { Switch } from "@jthum/framework/svelte/ui/switch";
 	import { labelFromKey } from "$lib/runtime/ids.ts";
-	import type { FieldDef, FormDef, RecordValue, TypeDef } from "$lib/runtime/model.ts";
+	import type { CollectionDraft, FieldDraft, FormDraft } from "@jthum/framework/svelte/studio";
 	import { resolveFieldState } from "$lib/runtime/field-state.ts";
-	import { fieldWidget, findType } from "$lib/runtime/query.ts";
+	import { fieldWidget } from "$lib/runtime/query.ts";
 	import { cn } from "$lib/utils.ts";
 	import CircleCheckIcon from "@lucide/svelte/icons/circle-check";
 
@@ -30,13 +30,13 @@
 		submitLabel,
 		fullWidth = false,
 	}: {
-		type?: TypeDef | null;
-		record?: RecordValue | null;
+		type?: CollectionDraft | null;
+		record?: Record<string, unknown> | null;
 		fields?: string[];
-		form?: FormDef | null;
+		form?: FormDraft | null;
 		defaults?: Record<string, unknown>;
 		omit?: string[];
-		onSaved?: (record: RecordValue | null) => void;
+		onSaved?: (record: Record<string, unknown> | null) => void;
 		onCancel?: () => void;
 		submitLabel?: string;
 		fullWidth?: boolean;
@@ -52,7 +52,7 @@
 		keys
 			.filter((key) => key !== type?.lifecycle?.field)
 			.map((key) => definitions.find((field) => field.key === key))
-			.filter(Boolean) as FieldDef[],
+		.filter(Boolean) as FieldDraft[],
 	);
 	let values = $state<Record<string, unknown>>({});
 	const visible = $derived(configuredFields.filter((field) => resolveFieldState(field, values).visible));
@@ -64,8 +64,8 @@
 	);
 
 	function formValues(
-		current: FieldDef[],
-		row: RecordValue | null | undefined,
+		current: FieldDraft[],
+		row: Record<string, unknown> | null | undefined,
 		initial: Record<string, unknown>,
 	): Record<string, unknown> {
 		const next: Record<string, unknown> = {};
@@ -82,7 +82,7 @@
 	let pending = $state(false);
 	let submitted = $state(false);
 	const defaultsKey = $derived(JSON.stringify(defaults));
-	const recordId = $derived(record?.id ?? "");
+	const recordId = $derived(record?.id ? String(record.id) : "");
 	const formKey = $derived(form?.key ?? "");
 
 	$effect.pre(() => {
@@ -105,17 +105,16 @@
 		values = { ...values, ...Object.fromEntries(clear.map((field) => [field.key, null])) };
 	});
 
-	async function optionsFor(field: FieldDef) {
+	async function optionsFor(field: FieldDraft) {
 		if (field.type === "enum") {
 			return (field.values ?? []).map((value) => ({ id: value, label: labelFromKey(value) }));
 		}
-		if (field.type !== "reference" || !field.target || !session.host) return [];
-		const ctx = runtime().queryContext();
-		const target = findType(ctx, field.target);
+		if (field.type !== "reference" || !field.target) return [];
+		const target = canonicalStudio.context?.collections.find((item) => item.key === field.target);
 		if (!target) return [];
-		const rows = await runtime().listRecords(target.key);
+		const rows = await canonicalStudio.listRecords(target.key);
 		return rows.map((row) => ({
-			id: row.id,
+			id: String(row.id),
 			label: recordTitle(row, target),
 		}));
 	}
@@ -123,7 +122,7 @@
 	let refOptions = $state<Record<string, Array<{ id: string; label: string }>>>({});
 
 	$effect(() => {
-		void session.revision;
+		void canonicalStudio.revision;
 		void optionKeys;
 		const current = visible;
 		void (async () => {
@@ -148,11 +147,11 @@
 		try {
 			const payload = { ...values };
 			const saved = form
-				? await runtime().submitForm(form.key, payload, record?.id)
+				? await canonicalStudio.submitForm(form.key, payload, recordId || undefined)
 				: record && type
-					? await runtime().update(type.key, record.id, payload)
+					? await canonicalStudio.updateRecord(type.key, recordId, payload)
 					: type
-						? await runtime().create(type.key, payload)
+						? await canonicalStudio.createRecord(type.key, payload)
 						: null;
 			if (form?.mode === "standalone") {
 				values = formValues(definitions, null, {});

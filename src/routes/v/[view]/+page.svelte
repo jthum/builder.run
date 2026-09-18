@@ -1,16 +1,15 @@
 <script lang="ts">
 	import { page } from "$app/state";
-	import { addLabel, typeByKey } from "$lib/app/labels.ts";
-	import { runtime, session } from "$lib/app/session.svelte.ts";
+	import { addLabel } from "$lib/app/labels.ts";
+	import { canonicalStudio } from "$lib/app/canonical-studio.svelte.ts";
 	import { PageHeader } from "@jthum/framework/svelte/studio";
 	import RecordTable from "$lib/components/record-table.svelte";
 	import { Button } from "@jthum/framework/svelte/ui/button";
 	import PlusIcon from "@lucide/svelte/icons/plus";
 
 	const viewKey = $derived(page.params.view);
-	const spec = $derived(session.resolvedSpec);
-	const view = $derived(spec?.views.find((item) => item.key === viewKey));
-	const type = $derived(typeByKey(spec, view?.source));
+	const view = $derived(canonicalStudio.context?.views.find((item) => item.key === viewKey));
+	const type = $derived(canonicalStudio.context?.collections.find((item) => item.key === view?.source));
 	let rows = $state<Array<Record<string, unknown>> | null>(null);
 	let expose = $state<Record<string, string>>({});
 
@@ -26,14 +25,14 @@
 	});
 
 	$effect(() => {
-		void session.revision;
+		void canonicalStudio.revision;
 		void viewKey;
 		void expose;
 		rows = null;
 		if (!view) return;
 		const extra = Object.fromEntries(Object.entries(expose).filter(([, value]) => value !== ""));
-		void runtime()
-			.queryView(view.key, extra)
+		void canonicalStudio
+			.queryViewWith(view.key, extra)
 			.then((result) => {
 				rows = result;
 			});

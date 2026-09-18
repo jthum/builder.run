@@ -2,7 +2,6 @@
   import { canonicalStudio } from "$lib/app/canonical-studio.svelte.ts";
   import { goto } from "$app/navigation";
   import { FormEditor, ruleSummary } from "@jthum/framework/svelte/studio";
-  import { session } from "$lib/app/session.svelte.ts";
   import type { FormDraft } from "@jthum/framework/svelte/studio";
   import { uniqueKey } from "$lib/runtime/ids.ts";
   import RecordForm from "./record-form.svelte";
@@ -28,7 +27,7 @@
   describeRule={rule => ruleSummary(rule, context)}
 >
   {#snippet previewContent(preview)}
-    <RecordForm type={session.resolvedSpec?.types.find(type => type.key === preview.collection?.key)}
+    <RecordForm type={context.collections.find(type => type.key === preview.collection?.key)}
       form={preview.form} fields={preview.fields} fullWidth />
   {/snippet}
 </FormEditor>

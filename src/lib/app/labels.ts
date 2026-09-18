@@ -1,12 +1,7 @@
 import { isId, labelFromKey } from "$lib/runtime/ids.ts";
-import type {
-  AppSpec,
-  FieldDef,
-  FieldKind,
-  TypeDef,
-  ValueSemantic,
-  ViewDef,
-} from "$lib/runtime/model.ts";
+import type { AppSpec, FieldKind, TypeDef, ValueSemantic } from "$lib/runtime/model.ts";
+import type { CollectionDraft, FieldDraft, ViewDraft } from "@jthum/framework/svelte/studio";
+import type { ViewDef } from "$lib/runtime/model.ts";
 import { FIELD_CAPABILITIES, FIELD_KINDS } from "$lib/runtime/model.ts";
 import { scalarString } from "$lib/runtime/values.ts";
 import pluralize from "pluralize";
@@ -24,7 +19,7 @@ export function spaceLabel(name: string | undefined): string {
   return name;
 }
 
-export function collectionLabel(type: TypeDef): string {
+export function collectionLabel(type: CollectionDraft): string {
   return type.collection_label?.trim() || defaultCollectionLabel(type.label);
 }
 
@@ -32,21 +27,21 @@ export function defaultCollectionLabel(label: string): string {
   return pluralize.plural(label);
 }
 
-export function addLabel(type: TypeDef): string {
+export function addLabel(type: CollectionDraft): string {
   return `Add ${type.label.toLowerCase()}`;
 }
 
-export function emptyCollectionTitle(type: TypeDef): string {
+export function emptyCollectionTitle(type: CollectionDraft): string {
   return `No ${collectionLabel(type).toLowerCase()} yet`;
 }
 
-export function emptyCollectionDescription(type: TypeDef): string {
+export function emptyCollectionDescription(type: CollectionDraft): string {
   return `Add the first ${type.label.toLowerCase()} to get started.`;
 }
 
 export function recordTitle(
   record: Record<string, unknown> | null | undefined,
-  type?: TypeDef,
+  type?: CollectionDraft,
 ): string {
   if (!record) return type?.label ?? "Record";
   const value = record.name ?? record.title ?? record.number ?? record.email;
@@ -54,7 +49,7 @@ export function recordTitle(
   return type?.label ?? "Record";
 }
 
-export function columnLabel(path: string, type?: TypeDef): string {
+export function columnLabel(path: string, type?: CollectionDraft): string {
   const [head, ...rest] = path.split(".");
   const field = type?.fields.find((item) => item.key === head);
   const base = field?.label ?? labelFromKey(head);
@@ -102,8 +97,8 @@ export function isAmountPath(path: string): boolean {
 }
 
 export function aggregateRatingMax(
-  view: ViewDef,
-  type: TypeDef | undefined,
+  view: ViewDraft,
+  type: CollectionDraft | undefined,
   path: string,
 ): number | undefined {
   const measure = view.measures?.[path];
@@ -156,7 +151,7 @@ export function semanticDotClass(semantic: ValueSemantic): string {
   }
 }
 
-export function fieldValueSemantic(field: FieldDef, value: unknown): ValueSemantic | undefined {
+export function fieldValueSemantic(field: FieldDraft, value: unknown): ValueSemantic | undefined {
   if (field.type !== "enum" || field.presentation !== "badge") return undefined;
   return field.value_semantics?.[scalarString(value)] ?? "neutral";
 }

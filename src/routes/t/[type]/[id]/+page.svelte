@@ -2,8 +2,7 @@
 	import { goto } from "$app/navigation";
 	import { page } from "$app/state";
 	import { addLabel, collectionLabel, recordTitle } from "$lib/app/labels.ts";
-	import { applicableWorkflows, reverseRelations } from "$lib/app/relations.ts";
-	import { runtime, session } from "$lib/app/session.svelte.ts";
+	import { canonicalStudio } from "$lib/app/canonical-studio.svelte.ts";
 	import FormattedValue from "$lib/components/formatted-value.svelte";
 	import { PageHeader } from "@jthum/framework/svelte/studio";
 	import RecordForm from "$lib/components/record-form.svelte";
@@ -18,35 +17,45 @@
 		implicitEditFormKey,
 		implicitViewKey,
 	} from "$lib/runtime/defaults.ts";
-	import { normalizeFilters } from "$lib/runtime/filters.ts";
-	import { parseTypeRef } from "$lib/runtime/model.ts";
-	import { projectRow, RECORD_ID_TOKEN } from "$lib/runtime/query.ts";
-	import type { FieldDef, FormDef, RecordValue, TypeDef, ViewDef } from "$lib/runtime/model.ts";
+	import type { CollectionDraft, FieldDraft, FormDraft, ViewDraft } from "@jthum/framework/svelte/studio";
 	import EllipsisIcon from "@lucide/svelte/icons/ellipsis";
 	import PencilIcon from "@lucide/svelte/icons/pencil";
 	import { toast } from "svelte-sonner";
 
 	const typeKey = $derived(page.params.type ?? "");
 	const id = $derived(page.params.id ?? "");
-	const spec = $derived(session.resolvedSpec);
-	const type = $derived(spec?.types.find((item) => item.key === typeKey));
-	const form = $derived(spec?.forms.find((item) => item.key === implicitEditFormKey(typeKey)));
-	const related = $derived(spec && typeKey ? reverseRelations(spec, typeKey) : []);
-	let record = $state<RecordValue | null>(null);
+	const context = $derived(canonicalStudio.context);
+	const type = $derived(context?.collections.find((item) => item.key === typeKey));
+	const form = $derived(context?.forms.find((item) => item.key === implicitEditFormKey(typeKey)));
+	const related = $derived(
+		(context?.collections ?? []).flatMap((collection) =>
+			collection.fields
+				.filter((field) => field.type === "reference" && field.target === typeKey)
+				.map((field) => ({ type: collection, field })),
+		),
+	);
+	let record = $state<Record<string, unknown> | null>(null);
 	let missing = $state(false);
 	let editing = $state(false);
 	let deleteOpen = $state(false);
 	let relatedRows = $state<Record<string, Array<Record<string, unknown>>>>({});
 	let display = $state<Record<string, unknown> | null>(null);
 	let creating = $state<{
-		type: TypeDef;
-		field: FieldDef;
-		form: FormDef | undefined;
+		type: CollectionDraft;
+		field: FieldDraft;
+		form: FormDraft | undefined;
 	} | null>(null);
 
 	const title = $derived(recordTitle(record, type));
 	const recordActions = $derived(
-		spec && type && record ? applicableWorkflows(spec, type.key, record) : [],
+		(context?.rules ?? []).filter(
+			(rule) =>
+				!rule.trigger &&
+				rule.expose?.includes("ui") &&
+				Object.values(rule.input ?? {}).some(
+					(input) => "record" in input && input.record === typeKey,
+				),
+		),
 	);
 	const lifecycleActions = $derived(
 		type?.lifecycle && record
@@ -57,34 +66,26 @@
 	);
 
 	$effect(() => {
-		void session.revision;
+		void canonicalStudio.revision;
 		void id;
 		missing = false;
 		editing = false;
 		void (async () => {
 			try {
-				const row = await runtime().getRecord(typeKey, id);
+				const row = await canonicalStudio.getRecord(typeKey, id);
 				record = row;
 				missing = !row;
 				if (row && type) {
-					const projected = await projectRow(
-						runtime().queryContext(),
-						type,
-						row,
-						type.fields.map((field) =>
-							field.type === "reference" ? `${field.key}.name` : field.key,
-						),
-					);
+					const projected = { ...row };
 					for (const field of type.fields) {
 						if (field.type !== "reference" || !row[field.key]) continue;
 						const path = `${field.key}.name`;
-						if (projected[path]) continue;
-						const target = parseTypeRef(field.target || "").type;
-						const related = target
-							? await runtime().getRecord(target, String(row[field.key]))
+						const target = field.target ?? "";
+						const linked = target
+							? await canonicalStudio.getRecord(target, String(row[field.key]))
 							: null;
 						projected[path] =
-							related?.name ?? related?.title ?? related?.number ?? related?.email ?? null;
+							linked?.name ?? linked?.title ?? linked?.number ?? linked?.email ?? null;
 					}
 					display = projected;
 				} else {
@@ -97,30 +98,23 @@
 	});
 
 	$effect(() => {
-		void session.revision;
+		void canonicalStudio.revision;
 		void id;
 		void (async () => {
-			if (!spec || !record) return;
+			if (!context || !record) return;
 			try {
 				const next: Record<string, Array<Record<string, unknown>>> = {};
-				for (const rel of reverseRelations(spec, typeKey)) {
+				for (const rel of related) {
 					const view = relatedViewFor(rel.type.key, rel.field.key);
-					if (view && relatedViewIsContextual(view, rel.field.key)) {
-						next[rel.type.key] = await runtime().queryView(view, undefined, { recordId: id });
+					if (view && isContextual(view)) {
+						next[rel.type.key] = await canonicalStudio.queryViewWith(view.key, {
+							record_id: id,
+						});
 						continue;
 					}
-					const rows = await runtime().listRecords(rel.type.key);
+					const rows = await canonicalStudio.listRecords(rel.type.key);
 					const matched = rows.filter((row) => String(row[rel.field.key] ?? "") === id);
-					if (view) {
-						next[rel.type.key] = [];
-						for (const row of matched) {
-							next[rel.type.key].push(
-								await projectRow(runtime().queryContext(), rel.type, row, view.fields),
-							);
-						}
-					} else {
-						next[rel.type.key] = matched;
-					}
+					next[rel.type.key] = matched;
 				}
 				relatedRows = next;
 			} catch (err) {
@@ -129,11 +123,11 @@
 		})();
 	});
 
-	function startRelatedCreate(rel: { type: TypeDef; field: FieldDef }) {
+	function startRelatedCreate(rel: { type: CollectionDraft; field: FieldDraft }) {
 		creating = {
 			type: rel.type,
 			field: rel.field,
-			form: spec?.forms.find((item) => item.key === implicitCreateFormKey(rel.type.key)),
+			form: context?.forms.find((item) => item.key === implicitCreateFormKey(rel.type.key)),
 		};
 	}
 
@@ -141,40 +135,38 @@
 	const createOmit = $derived(creating ? [creating.field.key] : []);
 
 	async function invoke(flowKey: string, label: string) {
-		await runtime().invoke(flowKey, { [typeKey]: id });
+		const rule = context?.rules.find((item) => item.key === flowKey);
+		const inputName = Object.entries(rule?.input ?? {}).find(
+			([, input]) => "record" in input && input.record === typeKey,
+		)?.[0];
+		await canonicalStudio.runRule(flowKey, { [inputName ?? typeKey]: id });
 		toast.success(label);
 	}
 
 	async function applyTransition(transitionKey: string, label: string) {
-		await runtime().transition(typeKey, id, transitionKey);
+		const transition = type?.lifecycle?.transitions.find((item) => item.key === transitionKey);
+		if (!type?.lifecycle || !transition) return;
+		record = await canonicalStudio.updateRecord(typeKey, id, {
+			[type.lifecycle.field]: transition.to,
+		});
 		toast.success(label);
 	}
 
 	async function remove() {
-		await runtime().remove(typeKey, id);
+		await canonicalStudio.deleteRecord(typeKey, id);
 		toast.success("Deleted");
 		await goto(`/t/${typeKey}`);
 	}
 
-	function relatedViewFor(typeKeyRel: string, fieldKey?: string): ViewDef | undefined {
-		const views = spec?.views.filter((item) => item.source === typeKeyRel) ?? [];
-		if (fieldKey) {
-			const contextual = views
-				.filter((item) =>
-					normalizeFilters(item.where).some(
-						(clause) => clause.field === fieldKey && clause.value === RECORD_ID_TOKEN,
-					),
-				)
-				.sort((left, right) => Number(Boolean(left.implicit)) - Number(Boolean(right.implicit)));
-			if (contextual[0]) return contextual[0];
-		}
+	function relatedViewFor(typeKeyRel: string, _fieldKey?: string): ViewDraft | undefined {
+		const views = context?.views.filter((item) => item.source === typeKeyRel) ?? [];
+		const contextual = views.find(isContextual);
+		if (contextual) return contextual;
 		return views.find((item) => item.key === implicitViewKey(typeKeyRel)) ?? views[0];
 	}
 
-	function relatedViewIsContextual(view: ViewDef, fieldKey: string): boolean {
-		return normalizeFilters(view.where).some(
-			(clause) => clause.field === fieldKey && clause.value === RECORD_ID_TOKEN,
-		);
+	function isContextual(view: ViewDraft): boolean {
+		return JSON.stringify(view.where ?? {}).includes("$record.id");
 	}
 
 	const updated = $derived(
@@ -269,7 +261,9 @@
 			{#if view}
 				<div class="flex flex-col gap-3">
 					<h2 class="text-lg font-medium">
-						{relatedViewIsContextual(view, rel.field.key) ? view.label : collectionLabel(rel.type)}
+						{isContextual(view)
+							? view.label
+							: collectionLabel(rel.type)}
 					</h2>
 					<RecordTable
 						rows={relatedRows[rel.type.key] ?? []}

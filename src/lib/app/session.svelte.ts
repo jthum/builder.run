@@ -1,6 +1,8 @@
 import { Host, type HostSnapshot } from "$lib/runtime/host.ts";
 import type { Actor, AppSpec, TypeDef } from "$lib/runtime/model.ts";
 import type { SpaceAccent } from "$lib/runtime/platform.ts";
+import { sampleApps } from "$lib/runtime/samples.ts";
+import { seedTemplateRecords } from "$lib/app/template-records.ts";
 import {
   deleteApp as deleteFrameworkApp,
   openRuntime,
@@ -217,7 +219,11 @@ export async function selectApp(id: string): Promise<void> {
 
 export async function createApp(name: string, template?: string | null): Promise<void> {
   await runtime().createApp(name, template);
-  if (live) await alignFrameworkApp(live);
+  if (live) {
+    await alignFrameworkApp(live);
+    const sample = sampleApps.find((item) => item.key === template);
+    if (sample) await seedTemplateRecords(live.framework, sample);
+  }
 }
 
 export async function renameApp(name: string): Promise<void> {
