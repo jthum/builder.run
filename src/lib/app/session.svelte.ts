@@ -15,7 +15,7 @@ import {
   renameApp as updateAppName,
   type OpenedRuntime,
 } from "$lib/framework/bootstrap.ts";
-import { createKernelSqlitePersistence, RUNTIME_DATABASE } from "$lib/framework/sqlite.ts";
+import { createKernelSqlitePersistence, CATALOG_DATABASE } from "$lib/framework/sqlite.ts";
 import { openSqlGateway, type SqlGateway } from "$lib/runtime/persistence/sqlite/gateway.ts";
 import {
   clearStorageLockReload,
@@ -155,7 +155,7 @@ async function publishContext(runtime: LiveRuntime): Promise<void> {
   session.diagnostics = {
     backend: runtime.gateway.backend,
     engine: "SQLite",
-    database: RUNTIME_DATABASE,
+    database: CATALOG_DATABASE,
   };
   session.webmcp = webmcpSupported();
   session.webmcpToolMode = getWebMcpAppToolMode();

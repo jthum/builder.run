@@ -65,6 +65,9 @@ async function openWorkerGateway(): Promise<SqlGateway> {
         },
       } satisfies SqlConnection;
     },
+    async remove(name: string) {
+      await rpc({ method: "remove", db: name });
+    },
     async wipe() {
       try {
         await rpc({ method: "wipe" });

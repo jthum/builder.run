@@ -199,6 +199,16 @@ async function wipe() {
   await removeOpfsTree(OPFS_DIR);
 }
 
+async function removeDb(name) {
+  const sqlite = await boot();
+  const handle = dbs.get(name);
+  if (handle != null) {
+    await sqlite.close(handle);
+    dbs.delete(name);
+  }
+  if (vfsInstance?.xDelete) await vfsInstance.xDelete(name, 1);
+}
+
 async function query(dbName, sql, params = []) {
   const sqlite = await boot();
   const db = await openDb(dbName);
@@ -258,6 +268,11 @@ async function handleMessage(event) {
     }
     if (method === "wipe") {
       await wipe();
+      self.postMessage({ id, result: true });
+      return;
+    }
+    if (method === "remove") {
+      await removeDb(db);
       self.postMessage({ id, result: true });
       return;
     }

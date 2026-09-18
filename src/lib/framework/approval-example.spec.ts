@@ -60,13 +60,18 @@ describe("Framework approval UI contract", () => {
         expect(paused.status).toBe("waiting");
         expect(paused).not.toHaveProperty("checkpoint");
         expect(paused.vars?.request).toBe("New laptop");
-        const agent = await kernel.createActor(context, { name: "Agent", kind: "agent" });
-        await kernel.addMembership(context, {
-          actorId: agent.id,
-          workspaceId: context.workspaceId,
+        const agent = await kernel.createAgent(context, {
+          name: "Agent",
+          instructions: "Review requests.",
+          provider: "test",
+          model: "test",
           permissions: ["read"],
+          tools: { include: [], search: false },
         });
-        const agentClient = await createWorkspaceClient(kernel, { ...context, actorId: agent.id });
+        const agentClient = await createWorkspaceClient(kernel, {
+          ...context,
+          actorId: agent.actor.id,
+        });
         expect(await agentClient.listRuleExecutions()).toEqual([]);
         await expect(agentClient.getRuleExecutionDetails(paused.id)).rejects.toMatchObject({
           code: "PERMISSION.DENIED",

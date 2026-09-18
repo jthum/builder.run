@@ -9,6 +9,8 @@ export interface SqlConnection {
 export interface SqlGateway {
   readonly backend: PersistenceBackend;
   open(name: string): Promise<SqlConnection>;
+  /** Remove one closed logical database. Missing databases are a successful no-op. */
+  remove(name: string): Promise<void>;
   wipe(): Promise<void>;
 }
 

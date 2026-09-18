@@ -2,7 +2,7 @@ import { SqlitePersistenceAdapter } from "@jthum/framework/sqlite";
 import type { SqliteConnection, SqliteDatabase, SqliteParameters } from "@jthum/framework/sqlite";
 import type { SqlConnection, SqlGateway } from "$lib/runtime/persistence/sqlite/gateway.ts";
 
-export const RUNTIME_DATABASE = "runtime.db";
+export const CATALOG_DATABASE = "catalog.db";
 const leasedDatabaseNames = new WeakMap<SqlGateway, Set<string>>();
 
 /**
@@ -14,20 +14,55 @@ const leasedDatabaseNames = new WeakMap<SqlGateway, Set<string>>();
  */
 export function createKernelSqlitePersistence(
   gateway: SqlGateway,
-  databaseName = RUNTIME_DATABASE,
+  databaseName = CATALOG_DATABASE,
 ): SqlitePersistenceAdapter {
-  return new SqlitePersistenceAdapter(async () => {
-    acquireDatabaseLease(gateway, databaseName);
+  const openDatabase = async (name: string): Promise<SqliteDatabase> => {
+    acquireDatabaseLease(gateway, name);
     try {
-      const connection = await gateway.open(databaseName);
+      const connection = await gateway.open(name);
       return new GatewaySqliteDatabase(connection, () => {
-        releaseDatabaseLease(gateway, databaseName);
+        releaseDatabaseLease(gateway, name);
       });
     } catch (error) {
-      releaseDatabaseLease(gateway, databaseName);
+      releaseDatabaseLease(gateway, name);
       throw error;
     }
+  };
+  return new SqlitePersistenceAdapter(() => openDatabase(databaseName), {
+    workspaceDatabases: {
+      open: ({ workspaceId }) => openDatabase(workspaceDatabaseName(workspaceId, databaseName)),
+      remove: ({ workspaceId }) => gateway.remove(workspaceDatabaseName(workspaceId, databaseName)),
+    },
+    scopeDatabases: {
+      open: ({ workspaceId, scope }) =>
+        openDatabase(scopeDatabaseName(workspaceId, scope.kind, scope.id, databaseName)),
+      remove: ({ workspaceId, scope }) =>
+        gateway.remove(scopeDatabaseName(workspaceId, scope.kind, scope.id, databaseName)),
+    },
   });
+}
+
+export function workspaceDatabaseName(workspaceId: string, catalogName = CATALOG_DATABASE): string {
+  return `${databasePrefix(catalogName)}--workspace-${encodeDatabaseIdentity(workspaceId)}.db`;
+}
+
+export function scopeDatabaseName(
+  workspaceId: string,
+  kind: string,
+  id: string,
+  catalogName = CATALOG_DATABASE,
+): string {
+  return `${databasePrefix(catalogName)}--scope-${encodeDatabaseIdentity([workspaceId, kind, id])}.db`;
+}
+
+function databasePrefix(catalogName: string): string {
+  return catalogName.endsWith(".db") ? catalogName.slice(0, -3) : catalogName;
+}
+
+function encodeDatabaseIdentity(value: string | readonly string[]): string {
+  return [...new TextEncoder().encode(JSON.stringify(value))]
+    .map((byte) => byte.toString(16).padStart(2, "0"))
+    .join("");
 }
 
 function acquireDatabaseLease(gateway: SqlGateway, name: string): void {
