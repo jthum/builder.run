@@ -1,5 +1,6 @@
 import { uniqueKey } from "./ids.ts";
 import type { FieldDraft, FieldKind, CollectionDraft } from "$lib/blocks/presentation.ts";
+import { Catalog, type CatalogSource } from "@jthum/framework/catalog";
 
 export type TypeTemplateCategory = "people" | "work" | "money" | "content";
 
@@ -28,7 +29,7 @@ export const typeTemplateCategories: Array<{ key: TypeTemplateCategory; label: s
   { key: "content", label: "Content" },
 ];
 
-export const typeTemplates: TypeTemplate[] = [
+const officialTypeTemplateEntries: TypeTemplate[] = [
   {
     key: "person",
     label: "Person",
@@ -144,6 +145,20 @@ export const typeTemplates: TypeTemplate[] = [
     ],
   },
 ];
+
+export const officialTypeTemplateSource: CatalogSource<TypeTemplate> = {
+  key: "official",
+  label: "Official",
+  description: "Reusable Collection and Field shapes maintained by builder.run.",
+  categories: typeTemplateCategories,
+  entries: officialTypeTemplateEntries,
+};
+
+export const typeTemplateSources: readonly CatalogSource<TypeTemplate>[] = [
+  officialTypeTemplateSource,
+];
+export const typeTemplateCatalog = new Catalog(typeTemplateSources);
+export const typeTemplates = typeTemplateCatalog.list().items.map(({ entry }) => entry);
 
 export function resolveFieldTarget(
   wanted: string | undefined,

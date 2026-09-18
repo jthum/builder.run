@@ -5,6 +5,7 @@ import type {
   BlockInputDefinition,
   BlockInputType,
 } from "@jthum/framework/blocks";
+import type { CatalogSource } from "@jthum/framework/catalog";
 import type { Component } from "svelte";
 
 export type BlockCategory = "highlights" | "content" | "data" | "charts" | "actions";
@@ -43,12 +44,8 @@ export interface BlockPreviewModule {
 }
 
 /** A normalized catalog that has been installed into the application bundle. */
-export interface BlockRegistrySource {
-  key: string;
-  label: string;
-  description: string;
+export interface BlockSource extends CatalogSource<BlockDefinition> {
   kind: "bundled";
-  blocks: readonly BlockDefinition[];
   load: (key: string) => Promise<BlockComponent | undefined>;
   loadPreview: (key: string) => Promise<BlockPreview | undefined>;
 }

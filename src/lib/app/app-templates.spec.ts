@@ -3,10 +3,23 @@ import { openRuntime, listApps } from "$lib/framework/bootstrap.ts";
 import { createKernelSqlitePersistence } from "$lib/framework/sqlite.ts";
 import { createNodeGateway } from "$lib/runtime/persistence/sqlite/node-gateway.ts";
 import { emptySpec } from "$lib/framework/bootstrap.ts";
-import { appTemplates } from "./templates/index.ts";
+import { appTemplateCatalog, appTemplates, officialAppTemplateSource } from "./templates/index.ts";
 import { seedApp, instantiateDefinitions } from "./app-templates.ts";
 
 describe("canonical App templates", () => {
+  it("discovers official templates through the host-selected catalog", () => {
+    const discovered = appTemplateCatalog.list({ sourceKeys: ["official"], category: "projects" });
+
+    expect(appTemplateCatalog.sources()).toEqual([
+      expect.objectContaining({ key: "official", label: "Official" }),
+    ]);
+    expect(discovered.items.map(({ entry }) => entry.key)).toEqual(
+      officialAppTemplateSource.entries
+        .filter((entry) => entry.category === "projects")
+        .map((entry) => entry.key),
+    );
+  });
+
   it("removes a newly created App on seeding failure without rolling back shared data", async () => {
     const runtime = await openRuntime({
       kernel: {

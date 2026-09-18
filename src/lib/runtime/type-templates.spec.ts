@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vite-plus/test";
 import { uniqueKey } from "./ids.ts";
-import { resolveTemplateFields, typeDraftFromTemplate, typeTemplates } from "./type-templates.ts";
+import {
+  resolveTemplateFields,
+  typeDraftFromTemplate,
+  typeTemplateCatalog,
+  typeTemplates,
+} from "./type-templates.ts";
 import type { CollectionDraft } from "$lib/blocks/presentation.ts";
 
 describe("type templates", () => {
@@ -11,6 +16,14 @@ describe("type templates", () => {
     expose: true,
     fields: [],
   } as CollectionDraft;
+
+  it("exposes Field recipes through the same catalog discovery contract", () => {
+    const money = typeTemplateCatalog.list({ category: "money", search: "approval" });
+
+    expect(money.items.map(({ source, entry }) => [source.key, entry.key])).toEqual([
+      ["official", "expense"],
+    ]);
+  });
   const project = {
     id: "B000000000000003",
     key: "project",

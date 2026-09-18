@@ -5,8 +5,9 @@ import type {
   BlockModule,
   BlockPreview,
   BlockPreviewModule,
-  BlockRegistrySource,
+  BlockSource,
 } from "./types.ts";
+import { Catalog, type CatalogSource } from "@jthum/framework/catalog";
 
 const definitions = import.meta.glob<{ default: BlockDefinition }>("./**/definition.ts", {
   eager: true,
@@ -68,21 +69,33 @@ function loadOfficialPreview(key: string): Promise<BlockPreview | undefined> {
 }
 
 /** The built-in catalog. Future trusted catalogs can implement this contract after installation. */
-export const officialBlockRegistry: BlockRegistrySource = {
+export const officialBlockSource: BlockSource = {
   key: "official",
   label: "Official",
   description: "Blocks designed and maintained by builder.run.",
   kind: "bundled",
-  blocks: officialBlocks,
+  categories: blockCategories,
+  entries: officialBlocks,
   load: loadOfficialBlock,
   loadPreview: loadOfficialPreview,
 };
 
 /** Catalogs currently available to this build. Remote code is never loaded from this list. */
-export const blockRegistrySources: readonly BlockRegistrySource[] = [officialBlockRegistry];
+export const blockSources: readonly BlockSource[] = [officialBlockSource];
 
-export const blocks = blockRegistrySources
-  .flatMap((source) => source.blocks)
+const blockCatalogSources: readonly CatalogSource<BlockDefinition>[] = blockSources.map(
+  ({ key, label, description, categories, entries }) => ({
+    key,
+    label,
+    description,
+    categories,
+    entries,
+  }),
+);
+export const blockCatalog = new Catalog(blockCatalogSources);
+const blockItems = blockCatalog.list().items;
+export const blocks = blockItems
+  .map(({ entry }) => entry)
   .sort(
     (left, right) =>
       (categoryOrder.get(left.category) ?? 99) - (categoryOrder.get(right.category) ?? 99) ||
@@ -91,10 +104,14 @@ export const blocks = blockRegistrySources
   );
 
 const sourceByBlockKey = new Map(
-  blockRegistrySources.flatMap((source) =>
-    source.blocks.map((block) => [block.key, source] as const),
+  blockItems.map(
+    ({ source, entry }) =>
+      [entry.key, blockSources.find((candidate) => candidate.key === source.key)!] as const,
   ),
 );
+
+if (sourceByBlockKey.size !== blockItems.length)
+  throw new Error("Installed Block keys must be unique across catalog sources.");
 
 export function loadBlock(key: string): Promise<BlockComponent | undefined> {
   return sourceByBlockKey.get(key)?.load(key) ?? Promise.resolve(undefined);

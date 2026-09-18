@@ -4,9 +4,10 @@ import { previewSpec } from "./preview-fixtures.ts";
 import {
   loadBlockPreview,
   loadBlock,
-  officialBlockRegistry,
+  blockCatalog,
+  officialBlockSource,
   blockCategories,
-  blockRegistrySources,
+  blockSources,
   blocks,
 } from "./registry.ts";
 
@@ -21,10 +22,11 @@ describe("block registry", () => {
   });
 
   it("exposes the official blocks through the installed registry-source contract", () => {
-    expect(blockRegistrySources).toEqual([officialBlockRegistry]);
-    expect(officialBlockRegistry.kind).toBe("bundled");
-    expect(officialBlockRegistry.blocks).toEqual(blocks);
-    expect(blockRegistrySources.flatMap((source) => source.blocks)).toEqual(blocks);
+    expect(blockSources).toEqual([officialBlockSource]);
+    expect(officialBlockSource.kind).toBe("bundled");
+    expect(officialBlockSource.entries).toEqual(blocks);
+    expect(blockSources.flatMap((source) => source.entries)).toEqual(blocks);
+    expect(blockCatalog.list({ category: "charts" }).items.length).toBeGreaterThan(0);
   });
 
   it("can lazy-load a component for every definition", async () => {
