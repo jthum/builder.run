@@ -1,265 +1,200 @@
 import { describe, expect, it } from "vite-plus/test";
-import { normalizeSpec } from "$lib/runtime/model.ts";
 import { createNodeGateway } from "$lib/runtime/persistence/sqlite/node-gateway.ts";
-import { Kernel } from "@jthum/framework/kernel";
+import { createKernelSqlitePersistence } from "./sqlite.ts";
 import {
   createApp,
+  createSpace,
   deleteApp,
+  emptySpec,
   listApps,
   openRuntime,
   renameApp,
   resolveApp,
-  resolveProjectedApp,
+  resolveSpace,
 } from "./bootstrap.ts";
-import { createKernelSqlitePersistence } from "./sqlite.ts";
+import type { Spec } from "@jthum/framework/spec";
 
-describe("Framework vertical slice", () => {
-  it("does not recreate a deleted seed App when a saved selection is stale", async () => {
-    const gateway = createNodeGateway();
-    const persistence = createKernelSqlitePersistence(gateway, "deleted-app-selection-test");
-    const seed = {
-      spaceName: "Personal Space",
-      appName: "Original",
-      user: { name: "Jane" },
-      spaceSpec: normalizeSpec({ key: "space", label: "Space" }),
-      appSpec: normalizeSpec({ key: "original", label: "Original" }),
-      sharedTypes: [],
-    };
-    const original = await openRuntime({ kernel: { persistence }, seed });
-    const survivor = await createApp(original.kernel, original.spaceContext, {
-      name: "Survivor",
-      spec: normalizeSpec({ key: "survivor", label: "Survivor" }),
-      sharedTypes: [],
-    });
-    await deleteApp(original.kernel, original.spaceContext, original.app.id);
-    await original.kernel.close();
-    const reopened = await openRuntime({
-      kernel: { persistence },
-      seed,
-      preferredSelection: original.selection,
-    });
-    expect(reopened.selection).toEqual(survivor.selection);
-    expect(await listApps(reopened.kernel, reopened.spaceContext)).toHaveLength(1);
-    await reopened.kernel.close();
-  });
-
-  it("runs shared records, an app Form, View, and Page on the Framework Kernel", async () => {
-    expect.hasAssertions();
-    const spaceSpec = normalizeSpec({
-      key: "personal_space",
-      label: "Personal Space",
-      types: {
-        contact: {
-          id: "A000000000000001",
-          expose: true,
-          fields: {
-            name: { id: "A000000000000002", type: "text", required: true },
+function seed() {
+  const spaceSpec: Spec = {
+    ...emptySpec("space", "Space"),
+    collections: [
+      {
+        id: "contact",
+        key: "contact",
+        label: "Contact",
+        fields: [{ id: "contact_name", key: "name", label: "Name", type: "text", required: true }],
+      },
+    ],
+  };
+  const appSpec: Spec = {
+    ...emptySpec("billing", "Billing"),
+    sources: [{ id: "contact", key: "contact", label: "Contact" }],
+    collections: [
+      {
+        id: "invoice",
+        key: "invoice",
+        label: "Invoice",
+        fields: [
+          { id: "number", key: "number", label: "Number", type: "text", required: true },
+          {
+            id: "invoice_contact",
+            key: "contact",
+            label: "Contact",
+            type: "reference",
+            sourceId: "contact",
           },
-        },
+        ],
       },
-    });
-    const contact = spaceSpec.types[0]!;
-    const appSpec = normalizeSpec({
-      key: "billing",
-      label: "Billing",
-      types: {
-        invoice: {
-          id: "A000000000000003",
-          fields: {
-            number: { id: "A000000000000004", type: "text", required: true },
-            contact: {
-              id: "A000000000000005",
-              type: "reference",
-              target: "contact",
-              required: true,
-            },
-          },
-        },
-      },
-      views: {
-        invoices: {
-          id: "A000000000000006",
-          source: "invoice",
-          fields: ["number", "contact.name"],
-        },
-      },
-      forms: {
-        create_invoice: {
-          id: "A000000000000007",
-          mode: "create",
-          type: "invoice",
-          fields: ["number", "contact"],
-        },
-      },
-      pages: {
-        home: {
-          id: "A000000000000008",
-          blocks: [
-            {
-              kind: "group",
-              columns: 1,
-              blocks: [{ kind: "block", block: "table", config: { view: "invoices" } }],
-            },
+    ],
+    views: [
+      {
+        id: "invoices",
+        key: "invoices",
+        label: "Invoices",
+        source: "invoice",
+        query: {
+          select: [
+            { path: ["number"], as: "number" },
+            { path: ["invoice_contact", "contact_name"], as: "contact_name" },
           ],
         },
       },
-    });
-    const gateway = createNodeGateway();
-    const persistence = createKernelSqlitePersistence(gateway, "builder-slice-test");
-    const seed = {
-      spaceName: "Personal Space",
-      appName: "Billing",
-      user: { name: "Jane" },
-      spaceSpec,
-      appSpec,
-      sharedTypes: [contact],
-    };
-    const instance = await openRuntime({
-      kernel: { persistence },
-      seed,
-    });
+    ],
+    forms: [
+      {
+        id: "create_invoice",
+        key: "create_invoice",
+        label: "Create Invoice",
+        mode: "create",
+        collectionId: "invoice",
+        fieldIds: ["number", "invoice_contact"],
+      },
+    ],
+    pages: [
+      {
+        id: "home",
+        key: "home",
+        label: "Home",
+        layout: [{ id: "table", kind: "block", block: "table", config: { view: "invoices" } }],
+      },
+    ],
+  };
+  return { spaceName: "Space", appName: "Billing", user: { name: "Jane" }, spaceSpec, appSpec };
+}
+function persistence() {
+  return createKernelSqlitePersistence(createNodeGateway());
+}
 
-    expect(instance.isNew).toBe(true);
-    if (!instance.isNew) throw new Error("Expected a newly seeded runtime");
-    expect(instance.gaps).toEqual([]);
-    const emptyAppSpec = normalizeSpec({ key: "empty", label: "Empty" });
-    const emptyApp = await createApp(instance.kernel, instance.spaceContext, {
-      name: "Empty",
-      spec: emptyAppSpec,
-      sharedTypes: [contact],
+describe("canonical local bootstrap", () => {
+  it("runs S1 shared relations, Forms, Views and Pages and reopens the canonical stores", async () => {
+    const adapter = persistence();
+    const initialSeed = seed();
+    const runtime = await openRuntime({ kernel: { persistence: adapter }, seed: initialSeed });
+    expect(runtime.isNew).toBe(true);
+    const contact = await runtime.spaceClient.createRecord("contact", { name: "Ada" });
+    await runtime.appClient.submitForm("create_invoice", {
+      values: { number: "INV-1", contact: contact.id },
     });
-    expect(emptyApp.app.spec.sources).toEqual([
-      expect.objectContaining({ id: contact.id, key: "contact" }),
-    ]);
-    const sameEmptyApp = await resolveProjectedApp(instance.kernel, instance.spaceContext, {
-      name: "A different display name does not duplicate identity",
-      spec: emptyAppSpec,
-      sharedTypes: [contact],
-    });
-    expect(sameEmptyApp.app.id).toBe(emptyApp.app.id);
-    expect(await listApps(instance.kernel, instance.spaceContext)).toEqual([
-      expect.objectContaining({ id: instance.app.id, name: "Billing" }),
-      expect.objectContaining({ id: emptyApp.app.id, name: "Empty" }),
-    ]);
-    const renamed = await renameApp(instance.kernel, emptyApp, "Notes");
-    expect(renamed.app).toMatchObject({ id: emptyApp.app.id, name: "Notes" });
-    const ada = await instance.spaceClient.createRecord("contact", {
-      name: "Ada",
-    });
-    const submitted = await instance.appClient.submitForm("create_invoice", {
-      values: { number: "INV-1", contact: ada.id },
-    });
-    expect(submitted).toMatchObject({
-      mode: "create",
-      record: { values: { number: "INV-1", contact: ada.id } },
-    });
-    expect((await instance.appClient.queryView("invoices")).data.rows).toEqual([
+    expect((await runtime.appClient.queryView("invoices")).data.rows).toEqual([
       expect.objectContaining({ values: { number: "INV-1", contact_name: "Ada" } }),
     ]);
-    expect(await instance.appClient.getPage("home")).toMatchObject({
-      layout: [
-        {
-          kind: "group",
-          children: [{ kind: "block", block: "table", config: { view: "invoices" } }],
-        },
-      ],
+    expect(await runtime.appClient.getPage("home")).toMatchObject({ key: "home" });
+    const notes = await createApp(runtime.kernel, runtime.spaceContext, {
+      name: "Notes",
+      spec: emptySpec("notes", "Notes"),
     });
-    expect(await instance.spaceClient.listRecords("contact")).toHaveLength(1);
-    expect(await instance.appClient.listRecords("invoice")).toHaveLength(1);
-    await instance.kernel.close();
-
+    const renamed = await renameApp(runtime.kernel, notes, "Notebook");
+    await runtime.kernel.close();
     const reopened = await openRuntime({
-      kernel: { persistence },
-      seed,
+      kernel: { persistence: adapter },
+      seed: initialSeed,
+      preferredSelection: renamed.selection,
     });
-    expect(reopened.isNew).toBe(false);
-    expect(await reopened.spaceClient.listRecords("contact")).toHaveLength(1);
-    expect(await reopened.appClient.listRecords("invoice")).toHaveLength(1);
-    expect(reopened.selection).toEqual(instance.selection);
-    expect(reopened.actorId).toBe(instance.actorId);
-    const fallback = await deleteApp(reopened.kernel, reopened.spaceContext, emptyApp.app.id);
-    expect(fallback.selection.appId).toBe(instance.app.id);
-    expect(await listApps(reopened.kernel, reopened.spaceContext)).toEqual([
-      expect.objectContaining({ id: instance.app.id, name: "Billing" }),
-    ]);
+    expect(reopened.app.name).toBe("Notebook");
+    expect(reopened.selection).toEqual(notes.selection);
+    const billing = await resolveApp(reopened.kernel, runtime.selection, runtime.actorId);
+    expect(await billing.appClient.listRecords("invoice")).toHaveLength(1);
+    expect(await billing.spaceClient.listRecords("contact")).toHaveLength(1);
+    expect((await billing.appClient.getWorkspace()).spec).not.toHaveProperty("records");
+    await reopened.kernel.close();
+  });
+
+  it("does not recreate deleted starter Apps and retains the final App", async () => {
+    const adapter = persistence();
+    const initialSeed = seed();
+    const runtime = await openRuntime({ kernel: { persistence: adapter }, seed: initialSeed });
+    const survivor = await createApp(runtime.kernel, runtime.spaceContext, {
+      name: "Notes",
+      spec: emptySpec("notes", "Notes"),
+    });
+    await deleteApp(runtime.kernel, runtime.spaceContext, runtime.app.id);
+    await runtime.kernel.close();
+    const reopened = await openRuntime({
+      kernel: { persistence: adapter },
+      seed: initialSeed,
+      preferredSelection: runtime.selection,
+    });
+    expect(reopened.selection).toEqual(survivor.selection);
+    expect(await listApps(reopened.kernel, reopened.spaceContext)).toHaveLength(1);
     await expect(
-      deleteApp(reopened.kernel, reopened.spaceContext, instance.app.id),
+      deleteApp(reopened.kernel, reopened.spaceContext, survivor.app.id),
     ).rejects.toThrow("retain at least one App");
     await reopened.kernel.close();
-
-    const serverKernel = await Kernel.open({ persistence });
-    await expect(
-      resolveApp(
-        serverKernel,
-        { ...instance.selection, appId: instance.selection.spaceId },
-        instance.actorId,
-      ),
-    ).rejects.toThrow("does not resolve to one Space and App");
-    const recovered = await resolveApp(serverKernel, instance.selection, instance.actorId);
-    expect(recovered.selection).toEqual(instance.selection);
-    expect((await recovered.appClient.queryView("invoices")).data.rows).toHaveLength(1);
-    await serverKernel.close();
-    await gateway.wipe();
   });
 
-  it("validates a seed before writing a partial topology", async () => {
-    expect.hasAssertions();
-    const gateway = createNodeGateway();
-    const persistence = createKernelSqlitePersistence(gateway, "invalid-seed-test");
-    const contact = normalizeSpec({
-      key: "shared",
-      types: { contact: { fields: { name: "text" } } },
-    }).types[0]!;
+  it("creates independent Spaces with local issuance and switches without reopening the Kernel", async () => {
+    const runtime = await openRuntime({ kernel: { persistence: persistence() }, seed: seed() });
+    const other = await createSpace(runtime.kernel, {
+      ...seed(),
+      spaceName: "Studio",
+      spaceSpec: emptySpec("studio", "Studio"),
+      appSpec: emptySpec("home", "Home"),
+    });
+    expect(other.space).toMatchObject({ isRoot: true, parentId: null, rootId: other.space.id });
+    expect(other.actorId).not.toBe(runtime.actorId);
+    const selected = await resolveSpace(runtime.kernel, other.space.id, other.actorId);
+    expect(selected.selection).toEqual(other.selection);
+    const returned = await resolveSpace(runtime.kernel, runtime.space.id, runtime.actorId);
+    expect(returned.actorId).toBe(runtime.actorId);
+    const recruiting = await runtime.kernel.createWorkspace(runtime.spaceContext, {
+      name: "Recruiting",
+    });
+    const candidate = await runtime.kernel.createActor(
+      { workspaceId: recruiting.workspace.id, actorId: runtime.actorId },
+      { name: "Candidate", kind: "user" },
+    );
+    expect(candidate.originId).toBe(recruiting.workspace.id);
+    expect(
+      (await runtime.kernel.listActorsByOrigin(runtime.spaceContext, runtime.space.id)).map(
+        (actor) => actor.id,
+      ),
+    ).not.toContain(candidate.id);
+    await expect(resolveApp(runtime.kernel, other.selection, runtime.actorId)).rejects.toThrow();
+    await runtime.kernel.close();
+  });
 
+  it("cleans up a child App when its canonical Spec is invalid", async () => {
+    const runtime = await openRuntime({ kernel: { persistence: persistence() }, seed: seed() });
+    const before = await listApps(runtime.kernel, runtime.spaceContext);
     await expect(
-      openRuntime({
-        kernel: { persistence },
-        seed: {
-          spaceName: "Personal Space",
-          appName: "Empty",
-          user: { name: "Jane" },
-          spaceSpec: normalizeSpec({ key: "personal_space" }),
-          appSpec: normalizeSpec({ key: "empty" }),
-          sharedTypes: [contact],
+      createApp(runtime.kernel, runtime.spaceContext, {
+        name: "Invalid",
+        spec: {
+          ...emptySpec("bad", "Bad"),
+          forms: [
+            {
+              id: "bad",
+              key: "bad",
+              label: "Bad",
+              mode: "create",
+              collectionId: "missing",
+              fieldIds: [],
+            },
+          ],
         },
       }),
-    ).rejects.toThrow("must project from the Space into the App");
-
-    const session = await persistence.open();
-    await expect(session.catalog.listRootWorkspaces()).resolves.toEqual([]);
-    await session.close();
-    await gateway.wipe();
-  });
-
-  it("opens the Space and App selected by stable Spec identity", async () => {
-    const gateway = createNodeGateway();
-    const persistence = createKernelSqlitePersistence(gateway, "space-selection-test");
-    const firstSeed = {
-      spaceName: "Personal Space",
-      appName: "Projects",
-      user: { name: "Jane" },
-      spaceSpec: normalizeSpec({ key: "personal_space", label: "Personal Space" }),
-      appSpec: normalizeSpec({ key: "projects", label: "Projects" }),
-      sharedTypes: [],
-    };
-    const secondSeed = {
-      spaceName: "Client Space",
-      appName: "CRM",
-      user: { name: "Sam" },
-      spaceSpec: normalizeSpec({ key: "client_space", label: "Client Space" }),
-      appSpec: normalizeSpec({ key: "crm", label: "CRM" }),
-      sharedTypes: [],
-    };
-
-    const first = await openRuntime({ kernel: { persistence }, seed: firstSeed });
-    await first.kernel.close();
-    const second = await openRuntime({ kernel: { persistence }, seed: secondSeed });
-    expect(second.space.spec.id).toBe(secondSeed.spaceSpec.id);
-    expect(second.app.spec.id).toBe(secondSeed.appSpec.id);
-    await second.kernel.close();
-    const reopenedFirst = await openRuntime({ kernel: { persistence }, seed: firstSeed });
-    expect(reopenedFirst.selection).toEqual(first.selection);
-    await reopenedFirst.kernel.close();
-    await gateway.wipe();
+    ).rejects.toThrow();
+    expect(await listApps(runtime.kernel, runtime.spaceContext)).toEqual(before);
+    await runtime.kernel.close();
   });
 });

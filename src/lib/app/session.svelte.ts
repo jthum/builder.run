@@ -1,268 +1,227 @@
-import { Host, type HostSnapshot } from "$lib/runtime/host.ts";
-import type { Actor, AppSpec, TypeDef } from "$lib/runtime/model.ts";
+import type { Actor } from "@jthum/framework/kernel";
+import { LOCAL_BROWSER_ENVIRONMENT } from "@jthum/framework/kernel";
+import type { Spec } from "@jthum/framework/spec";
 import { SPACE_ACCENT_KEYS, type SpaceAccent } from "$lib/runtime/platform.ts";
-import { seedApp } from "$lib/app/app-templates.ts";
-import { readSelection, writeSelection } from "$lib/app/selection.ts";
+import { seedApp } from "./app-templates.ts";
+import { readSelection, writeSelection } from "./selection.ts";
 import {
-  deleteApp as deleteFrameworkApp,
+  createSpace as seedSpace,
+  deleteApp as removeApp,
+  emptySpec,
   listApps,
   openRuntime,
   resolveApp,
-  renameApp as renameFrameworkApp,
+  resolveSpace,
+  renameApp as updateAppName,
   type OpenedRuntime,
 } from "$lib/framework/bootstrap.ts";
-import { LOCAL_BROWSER_ENVIRONMENT } from "@jthum/framework/kernel";
-import { createKernelSqlitePersistence } from "$lib/framework/sqlite.ts";
-import { openSqlGateway } from "$lib/runtime/persistence/sqlite/gateway.ts";
+import { createKernelSqlitePersistence, RUNTIME_DATABASE } from "$lib/framework/sqlite.ts";
+import { openSqlGateway, type SqlGateway } from "$lib/runtime/persistence/sqlite/gateway.ts";
 import {
   clearStorageLockReload,
   isStorageLocked,
   takeStorageLockReload,
 } from "$lib/runtime/persistence/sqlite/storage-lock.ts";
 import {
+  buildTools,
   createWebMcpBridge,
   getWebMcpAppToolMode,
   setWebMcpAppToolMode,
   webmcpSupported,
   type WebMcpAppToolMode,
-} from "$lib/runtime/webmcp.ts";
+  type ToolContext,
+  type WebMcpBridge,
+} from "./webmcp.ts";
 
 export interface AppSummary {
   readonly id: string;
   readonly name: string;
 }
-
 export interface SpaceSummary {
   readonly id: string;
   readonly name: string;
 }
-
 export interface RuntimeDiagnostics {
   readonly backend: string;
   readonly engine: string;
-  readonly stores: HostSnapshot["stores"];
-  readonly catalog: HostSnapshot["catalog"];
+  readonly database: string;
 }
-
+type ProfileActor = Actor & { readonly roles: readonly string[] };
 class SessionState {
   ready = $state(false);
-  host = $state.raw<Host | null>(null);
   framework = $state.raw<OpenedRuntime | null>(null);
   diagnostics = $state.raw<RuntimeDiagnostics | null>(null);
   app = $state.raw<AppSummary | null>(null);
   apps = $state.raw<readonly AppSummary[]>([]);
   space = $state.raw<SpaceSummary | null>(null);
   spaces = $state.raw<readonly SpaceSummary[]>([]);
-  resolvedSpec = $state.raw<AppSpec | undefined>(undefined);
-  authoredSpec = $state.raw<AppSpec | undefined>(undefined);
-  sharedTypes = $state.raw<readonly TypeDef[]>([]);
-  actor = $state.raw<Actor | null>(null);
-  actors = $state.raw<readonly Actor[]>([]);
+  actor = $state.raw<ProfileActor | null>(null);
+  actors = $state.raw<readonly ProfileActor[]>([]);
   accent = $state<SpaceAccent>("blue");
   error = $state<string | null>(null);
   revision = $state(0);
   webmcp = $state(false);
   webmcpToolMode = $state<WebMcpAppToolMode>("compact");
 }
-
 export const session = new SessionState();
-
 type LiveRuntime = {
-  host: Host;
   framework: OpenedRuntime;
-  unsub: () => void;
-  stopMcp: () => void;
+  gateway: SqlGateway;
+  bridge?: WebMcpBridge;
+  spec: Spec;
 };
-
+const listeners = new Set<() => void>();
 const hot = import.meta.hot;
 let live: LiveRuntime | null = hot?.data.live ?? null;
-let booting: Promise<void> | null = hot?.data.booting ?? null;
-
+let booting: Promise<void> | null = null;
 hot?.dispose(() => {
+  live?.bridge?.stop();
   hot.data.live = live;
-  hot.data.booting = booting;
 });
-
-function publish(runtime: LiveRuntime) {
-  runtime.unsub?.();
-  runtime.unsub = runtime.host.subscribe(() => {
-    publishSnapshot(runtime.host.snapshot());
-    session.revision += 1;
-  });
-  session.host = runtime.host;
-  session.framework = runtime.framework;
-  publishSnapshot(runtime.host.snapshot());
-  session.webmcp = webmcpSupported();
-  session.webmcpToolMode = getWebMcpAppToolMode();
-  session.ready = true;
-  session.error = null;
-  clearStorageLockReload();
-  void publishFrameworkPreferences(runtime).catch((error: unknown) => {
-    session.error = error instanceof Error ? error.message : "Unable to load profile settings.";
+function current(): LiveRuntime {
+  if (!live) throw new Error("The runtime is not ready.");
+  return live;
+}
+export function publishToolSpec(spec: Spec): void {
+  if (!live || spec.id !== live.framework.app.spec.id) return;
+  live.spec = spec;
+  session.revision += 1;
+  listeners.forEach((listener) => listener());
+}
+export const toolContext: ToolContext = {
+  runtime: () => current().framework,
+  spec: () => current().spec,
+  changed: async () => refreshContext(),
+  createApp,
+  selectApp,
+  deleteApp,
+  createSpace,
+};
+function connectTools(runtime: LiveRuntime): void {
+  runtime.bridge?.stop();
+  runtime.bridge = createWebMcpBridge({
+    getTools: (mode) => buildTools(toolContext, { appTools: mode }),
+    subscribe: (listener) => {
+      listeners.add(listener);
+      return () => listeners.delete(listener);
+    },
   });
 }
 
-async function publishFrameworkPreferences(runtime: LiveRuntime): Promise<void> {
+async function refreshContext(): Promise<void> {
+  const runtime = current();
+  const previous = runtime.framework;
+  const [space, app] = await Promise.all([
+    previous.spaceClient.getWorkspace(),
+    previous.appClient.getWorkspace(),
+  ]);
+  if (live !== runtime || runtime.framework !== previous) return;
+  runtime.framework = { ...previous, space, app };
+  runtime.spec = app.spec;
+  await publishContext(runtime);
+}
+async function publishContext(runtime: LiveRuntime): Promise<void> {
   const framework = runtime.framework;
-  const [actor, apps] = await Promise.all([
+  const [actor, apps, spaces, actors, memberships] = await Promise.all([
     framework.spaceClient.getActor(framework.actorId),
     listApps(framework.kernel, framework.spaceContext),
+    framework.kernel.listRootWorkspaces(framework.spaceContext),
+    framework.kernel.listActorsByOrigin(framework.spaceContext, framework.space.id),
+    framework.kernel.listMembershipsForWorkspace(framework.spaceContext, framework.space.id),
   ]);
   if (runtime !== live || runtime.framework !== framework || !actor) return;
+  const role = (id: string): readonly string[] =>
+    memberships.find((member) => member.actorId === id)?.permissions.includes("manage")
+      ? ["admin"]
+      : ["member"];
+  session.framework = framework;
   session.app = { id: framework.app.id, name: framework.app.name };
-  session.apps = apps.map((app) => ({ id: app.id, name: app.name }));
-  writeSelection(localStorage, framework.selection);
-  session.actor = {
-    id: actor.id,
-    kind: actor.kind === "user" ? "human" : actor.kind,
-    name: actor.name,
-    ...(actor.email ? { email: actor.email } : {}),
-    roles: session.actor?.roles ?? ["owner"],
-  };
-  session.space = {
-    id: session.space?.id ?? runtime.framework.space.id,
-    name: runtime.framework.space.name,
-  };
-  const accent = runtime.framework.space.spec.meta?.appearance;
+  session.apps = apps.map(({ id, name }) => ({ id, name }));
+  session.space = { id: framework.space.id, name: framework.space.name };
+  session.spaces = spaces.map(({ id, name }) => ({ id, name }));
+  session.actor = { ...actor, roles: role(actor.id) };
+  session.actors = actors.map((actor) => ({ ...actor, roles: role(actor.id) }));
+  const appearance = framework.space.spec.meta?.appearance;
   session.accent = "blue";
-  if (accent && typeof accent === "object" && !Array.isArray(accent) && "accent" in accent) {
-    const value = accent.accent;
-    if (SPACE_ACCENT_KEYS.includes(value as SpaceAccent)) session.accent = value as SpaceAccent;
-  }
-}
-
-async function reopenFramework(runtime: LiveRuntime): Promise<void> {
-  const snapshot = runtime.host.snapshot();
-  await runtime.framework.kernel.close();
-  runtime.framework = await openRuntime({
-    kernel: {
-      environment: { ...LOCAL_BROWSER_ENVIRONMENT, durableRuleExecution: true },
-      persistence: createKernelSqlitePersistence(await openSqlGateway()),
-    },
-    seed: {
-      spaceName: snapshot.space.name,
-      appName: snapshot.app.name,
-      user: { name: snapshot.actor.name, email: snapshot.actor.email },
-      spaceSpec: snapshot.space.spec,
-      appSpec: snapshot.app.spec,
-      sharedTypes: snapshot.sharedTypes,
-    },
-  });
-  session.framework = runtime.framework;
-  await publishFrameworkPreferences(runtime);
-}
-
-function publishSnapshot(snapshot: HostSnapshot) {
+  if (
+    appearance &&
+    typeof appearance === "object" &&
+    !Array.isArray(appearance) &&
+    "accent" in appearance &&
+    SPACE_ACCENT_KEYS.includes(appearance.accent as SpaceAccent)
+  )
+    session.accent = appearance.accent as SpaceAccent;
+  writeSelection(localStorage, framework.selection);
   session.diagnostics = {
-    backend: snapshot.backend,
-    engine: snapshot.engine,
-    stores: snapshot.stores,
-    catalog: snapshot.catalog,
+    backend: runtime.gateway.backend,
+    engine: "SQLite",
+    database: RUNTIME_DATABASE,
   };
-  session.app = session.framework
-    ? { id: session.framework.app.id, name: session.framework.app.name }
-    : { id: snapshot.app.id, name: snapshot.app.name };
-  if (!session.framework) session.apps = snapshot.apps;
-  session.space = {
-    id: snapshot.space.id,
-    name: session.framework?.space.name ?? snapshot.space.name,
-  };
-  session.spaces = snapshot.spaces.map((space) =>
-    space.id === snapshot.space.id
-      ? { ...space, name: session.framework?.space.name ?? space.name }
-      : space,
-  );
-  session.resolvedSpec = snapshot.spec;
-  session.authoredSpec = snapshot.app.spec;
-  session.sharedTypes = snapshot.sharedTypes;
-  if (!session.framework) session.actor = snapshot.actor;
-  session.actors = snapshot.space.actors;
-  if (!session.framework) session.accent = snapshot.space.appearance?.accent ?? "blue";
+  session.webmcp = webmcpSupported();
+  session.webmcpToolMode = getWebMcpAppToolMode();
+  session.revision += 1;
+  listeners.forEach((listener) => listener());
 }
-
-function adoptLive(runtime: LiveRuntime) {
-  runtime.stopMcp?.();
-  const mcp = createWebMcpBridge(runtime.host);
-  runtime.stopMcp = () => mcp.stop();
-  publish(runtime);
-}
-
-if (live) adoptLive(live);
 
 export function boot(): Promise<void> {
   if (live) {
-    publish(live);
-    return booting ?? Promise.resolve();
+    booting ??= publishContext(live).then(() => {
+      if (live) connectTools(live);
+      session.ready = true;
+    });
+    return booting;
   }
   booting ??= (async () => {
+    let opened: OpenedRuntime | undefined;
     try {
-      const host = await Host.open();
-      const snapshot = host.snapshot();
-      let framework = await openRuntime({
+      const gateway = await openSqlGateway();
+      opened = await openRuntime({
         preferredSelection: readSelection(localStorage),
         kernel: {
           environment: { ...LOCAL_BROWSER_ENVIRONMENT, durableRuleExecution: true },
-          persistence: createKernelSqlitePersistence(await openSqlGateway()),
+          persistence: createKernelSqlitePersistence(gateway),
         },
         seed: {
-          spaceName: snapshot.space.name,
-          appName: snapshot.app.name,
-          user: { name: snapshot.actor.name, email: snapshot.actor.email },
-          spaceSpec: snapshot.space.spec,
-          appSpec: snapshot.app.spec,
-          sharedTypes: snapshot.sharedTypes,
+          spaceName: "Personal Space",
+          appName: "Home",
+          user: { name: "You" },
+          spaceSpec: emptySpec("personal_space", "Personal Space"),
+          appSpec: emptySpec("home", "Home"),
         },
       });
-      const mcp = createWebMcpBridge(host);
-      live = {
-        host,
-        framework,
-        unsub: () => {},
-        stopMcp: () => mcp.stop(),
-      };
-      await publishFrameworkPreferences(live);
-      publish(live);
+      live = { framework: opened, gateway, spec: opened.app.spec };
+      await publishContext(live);
+      connectTools(live);
+      session.ready = true;
+      session.error = null;
+      clearStorageLockReload();
     } catch (error) {
+      live?.bridge?.stop();
+      live = null;
+      await opened?.kernel.close();
       if (isStorageLocked(error) && takeStorageLockReload()) {
         location.reload();
         return;
       }
-      session.error = isStorageLocked(error)
-        ? "Another tab may still be using this space. Close extra tabs, then reload."
-        : "Something went wrong while opening your space. Reload to try again.";
+      session.error = error instanceof Error ? error.message : "Unable to open the local runtime.";
     }
   })();
   return booting;
 }
-
-export function runtime(): Host {
-  if (!session.host) throw new Error("builder.run runtime is not ready");
-  return session.host;
-}
-
 export async function updateProfile(input: { name: string; email?: string }): Promise<void> {
-  if (!live) throw new Error("The Framework runtime is not ready.");
-  const actor = await live.framework.spaceClient.updateActor(live.framework.actorId, input);
-  session.actor = {
-    id: actor.id,
-    kind: actor.kind === "user" ? "human" : actor.kind,
-    name: actor.name,
-    ...(actor.email ? { email: actor.email } : {}),
-    roles: session.actor?.roles ?? ["owner"],
-  };
+  const runtime = current();
+  await runtime.framework.spaceClient.updateActor(runtime.framework.actorId, input);
+  await publishContext(runtime);
 }
-
 export async function updateSpaceSettings(name: string, accent: SpaceAccent): Promise<void> {
-  if (!live) throw new Error("The Framework runtime is not ready.");
-  const renamed = await live.framework.kernel.renameWorkspace(live.framework.spaceContext, {
-    name,
-  });
-  const current = await live.framework.spaceClient.getWorkspace();
-  const appearance = current.spec.meta?.appearance;
-  const updated = await live.framework.spaceClient.applySpec({
-    ...current.spec,
+  const runtime = current();
+  await runtime.framework.kernel.renameWorkspace(runtime.framework.spaceContext, { name });
+  const space = await runtime.framework.spaceClient.getWorkspace();
+  const appearance = space.spec.meta?.appearance;
+  await runtime.framework.spaceClient.applySpec({
+    ...space.spec,
     meta: {
-      ...current.spec.meta,
+      ...space.spec.meta,
       appearance: {
         ...(appearance && typeof appearance === "object" && !Array.isArray(appearance)
           ? appearance
@@ -271,109 +230,88 @@ export async function updateSpaceSettings(name: string, accent: SpaceAccent): Pr
       },
     },
   });
-  live.framework = { ...live.framework, space: { ...renamed, spec: updated.spec } };
-  session.framework = live.framework;
-  session.space = { id: session.space?.id ?? renamed.id, name: renamed.name };
-  session.spaces = session.spaces.map((space) =>
-    space.id === session.space?.id ? { ...space, name: renamed.name } : space,
-  );
-  session.accent = accent;
+  await refreshContext();
 }
-
-/** App-shell commands stay behind this boundary while their implementation moves to the Framework. */
 export async function selectApp(id: string): Promise<void> {
-  if (!live) throw new Error("The Framework runtime is not ready.");
+  const runtime = current();
   const selected = await resolveApp(
-    live.framework.kernel,
-    { spaceId: live.framework.space.id, appId: id },
-    live.framework.actorId,
+    runtime.framework.kernel,
+    { spaceId: runtime.framework.space.id, appId: id },
+    runtime.framework.actorId,
   );
-  live.framework = { ...live.framework, ...selected };
-  session.framework = live.framework;
-  await publishFrameworkPreferences(live);
-  session.revision += 1;
+  runtime.framework = { ...runtime.framework, ...selected };
+  runtime.spec = selected.app.spec;
+  await publishContext(runtime);
 }
-
 export async function createApp(name: string, template?: string | null): Promise<void> {
-  if (!live) throw new Error("The Framework runtime is not ready.");
-  const app = await seedApp(live.framework, name, template);
-  live.framework = { ...live.framework, ...app };
-  session.framework = live.framework;
-  await publishFrameworkPreferences(live);
-  session.revision += 1;
+  const runtime = current();
+  const app = await seedApp(runtime.framework, name, template);
+  runtime.framework = { ...runtime.framework, ...app };
+  runtime.spec = app.app.spec;
+  await publishContext(runtime);
 }
-
 export async function renameApp(name: string): Promise<void> {
-  if (!live) throw new Error("The Framework runtime is not ready.");
-  const aligned = await renameFrameworkApp(live.framework.kernel, live.framework, name);
-  live.framework = { ...live.framework, ...aligned };
-  session.framework = live.framework;
-  await publishFrameworkPreferences(live);
-  session.revision += 1;
+  const runtime = current();
+  const app = await updateAppName(runtime.framework.kernel, runtime.framework, name);
+  runtime.framework = { ...runtime.framework, ...app };
+  await publishContext(runtime);
 }
-
 export async function deleteApp(id: string): Promise<void> {
-  if (!live) throw new Error("The Framework runtime is not ready.");
-  const previous = live.framework;
-  const fallback = await deleteFrameworkApp(previous.kernel, previous.spaceContext, id);
-  const selected =
+  const runtime = current();
+  const previous = runtime.framework;
+  const fallback = await removeApp(previous.kernel, previous.spaceContext, id);
+  const app =
     id === previous.app.id
       ? fallback
       : await resolveApp(previous.kernel, previous.selection, previous.actorId);
-  live.framework = { ...previous, ...selected };
-  session.framework = live.framework;
-  await publishFrameworkPreferences(live);
-  session.revision += 1;
+  runtime.framework = { ...previous, ...app };
+  runtime.spec = app.app.spec;
+  await publishContext(runtime);
 }
-
 export async function selectSpace(id: string): Promise<void> {
-  await runtime().switchSpace(id);
-  if (live) await reopenFramework(live);
+  const runtime = current();
+  const actorId = runtime.framework.localActors[id];
+  if (!actorId) throw new Error("Space has no locally issued User on this device.");
+  const selected = await resolveSpace(runtime.framework.kernel, id, actorId);
+  runtime.framework = { ...runtime.framework, ...selected };
+  runtime.spec = selected.app.spec;
+  await publishContext(runtime);
 }
-
 export async function createSpace(name: string): Promise<void> {
-  await runtime().createSpace(name);
-  if (live) await reopenFramework(live);
+  const runtime = current();
+  const selected = await seedSpace(runtime.framework.kernel, {
+    spaceName: name,
+    appName: "Home",
+    user: { name: session.actor?.name ?? "You", email: session.actor?.email },
+    spaceSpec: emptySpec("space", name),
+    appSpec: emptySpec("home", "Home"),
+  });
+  runtime.framework = { ...runtime.framework, ...selected };
+  runtime.framework = {
+    ...runtime.framework,
+    localActors: { ...runtime.framework.localActors, [selected.space.id]: selected.actorId },
+  };
+  runtime.spec = selected.app.spec;
+  await publishContext(runtime);
 }
-
 export function configureWebMcpAppToolMode(mode: WebMcpAppToolMode): void {
   setWebMcpAppToolMode(mode);
   session.webmcpToolMode = mode;
   session.revision += 1;
 }
-
-/** Dev tool: drop all local SQLite/OPFS/IndexedDB data and reload. */
+/** Explicit development reset: remove this product's local persistence and reload. */
 export async function wipeAllLocalData(): Promise<void> {
-  await session.framework?.kernel.close();
-  session.framework = null;
-  session.diagnostics = null;
-  session.app = null;
-  session.apps = [];
-  session.space = null;
-  session.spaces = [];
-  session.resolvedSpec = undefined;
-  session.authoredSpec = undefined;
-  session.sharedTypes = [];
-  session.actor = null;
-  session.actors = [];
-  session.accent = "blue";
-  if (session.host) {
-    await session.host.resetLocalData();
-  } else {
-    const { wipeLocalData } = await import("$lib/runtime/persistence/sqlite/browser-storage.ts");
-    await wipeLocalData();
-  }
+  const runtime = current();
+  runtime.bridge?.stop();
+  await runtime.framework.kernel.close();
+  await runtime.gateway.wipe();
+  localStorage.removeItem("app-selection");
   location.reload();
 }
-
-export const chrome: {
-  newAppOpen: boolean;
-  newAppPreset: string;
-} = $state({
+export const chrome: { newAppOpen: boolean; newAppPreset: string } = $state({
   newAppOpen: false,
   newAppPreset: "",
 });
-
 export function openNewApp(preset = "") {
   chrome.newAppPreset = preset;
   chrome.newAppOpen = true;

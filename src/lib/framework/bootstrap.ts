@@ -4,45 +4,31 @@ import {
   type KernelOptions,
   type Workspace,
 } from "@jthum/framework/kernel";
-import type { Spec } from "@jthum/framework/spec";
+import { createEmptySpec, type Spec } from "@jthum/framework/spec";
 import { createWorkspaceClient, type WorkspaceClient } from "@jthum/framework/client";
-import type { AppSpec, TypeDef } from "$lib/runtime/model.ts";
-import { projectFrameworkSpec, type FrameworkProjectionGap } from "./projection.ts";
+import { nanoid } from "nanoid";
 
 export interface RuntimeSeed {
   readonly spaceName: string;
   readonly appName: string;
   readonly user: { readonly name: string; readonly email?: string };
-  readonly spaceSpec: AppSpec;
-  readonly appSpec: AppSpec;
-  /** Shared Type definitions installed in the Space and bound into the App. */
-  readonly sharedTypes: readonly TypeDef[];
+  readonly spaceSpec: Spec;
+  readonly appSpec: Spec;
 }
-
 export interface AppSeed {
   readonly name: string;
-  readonly spec: AppSpec;
-  /** Existing Space Types this App consumes through Attachments. */
-  readonly sharedTypes: readonly TypeDef[];
+  readonly spec: Spec;
 }
-
 export interface AppSelection {
   readonly spaceId: string;
   readonly appId: string;
 }
-
-export interface CreateRuntimeInput extends RuntimeSeed {
-  readonly kernel: KernelOptions;
-}
-
 export interface OpenRuntimeInput {
   readonly kernel: KernelOptions;
   readonly seed: RuntimeSeed;
-  /** Optional local UI preferences; the persisted catalog remains authoritative. */
   readonly preferredSelection?: Partial<AppSelection>;
   readonly preferredActorId?: string;
 }
-
 export interface AppContext {
   readonly spaceClient: WorkspaceClient;
   readonly appClient: WorkspaceClient;
@@ -53,66 +39,44 @@ export interface AppContext {
   readonly selection: AppSelection;
   readonly actorId: string;
 }
-
 export interface AppRuntime extends AppContext {
   readonly kernel: Kernel;
 }
+export type OpenedRuntime = AppRuntime & {
+  readonly isNew: boolean;
+  /** Trusted browser-local issuance discovery, not server authentication. */
+  readonly localActors: Readonly<Record<string, string>>;
+};
 
-export interface CreatedRuntime extends AppRuntime {
-  /** Deliberate capabilities waiting on later framework phases. */
-  readonly gaps: readonly FrameworkProjectionGap[];
+export function emptySpec(key: string, label: string): Spec {
+  return createEmptySpec({ id: nanoid(), key, label });
 }
 
-export type OpenedRuntime =
-  | (CreatedRuntime & { readonly isNew: true })
-  | (AppRuntime & { readonly isNew: false });
-
-/**
- * Creates the Space/App topology on the Framework Kernel.
- *
- * This seeds the canonical Framework database and never reads the old Host database.
- */
-export async function createRuntime(input: CreateRuntimeInput): Promise<CreatedRuntime> {
-  const spaceProjection = projectFrameworkSpec(input.spaceSpec, { sharedTypes: [] });
-  const appProjection = projectFrameworkSpec(input.appSpec, {
-    sharedTypes: input.sharedTypes,
-  });
-  assertSharedTypesProjected(input.sharedTypes, spaceProjection.spec, appProjection.spec);
+/** Local host bootstrap; server hosts choose Actor identity from authenticated credentials. */
+export async function createRuntime(
+  input: RuntimeSeed & { readonly kernel: KernelOptions },
+): Promise<AppRuntime> {
   const kernel = await Kernel.open(input.kernel);
   try {
-    const root = await kernel.createRootWorkspace({
-      name: input.spaceName,
-      user: input.user,
-    });
-    const spaceContext = {
-      workspaceId: root.workspace.id,
-      actorId: root.user.id,
-    };
-    await kernel.applySpec(spaceContext, spaceProjection.spec);
-    const space = await kernel.updateWorkspaceAccess(spaceContext, {
-      members: ["read", "create", "update", "delete", "manage"],
-      others: ["read"],
-    });
-    const appRuntime = await createProjectedApp(
-      kernel,
-      spaceContext,
-      space,
-      input.appName,
-      input.sharedTypes,
-      appProjection.spec,
-    );
-    return {
-      kernel,
-      ...appRuntime,
-      gaps: [...spaceProjection.gaps, ...appProjection.gaps],
-    };
+    const context = await createSpace(kernel, input);
+    return { kernel, ...context };
   } catch (error) {
     await kernel.close();
     throw error;
   }
 }
 
-/** Creates one App as a child Workspace with explicit shared-Type Attachments. */
+export async function createSpace(kernel: Kernel, input: RuntimeSeed): Promise<AppContext> {
+  const root = await kernel.createRootWorkspace({ name: input.spaceName, user: input.user });
+  const spaceContext = { workspaceId: root.workspace.id, actorId: root.user.id };
+  await kernel.applySpec(spaceContext, input.spaceSpec);
+  await kernel.updateWorkspaceAccess(spaceContext, {
+    members: ["read", "create", "update", "delete", "manage"],
+    others: ["read"],
+  });
+  return createApp(kernel, spaceContext, { name: input.appName, spec: input.appSpec });
+}
+
 export async function createApp(
   kernel: Kernel,
   spaceContext: ExecutionContext,
@@ -120,19 +84,39 @@ export async function createApp(
 ): Promise<AppContext> {
   const space = await kernel.getWorkspace(spaceContext);
   if (!space?.isRoot) throw new Error("Apps must be created inside a Space.");
-  const projection = projectFrameworkSpec(input.spec, { sharedTypes: input.sharedTypes });
-  assertSharedTypesProjected(input.sharedTypes, space.spec, projection.spec);
-  return createProjectedApp(
-    kernel,
-    spaceContext,
-    space,
-    input.name,
-    input.sharedTypes,
-    projection.spec,
+  const collections = new Map(
+    space.spec.collections.map((collection) => [collection.key, collection]),
   );
+  for (const source of input.spec.sources) {
+    if (!collections.has(source.key))
+      throw new Error(`Shared Collection ${source.key} is unavailable.`);
+  }
+  const child = await kernel.createWorkspace(spaceContext, { name: input.name });
+  const appContext = { ...spaceContext, workspaceId: child.workspace.id };
+  try {
+    await kernel.applySpec(appContext, input.spec);
+    for (const source of input.spec.sources) {
+      await kernel.createAttachment(spaceContext, {
+        collectionKey: source.key,
+        targetId: child.workspace.id,
+        sourceId: source.id,
+      });
+    }
+    return resolveApp(
+      kernel,
+      { spaceId: space.id, appId: child.workspace.id },
+      spaceContext.actorId,
+    );
+  } catch (error) {
+    try {
+      await kernel.deleteWorkspace(appContext);
+    } catch (cleanupError) {
+      throw new AggregateError([error, cleanupError], "App creation and cleanup failed.");
+    }
+    throw error;
+  }
 }
 
-/** Lists the child Workspaces the current Actor can select as Apps. */
 export async function listApps(
   kernel: Kernel,
   spaceContext: ExecutionContext,
@@ -147,25 +131,6 @@ export async function listApps(
   return children.filter((workspace) => memberOf.has(workspace.id));
 }
 
-/** Resolve (or create) the canonical App that carries one projected Builder Spec identity. */
-export async function resolveProjectedApp(
-  kernel: Kernel,
-  spaceContext: ExecutionContext,
-  input: AppSeed,
-): Promise<AppContext> {
-  const projection = projectFrameworkSpec(input.spec, { sharedTypes: input.sharedTypes });
-  const apps = await listApps(kernel, spaceContext);
-  const existing = apps.find((app) => app.spec.id === projection.spec.id);
-  if (existing)
-    return resolveApp(
-      kernel,
-      { spaceId: spaceContext.workspaceId, appId: existing.id },
-      spaceContext.actorId,
-    );
-  return createApp(kernel, spaceContext, input);
-}
-
-/** Renames the selected App and returns a freshly resolved context. */
 export async function renameApp(
   kernel: Kernel,
   context: AppContext,
@@ -175,11 +140,6 @@ export async function renameApp(
   return resolveApp(kernel, context.selection, context.actorId);
 }
 
-/**
- * Deletes one App and resolves a deterministic sibling selection.
- * Builder host policy always retains at least one App; the Kernel itself only
- * enforces safe leaf-Workspace deletion.
- */
 export async function deleteApp(
   kernel: Kernel,
   spaceContext: ExecutionContext,
@@ -191,7 +151,7 @@ export async function deleteApp(
   if (!target) throw new Error(`App ${appId} is unavailable in this Space.`);
   const selected = await resolveApp(
     kernel,
-    { spaceId: spaceContext.workspaceId, appId: target.id },
+    { spaceId: spaceContext.workspaceId, appId },
     spaceContext.actorId,
   );
   await kernel.deleteWorkspace(selected.appContext);
@@ -203,15 +163,13 @@ export async function deleteApp(
   );
 }
 
-/** Resolves the Space/App convention for an Actor on an already-open Kernel. */
 export async function resolveApp(
   kernel: Kernel,
   selection: AppSelection,
   actorId: string,
 ): Promise<AppContext> {
-  const { spaceId, appId } = selection;
-  const spaceContext = await kernel.resolveContext({ workspaceId: spaceId, actorId });
-  const appContext = await kernel.resolveContext({ workspaceId: appId, actorId });
+  const spaceContext = await kernel.resolveContext({ workspaceId: selection.spaceId, actorId });
+  const appContext = await kernel.resolveContext({ workspaceId: selection.appId, actorId });
   const [space, app, actor] = await Promise.all([
     kernel.getWorkspace(spaceContext),
     kernel.getWorkspace(appContext),
@@ -239,129 +197,68 @@ export async function resolveApp(
   };
 }
 
-/** Opens the local topology, creating it only when the catalog is empty. */
-export async function openRuntime(input: OpenRuntimeInput): Promise<OpenedRuntime> {
-  const startup = await findStartup(
-    input.kernel,
-    input.seed,
-    input.preferredSelection,
-    input.preferredActorId,
-  );
-  if (startup) {
-    const kernel = await Kernel.open(input.kernel);
-    try {
-      if (!startup.selection.appId) {
-        const spaceContext = {
-          workspaceId: startup.selection.spaceId,
-          actorId: startup.actorId,
-        };
-        return {
-          kernel,
-          ...(await createApp(kernel, spaceContext, {
-            name: input.seed.appName,
-            spec: input.seed.appSpec,
-            sharedTypes: input.seed.sharedTypes,
-          })),
-          isNew: false,
-        };
-      }
-      return {
-        kernel,
-        ...(await resolveApp(
-          kernel,
-          { spaceId: startup.selection.spaceId, appId: startup.selection.appId },
-          startup.actorId,
-        )),
-        isNew: false,
-      };
-    } catch (error) {
-      await kernel.close();
-      throw error;
-    }
-  }
-  const created = await createRuntime({ ...input.seed, kernel: input.kernel });
-  return { ...created, isNew: true };
+/** Browser-only local Actor discovery, never a server authentication mechanism. */
+export async function resolveSpace(
+  kernel: Kernel,
+  spaceId: string,
+  actorId: string,
+): Promise<AppContext> {
+  const context = await kernel.resolveContext({ workspaceId: spaceId, actorId });
+  const app = (await listApps(kernel, context)).at(0);
+  if (!app) throw new Error("Space has no selectable App.");
+  return resolveApp(kernel, { spaceId, appId: app.id }, actorId);
 }
 
-async function findStartup(
-  options: KernelOptions,
-  seed: RuntimeSeed,
-  preferredSelection: Partial<AppSelection> | undefined,
-  preferredActorId: string | undefined,
-): Promise<{
-  readonly selection: { readonly spaceId: string; readonly appId?: string };
-  readonly actorId: string;
-} | null> {
-  const persistence = await options.persistence.open();
+export async function openRuntime(input: OpenRuntimeInput): Promise<OpenedRuntime> {
+  // Trusted local discovery precedes Kernel opening; it does not grant permissions.
+  const persistence = await input.kernel.persistence.open();
+  let startup: { selection: AppSelection; actorId: string } | undefined;
+  let empty = false;
+  const localActors: Record<string, string> = {};
   try {
     const roots = await persistence.catalog.listRootWorkspaces();
-    if (!roots.length) return null;
+    empty = !roots.length;
+    for (const root of roots) {
+      const user = (await persistence.catalog.listActorsByOrigin(root.id)).find(
+        (actor) => actor.kind === "user",
+      );
+      if (user) localActors[root.id] = user.id;
+    }
     const space =
-      roots.find((workspace) => workspace.id === preferredSelection?.spaceId) ??
-      roots.find((workspace) => workspace.spec.id === seed.spaceSpec.id);
-    if (!space) return null;
-    const users = (await persistence.catalog.listActorsByOrigin(space.id)).filter(
-      (actor) => actor.kind === "user",
-    );
-    const actor = users.find((candidate) => candidate.id === preferredActorId) ?? users.at(0);
-    if (!actor) throw new Error(`Space ${space.id} has no locally issued user.`);
-    const memberOf = new Set(
-      (await persistence.catalog.listMembershipsForActor(actor.id)).map(
-        (membership) => membership.workspaceId,
-      ),
-    );
-    const apps = (await persistence.catalog.listChildWorkspaces(space.id)).filter((workspace) =>
-      memberOf.has(workspace.id),
-    );
-    const app =
-      apps.find((workspace) => workspace.id === preferredSelection?.appId) ??
-      apps.find((workspace) => workspace.spec.id === seed.appSpec.id) ??
-      apps.at(0);
-    return {
-      selection: { spaceId: space.id, ...(app ? { appId: app.id } : {}) },
-      actorId: actor.id,
-    };
+      roots.find((root) => root.id === input.preferredSelection?.spaceId) ?? roots.at(0);
+    if (space) {
+      const users = (await persistence.catalog.listActorsByOrigin(space.id)).filter(
+        (actor) => actor.kind === "user",
+      );
+      const actor = users.find((user) => user.id === input.preferredActorId) ?? users.at(0);
+      if (!actor) throw new Error("Space has no locally issued User.");
+      const memberships = await persistence.catalog.listMembershipsForActor(actor.id);
+      const memberOf = new Set(memberships.map((membership) => membership.workspaceId));
+      const apps = (await persistence.catalog.listChildWorkspaces(space.id)).filter((app) =>
+        memberOf.has(app.id),
+      );
+      const app = apps.find((app) => app.id === input.preferredSelection?.appId) ?? apps.at(0);
+      if (!app) throw new Error("Space has no selectable App.");
+      startup = { selection: { spaceId: space.id, appId: app.id }, actorId: actor.id };
+    }
   } finally {
     await persistence.close();
   }
-}
-
-function assertSharedTypesProjected(sharedTypes: readonly TypeDef[], space: Spec, app: Spec): void {
-  const collections = new Set(space.collections.map((collection) => collection.id));
-  const sources = new Set(app.sources.map((source) => source.id));
-  for (const type of sharedTypes) {
-    if (!collections.has(type.id) || !sources.has(type.id)) {
-      throw new Error(`Shared Type ${type.key} must project from the Space into the App.`);
-    }
+  if (empty) {
+    const created = await createRuntime({ ...input.seed, kernel: input.kernel });
+    return { ...created, isNew: true, localActors: { [created.space.id]: created.actorId } };
   }
-}
-
-async function createProjectedApp(
-  kernel: Kernel,
-  spaceContext: ExecutionContext,
-  space: Workspace,
-  name: string,
-  sharedTypes: readonly TypeDef[],
-  spec: Spec,
-): Promise<AppContext> {
-  const child = await kernel.createWorkspace(spaceContext, { name });
-  const appContext = { ...spaceContext, workspaceId: child.workspace.id };
-  const app = await kernel.applySpec(appContext, spec);
-  for (const type of sharedTypes) {
-    await kernel.createAttachment(spaceContext, {
-      collectionKey: type.key,
-      targetId: app.id,
-      sourceId: type.id,
-    });
+  if (!startup) throw new Error("No locally accessible Space.");
+  const kernel = await Kernel.open(input.kernel);
+  try {
+    return {
+      kernel,
+      ...(await resolveApp(kernel, startup.selection, startup.actorId)),
+      isNew: false,
+      localActors,
+    };
+  } catch (error) {
+    await kernel.close();
+    throw error;
   }
-  return {
-    spaceClient: await createWorkspaceClient(kernel, spaceContext),
-    appClient: await createWorkspaceClient(kernel, appContext),
-    space,
-    app,
-    spaceContext,
-    appContext,
-    selection: { spaceId: space.id, appId: app.id },
-    actorId: spaceContext.actorId,
-  };
 }

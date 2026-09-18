@@ -14,7 +14,7 @@
 	import { labelFromKey } from "$lib/runtime/ids.ts";
 	import type { CollectionDraft, FieldDraft, FormDraft } from "@jthum/framework/svelte/studio";
 	import { resolveFieldState } from "$lib/runtime/field-state.ts";
-	import { fieldWidget } from "$lib/runtime/query.ts";
+	import { fieldWidgetFor } from "$lib/runtime/field-capabilities.ts";
 	import { cn } from "$lib/utils.ts";
 	import CircleCheckIcon from "@lucide/svelte/icons/circle-check";
 
@@ -177,7 +177,7 @@
 	<form class={cn("flex flex-col gap-6", fullWidth ? "w-full" : "max-w-xl")} onsubmit={submit}>
 		<Field.Group>
 			{#each visible as field (field.id)}
-				{@const widget = fieldWidget(field)}
+				{@const widget = fieldWidgetFor(field.type, field.presentation)}
 				{@const state = resolveFieldState(field, values)}
 				<Field.Field>
 					<Field.Label>{field.label}</Field.Label>

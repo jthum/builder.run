@@ -1,4 +1,4 @@
-import { session } from "$lib/app/session.svelte.ts";
+import { session, publishToolSpec } from "$lib/app/session.svelte.ts";
 import {
   createCollection,
   createCollectionActions,
@@ -53,6 +53,7 @@ class CanonicalStudioState {
       if (token !== this.generation || runtime !== session.framework) return;
       const shared = new Set(loaded.spec.sources.map((source) => source.key));
       this.spec = loaded.spec;
+      publishToolSpec(loaded.spec);
       this.schemas = loaded.schemas;
       this.spaceSchemas = space.schemas;
       this.spaceContext = space.context;
@@ -213,7 +214,7 @@ class CanonicalStudioState {
   async runRule(key: string, input: Record<string, unknown>): Promise<void> {
     const runtime = session.framework;
     if (!runtime) throw new Error("The Framework runtime is not ready.");
-    await runtime.appClient.runRule(key, input as never);
+    await runtime.appClient.runRule(key, { input: input as never });
     this.revision += 1;
   }
 

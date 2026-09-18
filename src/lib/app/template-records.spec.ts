@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vite-plus/test";
 import type { WorkspaceClient } from "@jthum/framework/client";
-import type { SampleApp } from "$lib/runtime/samples.ts";
+import type { AppTemplate } from "./templates/index.ts";
 import { seedTemplateRecords } from "./template-records.ts";
 
 function client(existing: Array<{ id: string; values: Record<string, never> }> = []) {
@@ -26,12 +26,12 @@ describe("template record seeding", () => {
       description: "Example",
       category: "projects",
       spec: {} as never,
-      exposedTypes: [{ key: "contact" } as never],
+      sharedCollections: [{ key: "contact" } as never],
       records: [
         { type: "contact", as: "jane", values: { name: "Jane" } },
         { type: "project", values: { name: "Launch", contact: "$jane" } },
       ],
-    } satisfies SampleApp;
+    } satisfies AppTemplate;
 
     await seedTemplateRecords({ spaceClient: space.value, appClient: app.value }, sample);
 
@@ -52,7 +52,8 @@ describe("template record seeding", () => {
       category: "projects",
       spec: {} as never,
       records: [{ type: "project", values: { name: "Launch" } }],
-    } satisfies SampleApp;
+      sharedCollections: [],
+    } satisfies AppTemplate;
 
     await seedTemplateRecords({ spaceClient: space.value, appClient: app.value }, sample);
 

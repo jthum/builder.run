@@ -1,5 +1,5 @@
 import type { WorkspaceClient } from "@jthum/framework/client";
-import type { SampleApp } from "$lib/runtime/samples.ts";
+import type { AppTemplate } from "./templates/index.ts";
 
 interface TemplateRecordClients {
   readonly spaceClient: WorkspaceClient;
@@ -9,10 +9,10 @@ interface TemplateRecordClients {
 /** Seed host-owned example data without making records part of the portable Spec. */
 export async function seedTemplateRecords(
   clients: TemplateRecordClients,
-  sample: SampleApp,
+  sample: AppTemplate,
 ): Promise<void> {
   if (!sample.records?.length) return;
-  const shared = new Set((sample.exposedTypes ?? []).map((type) => type.key));
+  const shared = new Set((sample.sharedCollections ?? []).map((type) => type.key));
   const localTypes = [
     ...new Set(sample.records.map((row) => row.type).filter((key) => !shared.has(key))),
   ];

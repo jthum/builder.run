@@ -9,7 +9,7 @@
 	import * as Card from "@jthum/framework/svelte/ui/card";
 	import type { PageDefinition } from "@jthum/framework/spec";
 	import { blockPresentationSpec } from "$lib/app/pages.ts";
-	import { sampleApps, templateCategories } from "$lib/runtime/samples.ts";
+	import { appTemplates, templateCategories } from "$lib/app/templates/index.ts";
 	import BriefcaseIcon from "@lucide/svelte/icons/briefcase";
 	import LayersIcon from "@lucide/svelte/icons/layers";
 	import PlusIcon from "@lucide/svelte/icons/plus";
@@ -60,7 +60,7 @@
 			{/snippet}
 		</PageHeader>
 		<div class="grid gap-4 md:grid-cols-3">
-			{#each sampleApps as sample (sample.key)}
+			{#each appTemplates as sample (sample.key)}
 				{@const Icon = templateIcons[sample.key] ?? LayersIcon}
 				<Card.Root class="h-full">
 					<Card.Content class="flex h-full flex-col gap-4 p-5">

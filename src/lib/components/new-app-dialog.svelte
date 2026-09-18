@@ -8,7 +8,7 @@
 	import { Button } from "@jthum/framework/svelte/ui/button";
 	import * as InputGroup from "@jthum/framework/svelte/ui/input-group";
 	import { Spinner } from "@jthum/framework/svelte/ui/spinner";
-	import { sampleApps, templateCategories } from "$lib/runtime/samples.ts";
+	import { appTemplates, templateCategories } from "$lib/app/templates/index.ts";
 	import { cn } from "$lib/utils.js";
 	import BriefcaseIcon from "@lucide/svelte/icons/briefcase";
 	import CalendarDaysIcon from "@lucide/svelte/icons/calendar-days";
@@ -71,11 +71,11 @@
 	let pending = $state(false);
 
 	const space = $derived(spaceLabel(session.space?.name));
-	const chosen = $derived(sampleApps.find((sample) => sample.key === selected));
-	const categoryCounts = $derived(Object.fromEntries(templateCategories.map((item) => [item.key, sampleApps.filter((sample) => sample.category === item.key).length])));
+	const chosen = $derived(appTemplates.find((sample) => sample.key === selected));
+	const categoryCounts = $derived(Object.fromEntries(templateCategories.map((item) => [item.key, appTemplates.filter((sample) => sample.category === item.key).length])));
 	const filtered = $derived.by(() => {
 		const needle = query.trim().toLowerCase();
-		const matches = sampleApps.filter((sample) => {
+		const matches = appTemplates.filter((sample) => {
 			if (category !== "all" && sample.category !== category) return false;
 			if (!needle) return true;
 			return `${sample.label} ${sample.description} ${sample.category}`.toLowerCase().includes(needle);
@@ -90,7 +90,7 @@
 
 	$effect(() => {
 		if (!open) return;
-		selected = preset || sampleApps[0]?.key || "";
+		selected = preset || appTemplates[0]?.key || "";
 		query = "";
 		category = "all";
 		sort = "recommended";
@@ -100,14 +100,14 @@
 	function selectCategory(key: string) {
 		category = key;
 		pageIndex = 0;
-		selected = sampleApps.find((sample) => key === "all" || sample.category === key)?.key ?? "";
+		selected = appTemplates.find((sample) => key === "all" || sample.category === key)?.key ?? "";
 	}
 
 	function search(value: string) {
 		query = value;
 		pageIndex = 0;
 		const needle = value.trim().toLowerCase();
-		selected = sampleApps.find((sample) => {
+		selected = appTemplates.find((sample) => {
 			if (category !== "all" && sample.category !== category) return false;
 			return !needle || `${sample.label} ${sample.description} ${sample.category}`.toLowerCase().includes(needle);
 		})?.key ?? "";
@@ -115,7 +115,7 @@
 
 	async function create(templateKey: string) {
 		if (pending) return;
-		const template = sampleApps.find((sample) => sample.key === templateKey);
+		const template = appTemplates.find((sample) => sample.key === templateKey);
 		const name = template?.label ?? "Untitled app";
 		pending = true;
 		try {
@@ -155,7 +155,7 @@
 						<Button type="button" variant={category === key ? "soft" : "ghost"} class="h-9 min-w-max justify-start gap-2.5 px-3 sm:w-full" onclick={() => selectCategory(key)}>
 							<span class={cn("flex size-6 shrink-0 items-center justify-center rounded-md", categoryTones[key as keyof typeof categoryTones])}><Icon class="size-3.5" /></span>
 							<span class="min-w-0 flex-1 truncate text-start">{detail.label}</span>
-							<span class="text-xs font-normal tabular-nums text-muted-foreground">{key === "all" ? sampleApps.length : categoryCounts[key] ?? 0}</span>
+							<span class="text-xs font-normal tabular-nums text-muted-foreground">{key === "all" ? appTemplates.length : categoryCounts[key] ?? 0}</span>
 						</Button>
 					{/each}
 	{/snippet}
@@ -183,7 +183,7 @@
 									</div>
 									<div class="mt-3 flex flex-wrap gap-1 border-t pt-3">
 										<Badge variant="surface">{detail.label}</Badge>
-										<Badge variant="surface">{sample.spec.types.length} types</Badge>
+										<Badge variant="surface">{sample.spec.collections.length} types</Badge>
 										<Badge variant="surface">{sample.spec.views.length} views</Badge>
 									</div>
 								</button>

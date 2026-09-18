@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { runtime } from "$lib/app/session.svelte.ts";
+	import { canonicalStudio } from "$lib/app/canonical-studio.svelte.ts";
 	import { Button } from "@jthum/framework/svelte/ui/button";
 	import * as Card from "@jthum/framework/svelte/ui/card";
 	import type { BlockProps } from "$lib/blocks/types.ts";
@@ -12,7 +12,7 @@
 		{ workflow: String(config.third_workflow ?? ""), label: String(config.third_label ?? "") },
 	].filter((action) => action.workflow).map((action) => ({ ...action, label: action.label || spec?.workflows.find((workflow) => workflow.key === action.workflow)?.label || "Run workflow" })));
 	async function run(workflow: string, label: string) {
-		await runtime().invoke(workflow, {});
+		await canonicalStudio.runRule(workflow, {});
 		toast.success(label);
 	}
 </script>

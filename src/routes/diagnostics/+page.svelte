@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { runtime, session, wipeAllLocalData } from "$lib/app/session.svelte.ts";
+	import { toolContext, session, wipeAllLocalData } from "$lib/app/session.svelte.ts";
 	import { PageHeader } from "@jthum/framework/svelte/studio";
 	import * as AlertDialog from "@jthum/framework/svelte/ui/alert-dialog";
 	import { Badge } from "@jthum/framework/svelte/ui/badge";
@@ -8,12 +8,12 @@
 	import * as Empty from "@jthum/framework/svelte/ui/empty";
 	import { Spinner } from "@jthum/framework/svelte/ui/spinner";
 	import * as Tabs from "@jthum/framework/svelte/ui/tabs";
-	import { buildTools, toolSurface, webmcpSupported } from "$lib/runtime/webmcp.ts";
+	import { buildTools, toolSurface, webmcpSupported } from "$lib/app/webmcp.ts";
 	import { toast } from "svelte-sonner";
 
 	const tools = $derived.by(() => {
 		void session.revision;
-		return session.host ? buildTools(runtime(), { appTools: session.webmcpToolMode }) : [];
+		return session.framework ? buildTools(toolContext, { appTools: session.webmcpToolMode }) : [];
 	});
 	const builderTools = $derived(tools.filter((tool) => toolSurface(tool) === "builder"));
 	const appTools = $derived(tools.filter((tool) => toolSurface(tool) === "app"));
@@ -43,22 +43,14 @@
 			</Card.Header>
 			<Card.Content class="flex flex-col gap-2">
 				<Badge>{session.diagnostics?.engine} · {session.diagnostics?.backend}</Badge>
-				{#if session.diagnostics?.catalog}
+				{#if session.diagnostics?.database}
 					<div class="text-sm">
 						<div class="font-medium">Control</div>
 						<div class="text-muted-foreground">
-							{session.diagnostics.catalog.database}: {session.diagnostics.catalog.tables.join(", ") || "no tables yet"}
+							{session.diagnostics.database}
 						</div>
 					</div>
 				{/if}
-				{#each session.diagnostics?.stores ?? [] as store (store.key)}
-					<div class="text-sm">
-						<div class="font-medium">{store.key === "space" ? store.label : "This app"}</div>
-						<div class="text-muted-foreground">
-							{store.database}: {store.tables.join(", ") || "no tables yet"}
-						</div>
-					</div>
-				{/each}
 			</Card.Content>
 		</Card.Root>
 		<Card.Root>

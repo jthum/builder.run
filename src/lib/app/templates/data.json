@@ -1,0 +1,2805 @@
+[
+  {
+    "key": "project_tracker",
+    "label": "Project tracker",
+    "description": "Plan client work, track delivery, and spot blocked tasks early.",
+    "category": "projects",
+    "spec": {
+      "version": 2,
+      "id": "H0IDehAKmeVRIUjp",
+      "key": "project_tracker",
+      "label": "Project tracker",
+      "collections": [
+        {
+          "id": "D9bBm7Es5UF0DQ7s",
+          "key": "project",
+          "label": "Project",
+          "fields": [
+            {
+              "id": "p7hxOFQQTgjO7NSR",
+              "key": "name",
+              "label": "Name",
+              "required": true,
+              "type": "text"
+            },
+            {
+              "id": "l7wfVhaYz2UJ43rH",
+              "key": "client",
+              "label": "Client",
+              "type": "reference",
+              "sourceId": "NGJPq0pOQB8KafsE"
+            },
+            {
+              "id": "I8DLNqYazPqTnacW",
+              "key": "status",
+              "label": "Status",
+              "default": "planned",
+              "meta": {
+                "presentation": {
+                  "presentation": "badge",
+                  "valueSemantics": {
+                    "planned": "info",
+                    "active": "success",
+                    "complete": "neutral"
+                  }
+                }
+              },
+              "type": "choice",
+              "options": [
+                {
+                  "id": "I8DLNqYazPqTnacW:planned",
+                  "key": "planned",
+                  "label": "Planned"
+                },
+                {
+                  "id": "I8DLNqYazPqTnacW:active",
+                  "key": "active",
+                  "label": "Active"
+                },
+                {
+                  "id": "I8DLNqYazPqTnacW:complete",
+                  "key": "complete",
+                  "label": "Complete"
+                }
+              ]
+            },
+            {
+              "id": "UxehYFjInF7TJPhl",
+              "key": "priority",
+              "label": "Priority",
+              "default": "medium",
+              "meta": {
+                "presentation": {
+                  "presentation": "badge",
+                  "valueSemantics": {
+                    "low": "neutral",
+                    "medium": "info",
+                    "high": "warning",
+                    "critical": "danger"
+                  }
+                }
+              },
+              "type": "choice",
+              "options": [
+                {
+                  "id": "UxehYFjInF7TJPhl:low",
+                  "key": "low",
+                  "label": "Low"
+                },
+                {
+                  "id": "UxehYFjInF7TJPhl:medium",
+                  "key": "medium",
+                  "label": "Medium"
+                },
+                {
+                  "id": "UxehYFjInF7TJPhl:high",
+                  "key": "high",
+                  "label": "High"
+                },
+                {
+                  "id": "UxehYFjInF7TJPhl:critical",
+                  "key": "critical",
+                  "label": "Critical"
+                }
+              ]
+            },
+            {
+              "id": "k60qCWLbICfynWkd",
+              "key": "budget",
+              "label": "Budget",
+              "type": "number"
+            },
+            {
+              "id": "WyoY7TJQMWI5SkME",
+              "key": "due_date",
+              "label": "Due Date",
+              "type": "date"
+            }
+          ]
+        },
+        {
+          "id": "fZTtkvMZNFGkNN0t",
+          "key": "task",
+          "label": "Task",
+          "fields": [
+            {
+              "id": "5Z3aZXFwvs2JJfXY",
+              "key": "title",
+              "label": "Title",
+              "required": true,
+              "type": "text"
+            },
+            {
+              "id": "RGfdQeG4GG00Qbv4",
+              "key": "project",
+              "label": "Project",
+              "required": true,
+              "type": "reference",
+              "sourceId": "D9bBm7Es5UF0DQ7s"
+            },
+            {
+              "id": "2REGMugf3d68BZDC",
+              "key": "status",
+              "label": "Status",
+              "default": "todo",
+              "meta": {
+                "presentation": {
+                  "presentation": "badge",
+                  "valueSemantics": {
+                    "todo": "neutral",
+                    "doing": "info",
+                    "blocked": "danger",
+                    "done": "success"
+                  }
+                }
+              },
+              "type": "choice",
+              "options": [
+                {
+                  "id": "2REGMugf3d68BZDC:todo",
+                  "key": "todo",
+                  "label": "Todo"
+                },
+                {
+                  "id": "2REGMugf3d68BZDC:doing",
+                  "key": "doing",
+                  "label": "Doing"
+                },
+                {
+                  "id": "2REGMugf3d68BZDC:blocked",
+                  "key": "blocked",
+                  "label": "Blocked"
+                },
+                {
+                  "id": "2REGMugf3d68BZDC:done",
+                  "key": "done",
+                  "label": "Done"
+                }
+              ]
+            },
+            {
+              "id": "Dzu9vVLbZtKpsPT9",
+              "key": "priority",
+              "label": "Priority",
+              "default": "medium",
+              "meta": {
+                "presentation": {
+                  "presentation": "badge",
+                  "valueSemantics": {
+                    "low": "neutral",
+                    "medium": "info",
+                    "high": "warning",
+                    "critical": "danger"
+                  }
+                }
+              },
+              "type": "choice",
+              "options": [
+                {
+                  "id": "Dzu9vVLbZtKpsPT9:low",
+                  "key": "low",
+                  "label": "Low"
+                },
+                {
+                  "id": "Dzu9vVLbZtKpsPT9:medium",
+                  "key": "medium",
+                  "label": "Medium"
+                },
+                {
+                  "id": "Dzu9vVLbZtKpsPT9:high",
+                  "key": "high",
+                  "label": "High"
+                },
+                {
+                  "id": "Dzu9vVLbZtKpsPT9:critical",
+                  "key": "critical",
+                  "label": "Critical"
+                }
+              ]
+            },
+            {
+              "id": "ytWQNpVpReTwbUvD",
+              "key": "assignee",
+              "label": "Assignee",
+              "type": "text"
+            },
+            {
+              "id": "pXGmCEY6qqELifJE",
+              "key": "estimate",
+              "label": "Estimate",
+              "type": "number"
+            },
+            {
+              "id": "HI7Lxi6VVotqSL1a",
+              "key": "due_date",
+              "label": "Due Date",
+              "type": "date"
+            }
+          ]
+        }
+      ],
+      "sources": [
+        {
+          "id": "NGJPq0pOQB8KafsE",
+          "key": "organisation",
+          "label": "Organisation"
+        }
+      ],
+      "views": [
+        {
+          "id": "ymNgePRrQxks9amw",
+          "key": "project_portfolio",
+          "label": "Project Portfolio",
+          "source": "project",
+          "query": {
+            "sort": [
+              {
+                "path": ["WyoY7TJQMWI5SkME"],
+                "direction": "asc"
+              }
+            ],
+            "select": [
+              {
+                "path": ["p7hxOFQQTgjO7NSR"],
+                "as": "name"
+              },
+              {
+                "path": ["l7wfVhaYz2UJ43rH", "uBJ7wlNvyzmvdtTN"],
+                "as": "client_name"
+              },
+              {
+                "path": ["I8DLNqYazPqTnacW"],
+                "as": "status"
+              },
+              {
+                "path": ["UxehYFjInF7TJPhl"],
+                "as": "priority"
+              },
+              {
+                "path": ["k60qCWLbICfynWkd"],
+                "as": "budget"
+              },
+              {
+                "path": ["WyoY7TJQMWI5SkME"],
+                "as": "due_date"
+              }
+            ]
+          }
+        },
+        {
+          "id": "357yTTOVVtsHBgsW",
+          "key": "active_projects",
+          "label": "Active Projects",
+          "source": "project",
+          "query": {
+            "filter": {
+              "path": ["I8DLNqYazPqTnacW"],
+              "operator": "eq",
+              "value": "active"
+            },
+            "sort": [
+              {
+                "path": ["WyoY7TJQMWI5SkME"],
+                "direction": "asc"
+              }
+            ],
+            "select": [
+              {
+                "path": ["p7hxOFQQTgjO7NSR"],
+                "as": "name"
+              },
+              {
+                "path": ["l7wfVhaYz2UJ43rH", "uBJ7wlNvyzmvdtTN"],
+                "as": "client_name"
+              },
+              {
+                "path": ["UxehYFjInF7TJPhl"],
+                "as": "priority"
+              },
+              {
+                "path": ["k60qCWLbICfynWkd"],
+                "as": "budget"
+              },
+              {
+                "path": ["WyoY7TJQMWI5SkME"],
+                "as": "due_date"
+              },
+              {
+                "path": ["I8DLNqYazPqTnacW"],
+                "as": "status"
+              }
+            ]
+          }
+        },
+        {
+          "id": "ikCkew3pN8yhJ4iZ",
+          "key": "all_tasks",
+          "label": "All Tasks",
+          "source": "task",
+          "query": {
+            "sort": [
+              {
+                "path": ["HI7Lxi6VVotqSL1a"],
+                "direction": "asc"
+              }
+            ],
+            "select": [
+              {
+                "path": ["5Z3aZXFwvs2JJfXY"],
+                "as": "title"
+              },
+              {
+                "path": ["RGfdQeG4GG00Qbv4", "p7hxOFQQTgjO7NSR"],
+                "as": "project_name"
+              },
+              {
+                "path": ["ytWQNpVpReTwbUvD"],
+                "as": "assignee"
+              },
+              {
+                "path": ["Dzu9vVLbZtKpsPT9"],
+                "as": "priority"
+              },
+              {
+                "path": ["2REGMugf3d68BZDC"],
+                "as": "status"
+              },
+              {
+                "path": ["pXGmCEY6qqELifJE"],
+                "as": "estimate"
+              },
+              {
+                "path": ["HI7Lxi6VVotqSL1a"],
+                "as": "due_date"
+              }
+            ]
+          }
+        },
+        {
+          "id": "AX4gFrOX5iR7VuNX",
+          "key": "blocked_tasks",
+          "label": "Blocked Tasks",
+          "source": "task",
+          "query": {
+            "filter": {
+              "path": ["2REGMugf3d68BZDC"],
+              "operator": "eq",
+              "value": "blocked"
+            },
+            "sort": [
+              {
+                "path": ["HI7Lxi6VVotqSL1a"],
+                "direction": "asc"
+              }
+            ],
+            "select": [
+              {
+                "path": ["5Z3aZXFwvs2JJfXY"],
+                "as": "title"
+              },
+              {
+                "path": ["RGfdQeG4GG00Qbv4", "p7hxOFQQTgjO7NSR"],
+                "as": "project_name"
+              },
+              {
+                "path": ["ytWQNpVpReTwbUvD"],
+                "as": "assignee"
+              },
+              {
+                "path": ["Dzu9vVLbZtKpsPT9"],
+                "as": "priority"
+              },
+              {
+                "path": ["HI7Lxi6VVotqSL1a"],
+                "as": "due_date"
+              },
+              {
+                "path": ["2REGMugf3d68BZDC"],
+                "as": "status"
+              }
+            ]
+          }
+        },
+        {
+          "id": "Q9dD0S0MSU7Vv7zg",
+          "key": "tasks_by_status",
+          "label": "Tasks By Status",
+          "source": "task",
+          "query": {
+            "aggregate": {
+              "group": {
+                "path": ["2REGMugf3d68BZDC"],
+                "as": "status",
+                "label": "Status"
+              },
+              "measures": [
+                {
+                  "as": "task_count",
+                  "label": "Task Count",
+                  "operation": "count"
+                },
+                {
+                  "as": "estimated_hours",
+                  "label": "Estimated Hours",
+                  "operation": "sum",
+                  "path": ["pXGmCEY6qqELifJE"]
+                }
+              ],
+              "sort": [
+                {
+                  "key": "task_count",
+                  "direction": "desc"
+                }
+              ]
+            }
+          }
+        }
+      ],
+      "forms": [
+        {
+          "id": "cUEmPoLpj436rsyh",
+          "key": "quick_task",
+          "label": "Quick Task",
+          "mode": "create",
+          "collectionId": "fZTtkvMZNFGkNN0t",
+          "fieldIds": [
+            "5Z3aZXFwvs2JJfXY",
+            "RGfdQeG4GG00Qbv4",
+            "ytWQNpVpReTwbUvD",
+            "Dzu9vVLbZtKpsPT9",
+            "2REGMugf3d68BZDC",
+            "pXGmCEY6qqELifJE",
+            "HI7Lxi6VVotqSL1a"
+          ]
+        }
+      ],
+      "pages": [
+        {
+          "id": "Su9W6o4MhyXDgbuL",
+          "key": "home",
+          "label": "Delivery overview",
+          "meta": {
+            "icon": "dashboard",
+            "path": "/"
+          },
+          "layout": [
+            {
+              "id": "l9Q4scGpSwVC9gZY",
+              "kind": "group",
+              "columns": 1,
+              "children": [
+                {
+                  "id": "mSEOMKVtrxs7a0DV",
+                  "kind": "block",
+                  "block": "heading",
+                  "config": {
+                    "title": "Delivery overview",
+                    "description": "A live view of active client work, priorities, and team capacity."
+                  }
+                }
+              ]
+            },
+            {
+              "id": "2qqXjOSe56YQRz45",
+              "kind": "group",
+              "columns": 3,
+              "children": [
+                {
+                  "id": "P5d87KgHLbhASE5E",
+                  "kind": "block",
+                  "block": "stat",
+                  "config": {
+                    "view": "active_projects",
+                    "title": "Active projects",
+                    "description": "Client work currently in delivery"
+                  }
+                },
+                {
+                  "id": "XZqaT4RKer6gNRcY",
+                  "kind": "block",
+                  "block": "stat",
+                  "config": {
+                    "view": "blocked_tasks",
+                    "title": "Blocked tasks",
+                    "description": "Items that need attention"
+                  }
+                },
+                {
+                  "id": "DTASf4kDpHTw644P",
+                  "kind": "block",
+                  "block": "metric",
+                  "config": {
+                    "view": "project_portfolio",
+                    "value": "budget",
+                    "date": "due_date",
+                    "title": "Portfolio budget",
+                    "description": "Across the complete project portfolio"
+                  }
+                }
+              ]
+            },
+            {
+              "id": "lCGyRwGQdhBujpul",
+              "kind": "group",
+              "columns": 2,
+              "minHeight": "m",
+              "children": [
+                {
+                  "id": "WrV0BsUhql50jQlt",
+                  "kind": "block",
+                  "block": "donut",
+                  "config": {
+                    "view": "tasks_by_status",
+                    "category": "status",
+                    "value": "task_count",
+                    "title": "Work by status"
+                  }
+                },
+                {
+                  "id": "ABMOjuVYJBJQMUYu",
+                  "kind": "block",
+                  "block": "bar",
+                  "config": {
+                    "view": "tasks_by_status",
+                    "category": "status",
+                    "value": "estimated_hours",
+                    "title": "Estimated hours"
+                  }
+                }
+              ]
+            },
+            {
+              "id": "tTNrETxzN2GJtj4G",
+              "kind": "group",
+              "columns": 2,
+              "minHeight": "m",
+              "children": [
+                {
+                  "id": "qoQIk0fLCKp5Nm1S",
+                  "kind": "block",
+                  "block": "leaderboard",
+                  "config": {
+                    "view": "all_tasks",
+                    "title": "Largest pieces of work",
+                    "label_field": "title",
+                    "value_field": "estimate",
+                    "detail_field": "project.name",
+                    "limit": 5
+                  }
+                },
+                {
+                  "id": "jryzOI8omNI4ngVr",
+                  "kind": "block",
+                  "block": "timeline",
+                  "config": {
+                    "view": "all_tasks",
+                    "title": "Upcoming delivery",
+                    "description": "Milestones ordered by due date",
+                    "title_field": "title",
+                    "description_field": "project.name",
+                    "date_field": "due_date",
+                    "status_field": "status",
+                    "limit": 6
+                  }
+                }
+              ]
+            },
+            {
+              "id": "SoIiNoujfgRdk5eg",
+              "kind": "group",
+              "columns": 1,
+              "minHeight": "m",
+              "children": [
+                {
+                  "id": "xaadmgHKToKvzYhB",
+                  "kind": "block",
+                  "block": "kanban",
+                  "config": {
+                    "view": "all_tasks",
+                    "field": "status",
+                    "title": "Delivery board"
+                  }
+                }
+              ]
+            },
+            {
+              "id": "T8qc8e0JG94gMQOH",
+              "kind": "group",
+              "columns": 1,
+              "children": [
+                {
+                  "id": "oHAZkI7j3A39PwLV",
+                  "kind": "block",
+                  "block": "table",
+                  "config": {
+                    "view": "active_projects",
+                    "title": "Active projects"
+                  }
+                },
+                {
+                  "id": "a0J5DRM29IKyssLq",
+                  "kind": "block",
+                  "block": "form",
+                  "config": {
+                    "form": "quick_task",
+                    "title": "Add a task"
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "rules": [
+        {
+          "id": "jkUBe2giU2iqYjik",
+          "key": "complete_project",
+          "label": "Complete Project",
+          "enabled": true,
+          "priority": 0,
+          "input": {
+            "project": {
+              "sourceId": "D9bBm7Es5UF0DQ7s"
+            }
+          },
+          "expose": ["ui", "agent"],
+          "steps": [
+            {
+              "id": "IwSM5J4zJBs9nuPLWiyH1",
+              "gate": {
+                "predicate": {
+                  "op": "context.not_equals",
+                  "value": "complete",
+                  "left": {
+                    "$ref": "vars.project",
+                    "fieldId": "I8DLNqYazPqTnacW"
+                  }
+                },
+                "pass": [
+                  {
+                    "id": "sO4yV_Cwf3C5pjiiIa7Cj",
+                    "action": {
+                      "key": "records.update",
+                      "input": {
+                        "record": {
+                          "$ref": "vars.project"
+                        },
+                        "values": {
+                          "I8DLNqYazPqTnacW": "complete"
+                        }
+                      }
+                    }
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "id": "bMMkz1nDAQhWZbCe",
+          "key": "complete_task",
+          "label": "Complete Task",
+          "enabled": true,
+          "priority": 0,
+          "input": {
+            "task": {
+              "sourceId": "fZTtkvMZNFGkNN0t"
+            }
+          },
+          "expose": ["ui", "agent"],
+          "steps": [
+            {
+              "id": "gvSp_ctkvUm13Lq9jLXNG",
+              "gate": {
+                "predicate": {
+                  "op": "context.not_equals",
+                  "value": "done",
+                  "left": {
+                    "$ref": "vars.task",
+                    "fieldId": "2REGMugf3d68BZDC"
+                  }
+                },
+                "pass": [
+                  {
+                    "id": "iBlvj4TsW98c2zyp9NCy-",
+                    "action": {
+                      "key": "records.update",
+                      "input": {
+                        "record": {
+                          "$ref": "vars.task"
+                        },
+                        "values": {
+                          "2REGMugf3d68BZDC": "done"
+                        }
+                      }
+                    }
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    "records": [
+      {
+        "type": "organisation",
+        "as": "northwind",
+        "values": {
+          "name": "Northwind",
+          "email": "hello@northwind.test"
+        }
+      },
+      {
+        "type": "organisation",
+        "as": "contoso",
+        "values": {
+          "name": "Contoso Labs",
+          "email": "projects@contoso.test"
+        }
+      },
+      {
+        "type": "project",
+        "as": "launch",
+        "values": {
+          "name": "Website launch",
+          "client": "$northwind",
+          "status": "active",
+          "priority": "critical",
+          "budget": 12000,
+          "due_date": "2026-09-18"
+        }
+      },
+      {
+        "type": "project",
+        "as": "audit",
+        "values": {
+          "name": "Brand audit",
+          "client": "$northwind",
+          "status": "planned",
+          "priority": "medium",
+          "budget": 4000,
+          "due_date": "2026-10-02"
+        }
+      },
+      {
+        "type": "project",
+        "as": "campaign",
+        "values": {
+          "name": "Autumn campaign",
+          "client": "$contoso",
+          "status": "active",
+          "priority": "high",
+          "budget": 18500,
+          "due_date": "2026-10-14"
+        }
+      },
+      {
+        "type": "project",
+        "as": "research",
+        "values": {
+          "name": "Customer research",
+          "client": "$contoso",
+          "status": "active",
+          "priority": "medium",
+          "budget": 7200,
+          "due_date": "2026-11-06"
+        }
+      },
+      {
+        "type": "project",
+        "as": "q2",
+        "values": {
+          "name": "Q2 campaign",
+          "client": "$northwind",
+          "status": "complete",
+          "priority": "low",
+          "budget": 6500,
+          "due_date": "2026-06-30"
+        }
+      },
+      {
+        "type": "task",
+        "values": {
+          "title": "Approve final homepage copy",
+          "project": "$launch",
+          "status": "blocked",
+          "priority": "critical",
+          "assignee": "Maya",
+          "estimate": 3,
+          "due_date": "2026-09-08"
+        }
+      },
+      {
+        "type": "task",
+        "values": {
+          "title": "Run accessibility pass",
+          "project": "$launch",
+          "status": "doing",
+          "priority": "high",
+          "assignee": "Jon",
+          "estimate": 6,
+          "due_date": "2026-09-11"
+        }
+      },
+      {
+        "type": "task",
+        "values": {
+          "title": "Configure production analytics",
+          "project": "$launch",
+          "status": "todo",
+          "priority": "medium",
+          "assignee": "Iris",
+          "estimate": 4,
+          "due_date": "2026-09-15"
+        }
+      },
+      {
+        "type": "task",
+        "values": {
+          "title": "Inventory brand touchpoints",
+          "project": "$audit",
+          "status": "doing",
+          "priority": "medium",
+          "assignee": "Maya",
+          "estimate": 8,
+          "due_date": "2026-09-22"
+        }
+      },
+      {
+        "type": "task",
+        "values": {
+          "title": "Interview sales team",
+          "project": "$audit",
+          "status": "todo",
+          "priority": "low",
+          "assignee": "Sam",
+          "estimate": 5,
+          "due_date": "2026-09-25"
+        }
+      },
+      {
+        "type": "task",
+        "values": {
+          "title": "Confirm media budget",
+          "project": "$campaign",
+          "status": "blocked",
+          "priority": "high",
+          "assignee": "Iris",
+          "estimate": 2,
+          "due_date": "2026-09-10"
+        }
+      },
+      {
+        "type": "task",
+        "values": {
+          "title": "Build campaign landing page",
+          "project": "$campaign",
+          "status": "doing",
+          "priority": "high",
+          "assignee": "Jon",
+          "estimate": 16,
+          "due_date": "2026-09-28"
+        }
+      },
+      {
+        "type": "task",
+        "values": {
+          "title": "Prepare launch creative",
+          "project": "$campaign",
+          "status": "todo",
+          "priority": "medium",
+          "assignee": "Maya",
+          "estimate": 12,
+          "due_date": "2026-10-05"
+        }
+      },
+      {
+        "type": "task",
+        "values": {
+          "title": "Synthesize interview notes",
+          "project": "$research",
+          "status": "todo",
+          "priority": "medium",
+          "assignee": "Sam",
+          "estimate": 10,
+          "due_date": "2026-10-20"
+        }
+      },
+      {
+        "type": "task",
+        "values": {
+          "title": "Recruit research panel",
+          "project": "$research",
+          "status": "done",
+          "priority": "medium",
+          "assignee": "Sam",
+          "estimate": 7,
+          "due_date": "2026-09-02"
+        }
+      }
+    ],
+    "sharedCollections": [
+      {
+        "id": "NGJPq0pOQB8KafsE",
+        "key": "organisation",
+        "label": "Organisation",
+        "fields": [
+          {
+            "id": "uBJ7wlNvyzmvdtTN",
+            "key": "name",
+            "label": "Name",
+            "required": true,
+            "type": "text"
+          },
+          {
+            "id": "WmpIXvhww6YXq4oA",
+            "key": "email",
+            "label": "Email",
+            "type": "text"
+          },
+          {
+            "id": "ZLOsgNjAmgXqwTWV",
+            "key": "website",
+            "label": "Website",
+            "type": "text"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "key": "expense_approval",
+    "label": "Expense approval",
+    "description": "Submit expenses, review the approval queue, and track spend by category.",
+    "category": "finance",
+    "spec": {
+      "version": 2,
+      "id": "LxB8rakrwG4pkdtK",
+      "key": "expense_approval",
+      "label": "Expense approval",
+      "collections": [
+        {
+          "id": "wOLoh1EjejMoJm7m",
+          "key": "expense",
+          "label": "Expense",
+          "fields": [
+            {
+              "id": "CjI2V4NeJOExwC6s",
+              "key": "title",
+              "label": "Title",
+              "required": true,
+              "type": "text"
+            },
+            {
+              "id": "MR0wRTQGKEXPAirx",
+              "key": "amount",
+              "label": "Amount",
+              "required": true,
+              "type": "number"
+            },
+            {
+              "id": "B4TsuVuR6htvUGGH",
+              "key": "category",
+              "label": "Category",
+              "default": "travel",
+              "type": "choice",
+              "options": [
+                {
+                  "id": "B4TsuVuR6htvUGGH:travel",
+                  "key": "travel",
+                  "label": "Travel"
+                },
+                {
+                  "id": "B4TsuVuR6htvUGGH:software",
+                  "key": "software",
+                  "label": "Software"
+                },
+                {
+                  "id": "B4TsuVuR6htvUGGH:meals",
+                  "key": "meals",
+                  "label": "Meals"
+                },
+                {
+                  "id": "B4TsuVuR6htvUGGH:equipment",
+                  "key": "equipment",
+                  "label": "Equipment"
+                },
+                {
+                  "id": "B4TsuVuR6htvUGGH:marketing",
+                  "key": "marketing",
+                  "label": "Marketing"
+                }
+              ]
+            },
+            {
+              "id": "BhksrT4vHj1HLnQe",
+              "key": "submitter",
+              "label": "Submitter",
+              "required": true,
+              "type": "text"
+            },
+            {
+              "id": "QEGRwJFrDMUIc8k1",
+              "key": "spent_on",
+              "label": "Spent On",
+              "required": true,
+              "type": "date"
+            },
+            {
+              "id": "YpJTsBi1hgnWlb49",
+              "key": "status",
+              "label": "Status",
+              "default": "draft",
+              "meta": {
+                "presentation": {
+                  "presentation": "badge",
+                  "valueSemantics": {
+                    "draft": "neutral",
+                    "submitted": "info",
+                    "approved": "success",
+                    "rejected": "danger",
+                    "paid": "success"
+                  }
+                }
+              },
+              "type": "choice",
+              "options": [
+                {
+                  "id": "YpJTsBi1hgnWlb49:draft",
+                  "key": "draft",
+                  "label": "Draft"
+                },
+                {
+                  "id": "YpJTsBi1hgnWlb49:submitted",
+                  "key": "submitted",
+                  "label": "Submitted"
+                },
+                {
+                  "id": "YpJTsBi1hgnWlb49:approved",
+                  "key": "approved",
+                  "label": "Approved"
+                },
+                {
+                  "id": "YpJTsBi1hgnWlb49:rejected",
+                  "key": "rejected",
+                  "label": "Rejected"
+                },
+                {
+                  "id": "YpJTsBi1hgnWlb49:paid",
+                  "key": "paid",
+                  "label": "Paid"
+                }
+              ]
+            },
+            {
+              "id": "I3ifZ3gCQjBSRkL0",
+              "key": "notes",
+              "label": "Notes",
+              "type": "text"
+            },
+            {
+              "id": "YWV1fxbyfCv6c2cX",
+              "key": "paid_at",
+              "label": "Paid At",
+              "type": "date"
+            }
+          ]
+        }
+      ],
+      "sources": [],
+      "views": [
+        {
+          "id": "hAUYTTshJOx2iJsx",
+          "key": "all_expenses",
+          "label": "All Expenses",
+          "source": "expense",
+          "query": {
+            "sort": [
+              {
+                "path": ["QEGRwJFrDMUIc8k1"],
+                "direction": "desc"
+              }
+            ],
+            "select": [
+              {
+                "path": ["CjI2V4NeJOExwC6s"],
+                "as": "title"
+              },
+              {
+                "path": ["BhksrT4vHj1HLnQe"],
+                "as": "submitter"
+              },
+              {
+                "path": ["B4TsuVuR6htvUGGH"],
+                "as": "category"
+              },
+              {
+                "path": ["MR0wRTQGKEXPAirx"],
+                "as": "amount"
+              },
+              {
+                "path": ["QEGRwJFrDMUIc8k1"],
+                "as": "spent_on"
+              },
+              {
+                "path": ["YpJTsBi1hgnWlb49"],
+                "as": "status"
+              }
+            ]
+          }
+        },
+        {
+          "id": "iulyhIEg3yl7OXtC",
+          "key": "approval_queue",
+          "label": "Approval Queue",
+          "source": "expense",
+          "query": {
+            "filter": {
+              "path": ["YpJTsBi1hgnWlb49"],
+              "operator": "eq",
+              "value": "submitted"
+            },
+            "sort": [
+              {
+                "path": ["QEGRwJFrDMUIc8k1"],
+                "direction": "asc"
+              }
+            ],
+            "select": [
+              {
+                "path": ["CjI2V4NeJOExwC6s"],
+                "as": "title"
+              },
+              {
+                "path": ["BhksrT4vHj1HLnQe"],
+                "as": "submitter"
+              },
+              {
+                "path": ["B4TsuVuR6htvUGGH"],
+                "as": "category"
+              },
+              {
+                "path": ["MR0wRTQGKEXPAirx"],
+                "as": "amount"
+              },
+              {
+                "path": ["QEGRwJFrDMUIc8k1"],
+                "as": "spent_on"
+              },
+              {
+                "path": ["YpJTsBi1hgnWlb49"],
+                "as": "status"
+              }
+            ]
+          }
+        },
+        {
+          "id": "2xhTzcr4TltB0P8S",
+          "key": "paid_expenses",
+          "label": "Paid Expenses",
+          "source": "expense",
+          "query": {
+            "filter": {
+              "path": ["YpJTsBi1hgnWlb49"],
+              "operator": "eq",
+              "value": "paid"
+            },
+            "sort": [
+              {
+                "path": ["QEGRwJFrDMUIc8k1"],
+                "direction": "asc"
+              }
+            ],
+            "select": [
+              {
+                "path": ["CjI2V4NeJOExwC6s"],
+                "as": "title"
+              },
+              {
+                "path": ["B4TsuVuR6htvUGGH"],
+                "as": "category"
+              },
+              {
+                "path": ["MR0wRTQGKEXPAirx"],
+                "as": "amount"
+              },
+              {
+                "path": ["QEGRwJFrDMUIc8k1"],
+                "as": "spent_on"
+              },
+              {
+                "path": ["YWV1fxbyfCv6c2cX"],
+                "as": "paid_at"
+              },
+              {
+                "path": ["YpJTsBi1hgnWlb49"],
+                "as": "status"
+              }
+            ]
+          }
+        },
+        {
+          "id": "jNxc6gpOxCjuNDca",
+          "key": "expenses_by_category",
+          "label": "Expenses By Category",
+          "source": "expense",
+          "query": {
+            "aggregate": {
+              "group": {
+                "path": ["B4TsuVuR6htvUGGH"],
+                "as": "category",
+                "label": "Category"
+              },
+              "measures": [
+                {
+                  "as": "expense_count",
+                  "label": "Expense Count",
+                  "operation": "count"
+                },
+                {
+                  "as": "total_amount",
+                  "label": "Total Amount",
+                  "operation": "sum",
+                  "path": ["MR0wRTQGKEXPAirx"]
+                }
+              ],
+              "sort": [
+                {
+                  "key": "total_amount",
+                  "direction": "desc"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "id": "eBRexIDoNyMfCUDL",
+          "key": "expenses_by_status",
+          "label": "Expenses By Status",
+          "source": "expense",
+          "query": {
+            "aggregate": {
+              "group": {
+                "path": ["YpJTsBi1hgnWlb49"],
+                "as": "status",
+                "label": "Status"
+              },
+              "measures": [
+                {
+                  "as": "expense_count",
+                  "label": "Expense Count",
+                  "operation": "count"
+                },
+                {
+                  "as": "total_amount",
+                  "label": "Total Amount",
+                  "operation": "sum",
+                  "path": ["MR0wRTQGKEXPAirx"]
+                }
+              ],
+              "sort": [
+                {
+                  "key": "total_amount",
+                  "direction": "desc"
+                }
+              ]
+            }
+          }
+        }
+      ],
+      "forms": [
+        {
+          "id": "J2nxloqCWegu3vrr",
+          "key": "submit_expense_form",
+          "label": "Submit Expense Form",
+          "mode": "create",
+          "collectionId": "wOLoh1EjejMoJm7m",
+          "fieldIds": [
+            "CjI2V4NeJOExwC6s",
+            "MR0wRTQGKEXPAirx",
+            "B4TsuVuR6htvUGGH",
+            "BhksrT4vHj1HLnQe",
+            "QEGRwJFrDMUIc8k1",
+            "I3ifZ3gCQjBSRkL0"
+          ]
+        }
+      ],
+      "pages": [
+        {
+          "id": "wXOCjuQa8eu2q7g9",
+          "key": "home",
+          "label": "Spend overview",
+          "meta": {
+            "icon": "money",
+            "path": "/"
+          },
+          "layout": [
+            {
+              "id": "MooDfCzUDPuUrrp6",
+              "kind": "group",
+              "columns": 1,
+              "children": [
+                {
+                  "id": "SWagCviSY8SmyPi6",
+                  "kind": "block",
+                  "block": "heading",
+                  "config": {
+                    "title": "Spend overview",
+                    "description": "Review incoming requests and understand where the budget is going."
+                  }
+                }
+              ]
+            },
+            {
+              "id": "F2CyDoqcKVmxc28P",
+              "kind": "group",
+              "columns": 3,
+              "children": [
+                {
+                  "id": "3XarNWcEmN27B4u7",
+                  "kind": "block",
+                  "block": "stat",
+                  "config": {
+                    "view": "approval_queue",
+                    "title": "Awaiting approval",
+                    "description": "Submitted requests ready to review"
+                  }
+                },
+                {
+                  "id": "503rwWeElW5PtG4v",
+                  "kind": "block",
+                  "block": "stat",
+                  "config": {
+                    "view": "paid_expenses",
+                    "title": "Paid expenses",
+                    "description": "Requests settled and complete"
+                  }
+                },
+                {
+                  "id": "Q4PR0uBjLm25N3Uc",
+                  "kind": "block",
+                  "block": "metric",
+                  "config": {
+                    "view": "all_expenses",
+                    "value": "amount",
+                    "date": "spent_on",
+                    "title": "Total submitted",
+                    "description": "All recorded spend to date"
+                  }
+                }
+              ]
+            },
+            {
+              "id": "tY5MVYHYyMBMdKrq",
+              "kind": "group",
+              "columns": 2,
+              "minHeight": "m",
+              "children": [
+                {
+                  "id": "B0I3RxVssukQg6eR",
+                  "kind": "block",
+                  "block": "donut",
+                  "config": {
+                    "view": "expenses_by_status",
+                    "category": "status",
+                    "value": "total_amount",
+                    "title": "Spend by status"
+                  }
+                },
+                {
+                  "id": "0DAZx8ERGamORCYS",
+                  "kind": "block",
+                  "block": "bar",
+                  "config": {
+                    "view": "expenses_by_category",
+                    "category": "category",
+                    "value": "total_amount",
+                    "title": "Spend by category"
+                  }
+                }
+              ]
+            },
+            {
+              "id": "JtdvTqrhZkwymwDU",
+              "kind": "group",
+              "columns": 2,
+              "minHeight": "m",
+              "children": [
+                {
+                  "id": "kBGxCfMINPLwZmZz",
+                  "kind": "block",
+                  "block": "leaderboard",
+                  "config": {
+                    "view": "all_expenses",
+                    "title": "Largest requests",
+                    "label_field": "title",
+                    "value_field": "amount",
+                    "detail_field": "submitter",
+                    "limit": 5
+                  }
+                },
+                {
+                  "id": "g9QwL3KERip8SKTF",
+                  "kind": "block",
+                  "block": "timeline",
+                  "config": {
+                    "view": "all_expenses",
+                    "title": "Recent spend",
+                    "description": "Requests ordered by spend date",
+                    "title_field": "title",
+                    "description_field": "submitter",
+                    "date_field": "spent_on",
+                    "status_field": "status",
+                    "limit": 6
+                  }
+                }
+              ]
+            },
+            {
+              "id": "OfdgQK8aRqbP6EvN",
+              "kind": "group",
+              "columns": 1,
+              "children": [
+                {
+                  "id": "1HApbOvSBKgzLcXx",
+                  "kind": "block",
+                  "block": "table",
+                  "config": {
+                    "view": "approval_queue",
+                    "title": "Approval queue"
+                  }
+                },
+                {
+                  "id": "Ydt8Qgm874YOO5PP",
+                  "kind": "block",
+                  "block": "form",
+                  "config": {
+                    "form": "submit_expense_form",
+                    "title": "Submit an expense"
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "rules": [
+        {
+          "id": "wojjbIqGVq3liefl",
+          "key": "submit_expense",
+          "label": "Submit Expense",
+          "enabled": true,
+          "priority": 0,
+          "input": {
+            "expense": {
+              "sourceId": "wOLoh1EjejMoJm7m"
+            }
+          },
+          "expose": ["ui", "agent"],
+          "steps": [
+            {
+              "id": "5essfjnc__wEtf8EwBGEI",
+              "gate": {
+                "predicate": {
+                  "op": "context.equals",
+                  "value": "draft",
+                  "left": {
+                    "$ref": "vars.expense",
+                    "fieldId": "YpJTsBi1hgnWlb49"
+                  }
+                },
+                "pass": [
+                  {
+                    "id": "o-aYOu0KIdwOKeMHI4vCH",
+                    "action": {
+                      "key": "records.update",
+                      "input": {
+                        "record": {
+                          "$ref": "vars.expense"
+                        },
+                        "values": {
+                          "YpJTsBi1hgnWlb49": "submitted"
+                        }
+                      }
+                    }
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "id": "UkfeoTTREvx3aawo",
+          "key": "approve_expense",
+          "label": "Approve Expense",
+          "enabled": true,
+          "priority": 0,
+          "input": {
+            "expense": {
+              "sourceId": "wOLoh1EjejMoJm7m"
+            }
+          },
+          "expose": ["ui", "agent"],
+          "steps": [
+            {
+              "id": "sObGlEW8fndhKUBAauNWC",
+              "gate": {
+                "predicate": {
+                  "op": "context.equals",
+                  "value": "submitted",
+                  "left": {
+                    "$ref": "vars.expense",
+                    "fieldId": "YpJTsBi1hgnWlb49"
+                  }
+                },
+                "pass": [
+                  {
+                    "id": "bO1FKf8XzU_YR9P6G2RnT",
+                    "action": {
+                      "key": "records.update",
+                      "input": {
+                        "record": {
+                          "$ref": "vars.expense"
+                        },
+                        "values": {
+                          "YpJTsBi1hgnWlb49": "approved"
+                        }
+                      }
+                    }
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "id": "59c95IOtj68QpAgG",
+          "key": "reject_expense",
+          "label": "Reject Expense",
+          "enabled": true,
+          "priority": 0,
+          "input": {
+            "expense": {
+              "sourceId": "wOLoh1EjejMoJm7m"
+            }
+          },
+          "expose": ["ui", "agent"],
+          "steps": [
+            {
+              "id": "kwaiOOu0fMwxHylNFohZJ",
+              "gate": {
+                "predicate": {
+                  "op": "context.equals",
+                  "value": "submitted",
+                  "left": {
+                    "$ref": "vars.expense",
+                    "fieldId": "YpJTsBi1hgnWlb49"
+                  }
+                },
+                "pass": [
+                  {
+                    "id": "UKgkrfe-TkObX4mpysyQC",
+                    "action": {
+                      "key": "records.update",
+                      "input": {
+                        "record": {
+                          "$ref": "vars.expense"
+                        },
+                        "values": {
+                          "YpJTsBi1hgnWlb49": "rejected"
+                        }
+                      }
+                    }
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "id": "CdAbji7UUBLcoSVy",
+          "key": "mark_paid",
+          "label": "Mark Paid",
+          "enabled": true,
+          "priority": 0,
+          "input": {
+            "expense": {
+              "sourceId": "wOLoh1EjejMoJm7m"
+            }
+          },
+          "expose": ["ui", "agent"],
+          "steps": [
+            {
+              "id": "33O6shKNXsFdJC4LSRBiO",
+              "action": {
+                "key": "records.update",
+                "input": {
+                  "record": {
+                    "$ref": "vars.expense"
+                  },
+                  "values": {
+                    "YpJTsBi1hgnWlb49": "paid"
+                  }
+                }
+              }
+            }
+          ]
+        },
+        {
+          "id": "1XojIcjEfIQW3KhD",
+          "key": "record_paid_date",
+          "label": "Record Paid Date",
+          "enabled": true,
+          "priority": 0,
+          "input": {
+            "expense": {
+              "sourceId": "wOLoh1EjejMoJm7m"
+            }
+          },
+          "trigger": {
+            "event": "record.field_changed",
+            "sourceId": "wOLoh1EjejMoJm7m",
+            "fieldId": "YpJTsBi1hgnWlb49"
+          },
+          "steps": [
+            {
+              "id": "fojzvdhcX5nQEJ26M3Aoa",
+              "gate": {
+                "predicate": {
+                  "op": "context.equals",
+                  "value": "paid",
+                  "left": {
+                    "$ref": "vars.expense",
+                    "fieldId": "YpJTsBi1hgnWlb49"
+                  }
+                },
+                "pass": [
+                  {
+                    "id": "h4A3K6AtxCXmEgqp9H4JM",
+                    "action": {
+                      "key": "records.update",
+                      "input": {
+                        "record": {
+                          "$ref": "vars.expense"
+                        },
+                        "values": {
+                          "YWV1fxbyfCv6c2cX": {
+                            "$ref": "meta.now"
+                          }
+                        }
+                      }
+                    }
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    "records": [
+      {
+        "type": "expense",
+        "values": {
+          "title": "Train to Manchester",
+          "amount": 86,
+          "category": "travel",
+          "submitter": "Ava Patel",
+          "spent_on": "2026-09-01",
+          "status": "draft",
+          "notes": "Customer workshop"
+        }
+      },
+      {
+        "type": "expense",
+        "values": {
+          "title": "Design software",
+          "amount": 320,
+          "category": "software",
+          "submitter": "Noah Green",
+          "spent_on": "2026-08-28",
+          "status": "submitted",
+          "notes": "Annual team licence"
+        }
+      },
+      {
+        "type": "expense",
+        "values": {
+          "title": "Client lunch",
+          "amount": 54,
+          "category": "meals",
+          "submitter": "Mia Chen",
+          "spent_on": "2026-08-30",
+          "status": "approved"
+        }
+      },
+      {
+        "type": "expense",
+        "values": {
+          "title": "Conference ticket",
+          "amount": 210,
+          "category": "marketing",
+          "submitter": "Ava Patel",
+          "spent_on": "2026-08-12",
+          "status": "paid",
+          "paid_at": "2026-08-18"
+        }
+      },
+      {
+        "type": "expense",
+        "values": {
+          "title": "Standing desk",
+          "amount": 475,
+          "category": "equipment",
+          "submitter": "Noah Green",
+          "spent_on": "2026-08-25",
+          "status": "submitted",
+          "notes": "Home office allowance"
+        }
+      },
+      {
+        "type": "expense",
+        "values": {
+          "title": "Airport transfer",
+          "amount": 62,
+          "category": "travel",
+          "submitter": "Mia Chen",
+          "spent_on": "2026-08-21",
+          "status": "paid",
+          "paid_at": "2026-08-27"
+        }
+      },
+      {
+        "type": "expense",
+        "values": {
+          "title": "Team planning lunch",
+          "amount": 148,
+          "category": "meals",
+          "submitter": "Leo Martin",
+          "spent_on": "2026-08-22",
+          "status": "submitted"
+        }
+      },
+      {
+        "type": "expense",
+        "values": {
+          "title": "Research database",
+          "amount": 199,
+          "category": "software",
+          "submitter": "Mia Chen",
+          "spent_on": "2026-08-15",
+          "status": "rejected",
+          "notes": "Duplicate subscription"
+        }
+      },
+      {
+        "type": "expense",
+        "values": {
+          "title": "Product demo booth",
+          "amount": 1250,
+          "category": "marketing",
+          "submitter": "Leo Martin",
+          "spent_on": "2026-07-29",
+          "status": "approved"
+        }
+      },
+      {
+        "type": "expense",
+        "values": {
+          "title": "Webcam and lighting",
+          "amount": 184,
+          "category": "equipment",
+          "submitter": "Ava Patel",
+          "spent_on": "2026-07-24",
+          "status": "paid",
+          "paid_at": "2026-08-02"
+        }
+      },
+      {
+        "type": "expense",
+        "values": {
+          "title": "Partner dinner",
+          "amount": 126,
+          "category": "meals",
+          "submitter": "Noah Green",
+          "spent_on": "2026-09-02",
+          "status": "submitted"
+        }
+      },
+      {
+        "type": "expense",
+        "values": {
+          "title": "Return flight to Berlin",
+          "amount": 412,
+          "category": "travel",
+          "submitter": "Leo Martin",
+          "spent_on": "2026-07-18",
+          "status": "paid",
+          "paid_at": "2026-07-25"
+        }
+      }
+    ],
+    "sharedCollections": []
+  },
+  {
+    "key": "freelance_crm",
+    "label": "Freelance CRM",
+    "description": "Manage client work, follow project delivery, and keep invoices moving.",
+    "category": "crm",
+    "spec": {
+      "version": 2,
+      "id": "rZWVS4iP5CxjgPyg",
+      "key": "freelance_crm",
+      "label": "Freelance CRM",
+      "collections": [
+        {
+          "id": "aNpsktvQKlSvwk3S",
+          "key": "project",
+          "label": "Project",
+          "fields": [
+            {
+              "id": "PEMEiD9yv1v9J9in",
+              "key": "name",
+              "label": "Name",
+              "required": true,
+              "type": "text"
+            },
+            {
+              "id": "ZdB7QRfASNlvUtek",
+              "key": "client",
+              "label": "Client",
+              "type": "reference",
+              "sourceId": "IlngvM46KanFKKmR"
+            },
+            {
+              "id": "soZsmfgHNScu9huc",
+              "key": "status",
+              "label": "Status",
+              "default": "planned",
+              "meta": {
+                "presentation": {
+                  "presentation": "badge",
+                  "valueSemantics": {
+                    "planned": "info",
+                    "active": "success",
+                    "paused": "warning",
+                    "completed": "neutral"
+                  }
+                }
+              },
+              "type": "choice",
+              "options": [
+                {
+                  "id": "soZsmfgHNScu9huc:planned",
+                  "key": "planned",
+                  "label": "Planned"
+                },
+                {
+                  "id": "soZsmfgHNScu9huc:active",
+                  "key": "active",
+                  "label": "Active"
+                },
+                {
+                  "id": "soZsmfgHNScu9huc:paused",
+                  "key": "paused",
+                  "label": "Paused"
+                },
+                {
+                  "id": "soZsmfgHNScu9huc:completed",
+                  "key": "completed",
+                  "label": "Completed"
+                }
+              ]
+            },
+            {
+              "id": "fX2smTEpcIQoTqZZ",
+              "key": "budget",
+              "label": "Budget",
+              "type": "number"
+            },
+            {
+              "id": "6nwAltAor4fTyewy",
+              "key": "due_date",
+              "label": "Due Date",
+              "type": "date"
+            }
+          ]
+        },
+        {
+          "id": "3zQyDVgKH8FLKC2n",
+          "key": "invoice",
+          "label": "Invoice",
+          "fields": [
+            {
+              "id": "ro1PBxbnHbFoD4He",
+              "key": "number",
+              "label": "Number",
+              "required": true,
+              "type": "text"
+            },
+            {
+              "id": "wDF2XuMlpEJeH6um",
+              "key": "project",
+              "label": "Project",
+              "type": "reference",
+              "sourceId": "aNpsktvQKlSvwk3S"
+            },
+            {
+              "id": "iHH5AecynTHVDh7Y",
+              "key": "amount",
+              "label": "Amount",
+              "required": true,
+              "type": "number"
+            },
+            {
+              "id": "IfZ4jQO3l7uXAzCa",
+              "key": "status",
+              "label": "Status",
+              "default": "draft",
+              "meta": {
+                "presentation": {
+                  "presentation": "badge",
+                  "valueSemantics": {
+                    "draft": "neutral",
+                    "sent": "info",
+                    "paid": "success",
+                    "overdue": "danger"
+                  }
+                }
+              },
+              "type": "choice",
+              "options": [
+                {
+                  "id": "IfZ4jQO3l7uXAzCa:draft",
+                  "key": "draft",
+                  "label": "Draft"
+                },
+                {
+                  "id": "IfZ4jQO3l7uXAzCa:sent",
+                  "key": "sent",
+                  "label": "Sent"
+                },
+                {
+                  "id": "IfZ4jQO3l7uXAzCa:paid",
+                  "key": "paid",
+                  "label": "Paid"
+                },
+                {
+                  "id": "IfZ4jQO3l7uXAzCa:overdue",
+                  "key": "overdue",
+                  "label": "Overdue"
+                }
+              ]
+            },
+            {
+              "id": "0gpGbnxrOKIcd6bs",
+              "key": "issued_on",
+              "label": "Issued On",
+              "type": "date"
+            },
+            {
+              "id": "rNeQyiUJA1FNJFWQ",
+              "key": "due_date",
+              "label": "Due Date",
+              "type": "date"
+            },
+            {
+              "id": "S2yPpVrH5M0rzbRd",
+              "key": "paid_at",
+              "label": "Paid At",
+              "type": "date"
+            }
+          ]
+        }
+      ],
+      "sources": [
+        {
+          "id": "IlngvM46KanFKKmR",
+          "key": "organisation",
+          "label": "Organisation"
+        },
+        {
+          "id": "dcQ7ybjO9lD48aeF",
+          "key": "contact",
+          "label": "Contact"
+        }
+      ],
+      "views": [
+        {
+          "id": "Te85jg7XYHIOkeSG",
+          "key": "all_projects",
+          "label": "All Projects",
+          "source": "project",
+          "query": {
+            "sort": [
+              {
+                "path": ["6nwAltAor4fTyewy"],
+                "direction": "asc"
+              }
+            ],
+            "select": [
+              {
+                "path": ["PEMEiD9yv1v9J9in"],
+                "as": "name"
+              },
+              {
+                "path": ["ZdB7QRfASNlvUtek", "ZVdy2cTKVVjq45FI"],
+                "as": "client_name"
+              },
+              {
+                "path": ["soZsmfgHNScu9huc"],
+                "as": "status"
+              },
+              {
+                "path": ["fX2smTEpcIQoTqZZ"],
+                "as": "budget"
+              },
+              {
+                "path": ["6nwAltAor4fTyewy"],
+                "as": "due_date"
+              }
+            ]
+          }
+        },
+        {
+          "id": "SnRZI3tmMDYXPlRB",
+          "key": "active_projects",
+          "label": "Active Projects",
+          "source": "project",
+          "query": {
+            "filter": {
+              "path": ["soZsmfgHNScu9huc"],
+              "operator": "eq",
+              "value": "active"
+            },
+            "sort": [
+              {
+                "path": ["6nwAltAor4fTyewy"],
+                "direction": "asc"
+              }
+            ],
+            "select": [
+              {
+                "path": ["PEMEiD9yv1v9J9in"],
+                "as": "name"
+              },
+              {
+                "path": ["ZdB7QRfASNlvUtek", "ZVdy2cTKVVjq45FI"],
+                "as": "client_name"
+              },
+              {
+                "path": ["soZsmfgHNScu9huc"],
+                "as": "status"
+              },
+              {
+                "path": ["fX2smTEpcIQoTqZZ"],
+                "as": "budget"
+              },
+              {
+                "path": ["6nwAltAor4fTyewy"],
+                "as": "due_date"
+              }
+            ]
+          }
+        },
+        {
+          "id": "1YNNsLNTATvvET9o",
+          "key": "all_invoices",
+          "label": "All Invoices",
+          "source": "invoice",
+          "query": {
+            "sort": [
+              {
+                "path": ["0gpGbnxrOKIcd6bs"],
+                "direction": "asc"
+              }
+            ],
+            "select": [
+              {
+                "path": ["ro1PBxbnHbFoD4He"],
+                "as": "number"
+              },
+              {
+                "path": ["wDF2XuMlpEJeH6um", "PEMEiD9yv1v9J9in"],
+                "as": "project_name"
+              },
+              {
+                "path": ["iHH5AecynTHVDh7Y"],
+                "as": "amount"
+              },
+              {
+                "path": ["0gpGbnxrOKIcd6bs"],
+                "as": "issued_on"
+              },
+              {
+                "path": ["rNeQyiUJA1FNJFWQ"],
+                "as": "due_date"
+              },
+              {
+                "path": ["IfZ4jQO3l7uXAzCa"],
+                "as": "status"
+              }
+            ]
+          }
+        },
+        {
+          "id": "tK7FC7n0Gjdfzk74",
+          "key": "unpaid_invoices",
+          "label": "Unpaid Invoices",
+          "source": "invoice",
+          "parameters": [
+            {
+              "key": "status",
+              "label": "Status",
+              "path": ["IfZ4jQO3l7uXAzCa"]
+            }
+          ],
+          "query": {
+            "filter": {
+              "path": ["IfZ4jQO3l7uXAzCa"],
+              "operator": "eq",
+              "value": "sent"
+            },
+            "sort": [
+              {
+                "path": ["rNeQyiUJA1FNJFWQ"],
+                "direction": "asc"
+              }
+            ],
+            "select": [
+              {
+                "path": ["ro1PBxbnHbFoD4He"],
+                "as": "number"
+              },
+              {
+                "path": ["wDF2XuMlpEJeH6um", "PEMEiD9yv1v9J9in"],
+                "as": "project_name"
+              },
+              {
+                "path": ["iHH5AecynTHVDh7Y"],
+                "as": "amount"
+              },
+              {
+                "path": ["0gpGbnxrOKIcd6bs"],
+                "as": "issued_on"
+              },
+              {
+                "path": ["rNeQyiUJA1FNJFWQ"],
+                "as": "due_date"
+              },
+              {
+                "path": ["IfZ4jQO3l7uXAzCa"],
+                "as": "status"
+              }
+            ]
+          }
+        },
+        {
+          "id": "RuWIgAfBh9iXE84p",
+          "key": "overdue_invoices",
+          "label": "Overdue Invoices",
+          "source": "invoice",
+          "query": {
+            "filter": {
+              "path": ["IfZ4jQO3l7uXAzCa"],
+              "operator": "eq",
+              "value": "overdue"
+            },
+            "sort": [
+              {
+                "path": ["rNeQyiUJA1FNJFWQ"],
+                "direction": "asc"
+              }
+            ],
+            "select": [
+              {
+                "path": ["ro1PBxbnHbFoD4He"],
+                "as": "number"
+              },
+              {
+                "path": ["wDF2XuMlpEJeH6um", "PEMEiD9yv1v9J9in"],
+                "as": "project_name"
+              },
+              {
+                "path": ["iHH5AecynTHVDh7Y"],
+                "as": "amount"
+              },
+              {
+                "path": ["rNeQyiUJA1FNJFWQ"],
+                "as": "due_date"
+              },
+              {
+                "path": ["IfZ4jQO3l7uXAzCa"],
+                "as": "status"
+              }
+            ]
+          }
+        },
+        {
+          "id": "ZaWdXrYXbLXaxEE8",
+          "key": "invoice_totals_by_status",
+          "label": "Invoice Totals By Status",
+          "source": "invoice",
+          "query": {
+            "aggregate": {
+              "group": {
+                "path": ["IfZ4jQO3l7uXAzCa"],
+                "as": "status",
+                "label": "Status"
+              },
+              "measures": [
+                {
+                  "as": "invoice_count",
+                  "label": "Invoice Count",
+                  "operation": "count"
+                },
+                {
+                  "as": "total_amount",
+                  "label": "Total Amount",
+                  "operation": "sum",
+                  "path": ["iHH5AecynTHVDh7Y"]
+                }
+              ],
+              "sort": [
+                {
+                  "key": "total_amount",
+                  "direction": "desc"
+                }
+              ]
+            }
+          }
+        }
+      ],
+      "forms": [
+        {
+          "id": "Zes6zGVMajTkX5G9",
+          "key": "create_invoice",
+          "label": "Create Invoice",
+          "mode": "create",
+          "collectionId": "3zQyDVgKH8FLKC2n",
+          "fieldIds": [
+            "ro1PBxbnHbFoD4He",
+            "wDF2XuMlpEJeH6um",
+            "iHH5AecynTHVDh7Y",
+            "0gpGbnxrOKIcd6bs",
+            "rNeQyiUJA1FNJFWQ",
+            "IfZ4jQO3l7uXAzCa"
+          ]
+        }
+      ],
+      "pages": [
+        {
+          "id": "VeMq0U2mjuCz2XJn",
+          "key": "home",
+          "label": "Business overview",
+          "meta": {
+            "icon": "dashboard",
+            "path": "/"
+          },
+          "layout": [
+            {
+              "id": "VcCmjwICPxfMgUrB",
+              "kind": "group",
+              "columns": 1,
+              "children": [
+                {
+                  "id": "M3Xiryfv66WRwFJq",
+                  "kind": "block",
+                  "block": "heading",
+                  "config": {
+                    "title": "Business overview",
+                    "description": "Keep client delivery healthy and see what is outstanding at a glance."
+                  }
+                }
+              ]
+            },
+            {
+              "id": "SfGaFJMxyl8dxBbR",
+              "kind": "group",
+              "columns": 3,
+              "children": [
+                {
+                  "id": "WEKWZdQPGuFTkFdF",
+                  "kind": "block",
+                  "block": "stat",
+                  "config": {
+                    "view": "active_projects",
+                    "title": "Active projects",
+                    "description": "Client engagements currently moving"
+                  }
+                },
+                {
+                  "id": "DPjIXN7BzhgSZb0a",
+                  "kind": "block",
+                  "block": "stat",
+                  "config": {
+                    "view": "overdue_invoices",
+                    "title": "Overdue invoices",
+                    "description": "Payments that need follow-up"
+                  }
+                },
+                {
+                  "id": "fy0wEAABKKUYGa7I",
+                  "kind": "block",
+                  "block": "metric",
+                  "config": {
+                    "view": "all_invoices",
+                    "value": "amount",
+                    "date": "issued_on",
+                    "title": "Total invoiced",
+                    "description": "Value billed across all client work"
+                  }
+                }
+              ]
+            },
+            {
+              "id": "yOTkdDIOBoP6AdPL",
+              "kind": "group",
+              "columns": 2,
+              "minHeight": "m",
+              "children": [
+                {
+                  "id": "MQ5najGyBSFblwyH",
+                  "kind": "block",
+                  "block": "donut",
+                  "config": {
+                    "view": "invoice_totals_by_status",
+                    "category": "status",
+                    "value": "total_amount",
+                    "title": "Invoice mix"
+                  }
+                },
+                {
+                  "id": "u9H9w8rEbYB9avwc",
+                  "kind": "block",
+                  "block": "line",
+                  "config": {
+                    "view": "all_invoices",
+                    "category": "issued_on",
+                    "value": "amount",
+                    "title": "Invoicing over time"
+                  }
+                }
+              ]
+            },
+            {
+              "id": "ako797zWR2Ul3R3f",
+              "kind": "group",
+              "columns": 2,
+              "minHeight": "m",
+              "children": [
+                {
+                  "id": "6Z8CIhlzWqDgUufl",
+                  "kind": "block",
+                  "block": "leaderboard",
+                  "config": {
+                    "view": "all_invoices",
+                    "title": "Largest invoices",
+                    "label_field": "number",
+                    "value_field": "amount",
+                    "detail_field": "project.name",
+                    "limit": 5
+                  }
+                },
+                {
+                  "id": "eA6NqA4SenHx1EpV",
+                  "kind": "block",
+                  "block": "timeline",
+                  "config": {
+                    "view": "all_invoices",
+                    "title": "Invoice timeline",
+                    "description": "Invoices ordered by due date",
+                    "title_field": "number",
+                    "description_field": "project.name",
+                    "date_field": "due_date",
+                    "status_field": "status",
+                    "limit": 6
+                  }
+                }
+              ]
+            },
+            {
+              "id": "QPJXASAeOv8s6pQ3",
+              "kind": "group",
+              "columns": 1,
+              "minHeight": "m",
+              "children": [
+                {
+                  "id": "DiiyRvzQurxaNXS7",
+                  "kind": "block",
+                  "block": "kanban",
+                  "config": {
+                    "view": "all_projects",
+                    "field": "status",
+                    "title": "Project pipeline"
+                  }
+                }
+              ]
+            },
+            {
+              "id": "9TRgNhiBFtqbAjTc",
+              "kind": "group",
+              "columns": 1,
+              "children": [
+                {
+                  "id": "IwshzUZ9kf9uXTAW",
+                  "kind": "block",
+                  "block": "table",
+                  "config": {
+                    "view": "unpaid_invoices",
+                    "title": "Awaiting payment"
+                  }
+                },
+                {
+                  "id": "ZkVfZc3Iom5ly24G",
+                  "kind": "block",
+                  "block": "form",
+                  "config": {
+                    "form": "create_invoice",
+                    "title": "Create an invoice"
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "rules": [
+        {
+          "id": "gygoanNsvMyrtRHh",
+          "key": "mark_invoice_paid",
+          "label": "Mark Invoice Paid",
+          "enabled": true,
+          "priority": 0,
+          "input": {
+            "invoice": {
+              "sourceId": "3zQyDVgKH8FLKC2n"
+            }
+          },
+          "expose": ["ui", "agent"],
+          "steps": [
+            {
+              "id": "yY-muwWSd80JaamT0xZ-i",
+              "action": {
+                "key": "records.update",
+                "input": {
+                  "record": {
+                    "$ref": "vars.invoice"
+                  },
+                  "values": {
+                    "IfZ4jQO3l7uXAzCa": "paid"
+                  }
+                }
+              }
+            }
+          ]
+        },
+        {
+          "id": "ZgsiaOhzrsqaIcl0",
+          "key": "record_paid_date",
+          "label": "Record Paid Date",
+          "enabled": true,
+          "priority": 0,
+          "input": {
+            "invoice": {
+              "sourceId": "3zQyDVgKH8FLKC2n"
+            }
+          },
+          "trigger": {
+            "event": "record.field_changed",
+            "sourceId": "3zQyDVgKH8FLKC2n",
+            "fieldId": "IfZ4jQO3l7uXAzCa"
+          },
+          "steps": [
+            {
+              "id": "pk8zOZcHDfrTiHXECundH",
+              "gate": {
+                "predicate": {
+                  "op": "context.equals",
+                  "value": "paid",
+                  "left": {
+                    "$ref": "vars.invoice",
+                    "fieldId": "IfZ4jQO3l7uXAzCa"
+                  }
+                },
+                "pass": [
+                  {
+                    "id": "NgAvOhEK_QZJcmfABQU4f",
+                    "action": {
+                      "key": "records.update",
+                      "input": {
+                        "record": {
+                          "$ref": "vars.invoice"
+                        },
+                        "values": {
+                          "S2yPpVrH5M0rzbRd": {
+                            "$ref": "meta.now"
+                          }
+                        }
+                      }
+                    }
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    "records": [
+      {
+        "type": "organisation",
+        "as": "acme",
+        "values": {
+          "name": "Acme Ltd",
+          "email": "hello@acme.test",
+          "website": "https://acme.test"
+        }
+      },
+      {
+        "type": "organisation",
+        "as": "bright",
+        "values": {
+          "name": "Brightline Studio",
+          "email": "hi@brightline.test",
+          "website": "https://brightline.test"
+        }
+      },
+      {
+        "type": "organisation",
+        "as": "harbor",
+        "values": {
+          "name": "Harbor Health",
+          "email": "team@harbor.test",
+          "website": "https://harbor.test"
+        }
+      },
+      {
+        "type": "contact",
+        "values": {
+          "name": "Jane Cole",
+          "email": "jane@acme.test",
+          "organisation": "$acme"
+        }
+      },
+      {
+        "type": "contact",
+        "values": {
+          "name": "Eli Brooks",
+          "email": "eli@brightline.test",
+          "organisation": "$bright"
+        }
+      },
+      {
+        "type": "contact",
+        "values": {
+          "name": "Priya Rao",
+          "email": "priya@harbor.test",
+          "organisation": "$harbor"
+        }
+      },
+      {
+        "type": "project",
+        "as": "web",
+        "values": {
+          "name": "Website redesign",
+          "client": "$acme",
+          "status": "active",
+          "budget": 8000,
+          "due_date": "2026-09-24"
+        }
+      },
+      {
+        "type": "project",
+        "as": "brand",
+        "values": {
+          "name": "Brand refresh",
+          "client": "$bright",
+          "status": "planned",
+          "budget": 2500,
+          "due_date": "2026-10-18"
+        }
+      },
+      {
+        "type": "project",
+        "as": "portal",
+        "values": {
+          "name": "Patient portal research",
+          "client": "$harbor",
+          "status": "active",
+          "budget": 6200,
+          "due_date": "2026-10-04"
+        }
+      },
+      {
+        "type": "project",
+        "as": "launch",
+        "values": {
+          "name": "Product launch kit",
+          "client": "$bright",
+          "status": "paused",
+          "budget": 4800,
+          "due_date": "2026-10-28"
+        }
+      },
+      {
+        "type": "project",
+        "as": "annual",
+        "values": {
+          "name": "Annual report",
+          "client": "$acme",
+          "status": "completed",
+          "budget": 3900,
+          "due_date": "2026-07-30"
+        }
+      },
+      {
+        "type": "invoice",
+        "values": {
+          "number": "INV-104",
+          "project": "$web",
+          "amount": 8000,
+          "status": "sent",
+          "issued_on": "2026-08-25",
+          "due_date": "2026-09-24"
+        }
+      },
+      {
+        "type": "invoice",
+        "values": {
+          "number": "INV-103",
+          "project": "$brand",
+          "amount": 1200,
+          "status": "paid",
+          "issued_on": "2026-08-10",
+          "due_date": "2026-08-25",
+          "paid_at": "2026-08-22"
+        }
+      },
+      {
+        "type": "invoice",
+        "values": {
+          "number": "INV-102",
+          "project": "$annual",
+          "amount": 3900,
+          "status": "paid",
+          "issued_on": "2026-07-18",
+          "due_date": "2026-08-01",
+          "paid_at": "2026-07-29"
+        }
+      },
+      {
+        "type": "invoice",
+        "values": {
+          "number": "INV-105",
+          "project": "$portal",
+          "amount": 3100,
+          "status": "sent",
+          "issued_on": "2026-08-29",
+          "due_date": "2026-09-12"
+        }
+      },
+      {
+        "type": "invoice",
+        "values": {
+          "number": "INV-101",
+          "project": "$web",
+          "amount": 2400,
+          "status": "overdue",
+          "issued_on": "2026-07-22",
+          "due_date": "2026-08-21"
+        }
+      },
+      {
+        "type": "invoice",
+        "values": {
+          "number": "INV-106",
+          "project": "$launch",
+          "amount": 1600,
+          "status": "draft",
+          "issued_on": "2026-09-02",
+          "due_date": "2026-10-02"
+        }
+      },
+      {
+        "type": "invoice",
+        "values": {
+          "number": "INV-100",
+          "project": "$annual",
+          "amount": 1950,
+          "status": "paid",
+          "issued_on": "2026-06-30",
+          "due_date": "2026-07-14",
+          "paid_at": "2026-07-12"
+        }
+      },
+      {
+        "type": "invoice",
+        "values": {
+          "number": "INV-099",
+          "project": "$portal",
+          "amount": 1550,
+          "status": "overdue",
+          "issued_on": "2026-07-05",
+          "due_date": "2026-08-04"
+        }
+      }
+    ],
+    "sharedCollections": [
+      {
+        "id": "IlngvM46KanFKKmR",
+        "key": "organisation",
+        "label": "Organisation",
+        "fields": [
+          {
+            "id": "ZVdy2cTKVVjq45FI",
+            "key": "name",
+            "label": "Name",
+            "required": true,
+            "type": "text"
+          },
+          {
+            "id": "XOEdyZ4bvybl6meH",
+            "key": "email",
+            "label": "Email",
+            "type": "text"
+          },
+          {
+            "id": "Jj5bKt4l0dTXFWqX",
+            "key": "website",
+            "label": "Website",
+            "type": "text"
+          }
+        ]
+      },
+      {
+        "id": "dcQ7ybjO9lD48aeF",
+        "key": "contact",
+        "label": "Contact",
+        "fields": [
+          {
+            "id": "Q5TPzbOHY430gLQb",
+            "key": "name",
+            "label": "Name",
+            "required": true,
+            "type": "text"
+          },
+          {
+            "id": "tUuFetfoQ4DiCCOH",
+            "key": "email",
+            "label": "Email",
+            "type": "text"
+          },
+          {
+            "id": "wTjo33kvccuI03Hb",
+            "key": "organisation",
+            "label": "Organisation",
+            "type": "reference",
+            "sourceId": "IlngvM46KanFKKmR"
+          }
+        ]
+      }
+    ]
+  }
+]
