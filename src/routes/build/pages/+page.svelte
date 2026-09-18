@@ -2,7 +2,7 @@
 	import { canonicalStudio } from "$lib/app/canonical-studio.svelte.ts";
 	import PageBuilder from "$lib/components/page-builder.svelte";
 	import type { PageDefinition } from "@jthum/framework/spec";
-	import { isStudioManaged } from "@jthum/framework/svelte/studio";
+	import { isStudioManaged } from "@jthum/framework/svelte/studio/data";
 
 	const definitions = $derived(
 		canonicalStudio.spec

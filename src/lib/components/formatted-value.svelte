@@ -2,7 +2,7 @@
 	import { formatCell, isStatusPath } from "$lib/app/labels.ts";
 	import RatingValue from "$lib/components/rating-value.svelte";
 	import StatusPill from "$lib/components/status-pill.svelte";
-	import type { CollectionDraft } from "@jthum/framework/svelte/studio";
+	import type { CollectionDraft } from "@jthum/framework/svelte/studio/data";
 	import { cn } from "$lib/utils.ts";
 
 	let {

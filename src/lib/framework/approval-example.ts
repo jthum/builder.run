@@ -2,7 +2,7 @@ import type { WorkspaceClient } from "@jthum/framework/client";
 import type { RuleDefinition } from "@jthum/framework/spec";
 import { nanoid } from "nanoid";
 
-/** Explicit example installation; never modifies business records or the Host's Spec. */
+/** Explicit example installation; never modifies business records or unrelated definitions. */
 export async function installApprovalExample(client: WorkspaceClient): Promise<RuleDefinition> {
   const workspace = await client.getWorkspace();
   const existing = workspace.spec.rules.find((rule) => rule.meta?.example === "durable_approval");

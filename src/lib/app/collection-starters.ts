@@ -6,7 +6,7 @@ import {
   formDefinitionFromDraft,
   viewDefinitionFromDraft,
   type ViewAuthoringSchemas,
-} from "@jthum/framework/svelte/studio";
+} from "@jthum/framework/svelte/studio/data";
 
 export async function installCollectionStarters(
   client: WorkspaceClient,

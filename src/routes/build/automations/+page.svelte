@@ -1,9 +1,10 @@
 <script lang="ts">
 	import { goto } from "$app/navigation";
 	import { canonicalStudio } from "$lib/app/canonical-studio.svelte.ts";
-	import { NameDialog, ruleSummary } from "@jthum/framework/svelte/studio";
-	import type { NewRuleDraft } from "@jthum/framework/svelte/studio";
-	import { PageHeader } from "@jthum/framework/svelte/studio";
+	import NameDialog from "@jthum/framework/svelte/studio/name-dialog";
+	import { ruleSummary } from "@jthum/framework/svelte/studio/data";
+	import type { NewRuleDraft } from "@jthum/framework/svelte/studio/data";
+	import PageHeader from "@jthum/framework/svelte/studio/page-header";
 	import { Badge } from "@jthum/framework/svelte/ui/badge";
 	import { Button } from "@jthum/framework/svelte/ui/button";
 	import * as Card from "@jthum/framework/svelte/ui/card";

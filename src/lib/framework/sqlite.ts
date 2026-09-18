@@ -10,7 +10,7 @@ const leasedDatabaseNames = new WeakMap<SqlGateway, Set<string>>();
  *
  * The gateway selects wa-sqlite in the browser and node:sqlite in tests. This adapter owns only
  * transaction ordering and the small difference between the two SQL interfaces; it does not
- * depend on Builder.run's legacy Host, catalog, or record services.
+ * depend on product catalog or record services.
  */
 export function createKernelSqlitePersistence(
   gateway: SqlGateway,

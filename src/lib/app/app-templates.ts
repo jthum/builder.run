@@ -131,6 +131,19 @@ export async function seedApp(
       collections: [...space.spec.collections, ...incoming],
     });
   const app = await createApp(runtime.kernel, runtime.spaceContext, { name: trimmed, spec });
-  if (sample) await seedTemplateRecords(app, sample);
+  if (sample) {
+    try {
+      await seedTemplateRecords(app, sample);
+    } catch (error) {
+      // Remove only the newly created App. Shared definitions/examples may already be
+      // reused elsewhere and must not be destructively rolled back by this recipe.
+      try {
+        await runtime.kernel.deleteWorkspace(app.appContext);
+      } catch (cleanupError) {
+        throw new AggregateError([error, cleanupError], "Template seeding and App cleanup failed.");
+      }
+      throw error;
+    }
+  }
   return app;
 }

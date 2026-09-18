@@ -8,7 +8,8 @@
 	import { studioGroupOrder, studioItems } from "$lib/app/studio.ts";
 	import AppSettingsDialog from "$lib/components/app-settings-dialog.svelte";
 	import SidebarNavGroup from "$lib/components/sidebar-nav-group.svelte";
-	import { isStudioManaged, NameDialog } from "@jthum/framework/svelte/studio";
+	import NameDialog from "@jthum/framework/svelte/studio/name-dialog";
+	import { isStudioManaged } from "@jthum/framework/svelte/studio/data";
 	import NewAppDialog from "$lib/components/new-app-dialog.svelte";
 	import ProfileDialog from "$lib/components/profile-dialog.svelte";
 	import SpaceSettingsDialog from "$lib/components/space-settings-dialog.svelte";
@@ -37,7 +38,7 @@
 	import UsersIcon from "@lucide/svelte/icons/users";
 	import WorkflowIcon from "@lucide/svelte/icons/workflow";
 	import type { PagePresentation } from "$lib/blocks/presentation.ts";
-	import type { CollectionDraft } from "@jthum/framework/svelte/studio";
+	import type { CollectionDraft } from "@jthum/framework/svelte/studio/data";
 	import { pageIconEntry } from "$lib/runtime/page-icons.ts";
 	import { groupPagesByFolder, pageHref } from "$lib/runtime/blocks.ts";
 	import type { Component, ComponentProps } from "svelte";

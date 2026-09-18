@@ -6,7 +6,7 @@ import {
   createCollection,
   editorContextFromSpec,
   isStudioManaged,
-} from "@jthum/framework/svelte/studio";
+} from "@jthum/framework/svelte/studio/data";
 import { installCollectionStarters } from "./collection-starters.ts";
 
 describe("Builder Collection starters", () => {

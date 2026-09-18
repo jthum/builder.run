@@ -3,8 +3,14 @@
   import { goto } from "$app/navigation";
   import { session } from "$lib/app/session.svelte.ts";
   import { installApprovalExample } from "$lib/framework/approval-example.ts";
-  import { ExecutionInspector, ExecutionList, RuleLauncher, RuleEditor, ruleDraftFromDefinition, ruleDefinitionFromDraft, PageHeader, OptionSelect } from "@jthum/framework/svelte/studio";
-  import type { RuleDraft, EditorContext } from "@jthum/framework/svelte/studio";
+  import ExecutionInspector from "@jthum/framework/svelte/studio/execution-inspector";
+  import ExecutionList from "@jthum/framework/svelte/studio/execution-list";
+  import RuleLauncher from "@jthum/framework/svelte/studio/rule-launcher";
+  import RuleEditor from "@jthum/framework/svelte/studio/rule-editor";
+  import PageHeader from "@jthum/framework/svelte/studio/page-header";
+  import OptionSelect from "@jthum/framework/svelte/studio/option-select";
+  import { ruleDraftFromDefinition, ruleDefinitionFromDraft } from "@jthum/framework/svelte/studio/data";
+  import type { RuleDraft, EditorContext } from "@jthum/framework/svelte/studio/data";
   import * as Alert from "@jthum/framework/svelte/ui/alert";
   import { Button } from "@jthum/framework/svelte/ui/button";
   import { Spinner } from "@jthum/framework/svelte/ui/spinner";

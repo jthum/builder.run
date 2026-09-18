@@ -2,7 +2,7 @@
 	import { goto } from "$app/navigation";
 	import { spaceLabel } from "$lib/app/labels.ts";
 	import { createApp, session } from "$lib/app/session.svelte.ts";
-	import { OptionSelect } from "@jthum/framework/svelte/studio";
+	import OptionSelect from "@jthum/framework/svelte/studio/option-select";
 	import TemplateLibraryDialog from "$lib/components/template-library-dialog.svelte";
 	import { Badge } from "@jthum/framework/svelte/ui/badge";
 	import { Button } from "@jthum/framework/svelte/ui/button";

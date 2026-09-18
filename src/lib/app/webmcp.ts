@@ -1,4 +1,6 @@
 import type { AppRuntime } from "$lib/framework/bootstrap.ts";
+import { launchRule } from "@jthum/framework/client";
+import { FrameworkError, ERROR_CODES } from "@jthum/framework/errors";
 import type { CollectionDefinition, FieldDefinition, JsonValue, Spec } from "@jthum/framework/spec";
 import { stringify, parse } from "yaml";
 import { blocks } from "$lib/runtime/blocks.ts";
@@ -31,12 +33,18 @@ const string = { type: "string" };
 const valuesSchema = { type: "object", additionalProperties: true };
 function text(value: unknown): string {
   if (typeof value !== "string" || !value.trim())
-    throw new Error("A non-empty string is required.");
+    throw new FrameworkError({
+      code: ERROR_CODES.validationInvalidInput,
+      message: "A non-empty string is required.",
+    });
   return value;
 }
 function values(value: unknown): Record<string, JsonValue> {
   if (!value || typeof value !== "object" || Array.isArray(value))
-    throw new Error("Values must be an object.");
+    throw new FrameworkError({
+      code: ERROR_CODES.validationInvalidInput,
+      message: "Values must be an object.",
+    });
   return value as Record<string, JsonValue>;
 }
 function fieldSchema(field: FieldDefinition): Record<string, unknown> {
@@ -246,22 +254,63 @@ export function buildTools(
     tools.push(
       tool(
         `upsert_${kind}`,
-        `Create or replace a canonical ${kind} definition. Supply its stable id, key, label and complete definition; get_spec shows the current format. Collections may be installed in the Space with shared: true.`,
+        `Create or replace a canonical ${kind} definition. Supply its stable id, key, label and complete definition; get_spec shows the current format. A Collection with shared: true is installed in the Space and attached to this App.`,
         object({ definition: valuesSchema, shared: { type: "boolean" } }, ["definition"]),
         async ({ definition, shared }) => {
-          const target =
-            kind === "collection" && shared === true ? runtime().spaceClient : client();
+          const current = runtime();
+          const isShared = kind === "collection" && shared === true;
+          const target = isShared ? current.spaceClient : current.appClient;
           const workspace = await target.getWorkspace();
           const item = values(definition);
           const id = text(item.id);
           const existing = workspace.spec[key];
-          return target.applySpec({
+          const updated = await target.applySpec({
             ...workspace.spec,
             [key]: [
               ...existing.filter((candidate) => candidate.id !== id && candidate.key !== item.key),
               item,
             ],
           } as Spec);
+          if (!isShared) return updated;
+
+          const app = await current.appClient.getWorkspace();
+          const source = { id, key: text(item.key), label: text(item.label) };
+          const previous = app.spec;
+          const next = {
+            ...previous,
+            sources: [
+              ...previous.sources.filter(
+                (candidate) => candidate.id !== id && candidate.key !== source.key,
+              ),
+              source,
+            ],
+          };
+          try {
+            await current.appClient.applySpec(next);
+            const attached = (await current.kernel.listAttachmentsTo(current.appContext)).some(
+              (binding) => !binding.revokedAt && binding.sourceId === id,
+            );
+            if (!attached)
+              await current.kernel.createAttachment(current.spaceContext, {
+                collectionKey: source.key,
+                targetId: current.app.id,
+                sourceId: id,
+              });
+          } catch (error) {
+            try {
+              await current.appClient.applySpec(previous);
+            } catch (cleanupError) {
+              throw new AggregateError(
+                [error, cleanupError],
+                "Shared Collection attachment and cleanup failed.",
+              );
+            }
+            throw error;
+          }
+          return {
+            collection: updated.spec.collections.find((candidate) => candidate.id === id),
+            source,
+          };
         },
       ),
     );
@@ -270,28 +319,31 @@ export function buildTools(
   const operations: Record<string, (input: Record<string, unknown>) => unknown> = {
     list: ({ collection }) => client().querySource(text(collection)),
     get: ({ collection, id }) => client().getSourceRecord(text(collection), text(id)),
-    create: ({ collection, values: input }) =>
-      writeClient(text(collection)).createRecord(text(collection), values(input)),
-    update: ({ collection, id, values: input }) =>
-      writeClient(text(collection)).updateRecord(text(collection), text(id), values(input)),
-    delete: ({ collection, id }) =>
-      writeClient(text(collection)).deleteRecord(text(collection), text(id)),
+    create: async ({ collection, values: input }) =>
+      (await writeClient(text(collection))).createRecord(text(collection), values(input)),
+    update: async ({ collection, id, values: input }) =>
+      (await writeClient(text(collection))).updateRecord(text(collection), text(id), values(input)),
+    delete: async ({ collection, id }) =>
+      (await writeClient(text(collection))).deleteRecord(text(collection), text(id)),
     transition: async ({ collection, id, transition }) => {
-      const source = await client().getSource(text(collection));
+      const current = runtime();
+      const target = await writeClient(text(collection), current, context.spec());
+      const source = await current.appClient.getSource(text(collection));
       const lifecycle = source?.schema.lifecycle;
       const move = lifecycle?.transitions.find((candidate) => candidate.key === text(transition));
       const field = source?.schema.fields.find((candidate) => candidate.id === lifecycle?.fieldId);
       if (!move || !field) throw new Error("Lifecycle transition is unavailable.");
-      return writeClient(text(collection)).updateRecord(text(collection), text(id), {
+      return target.updateRecord(text(collection), text(id), {
         [field.key]: move.to,
       });
     },
   };
-  function writeClient(key: string) {
-    const source = context.spec().sources.find((source) => source.key === key);
+  async function writeClient(key: string, current = runtime(), spec = context.spec()) {
+    const source = spec.sources.find((source) => source.key === key);
+    const space = source ? await current.spaceClient.getWorkspace() : undefined;
     const shared =
-      source && runtime().space.spec.collections.some((collection) => collection.id === source.id);
-    return shared ? runtime().spaceClient : client();
+      source && space?.spec.collections.some((collection) => collection.id === source.id);
+    return shared ? current.spaceClient : current.appClient;
   }
   const operationSchema = (operation: string) =>
     object(
@@ -397,7 +449,18 @@ export function buildTools(
             .filter(([, value]) => value.required)
             .map(([key]) => key),
         ),
-        (input) => client().runRule(rule.key, { input: input as Record<string, JsonValue> }),
+        async (input) => {
+          const result = await launchRule(client(), rule.key, {
+            input: input as Record<string, JsonValue>,
+          });
+          return result.mode === "short"
+            ? result.run
+            : {
+                ...result.execution,
+                mode: "durable",
+                runUrl: `/build/automations/runs?run=${encodeURIComponent(result.execution.id)}`,
+              };
+        },
         false,
         "app",
       ),
@@ -575,7 +638,13 @@ export function createWebMcpBridge(
           return toolOutput(await tool.execute(input ?? {}));
         } catch (error) {
           return toolOutput({
-            error: error instanceof Error ? error.message : String(error),
+            error:
+              error instanceof FrameworkError
+                ? error.toEnvelope()
+                : {
+                    code: ERROR_CODES.internalUnexpected,
+                    message: "An unexpected error occurred.",
+                  },
           });
         }
       } finally {

@@ -18,8 +18,9 @@ import {
   type RuleActions,
   type ViewActions,
   type ViewAuthoringSchemas,
-} from "@jthum/framework/svelte/studio";
+} from "@jthum/framework/svelte/studio/data";
 import type { Spec } from "@jthum/framework/spec";
+import { launchRule, type RuleLaunch } from "@jthum/framework/client";
 import { installCollectionStarters } from "$lib/app/collection-starters.ts";
 
 class CanonicalStudioState {
@@ -211,11 +212,12 @@ class CanonicalStudioState {
     return result.mode === "standalone" ? null : this.recordValue(result.record);
   }
 
-  async runRule(key: string, input: Record<string, unknown>): Promise<void> {
+  async runRule(key: string, input: Record<string, unknown>): Promise<RuleLaunch> {
     const runtime = session.framework;
     if (!runtime) throw new Error("The Framework runtime is not ready.");
-    await runtime.appClient.runRule(key, { input: input as never });
+    const result = await launchRule(runtime.appClient, key, { input: input as never });
     this.revision += 1;
+    return result;
   }
 
   async replaceSpec(spec: Spec): Promise<void> {

@@ -1,9 +1,9 @@
 <script lang="ts">
   import { canonicalStudio } from "$lib/app/canonical-studio.svelte.ts";
   import { goto } from "$app/navigation";
-  import { CollectionEditor } from "@jthum/framework/svelte/studio";
+  import CollectionEditor from "@jthum/framework/svelte/studio/collection-editor";
   import { defaultCollectionLabel } from "$lib/app/labels.ts";
-  import type { CollectionDraft } from "@jthum/framework/svelte/studio";
+  import type { CollectionDraft } from "@jthum/framework/svelte/studio/data";
   let { type }: { type: CollectionDraft } = $props();
   const context = $derived(
     type.expose ? canonicalStudio.spaceContext! : canonicalStudio.context!,

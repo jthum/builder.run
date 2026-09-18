@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vite-plus/test";
 import { MemoryPersistenceAdapter } from "@jthum/framework/persistence";
+import { LOCAL_BROWSER_ENVIRONMENT } from "@jthum/framework/kernel";
 import { emptySpec, openRuntime, createApp, resolveApp } from "$lib/framework/bootstrap.ts";
 import {
   buildTools,
@@ -10,7 +11,10 @@ import {
 
 async function fixture() {
   let runtime = await openRuntime({
-    kernel: { persistence: new MemoryPersistenceAdapter() },
+    kernel: {
+      persistence: new MemoryPersistenceAdapter(),
+      environment: { ...LOCAL_BROWSER_ENVIRONMENT, durableRuleExecution: true },
+    },
     seed: {
       spaceName: "Space",
       appName: "Tickets",
@@ -46,6 +50,13 @@ async function fixture() {
           },
         ],
         rules: [
+          {
+            id: "wait",
+            key: "wait",
+            label: "Wait",
+            expose: ["agent"],
+            steps: [{ id: "delay", delay: { duration: "1h" } }],
+          },
           {
             id: "remember",
             key: "remember",
@@ -90,6 +101,146 @@ async function fixture() {
 }
 
 describe("canonical WebMCP", () => {
+  it("keeps a lifecycle change bound to its original App while awaiting its schema", async () => {
+    const value = await fixture();
+    const original = value.context.runtime().appClient;
+    let release!: () => void;
+    let entered!: () => void;
+    const blocked = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const ready = new Promise<void>((resolve) => {
+      entered = resolve;
+    });
+    const getSource = original.getSource.bind(original);
+    vi.spyOn(original, "getSource").mockImplementation(async (key) => {
+      entered();
+      await blocked;
+      return getSource(key);
+    });
+    try {
+      const record = await original.createRecord("ticket", { title: "Printer" });
+      const tool = buildTools(value.context).find((item) => item.name === "transition_record")!;
+      const operation = tool.execute({
+        collection: "ticket",
+        id: record.id,
+        transition: "resolve",
+      });
+      await ready;
+      await value.context.createApp("Other");
+      release();
+      await operation;
+      expect(await original.getRecord("ticket", record.id)).toMatchObject({
+        values: { status: "resolved" },
+      });
+      expect(value.context.spec().key).toBe("other");
+    } finally {
+      release();
+      await value.close();
+    }
+  });
+  it("launches durable workflows and returns a run reference", async () => {
+    const value = await fixture();
+    try {
+      const tool = buildTools(value.context).find((item) => item.name === "invoke_wait")!;
+      const result = (await tool.execute({})) as { id: string; mode: string; runUrl: string };
+      expect(result).toMatchObject({ mode: "durable", status: "waiting" });
+      expect(result.runUrl).toContain(encodeURIComponent(result.id));
+      expect(
+        await value.context.runtime().appClient.getRuleExecutionDetails(result.id),
+      ).toMatchObject({ status: "waiting" });
+    } finally {
+      await value.close();
+    }
+  });
+
+  it("returns Framework codes and validation issues without exposing unexpected internals", async () => {
+    const value = await fixture();
+    const callbacks = new Map<string, (input: Record<string, unknown>) => Promise<unknown>>();
+    const bridge = createWebMcpBridge(
+      {
+        getTools: (mode) => [
+          ...buildTools(value.context, { appTools: mode }),
+          {
+            name: "unexpected",
+            description: "Failure fixture",
+            inputSchema: {},
+            execute: () => {
+              throw new Error("private database path");
+            },
+          },
+        ],
+        subscribe: () => () => {},
+      },
+      {
+        registerTool: (tool) => {
+          callbacks.set(tool.name, tool.execute);
+        },
+      },
+      { appTools: "compact" },
+    );
+    try {
+      await bridge.flush();
+      const invalid = JSON.parse(
+        String(await callbacks.get("create_record")!({ collection: "ticket", values: {} })),
+      );
+      expect(invalid.error).toMatchObject({
+        code: "VALIDATION.INVALID_INPUT",
+        issues: [expect.objectContaining({ path: "values.title" })],
+      });
+      const missing = JSON.parse(
+        String(await callbacks.get("create_record")!({ collection: "missing", values: {} })),
+      );
+      expect(missing.error).toMatchObject({
+        code: "RESOURCE.NOT_FOUND",
+        details: expect.any(Object),
+      });
+      const unexpected = String(await callbacks.get("unexpected")!({}));
+      expect(JSON.parse(unexpected).error.code).toBe("INTERNAL.UNEXPECTED");
+      expect(unexpected).not.toContain("private database path");
+    } finally {
+      bridge.stop();
+      await value.close();
+    }
+  });
+
+  it("keeps an in-flight Spec replacement bound to its original App after switching", async () => {
+    const value = await fixture();
+    const original = value.context.runtime().appClient;
+    let release!: () => void;
+    let entered!: () => void;
+    const blocked = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const ready = new Promise<void>((resolve) => {
+      entered = resolve;
+    });
+    const apply = original.applySpec.bind(original);
+    vi.spyOn(original, "applySpec").mockImplementation(async (spec) => {
+      entered();
+      await blocked;
+      return apply(spec);
+    });
+    try {
+      const replacement = {
+        ...(await original.getWorkspace()).spec,
+        id: "replacement",
+        label: "Replaced",
+      };
+      const tool = buildTools(value.context).find((item) => item.name === "apply_spec")!;
+      const operation = tool.execute({ spec: replacement });
+      await ready;
+      await value.context.createApp("Other");
+      release();
+      await operation;
+      expect((await original.getWorkspace()).spec.id).toBe("replacement");
+      expect(value.context.spec().key).toBe("other");
+      expect((await value.context.runtime().appClient.getWorkspace()).spec.label).toBe("Other");
+    } finally {
+      release();
+      await value.close();
+    }
+  });
   it("defers registry changes until an executing tool has returned", async () => {
     let changed: (() => void) | undefined;
     let release!: () => void;
@@ -206,6 +357,45 @@ describe("canonical WebMCP", () => {
         expect.objectContaining({ meta: { custom: { color: "violet" } } }),
       );
       expect(JSON.parse(exported.spec)).not.toHaveProperty("records");
+    } finally {
+      await value.close();
+    }
+  });
+
+  it("installs shared Collections as usable attached Sources", async () => {
+    const value = await fixture();
+    try {
+      const tools = new Map(buildTools(value.context).map((tool) => [tool.name, tool]));
+      await tools.get("upsert_collection")!.execute({
+        shared: true,
+        definition: {
+          id: "contact",
+          key: "contact",
+          label: "Contact",
+          fields: [
+            { id: "contact_name", key: "name", label: "Name", type: "text", required: true },
+          ],
+        },
+      });
+      expect((await value.context.runtime().appClient.getSource("contact"))?.schema.key).toBe(
+        "contact",
+      );
+      expect(
+        await value.context.runtime().kernel.listAttachmentsTo(value.context.runtime().appContext),
+      ).toEqual([
+        expect.objectContaining({
+          sourceId: "contact",
+          collectionId: "contact",
+        }),
+      ]);
+      await tools.get("create_record")!.execute({ collection: "contact", values: { name: "Ada" } });
+      expect(
+        (
+          (await tools.get("list_records")!.execute({ collection: "contact" })) as {
+            rows: unknown[];
+          }
+        ).rows,
+      ).toHaveLength(1);
     } finally {
       await value.close();
     }

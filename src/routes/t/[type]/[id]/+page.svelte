@@ -3,8 +3,9 @@
 	import { page } from "$app/state";
 	import { addLabel, collectionLabel, recordTitle } from "$lib/app/labels.ts";
 	import { canonicalStudio } from "$lib/app/canonical-studio.svelte.ts";
+	import { runWorkflow } from "$lib/app/workflow-launch.ts";
 	import FormattedValue from "$lib/components/formatted-value.svelte";
-	import { PageHeader } from "@jthum/framework/svelte/studio";
+	import PageHeader from "@jthum/framework/svelte/studio/page-header";
 	import RecordForm from "$lib/components/record-form.svelte";
 	import RecordTable from "$lib/components/record-table.svelte";
 	import * as AlertDialog from "@jthum/framework/svelte/ui/alert-dialog";
@@ -17,7 +18,7 @@
 		implicitEditFormKey,
 		implicitViewKey,
 	} from "$lib/runtime/defaults.ts";
-	import type { CollectionDraft, FieldDraft, FormDraft, ViewDraft } from "@jthum/framework/svelte/studio";
+	import type { CollectionDraft, FieldDraft, FormDraft, ViewDraft } from "@jthum/framework/svelte/studio/data";
 	import EllipsisIcon from "@lucide/svelte/icons/ellipsis";
 	import PencilIcon from "@lucide/svelte/icons/pencil";
 	import { toast } from "svelte-sonner";
@@ -139,8 +140,7 @@
 		const inputName = Object.entries(rule?.input ?? {}).find(
 			([, input]) => "record" in input && input.record === typeKey,
 		)?.[0];
-		await canonicalStudio.runRule(flowKey, { [inputName ?? typeKey]: id });
-		toast.success(label);
+		await runWorkflow(flowKey, { [inputName ?? typeKey]: id }, label);
 	}
 
 	async function applyTransition(transitionKey: string, label: string) {

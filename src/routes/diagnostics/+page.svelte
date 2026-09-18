@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { toolContext, session, wipeAllLocalData } from "$lib/app/session.svelte.ts";
-	import { PageHeader } from "@jthum/framework/svelte/studio";
+	import PageHeader from "@jthum/framework/svelte/studio/page-header";
 	import * as AlertDialog from "@jthum/framework/svelte/ui/alert-dialog";
 	import { Badge } from "@jthum/framework/svelte/ui/badge";
 	import { Button } from "@jthum/framework/svelte/ui/button";

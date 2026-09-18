@@ -2,9 +2,10 @@
   import { canonicalStudio } from "$lib/app/canonical-studio.svelte.ts";
   import { session } from "$lib/app/session.svelte.ts";
   import { goto } from "$app/navigation";
-  import { RuleEditor, CORE_RULE_EFFECTS, type RuleDraft, type RuleCompatibility } from "@jthum/framework/svelte/studio";
+  import RuleEditor from "@jthum/framework/svelte/studio/rule-editor";
+  import { CORE_RULE_EFFECTS, type RuleDraft, type RuleCompatibility } from "@jthum/framework/svelte/studio/data";
   import { ruleDefinitionFromDraft } from "@jthum/framework/svelte/studio/adapters";
-  import { checkRuleCompatibility, requiredRuleCapabilities } from "@jthum/framework/kernel";
+  import { checkRuleCompatibility, requiresDurableExecution } from "@jthum/framework/kernel";
   let { workflow }: { workflow: RuleDraft } = $props();
   const context = $derived(canonicalStudio.context!);
   const actions = $derived(canonicalStudio.ruleActions());
@@ -17,8 +18,7 @@
       const shortProfile = runtime.kernel.getRuleRuntimeProfile(new Set([
         "record.created", "record.updated", "record.deleted", "record.field_changed", "form.submitted",
       ]));
-      const durable = requiredRuleCapabilities(rule).some(key =>
-        ["durable_waits", "signals", "actor_requests"].includes(key));
+      const durable = requiresDurableExecution(rule, spec.rules);
       // Automatic durable Event subscribers are not installed in this host yet.
       const profile = durable
         ? { ...runtime.kernel.getDurableRuleRuntimeProfile(), events: new Set<string>() }

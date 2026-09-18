@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vite-plus/test";
+import { describe, expect, it, vi } from "vite-plus/test";
 import { openRuntime, listApps } from "$lib/framework/bootstrap.ts";
 import { createKernelSqlitePersistence } from "$lib/framework/sqlite.ts";
 import { createNodeGateway } from "$lib/runtime/persistence/sqlite/node-gateway.ts";
@@ -7,6 +7,43 @@ import { appTemplates } from "./templates/index.ts";
 import { seedApp, instantiateDefinitions } from "./app-templates.ts";
 
 describe("canonical App templates", () => {
+  it("removes a newly created App on seeding failure without rolling back shared data", async () => {
+    const runtime = await openRuntime({
+      kernel: {
+        persistence: createKernelSqlitePersistence(createNodeGateway(), "failed-template-test"),
+      },
+      seed: {
+        spaceName: "Space",
+        appName: "Home",
+        user: { name: "Jane" },
+        spaceSpec: emptySpec("space", "Space"),
+        appSpec: emptySpec("home", "Home"),
+      },
+    });
+    try {
+      const before = await listApps(runtime.kernel, runtime.spaceContext);
+      const create = runtime.kernel.createRecord.bind(runtime.kernel);
+      let localWrites = 0;
+      vi.spyOn(runtime.kernel, "createRecord").mockImplementation(async (context, key, values) => {
+        if (context.workspaceId !== runtime.space.id && ++localWrites === 2)
+          throw new Error("Injected seed failure");
+        return create(context, key, values);
+      });
+      const sample = appTemplates[0]!;
+      await expect(seedApp(runtime, "Incomplete", sample.key)).rejects.toThrow(
+        "Injected seed failure",
+      );
+      expect(await listApps(runtime.kernel, runtime.spaceContext)).toEqual(before);
+      const space = await runtime.spaceClient.getWorkspace();
+      for (const collection of sample.sharedCollections) {
+        expect(space.spec.collections.some((item) => item.key === collection.key)).toBe(true);
+        expect((await runtime.spaceClient.listRecords(collection.key)).length).toBeGreaterThan(0);
+      }
+      expect((await runtime.appClient.getWorkspace()).spec.key).toBe("home");
+    } finally {
+      await runtime.kernel.close();
+    }
+  });
   it("refreshes stable Rule references and Field-keyed Action inputs without rewriting opaque data", () => {
     const meta = { id: "field", sourceId: "collection" };
     const value = instantiateDefinitions({

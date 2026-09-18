@@ -1,9 +1,9 @@
 <script lang="ts">
   import { canonicalStudio } from "$lib/app/canonical-studio.svelte.ts";
   import { goto } from "$app/navigation";
-  import { ViewEditor } from "@jthum/framework/svelte/studio";
+  import ViewEditor from "@jthum/framework/svelte/studio/view-editor";
   import RecordTable from "./record-table.svelte";
-  import type { ViewDraft } from "@jthum/framework/svelte/studio";
+  import type { ViewDraft } from "@jthum/framework/svelte/studio/data";
   let { view }: { view: ViewDraft } = $props();
   const context = $derived(canonicalStudio.context!);
   const actions = $derived(canonicalStudio.viewActions());

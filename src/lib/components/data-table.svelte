@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { isStatusPath, semanticDotClass, statusDotClass } from "$lib/app/labels.ts";
-	import { OptionSelect } from "@jthum/framework/svelte/studio";
+	import OptionSelect from "@jthum/framework/svelte/studio/option-select";
 	import { cellValue, compareRows, rowId, type DataTableColumn } from "$lib/components/data-table.ts";
 	import { Badge } from "@jthum/framework/svelte/ui/badge";
 	import { Button } from "@jthum/framework/svelte/ui/button";

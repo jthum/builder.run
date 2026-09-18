@@ -64,4 +64,4 @@ export const studioItems = [
 
 export const studioGroupOrder = ["Build", "Behaviour", "Library", "Space"] as const;
 
-/** Only authoring data crosses into Studio, never the Host or its session. */
+/** Only authoring data crosses into Studio, never a product session. */

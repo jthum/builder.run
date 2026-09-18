@@ -1,10 +1,9 @@
 <script lang="ts">
-	import { canonicalStudio } from "$lib/app/canonical-studio.svelte.ts";
+	import { runWorkflow } from "$lib/app/workflow-launch.ts";
 	import { Button } from "@jthum/framework/svelte/ui/button";
 	import * as Card from "@jthum/framework/svelte/ui/card";
 	import type { BlockProps } from "$lib/blocks/types.ts";
 	import ArrowRightIcon from "@lucide/svelte/icons/arrow-right";
-	import { toast } from "svelte-sonner";
 	let { config, spec }: BlockProps = $props();
 	const actions = $derived([
 		{ workflow: String(config.first_workflow ?? ""), label: String(config.first_label ?? "") },
@@ -12,8 +11,7 @@
 		{ workflow: String(config.third_workflow ?? ""), label: String(config.third_label ?? "") },
 	].filter((action) => action.workflow).map((action) => ({ ...action, label: action.label || spec?.workflows.find((workflow) => workflow.key === action.workflow)?.label || "Run workflow" })));
 	async function run(workflow: string, label: string) {
-		await canonicalStudio.runRule(workflow, {});
-		toast.success(label);
+		await runWorkflow(workflow, {}, label);
 	}
 </script>
 
