@@ -1,5 +1,8 @@
 import type { PageDefinition, PageLayoutNode as LayoutNode, SpecMeta } from "@jthum/framework/spec";
 import type { PageDef, PageLayoutNode } from "$lib/runtime/model.ts";
+import type { AppSpec } from "$lib/runtime/model.ts";
+import type { EditorContext } from "@jthum/framework/svelte/studio";
+import type { Spec } from "@jthum/framework/spec";
 import { normalizePage } from "$lib/runtime/blocks.ts";
 
 export function pageLayout(nodes: PageLayoutNode[]): LayoutNode[] {
@@ -58,4 +61,21 @@ export function pagePresentation(page: PageDefinition): PageDef {
     ...(typeof page.meta?.path === "string" ? { path: page.meta.path } : {}),
     blocks: pageBlocks(page.layout),
   };
+}
+
+/** Builder block-catalog input derived from canonical definitions; never persisted. */
+export function blockPresentationSpec(spec: Spec, context: EditorContext): AppSpec {
+  return {
+    version: 1,
+    id: spec.id,
+    key: spec.key,
+    label: spec.label,
+    ...(spec.meta ? { meta: spec.meta } : {}),
+    stores: [{ id: "local", key: "local", label: "App", kind: "local" }],
+    types: context.collections.map((collection) => ({ ...collection, store: "local" })),
+    views: context.views.map((view) => ({ ...view })),
+    forms: context.forms.map((form) => ({ ...form })),
+    workflows: context.rules.map((rule) => ({ ...rule })),
+    pages: spec.pages.map(pagePresentation),
+  } as AppSpec;
 }

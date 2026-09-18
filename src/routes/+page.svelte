@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { greeting, isBlankApp } from "$lib/app/labels.ts";
+	import { greeting } from "$lib/app/labels.ts";
 	import { openNewApp, session } from "$lib/app/session.svelte.ts";
 	import { canonicalStudio } from "$lib/app/canonical-studio.svelte.ts";
 	import PageCanvas from "$lib/components/page-canvas.svelte";
@@ -8,9 +8,8 @@
 	import { Button } from "@jthum/framework/svelte/ui/button";
 	import * as Card from "@jthum/framework/svelte/ui/card";
 	import type { PageDefinition } from "@jthum/framework/spec";
-	import { pageDefinition } from "$lib/app/pages.ts";
+	import { blockPresentationSpec } from "$lib/app/pages.ts";
 	import { sampleApps, templateCategories } from "$lib/runtime/samples.ts";
-	import { resolveHomePage } from "$lib/runtime/blocks.ts";
 	import BriefcaseIcon from "@lucide/svelte/icons/briefcase";
 	import LayersIcon from "@lucide/svelte/icons/layers";
 	import PlusIcon from "@lucide/svelte/icons/plus";
@@ -18,23 +17,20 @@
 	import WalletIcon from "@lucide/svelte/icons/wallet";
 	import type { Component } from "svelte";
 
-	const spec = $derived(session.resolvedSpec);
 	const blank = $derived(
 		canonicalStudio.spec
 			? canonicalStudio.spec.collections.length === 0 && canonicalStudio.spec.views.length === 0
-			: spec
-				? isBlankApp(spec)
-				: true,
+			: true,
 	);
 	const appName = $derived(session.app?.name ?? "Home");
 	const hello = $derived(greeting(session.actor?.name));
-	const legacyHome = $derived(spec ? resolveHomePage(spec) : null);
 	const home = $derived(
-		canonicalStudio.spec
-			? canonicalStudio.spec.pages.find((page) => page.key === "home" || page.meta?.path === "/")
-			: legacyHome
-				? pageDefinition(legacyHome)
-				: null,
+		canonicalStudio.spec?.pages.find((page) => page.key === "home" || page.meta?.path === "/"),
+	);
+	const presentationSpec = $derived(
+		canonicalStudio.spec && canonicalStudio.context
+			? blockPresentationSpec(canonicalStudio.spec, canonicalStudio.context)
+			: undefined,
 	);
 	const queryView = (key: string) => canonicalStudio.queryView(key);
 	const upsertPage = (draft: PageDefinition) => canonicalStudio.pageActions().save(draft);
@@ -99,7 +95,7 @@
 		page={home}
 		title={hello}
 		description={`A snapshot of ${appName}.`}
-		spec={session.resolvedSpec}
+		spec={presentationSpec}
 		revision={canonicalStudio.revision}
 		{queryView}
 		{upsertPage}

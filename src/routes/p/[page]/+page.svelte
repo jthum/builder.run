@@ -1,21 +1,16 @@
 <script lang="ts">
 	import { page } from "$app/state";
-	import { session } from "$lib/app/session.svelte.ts";
 	import { canonicalStudio } from "$lib/app/canonical-studio.svelte.ts";
 	import PageCanvas from "$lib/components/page-canvas.svelte";
-	import { resolvePage } from "$lib/runtime/blocks.ts";
-	import { pageDefinition } from "$lib/app/pages.ts";
+	import { blockPresentationSpec } from "$lib/app/pages.ts";
 	import type { PageDefinition } from "@jthum/framework/spec";
 
 	const pageKey = $derived(page.params.page ?? "");
-	const spec = $derived(session.resolvedSpec);
-	const legacyPage = $derived(spec ? resolvePage(spec, pageKey) : undefined);
-	const current = $derived(
-		canonicalStudio.spec
-			? canonicalStudio.spec.pages.find((item) => item.key === pageKey)
-			: legacyPage
-				? pageDefinition(legacyPage)
-				: undefined,
+	const current = $derived(canonicalStudio.spec?.pages.find((item) => item.key === pageKey));
+	const presentationSpec = $derived(
+		canonicalStudio.spec && canonicalStudio.context
+			? blockPresentationSpec(canonicalStudio.spec, canonicalStudio.context)
+			: undefined,
 	);
 	const startEditing = $derived(page.url.searchParams.get("edit") === "1");
 	const queryView = (key: string) => canonicalStudio.queryView(key);
@@ -27,7 +22,7 @@
 		page={current}
 		title={current.label}
 		{startEditing}
-		spec={session.resolvedSpec}
+		spec={presentationSpec}
 		revision={canonicalStudio.revision}
 		{queryView}
 		{upsertPage}

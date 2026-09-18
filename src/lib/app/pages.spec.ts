@@ -1,5 +1,5 @@
 import { expect, it } from "vite-plus/test";
-import { pageBlocks, pageDefinition } from "./pages.ts";
+import { pageBlocks, pageDefinition, pagePresentation } from "./pages.ts";
 import { createSpecId } from "$lib/runtime/ids.ts";
 
 it("passes stable Page identities and custom metadata through Studio", () => {
@@ -33,6 +33,7 @@ it("passes stable Page identities and custom metadata through Studio", () => {
     children: [{ id: blockId }],
   });
   expect(pageBlocks(definition.layout)).toEqual(page.blocks);
+  expect(pagePresentation(definition)).toMatchObject(page);
   expect(
     pageDefinition({ ...page, label: "New name", blocks: pageBlocks(definition.layout) }).layout,
   ).toEqual(definition.layout);
