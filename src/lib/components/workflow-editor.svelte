@@ -19,9 +19,8 @@
         "record.created", "record.updated", "record.deleted", "record.field_changed", "form.submitted",
       ]));
       const durable = requiresDurableExecution(rule, spec.rules);
-      // Automatic durable Event subscribers are not installed in this host yet.
       const profile = durable
-        ? { ...runtime.kernel.getDurableRuleRuntimeProfile(), events: new Set<string>() }
+        ? { ...runtime.kernel.getDurableRuleRuntimeProfile(), events: shortProfile.events }
         : shortProfile;
       return { diagnostics: checkRuleCompatibility(rule, profile).diagnostics.map(item => ({
         capability: item.key, support: item.support, message: item.message,
