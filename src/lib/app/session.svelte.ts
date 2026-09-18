@@ -3,9 +3,12 @@ import type { Actor, AppSpec, TypeDef } from "$lib/runtime/model.ts";
 import { SPACE_ACCENT_KEYS, type SpaceAccent } from "$lib/runtime/platform.ts";
 import { sampleApps } from "$lib/runtime/samples.ts";
 import { seedTemplateRecords } from "$lib/app/template-records.ts";
+import { readSelection, writeSelection } from "$lib/app/selection.ts";
 import {
   deleteApp as deleteFrameworkApp,
+  listApps,
   openRuntime,
+  resolveApp,
   renameApp as renameFrameworkApp,
   resolveProjectedApp,
   type OpenedRuntime,
@@ -103,8 +106,14 @@ function publish(runtime: LiveRuntime) {
 
 async function publishFrameworkPreferences(runtime: LiveRuntime): Promise<void> {
   const framework = runtime.framework;
-  const actor = await framework.spaceClient.getActor(framework.actorId);
+  const [actor, apps] = await Promise.all([
+    framework.spaceClient.getActor(framework.actorId),
+    listApps(framework.kernel, framework.spaceContext),
+  ]);
   if (runtime !== live || runtime.framework !== framework || !actor) return;
+  session.app = { id: framework.app.id, name: framework.app.name };
+  session.apps = apps.map((app) => ({ id: app.id, name: app.name }));
+  writeSelection(localStorage, framework.selection);
   session.actor = {
     id: actor.id,
     kind: actor.kind === "user" ? "human" : actor.kind,
@@ -168,8 +177,10 @@ function publishSnapshot(snapshot: HostSnapshot) {
     stores: snapshot.stores,
     catalog: snapshot.catalog,
   };
-  session.app = { id: snapshot.app.id, name: snapshot.app.name };
-  session.apps = snapshot.apps;
+  session.app = session.framework
+    ? { id: session.framework.app.id, name: session.framework.app.name }
+    : { id: snapshot.app.id, name: snapshot.app.name };
+  if (!session.framework) session.apps = snapshot.apps;
   session.space = {
     id: snapshot.space.id,
     name: session.framework?.space.name ?? snapshot.space.name,
@@ -206,6 +217,7 @@ export function boot(): Promise<void> {
       const host = await Host.open();
       const snapshot = host.snapshot();
       let framework = await openRuntime({
+        preferredSelection: readSelection(localStorage),
         kernel: {
           environment: { ...LOCAL_BROWSER_ENVIRONMENT, durableRuleExecution: true },
           persistence: createKernelSqlitePersistence(await openSqlGateway()),
@@ -226,7 +238,7 @@ export function boot(): Promise<void> {
         unsub: () => {},
         stopMcp: () => mcp.stop(),
       };
-      await alignFrameworkApp(live);
+      await publishFrameworkPreferences(live);
       publish(live);
     } catch (error) {
       if (isStorageLocked(error) && takeStorageLockReload()) {
@@ -288,8 +300,16 @@ export async function updateSpaceSettings(name: string, accent: SpaceAccent): Pr
 
 /** App-shell commands stay behind this boundary while their implementation moves to the Framework. */
 export async function selectApp(id: string): Promise<void> {
-  await runtime().switchApp(id);
-  if (live) await alignFrameworkApp(live);
+  if (!live) throw new Error("The Framework runtime is not ready.");
+  const selected = await resolveApp(
+    live.framework.kernel,
+    { spaceId: live.framework.space.id, appId: id },
+    live.framework.actorId,
+  );
+  live.framework = { ...live.framework, ...selected };
+  session.framework = live.framework;
+  await publishFrameworkPreferences(live);
+  session.revision += 1;
 }
 
 export async function createApp(name: string, template?: string | null): Promise<void> {
@@ -302,26 +322,26 @@ export async function createApp(name: string, template?: string | null): Promise
 }
 
 export async function renameApp(name: string): Promise<void> {
-  await runtime().renameApp(name);
-  if (!live) return;
-  await alignFrameworkApp(live);
+  if (!live) throw new Error("The Framework runtime is not ready.");
   const aligned = await renameFrameworkApp(live.framework.kernel, live.framework, name);
   live.framework = { ...live.framework, ...aligned };
   session.framework = live.framework;
+  await publishFrameworkPreferences(live);
+  session.revision += 1;
 }
 
 export async function deleteApp(id: string): Promise<void> {
-  if (live && live.host.app().id === id) {
-    await alignFrameworkApp(live);
-    const fallback = await deleteFrameworkApp(
-      live.framework.kernel,
-      live.framework.spaceContext,
-      live.framework.app.id,
-    );
-    live.framework = { ...live.framework, ...fallback };
-  }
-  await runtime().deleteApp(id);
-  if (live) await alignFrameworkApp(live);
+  if (!live) throw new Error("The Framework runtime is not ready.");
+  const previous = live.framework;
+  const fallback = await deleteFrameworkApp(previous.kernel, previous.spaceContext, id);
+  const selected =
+    id === previous.app.id
+      ? fallback
+      : await resolveApp(previous.kernel, previous.selection, previous.actorId);
+  live.framework = { ...previous, ...selected };
+  session.framework = live.framework;
+  await publishFrameworkPreferences(live);
+  session.revision += 1;
 }
 
 export async function selectSpace(id: string): Promise<void> {

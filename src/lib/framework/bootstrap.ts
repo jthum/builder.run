@@ -315,7 +315,8 @@ async function findStartup(
     );
     const app =
       apps.find((workspace) => workspace.id === preferredSelection?.appId) ??
-      apps.find((workspace) => workspace.spec.id === seed.appSpec.id);
+      apps.find((workspace) => workspace.spec.id === seed.appSpec.id) ??
+      apps.at(0);
     return {
       selection: { spaceId: space.id, ...(app ? { appId: app.id } : {}) },
       actorId: actor.id,

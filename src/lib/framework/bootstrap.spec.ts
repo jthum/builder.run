@@ -14,6 +14,35 @@ import {
 import { createKernelSqlitePersistence } from "./sqlite.ts";
 
 describe("Framework vertical slice", () => {
+  it("does not recreate a deleted seed App when a saved selection is stale", async () => {
+    const gateway = createNodeGateway();
+    const persistence = createKernelSqlitePersistence(gateway, "deleted-app-selection-test");
+    const seed = {
+      spaceName: "Personal Space",
+      appName: "Original",
+      user: { name: "Jane" },
+      spaceSpec: normalizeSpec({ key: "space", label: "Space" }),
+      appSpec: normalizeSpec({ key: "original", label: "Original" }),
+      sharedTypes: [],
+    };
+    const original = await openRuntime({ kernel: { persistence }, seed });
+    const survivor = await createApp(original.kernel, original.spaceContext, {
+      name: "Survivor",
+      spec: normalizeSpec({ key: "survivor", label: "Survivor" }),
+      sharedTypes: [],
+    });
+    await deleteApp(original.kernel, original.spaceContext, original.app.id);
+    await original.kernel.close();
+    const reopened = await openRuntime({
+      kernel: { persistence },
+      seed,
+      preferredSelection: original.selection,
+    });
+    expect(reopened.selection).toEqual(survivor.selection);
+    expect(await listApps(reopened.kernel, reopened.spaceContext)).toHaveLength(1);
+    await reopened.kernel.close();
+  });
+
   it("runs shared records, an app Form, View, and Page on the Framework Kernel", async () => {
     expect.hasAssertions();
     const spaceSpec = normalizeSpec({
