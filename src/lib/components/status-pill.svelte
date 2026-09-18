@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { formatCell, statusTone } from "$lib/app/labels.ts";
-	import type { ValueSemantic } from "$lib/runtime/model.ts";
+	import type { ValueSemantic } from "$lib/blocks/presentation.ts";
 
 	let { path, value, tone }: { path: string; value: unknown; tone?: ValueSemantic } = $props();
 

@@ -1,4 +1,4 @@
-import type { SpaceAccent } from "$lib/runtime/platform.ts";
+import type { SpaceAccent } from "$lib/app/appearance.ts";
 
 export type NameTone = {
   hue: number;

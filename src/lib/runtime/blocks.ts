@@ -8,13 +8,13 @@ import type {
   BlockInputType,
 } from "$lib/blocks/types.ts";
 import type {
-  AppSpec,
-  FieldDef,
-  PageLayoutNode,
-  PageDef,
-  PageRowHeight,
-  TypeDef,
-} from "./model.ts";
+  PageContext,
+  FieldDraft,
+  PageNode,
+  PagePresentation,
+  RowHeight,
+  CollectionDraft,
+} from "$lib/blocks/presentation.ts";
 import { createSpecId, isSpecId, labelFromKey } from "./ids.ts";
 
 export const HOME_PAGE_KEY = "home";
@@ -45,7 +45,7 @@ export interface BlockOption {
 }
 
 export function blockInputOptions(
-  spec: AppSpec,
+  spec: PageContext,
   input: BlockInput,
   config: Record<string, unknown>,
 ): BlockOption[] {
@@ -71,7 +71,7 @@ export function blockInputOptions(
 }
 
 export function describeBlock(
-  spec: AppSpec,
+  spec: PageContext,
   key: string,
   config: Record<string, unknown> = {},
 ): Record<string, unknown> {
@@ -110,7 +110,7 @@ function optionValues(options: BlockOption[]): string {
 
 /** Validate and safely complete a block's config from its registry definition. */
 export function configureBlockConfig(
-  spec: AppSpec,
+  spec: PageContext,
   block: BlockDefinition,
   supplied: Record<string, unknown> = {},
 ): Record<string, unknown> {
@@ -166,7 +166,7 @@ export function configureBlockConfig(
   return config;
 }
 
-function configurePageBlock(spec: AppSpec, node: PageLayoutNode): PageLayoutNode {
+function configurePageBlock(spec: PageContext, node: PageNode): PageNode {
   if (node.kind === "group") {
     return { ...node, blocks: node.blocks.map((child) => configurePageBlock(spec, child)) };
   }
@@ -182,14 +182,14 @@ function configurePageBlock(spec: AppSpec, node: PageLayoutNode): PageLayoutNode
   };
 }
 
-export function configurePageRows(spec: AppSpec, blocks: unknown): PageLayoutNode[] {
+export function configurePageRows(spec: PageContext, blocks: unknown): PageNode[] {
   return normalizePageRows(blocks).map((block) => configurePageBlock(spec, block));
 }
 
 const ROW_HEIGHTS = new Set<string>(["s", "m", "l", "xl"]);
 
-export function rowHeight(value: unknown): PageRowHeight | undefined {
-  if (typeof value === "string" && ROW_HEIGHTS.has(value)) return value as PageRowHeight;
+export function rowHeight(value: unknown): RowHeight | undefined {
+  if (typeof value === "string" && ROW_HEIGHTS.has(value)) return value as RowHeight;
   return undefined;
 }
 
@@ -201,10 +201,10 @@ export function rowHeightClass(value: unknown): string {
   return "";
 }
 
-const ROW_HEIGHT_RANK: Record<PageRowHeight, number> = { s: 1, m: 2, l: 3, xl: 4 };
+const ROW_HEIGHT_RANK: Record<RowHeight, number> = { s: 1, m: 2, l: 3, xl: 4 };
 
-export function defaultRowHeight(blocks: PageLayoutNode[]): PageRowHeight | undefined {
-  let preferred: PageRowHeight | undefined;
+export function defaultRowHeight(blocks: PageNode[]): RowHeight | undefined {
+  let preferred: RowHeight | undefined;
   for (const block of normalizeBlockList(blocks)) {
     const candidate =
       block.kind === "group"
@@ -218,12 +218,12 @@ export function defaultRowHeight(blocks: PageLayoutNode[]): PageRowHeight | unde
 }
 
 /** Explicit row height wins; otherwise let blocks request the space their content needs. */
-export function groupHeightClass(group: PageLayoutNode): string {
+export function groupHeightClass(group: PageNode): string {
   if (group.kind !== "group") return "";
   return rowHeightClass(rowHeight(group.min_height) ?? defaultRowHeight(group.blocks));
 }
 
-export function normalizeBlock(block: PageLayoutNode): PageLayoutNode {
+export function normalizeBlock(block: PageNode): PageNode {
   const currentId = block.id;
   const id = currentId && isSpecId(currentId) ? currentId : createSpecId();
   if (block.kind === "group") {
@@ -239,12 +239,12 @@ export function normalizeBlock(block: PageLayoutNode): PageLayoutNode {
   return { id, kind: "block", block: block.block, config: { ...block.config } };
 }
 
-export function normalizePage(page: PageDef): PageDef {
+export function normalizePage(page: PagePresentation): PagePresentation {
   return { ...page, blocks: normalizePageRows(page.blocks) };
 }
 
 /** Page roots render as rows, so a valid root block receives a one-column row. */
-export function normalizePageRows(blocks: unknown): PageLayoutNode[] {
+export function normalizePageRows(blocks: unknown): PageNode[] {
   return normalizeBlockList(blocks).map((block) =>
     block.kind === "group"
       ? block
@@ -258,7 +258,7 @@ export function clampColumns(value: unknown): number {
   return Math.min(4, Math.max(1, Math.round(n)));
 }
 
-export function collectViewKeys(blocks: PageLayoutNode[]): string[] {
+export function collectViewKeys(blocks: PageNode[]): string[] {
   const keys: string[] = [];
   for (const block of normalizeBlockList(blocks)) {
     if (block.kind === "group") keys.push(...collectViewKeys(block.blocks));
@@ -270,14 +270,14 @@ export function collectViewKeys(blocks: PageLayoutNode[]): string[] {
   return [...new Set(keys)];
 }
 
-function isPageLayoutNode(value: unknown): value is PageLayoutNode {
+function isPageLayoutNode(value: unknown): value is PageNode {
   if (!value || typeof value !== "object") return false;
   const kind = (value as { kind?: unknown }).kind;
   return kind === "block" || kind === "group";
 }
 
 /** Coerce WebMCP/JSON payloads: a one-child group often arrives as an object, not `[object]`. */
-export function asBlockList(value: unknown): PageLayoutNode[] {
+export function asBlockList(value: unknown): PageNode[] {
   if (value == null || value === false) return [];
   if (typeof value === "string") {
     const text = value.trim();
@@ -288,35 +288,33 @@ export function asBlockList(value: unknown): PageLayoutNode[] {
       return [];
     }
   }
-  if (Array.isArray(value)) return value as PageLayoutNode[];
+  if (Array.isArray(value)) return value as PageNode[];
   if (isPageLayoutNode(value)) return [value];
   if (typeof value === "object") {
     const record = value as Record<string, unknown>;
     const keys = Object.keys(record);
     if (keys.length && keys.every((key) => /^\d+$/.test(key))) {
-      return keys
-        .sort((a, b) => Number(a) - Number(b))
-        .map((key) => record[key]) as PageLayoutNode[];
+      return keys.sort((a, b) => Number(a) - Number(b)).map((key) => record[key]) as PageNode[];
     }
   }
   return [];
 }
 
-export function normalizeBlockList(blocks: unknown): PageLayoutNode[] {
+export function normalizeBlockList(blocks: unknown): PageNode[] {
   return asBlockList(blocks)
     .filter((block) => block?.kind === "block" || block?.kind === "group")
     .map(normalizeBlock);
 }
 
-export function implicitHomePage(spec: AppSpec): PageDef {
+export function implicitHomePage(spec: PageContext): PagePresentation {
   const views = isBlankApp(spec) ? [] : homeViews(spec);
   const columns = Math.min(4, Math.max(1, views.length || 1));
-  const stats: PageLayoutNode[] = views.map((view) => ({
+  const stats: PageNode[] = views.map((view) => ({
     kind: "block",
     block: "stat",
     config: { view: view.key },
   }));
-  const tables: PageLayoutNode[] = views.map((view) => ({
+  const tables: PageNode[] = views.map((view) => ({
     kind: "group",
     columns: 1,
     blocks: [
@@ -340,19 +338,19 @@ export function implicitHomePage(spec: AppSpec): PageDef {
   };
 }
 
-export function resolveHomePage(spec: AppSpec): PageDef {
+export function resolveHomePage(spec: PageContext): PagePresentation {
   const authored = spec.pages.find((page) => page.key === HOME_PAGE_KEY || page.path === "/");
   if (authored) return normalizePage(authored);
   return implicitHomePage(spec);
 }
 
-export function resolvePage(spec: AppSpec, key: string): PageDef | undefined {
+export function resolvePage(spec: PageContext, key: string): PagePresentation | undefined {
   if (key === HOME_PAGE_KEY) return resolveHomePage(spec);
   const page = spec.pages.find((item) => item.key === key);
   return page ? normalizePage(page) : undefined;
 }
 
-export function fieldsMatching(fields: FieldDef[], of?: BlockFieldKind): FieldDef[] {
+export function fieldsMatching(fields: FieldDraft[], of?: BlockFieldKind): FieldDraft[] {
   if (!of || of === "any") return fields;
   if (of === "date") {
     return [
@@ -375,13 +373,13 @@ export function fieldsMatching(fields: FieldDef[], of?: BlockFieldKind): FieldDe
   return fields.filter((field) => field.type === of);
 }
 
-export function typeForView(spec: AppSpec, viewKey: string): TypeDef | undefined {
+export function typeForView(spec: PageContext, viewKey: string): CollectionDraft | undefined {
   const view = spec.views.find((item) => item.key === viewKey);
   if (!view) return undefined;
   return spec.types.find((item) => item.key === view.source);
 }
 
-export function fieldsForView(spec: AppSpec, viewKey: string): FieldDef[] {
+export function fieldsForView(spec: PageContext, viewKey: string): FieldDraft[] {
   const view = spec.views.find((item) => item.key === viewKey);
   const type = typeForView(spec, viewKey);
   if (!view || !type) return [];
@@ -404,9 +402,9 @@ export function fieldsForView(spec: AppSpec, viewKey: string): FieldDef[] {
   return [groupField, ...measures];
 }
 
-function fieldForViewPath(spec: AppSpec, type: TypeDef, path: string): FieldDef {
-  let current: TypeDef | undefined = type;
-  let found: FieldDef | undefined;
+function fieldForViewPath(spec: PageContext, type: CollectionDraft, path: string): FieldDraft {
+  let current: CollectionDraft | undefined = type;
+  let found: FieldDraft | undefined;
   const parts = path.split(".");
   for (const [index, part] of parts.entries()) {
     found = current?.fields.find((field) => field.key === part);
@@ -423,7 +421,10 @@ function fieldForViewPath(spec: AppSpec, type: TypeDef, path: string): FieldDef 
   };
 }
 
-export function defaultBlockConfig(block: BlockDefinition, spec: AppSpec): Record<string, unknown> {
+export function defaultBlockConfig(
+  block: BlockDefinition,
+  spec: PageContext,
+): Record<string, unknown> {
   const config: Record<string, unknown> = {};
   const firstView = homeViews(spec)[0]?.key ?? spec.views[0]?.key ?? "";
   const firstForm =
@@ -446,15 +447,15 @@ export function defaultBlockConfig(block: BlockDefinition, spec: AppSpec): Recor
   return config;
 }
 
-export function createBlockNode(block: BlockDefinition, spec: AppSpec): PageLayoutNode {
+export function createBlockNode(block: BlockDefinition, spec: PageContext): PageNode {
   return { kind: "block", block: block.key, config: defaultBlockConfig(block, spec) };
 }
 
-export function emptyGroup(columns = 1): PageLayoutNode {
+export function emptyGroup(columns = 1): PageNode {
   return { kind: "group", columns: clampColumns(columns), blocks: [] };
 }
 
-export function moveSibling(blocks: PageLayoutNode[], from: number, to: number): PageLayoutNode[] {
+export function moveSibling(blocks: PageNode[], from: number, to: number): PageNode[] {
   if (from === to || from < 0 || to < 0 || from >= blocks.length || to >= blocks.length) {
     return blocks;
   }
@@ -466,11 +467,11 @@ export function moveSibling(blocks: PageLayoutNode[], from: number, to: number):
 }
 
 export function moveInGroup(
-  blocks: PageLayoutNode[],
+  blocks: PageNode[],
   groupIndex: number,
   from: number,
   to: number,
-): PageLayoutNode[] {
+): PageNode[] {
   const group = blocks[groupIndex];
   if (group?.kind !== "group") return blocks;
   const copy = [...blocks];
@@ -478,11 +479,7 @@ export function moveInGroup(
   return copy;
 }
 
-export function setGroupColumns(
-  blocks: PageLayoutNode[],
-  index: number,
-  columns: number,
-): PageLayoutNode[] {
+export function setGroupColumns(blocks: PageNode[], index: number, columns: number): PageNode[] {
   const group = blocks[index];
   if (group?.kind !== "group") return blocks;
   const copy = [...blocks];
@@ -491,10 +488,10 @@ export function setGroupColumns(
 }
 
 export function setGroupMinHeight(
-  blocks: PageLayoutNode[],
+  blocks: PageNode[],
   index: number,
-  minHeight?: PageRowHeight,
-): PageLayoutNode[] {
+  minHeight?: RowHeight,
+): PageNode[] {
   const group = blocks[index];
   if (group?.kind !== "group") return blocks;
   const copy = [...blocks];
@@ -505,11 +502,7 @@ export function setGroupMinHeight(
   return copy;
 }
 
-export function setBlock(
-  blocks: PageLayoutNode[],
-  path: number[],
-  next: PageLayoutNode,
-): PageLayoutNode[] {
+export function setBlock(blocks: PageNode[], path: number[], next: PageNode): PageNode[] {
   if (!path.length) return blocks;
   const [head, ...rest] = path;
   if (head == null || head < 0 || head >= blocks.length) return blocks;
@@ -525,7 +518,7 @@ export function setBlock(
   return copy;
 }
 
-export function removeBlock(blocks: PageLayoutNode[], path: number[]): PageLayoutNode[] {
+export function removeBlock(blocks: PageNode[], path: number[]): PageNode[] {
   if (!path.length) return blocks;
   const [head, ...rest] = path;
   if (head == null || head < 0 || head >= blocks.length) return blocks;
@@ -537,11 +530,7 @@ export function removeBlock(blocks: PageLayoutNode[], path: number[]): PageLayou
   return copy;
 }
 
-export function insertBlock(
-  blocks: PageLayoutNode[],
-  path: number[],
-  next: PageLayoutNode,
-): PageLayoutNode[] {
+export function insertBlock(blocks: PageNode[], path: number[], next: PageNode): PageNode[] {
   if (!path.length) return [...blocks, next];
   const [head, ...rest] = path;
   if (head == null) return [...blocks, next];
@@ -557,20 +546,16 @@ export function insertBlock(
   return copy;
 }
 
-export function appendInGroup(
-  blocks: PageLayoutNode[],
-  groupPath: number[],
-  next: PageLayoutNode,
-): PageLayoutNode[] {
+export function appendInGroup(blocks: PageNode[], groupPath: number[], next: PageNode): PageNode[] {
   if (!groupPath.length) return [...blocks, next];
   const group = blockAt(blocks, groupPath);
   if (group?.kind !== "group") return blocks;
   return setBlock(blocks, groupPath, { ...group, blocks: [...group.blocks, next] });
 }
 
-export function blockAt(blocks: PageLayoutNode[], path: number[]): PageLayoutNode | undefined {
-  let current: PageLayoutNode[] = blocks;
-  let found: PageLayoutNode | undefined;
+export function blockAt(blocks: PageNode[], path: number[]): PageNode | undefined {
+  let current: PageNode[] = blocks;
+  let found: PageNode | undefined;
   for (const index of path) {
     found = current[index];
     if (!found) return undefined;
@@ -588,7 +573,7 @@ export function gridClass(columns: number): string {
   return "grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4";
 }
 
-export function firstViewKey(blocks: PageLayoutNode[]): string | undefined {
+export function firstViewKey(blocks: PageNode[]): string | undefined {
   for (const block of normalizeBlockList(blocks)) {
     if (block.kind === "block") {
       const view = typeof block.config?.view === "string" ? block.config.view : "";
@@ -602,26 +587,26 @@ export function firstViewKey(blocks: PageLayoutNode[]): string | undefined {
   return undefined;
 }
 
-export function authoredNavPages(spec: AppSpec): PageDef[] {
+export function authoredNavPages(spec: PageContext): PagePresentation[] {
   return spec.pages.filter(
     (page) => !page.implicit && page.key !== HOME_PAGE_KEY && page.path !== "/",
   );
 }
 
-export function pageHref(page: PageDef): string {
+export function pageHref(page: PagePresentation): string {
   if (page.key === HOME_PAGE_KEY || page.path === "/") return "/";
   return `/p/${page.key}`;
 }
 
 export function moveAuthoredPage(
-  pages: PageDef[],
+  pages: PagePresentation[],
   fromKey: string,
   target: { folder: string | null; beforeKey?: string },
-): PageDef[] {
+): PagePresentation[] {
   const source = pages.find((page) => page.key === fromKey);
   if (!source) return pages;
   const next = pages.filter((page) => page.key !== fromKey).map((page) => ({ ...page }));
-  const moving: PageDef = { ...source, folder: target.folder || undefined };
+  const moving: PagePresentation = { ...source, folder: target.folder || undefined };
   if (!moving.folder) delete moving.folder;
   if (target.beforeKey) {
     const to = next.findIndex((page) => page.key === target.beforeKey);
@@ -646,10 +631,10 @@ export function moveAuthoredPage(
 }
 
 export function groupPagesByFolder(
-  pages: PageDef[],
-): Array<{ folder: string | null; pages: PageDef[] }> {
-  const ungrouped: PageDef[] = [];
-  const folders = new Map<string, PageDef[]>();
+  pages: PagePresentation[],
+): Array<{ folder: string | null; pages: PagePresentation[] }> {
+  const ungrouped: PagePresentation[] = [];
+  const folders = new Map<string, PagePresentation[]>();
   const order: string[] = [];
   for (const page of pages) {
     const folder = page.folder?.trim();
@@ -664,13 +649,13 @@ export function groupPagesByFolder(
       order.push(folder);
     }
   }
-  const groups: Array<{ folder: string | null; pages: PageDef[] }> = [];
+  const groups: Array<{ folder: string | null; pages: PagePresentation[] }> = [];
   if (ungrouped.length) groups.push({ folder: null, pages: ungrouped });
   for (const name of order) groups.push({ folder: name, pages: folders.get(name) ?? [] });
   return groups;
 }
 
-export function blockLabel(block: PageLayoutNode): string {
+export function blockLabel(block: PageNode): string {
   if (block.kind !== "block") return "Section";
   return blockByKey(block.block)?.label ?? labelFromKey(block.block);
 }

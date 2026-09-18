@@ -122,11 +122,27 @@ export function buildTools(
       "get_automation_primitives",
       "Inspect runtime Action capabilities and contracts.",
       object(),
-      () => ({
-        actions: runtime().kernel.listActionKeys(),
-        conditions: runtime().kernel.listConditionKeys(),
-        profile: runtime().kernel.getRuleRuntimeProfile(),
-      }),
+      () => {
+        const profile = runtime().kernel.getRuleRuntimeProfile(
+          new Set([
+            "record.created",
+            "record.updated",
+            "record.deleted",
+            "record.field_changed",
+            "form.submitted",
+          ]),
+        );
+        return {
+          actions: [...profile.actions],
+          conditions: [...profile.conditions],
+          profile: {
+            ...profile,
+            actions: [...profile.actions],
+            conditions: [...profile.conditions],
+            events: [...profile.events],
+          },
+        };
+      },
       true,
     ),
     tool(

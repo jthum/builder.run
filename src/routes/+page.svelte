@@ -8,7 +8,7 @@
 	import { Button } from "@jthum/framework/svelte/ui/button";
 	import * as Card from "@jthum/framework/svelte/ui/card";
 	import type { PageDefinition } from "@jthum/framework/spec";
-	import { blockPresentationSpec } from "$lib/app/pages.ts";
+	import { pageContext } from "$lib/app/pages.ts";
 	import { appTemplates, templateCategories } from "$lib/app/templates/index.ts";
 	import BriefcaseIcon from "@lucide/svelte/icons/briefcase";
 	import LayersIcon from "@lucide/svelte/icons/layers";
@@ -29,7 +29,7 @@
 	);
 	const presentationSpec = $derived(
 		canonicalStudio.spec && canonicalStudio.context
-			? blockPresentationSpec(canonicalStudio.spec, canonicalStudio.context)
+			? pageContext(canonicalStudio.spec, canonicalStudio.context)
 			: undefined,
 	);
 	const queryView = (key: string) => canonicalStudio.queryView(key);

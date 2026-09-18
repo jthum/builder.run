@@ -10,7 +10,7 @@
 	import * as DropdownMenu from "@jthum/framework/svelte/ui/dropdown-menu";
 	import * as InputGroup from "@jthum/framework/svelte/ui/input-group";
 	import { labelFromKey } from "$lib/runtime/ids.ts";
-	import type { FieldDef } from "$lib/runtime/model.ts";
+	import type { FieldDraft } from "$lib/blocks/presentation.ts";
 	import ChevronDownIcon from "@lucide/svelte/icons/chevron-down";
 	import SearchIcon from "@lucide/svelte/icons/search";
 	import XIcon from "@lucide/svelte/icons/x";
@@ -23,13 +23,13 @@
 		idPrefix = "expose",
 		mode = "panel",
 	}: {
-		fields: FieldDef[];
+		fields: FieldDraft[];
 		values: Record<string, string>;
 		idPrefix?: string;
 		mode?: "panel" | "active";
 	} = $props();
 
-	function choices(field: FieldDef): Array<{ value: string; label: string }> | null {
+	function choices(field: FieldDraft): Array<{ value: string; label: string }> | null {
 		if (field.type === "enum") {
 			return (field.values ?? []).map((value) => ({ value, label: labelFromKey(value) }));
 		}
@@ -46,13 +46,13 @@
 		values = { ...values, [field]: value };
 	}
 
-	function inputType(field: FieldDef): "date" | "number" | "search" {
+	function inputType(field: FieldDraft): "date" | "number" | "search" {
 		if (field.type === "date") return "date";
 		if (field.type === "number") return "number";
 		return "search";
 	}
 
-	function dotClass(field: FieldDef, value: string): string | undefined {
+	function dotClass(field: FieldDraft, value: string): string | undefined {
 		const semantic = fieldValueSemantic(field, value);
 		if (semantic) return semanticDotClass(semantic);
 		return isStatusPath(field.key) ? statusDotClass(value) : undefined;

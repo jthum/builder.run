@@ -1,13 +1,18 @@
 import { describe, expect, it } from "vite-plus/test";
-import { normalizeSpec } from "$lib/runtime/model.ts";
-import { editorContext } from "./studio.ts";
+import { emptySpec } from "$lib/framework/bootstrap.ts";
+import { editorContextFromSpec } from "@jthum/framework/svelte/studio/adapters";
 describe("Studio host boundary", () => {
   it("does not expose platform, persistence or session state", () => {
-    const context = editorContext(normalizeSpec({ label: "Test" }));
+    const context = editorContextFromSpec(emptySpec("test", "Test"));
     expect(Object.keys(context)).toEqual(["collections", "views", "forms", "rules"]);
     expect(context).toEqual({ collections: [], views: [], forms: [], rules: [] });
   });
   it("supports the initial loading state", () => {
-    expect(editorContext(undefined)).toEqual({ collections: [], views: [], forms: [], rules: [] });
+    expect(editorContextFromSpec(emptySpec("empty", "Empty"))).toEqual({
+      collections: [],
+      views: [],
+      forms: [],
+      rules: [],
+    });
   });
 });

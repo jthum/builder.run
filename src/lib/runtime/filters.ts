@@ -1,4 +1,4 @@
-import type { FilterClause, FilterOp } from "./model.ts";
+import type { FilterClause, FilterOp } from "$lib/blocks/presentation.ts";
 import { scalarString } from "./values.ts";
 
 export type { FilterClause, FilterOp };

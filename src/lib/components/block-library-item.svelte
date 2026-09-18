@@ -3,13 +3,13 @@
 	import { Badge } from "@jthum/framework/svelte/ui/badge";
 	import * as Card from "@jthum/framework/svelte/ui/card";
 	import { Skeleton } from "@jthum/framework/svelte/ui/skeleton";
-	import type { PageLayoutNode } from "$lib/runtime/model.ts";
+	import type { PageNode } from "$lib/blocks/presentation.ts";
 	import type { BlockDefinition } from "$lib/runtime/blocks.ts";
 	import { cn } from "$lib/utils.ts";
 	import { loadBlockPreview } from "$lib/blocks/registry.ts";
 
 	let { definition, wide = false, tall = false }: { definition: BlockDefinition; wide?: boolean; tall?: boolean } = $props();
-	const node = $derived({ kind: "block", block: definition.key } satisfies PageLayoutNode);
+	const node = $derived({ kind: "block", block: definition.key } satisfies PageNode);
 </script>
 
 <Card.Root class={cn("h-auto", wide && "xl:col-span-2")}>

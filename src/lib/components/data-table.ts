@@ -1,5 +1,5 @@
 import { scalarString } from "$lib/runtime/values.ts";
-import type { ValueSemantic } from "$lib/runtime/model.ts";
+import type { ValueSemantic } from "$lib/blocks/presentation.ts";
 
 export type DataTableColumn = {
   id: string;

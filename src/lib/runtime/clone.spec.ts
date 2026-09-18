@@ -2,7 +2,7 @@ import { describe, expect, it } from "vite-plus/test";
 import { readdir, readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { cloneData } from "./model.ts";
+import { cloneData } from "@jthum/framework/svelte/studio";
 
 describe("cloneData", () => {
   it("unwraps proxies into structured-cloneable objects", () => {

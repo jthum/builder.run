@@ -4,7 +4,7 @@
   import { goto } from "$app/navigation";
   import { RuleEditor, CORE_RULE_EFFECTS, type RuleDraft, type RuleCompatibility } from "@jthum/framework/svelte/studio";
   import { ruleDefinitionFromDraft } from "@jthum/framework/svelte/studio/adapters";
-  import { checkRuleCompatibility } from "@jthum/framework/kernel";
+  import { checkRuleCompatibility, requiredRuleCapabilities } from "@jthum/framework/kernel";
   let { workflow }: { workflow: RuleDraft } = $props();
   const context = $derived(canonicalStudio.context!);
   const actions = $derived(canonicalStudio.ruleActions());
@@ -14,7 +14,15 @@
     if (!runtime || !spec) return { diagnostics: [] };
     try {
       const rule = ruleDefinitionFromDraft(draft, spec, canonicalStudio.schemas);
-      const profile = runtime.kernel.getDurableRuleRuntimeProfile();
+      const shortProfile = runtime.kernel.getRuleRuntimeProfile(new Set([
+        "record.created", "record.updated", "record.deleted", "record.field_changed", "form.submitted",
+      ]));
+      const durable = requiredRuleCapabilities(rule).some(key =>
+        ["durable_waits", "signals", "actor_requests"].includes(key));
+      // Automatic durable Event subscribers are not installed in this host yet.
+      const profile = durable
+        ? { ...runtime.kernel.getDurableRuleRuntimeProfile(), events: new Set<string>() }
+        : shortProfile;
       return { diagnostics: checkRuleCompatibility(rule, profile).diagnostics.map(item => ({
         capability: item.key, support: item.support, message: item.message,
       })) };

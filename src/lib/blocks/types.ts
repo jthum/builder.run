@@ -1,4 +1,4 @@
-import type { AppSpec } from "$lib/runtime/model.ts";
+import type { PageContext } from "$lib/blocks/presentation.ts";
 import type {
   BlockDefinition as PortableBlockDefinition,
   BlockFieldKind,
@@ -23,7 +23,7 @@ export interface BlockProps {
   config: Record<string, unknown>;
   rows: Record<string, Array<Record<string, unknown>>>;
   ready?: boolean;
-  spec?: AppSpec;
+  spec?: PageContext;
 }
 
 export type BlockComponent = Component<BlockProps>;
@@ -35,7 +35,7 @@ export interface BlockModule {
 export interface BlockPreview {
   config: Record<string, unknown>;
   rows?: Record<string, Array<Record<string, unknown>>>;
-  spec?: AppSpec;
+  spec?: PageContext;
 }
 
 export interface BlockPreviewModule {

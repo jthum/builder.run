@@ -52,12 +52,33 @@ export function instantiateDefinitions<T>(value: T, identities = new Map<string,
       return referenceKeys.has(key) ? (identities.get(node) ?? node) : node;
     if (Array.isArray(node)) return node.map((child) => rewrite(child, key));
     if (!node || typeof node !== "object") return node;
+    const recordAction =
+      (key === "action" || key === "compensate") &&
+      "key" in node &&
+      (node.key === "records.create" || node.key === "records.update");
     return Object.fromEntries(
       Object.entries(node).map(([name, child]) => [
         name,
         name === "meta" || name === "default" || name === "value" || name === "config"
           ? child
-          : rewrite(child, name),
+          : recordAction && name === "input" && child && typeof child === "object"
+            ? Object.fromEntries(
+                Object.entries(child).map(([inputKey, inputValue]) => [
+                  inputKey,
+                  inputKey === "values" &&
+                  inputValue &&
+                  typeof inputValue === "object" &&
+                  !Array.isArray(inputValue)
+                    ? Object.fromEntries(
+                        Object.entries(inputValue).map(([fieldId, fieldValue]) => [
+                          identities.get(fieldId) ?? fieldId,
+                          rewrite(fieldValue),
+                        ]),
+                      )
+                    : rewrite(inputValue, inputKey),
+                ]),
+              )
+            : rewrite(child, name),
       ]),
     );
   };

@@ -1,7 +1,7 @@
 import type { Actor } from "@jthum/framework/kernel";
 import { LOCAL_BROWSER_ENVIRONMENT } from "@jthum/framework/kernel";
 import type { Spec } from "@jthum/framework/spec";
-import { SPACE_ACCENT_KEYS, type SpaceAccent } from "$lib/runtime/platform.ts";
+import { SPACE_ACCENT_KEYS, type SpaceAccent } from "$lib/app/appearance.ts";
 import { seedApp } from "./app-templates.ts";
 import { readSelection, writeSelection } from "./selection.ts";
 import {
@@ -82,8 +82,8 @@ function current(): LiveRuntime {
   if (!live) throw new Error("The runtime is not ready.");
   return live;
 }
-export function publishToolSpec(spec: Spec): void {
-  if (!live || spec.id !== live.framework.app.spec.id) return;
+export function publishToolSpec(appId: string, spec: Spec): void {
+  if (!live || appId !== live.framework.app.id) return;
   live.spec = spec;
   session.revision += 1;
   listeners.forEach((listener) => listener());

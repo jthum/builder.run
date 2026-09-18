@@ -14,7 +14,7 @@
 	import { labelFromKey } from "$lib/runtime/ids.ts";
 	import type { CollectionDraft, FieldDraft, FormDraft } from "@jthum/framework/svelte/studio";
 	import { resolveFieldState } from "$lib/runtime/field-state.ts";
-	import { fieldWidgetFor } from "$lib/runtime/field-capabilities.ts";
+	import { fieldWidgetFor } from "@jthum/framework/svelte/studio";
 	import { cn } from "$lib/utils.ts";
 	import CircleCheckIcon from "@lucide/svelte/icons/circle-check";
 

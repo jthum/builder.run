@@ -1,6 +1,6 @@
-import type { AppSpec } from "$lib/runtime/model.ts";
+import type { PageContext } from "$lib/blocks/presentation.ts";
 import { appTemplates } from "$lib/app/templates/index.ts";
-import { blockPresentationSpec } from "$lib/app/pages.ts";
+import { pageContext } from "$lib/app/pages.ts";
 import { editorContextFromSpec } from "@jthum/framework/svelte/studio/adapters";
 import type { BlockPreview } from "./types.ts";
 
@@ -10,9 +10,9 @@ const portable = {
   collections: [...template.spec.collections, ...template.sharedCollections],
   sources: [],
 };
-const baseSpec = blockPresentationSpec(portable, editorContextFromSpec(portable));
+const baseSpec = pageContext(portable, editorContextFromSpec(portable));
 
-export const previewSpec: AppSpec = {
+export const previewSpec: PageContext = {
   ...baseSpec,
   types: baseSpec.types.map((type) =>
     type.key === "project"

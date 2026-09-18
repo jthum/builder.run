@@ -1,5 +1,5 @@
 import { uniqueKey } from "./ids.ts";
-import type { FieldDef, FieldKind, TypeDef } from "./model.ts";
+import type { FieldDraft, FieldKind, CollectionDraft } from "$lib/blocks/presentation.ts";
 
 export type TypeTemplateCategory = "people" | "work" | "money" | "content";
 
@@ -147,19 +147,19 @@ export const typeTemplates: TypeTemplate[] = [
 
 export function resolveFieldTarget(
   wanted: string | undefined,
-  types: TypeDef[],
+  types: CollectionDraft[],
 ): string | undefined {
   if (!wanted) return undefined;
-  const match = types.find((type) => type.key === wanted || `${type.store}.${type.key}` === wanted);
+  const match = types.find((type) => type.key === wanted);
   if (!match) return undefined;
   return match.key;
 }
 
-export type TemplateFieldDraft = Partial<FieldDef> & { key: string; type: FieldKind };
+export type TemplateFieldDraft = Partial<FieldDraft> & { key: string; type: FieldKind };
 
 export function resolveTemplateFields(
   template: TypeTemplate,
-  types: TypeDef[],
+  types: CollectionDraft[],
 ): TemplateFieldDraft[] {
   const fields: TemplateFieldDraft[] = [];
   for (const field of template.fields) {
@@ -190,8 +190,8 @@ export function resolveTemplateFields(
 export function typeDraftFromTemplate(
   name: string,
   template: TypeTemplate | undefined,
-  existing: TypeDef[],
-): { key: string; label: string; store: string; fields: TemplateFieldDraft[] } {
+  existing: CollectionDraft[],
+): { key: string; label: string; fields: TemplateFieldDraft[] } {
   const key = uniqueKey(
     name,
     existing.map((type) => type.key),
@@ -200,7 +200,6 @@ export function typeDraftFromTemplate(
   return {
     key,
     label: name,
-    store: "local",
     fields: template ? resolveTemplateFields(template, existing) : [],
   };
 }

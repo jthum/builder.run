@@ -4,9 +4,42 @@ import { createKernelSqlitePersistence } from "$lib/framework/sqlite.ts";
 import { createNodeGateway } from "$lib/runtime/persistence/sqlite/node-gateway.ts";
 import { emptySpec } from "$lib/framework/bootstrap.ts";
 import { appTemplates } from "./templates/index.ts";
-import { seedApp } from "./app-templates.ts";
+import { seedApp, instantiateDefinitions } from "./app-templates.ts";
 
 describe("canonical App templates", () => {
+  it("refreshes stable Rule references and Field-keyed Action inputs without rewriting opaque data", () => {
+    const meta = { id: "field", sourceId: "collection" };
+    const value = instantiateDefinitions({
+      collections: [{ id: "collection", fields: [{ id: "field", meta }] }],
+      rules: [
+        {
+          id: "rule",
+          input: { record: { sourceId: "collection" } },
+          steps: [
+            {
+              id: "step",
+              action: {
+                key: "records.update",
+                input: {
+                  record: { $ref: "vars.record" },
+                  values: { field: { value: meta } },
+                },
+              },
+            },
+          ],
+        },
+      ],
+      config: meta,
+    });
+    const collection = value.collections[0]!;
+    const rule = value.rules[0]!;
+    expect(collection.id).not.toBe("collection");
+    expect(rule.input.record.sourceId).toBe(collection.id);
+    expect(Object.keys(rule.steps[0]!.action.input.values)).toEqual([collection.fields[0]!.id]);
+    expect(Object.values(rule.steps[0]!.action.input.values)).toEqual([{ value: meta }]);
+    expect(collection.fields[0]!.meta).toEqual(meta);
+    expect(value.config).toEqual(meta);
+  });
   it("installs every template, reuses shared Collections, and seeds starter records", async () => {
     const runtime = await openRuntime({
       kernel: {
@@ -31,9 +64,28 @@ describe("canonical App templates", () => {
             collection.id,
           );
         const shared = new Set((sample.sharedCollections ?? []).map((type) => type.key));
+        for (const view of app.app.spec.views)
+          expect((await app.appClient.queryView(view.key)).data.rows).toBeInstanceOf(Array);
         for (const key of new Set((sample.records ?? []).map((record) => record.type))) {
           const client = shared.has(key) ? app.spaceClient : app.appClient;
           expect((await client.listRecords(key)).length).toBeGreaterThan(0);
+        }
+        const manual = app.app.spec.rules.find(
+          (rule) => !rule.trigger && rule.expose?.includes("ui"),
+        );
+        if (manual) {
+          const input: Record<string, string> = {};
+          for (const [key, definition] of Object.entries(manual.input ?? {})) {
+            if (!("sourceId" in definition)) continue;
+            const source = [...app.app.spec.collections, ...app.app.spec.sources].find(
+              (item) => item.id === definition.sourceId,
+            )!;
+            const records = await app.appClient.querySource(source.key);
+            input[key] = records.rows[0]!.id;
+          }
+          expect(await app.appClient.runRule(manual.key, { input })).toMatchObject({
+            status: "completed",
+          });
         }
       }
       const apps = await listApps(runtime.kernel, runtime.spaceContext);

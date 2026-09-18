@@ -12,7 +12,7 @@ import ListIcon from "@lucide/svelte/icons/list";
 import TableIcon from "@lucide/svelte/icons/table";
 import UsersIcon from "@lucide/svelte/icons/users";
 import WalletIcon from "@lucide/svelte/icons/wallet";
-import type { PageLayoutNode } from "./model.ts";
+import type { PageNode } from "$lib/blocks/presentation.ts";
 
 export const PAGE_ICON_KEYS = [
   "page",
@@ -63,7 +63,7 @@ export function pageIconEntry(value: unknown) {
   return byKey.get(isPageIcon(value) ? value : "page") ?? pageIconList[0];
 }
 
-function blockKeys(blocks: PageLayoutNode[] | undefined): string[] {
+function blockKeys(blocks: PageNode[] | undefined): string[] {
   const keys: string[] = [];
   for (const block of blocks ?? []) {
     if (block.kind === "block") keys.push(block.block);
@@ -72,7 +72,7 @@ function blockKeys(blocks: PageLayoutNode[] | undefined): string[] {
   return keys;
 }
 
-export function guessPageIcon(blocks: PageLayoutNode[] | undefined): PageIconKey {
+export function guessPageIcon(blocks: PageNode[] | undefined): PageIconKey {
   const keys = blockKeys(blocks);
   if (keys.includes("kanban")) return "board";
   if (keys.includes("calendar")) return "calendar";

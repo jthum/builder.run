@@ -1,8 +1,7 @@
 import { isId, labelFromKey } from "$lib/runtime/ids.ts";
-import type { AppSpec, FieldKind, TypeDef, ValueSemantic } from "$lib/runtime/model.ts";
+import type { PageContext, FieldKind, ValueSemantic } from "$lib/blocks/presentation.ts";
 import type { CollectionDraft, FieldDraft, ViewDraft } from "@jthum/framework/svelte/studio";
-import type { ViewDef } from "$lib/runtime/model.ts";
-import { FIELD_CAPABILITIES, FIELD_KINDS } from "$lib/runtime/model.ts";
+import { FIELD_CAPABILITIES, FIELD_KINDS } from "$lib/blocks/presentation.ts";
 import { scalarString } from "$lib/runtime/values.ts";
 import pluralize from "pluralize";
 
@@ -57,17 +56,17 @@ export function columnLabel(path: string, type?: CollectionDraft): string {
   return `${base} ${labelFromKey(rest.join("_"))}`;
 }
 
-export function featuredViews(spec: AppSpec): ViewDef[] {
+export function featuredViews(spec: PageContext): ViewDraft[] {
   return spec.views.filter((view) => !view.implicit);
 }
 
-export function homeViews(spec: AppSpec): ViewDef[] {
+export function homeViews(spec: PageContext): ViewDraft[] {
   const featured = featuredViews(spec);
   if (featured.length) return featured;
   return spec.types
     .filter((type) => !type.expose)
     .map((type) => spec.views.find((view) => view.source === type.key))
-    .filter((view): view is ViewDef => Boolean(view));
+    .filter((view): view is ViewDraft => Boolean(view));
 }
 
 export function greeting(name?: string, at = new Date()): string {
@@ -78,11 +77,11 @@ export function greeting(name?: string, at = new Date()): string {
   return `${part}, ${first}`;
 }
 
-export function listHref(view: ViewDef): string {
+export function listHref(view: ViewDraft): string {
   return view.implicit ? `/t/${view.source}` : `/v/${view.key}`;
 }
 
-export function isBlankApp(spec: AppSpec): boolean {
+export function isBlankApp(spec: PageContext): boolean {
   return !spec.types.some((type) => !type.expose) && featuredViews(spec).length === 0;
 }
 
@@ -203,7 +202,10 @@ export function formatCell(
   return scalarString(value);
 }
 
-export function typeByKey(spec: AppSpec | undefined, key: string | undefined): TypeDef | undefined {
+export function typeByKey(
+  spec: PageContext | undefined,
+  key: string | undefined,
+): CollectionDraft | undefined {
   if (!spec || !key) return undefined;
   return spec.types.find((type) => type.key === key);
 }
@@ -220,7 +222,7 @@ export function countLabel(count: number, noun: string): string {
 
 export type Crumb = { label: string; href?: string };
 
-export function breadcrumbFor(path: string, spec?: AppSpec): Crumb[] {
+export function breadcrumbFor(path: string, spec?: PageContext): Crumb[] {
   const parts = path.split("/").filter(Boolean);
   if (!parts.length) return [{ label: "Home" }];
   if (parts[0] === "build") {

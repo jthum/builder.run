@@ -1685,7 +1685,7 @@
                         },
                         "values": {
                           "YWV1fxbyfCv6c2cX": {
-                            "$ref": "meta.now"
+                            "$ref": "meta.today"
                           }
                         }
                       }
@@ -2534,7 +2534,7 @@
                         },
                         "values": {
                           "S2yPpVrH5M0rzbRd": {
-                            "$ref": "meta.now"
+                            "$ref": "meta.today"
                           }
                         }
                       }

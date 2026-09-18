@@ -6,7 +6,7 @@
   import { blocks, blockCategories, preloadBlock } from "$lib/blocks/registry.ts";
   import type { BlockDefinition } from "$lib/blocks/types.ts";
   import { blockInputs, blockInputOptions, collectViewKeys, defaultBlockConfig } from "$lib/runtime/blocks.ts";
-  import type { AppSpec } from "$lib/runtime/model.ts";
+  import type { PageContext } from "$lib/blocks/presentation.ts";
   import { pageBlocks } from "$lib/app/pages.ts";
 
   let { page, title, description, editable = true, startEditing = false, spec, revision, queryView, upsertPage }: {
@@ -15,7 +15,7 @@
     description?: string;
     editable?: boolean;
     startEditing?: boolean;
-    spec?: AppSpec;
+    spec?: PageContext;
     revision: number;
     queryView: (key: string) => Promise<Array<Record<string, unknown>>>;
     upsertPage: (draft: PageDefinition) => Promise<unknown>;

@@ -14,7 +14,7 @@
 	import { Switch } from "@jthum/framework/svelte/ui/switch";
 	import * as Tabs from "@jthum/framework/svelte/ui/tabs";
 	import * as ToggleGroup from "@jthum/framework/svelte/ui/toggle-group";
-	import type { SpaceAccent } from "$lib/runtime/platform.ts";
+	import type { SpaceAccent } from "$lib/app/appearance.ts";
 	import BotIcon from "@lucide/svelte/icons/bot";
 	import PaletteIcon from "@lucide/svelte/icons/palette";
 	import Settings2Icon from "@lucide/svelte/icons/settings-2";

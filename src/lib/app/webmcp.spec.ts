@@ -90,6 +90,54 @@ async function fixture() {
 }
 
 describe("canonical WebMCP", () => {
+  it("defers registry changes until an executing tool has returned", async () => {
+    let changed: (() => void) | undefined;
+    let release!: () => void;
+    const blocked = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    let description = "Before";
+    let execute!: (input: Record<string, unknown>) => Promise<unknown>;
+    let registrations = 0;
+    let signal: AbortSignal | undefined;
+    const bridge = createWebMcpBridge(
+      {
+        getTools: () => [{ name: "blocked", description, inputSchema: {}, execute: () => blocked }],
+        subscribe: (listener) => {
+          changed = listener;
+          return () => {
+            changed = undefined;
+          };
+        },
+      },
+      {
+        registerTool: (tool, options) => {
+          registrations += 1;
+          execute = tool.execute;
+          signal = options?.signal;
+        },
+      },
+      { appTools: "compact" },
+    );
+    try {
+      await bridge.flush();
+      const running = execute({});
+      description = "After";
+      changed!();
+      await Promise.resolve();
+      expect(registrations).toBe(1);
+      expect(signal?.aborted).toBe(false);
+      release();
+      await running;
+      await bridge.flush();
+      expect(registrations).toBe(2);
+    } finally {
+      release();
+      bridge.stop();
+    }
+    expect(signal?.aborted).toBe(true);
+    expect(changed).toBeUndefined();
+  });
   it("executes compact CRUD and lifecycle changes through canonical clients", async () => {
     const fixtureValue = await fixture();
     try {

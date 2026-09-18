@@ -4,7 +4,7 @@
 	import * as Card from "@jthum/framework/svelte/ui/card";
 	import * as Empty from "@jthum/framework/svelte/ui/empty";
 	import { Skeleton } from "@jthum/framework/svelte/ui/skeleton";
-	import type { TypeDef, ViewDef } from "$lib/runtime/model.ts";
+	import type { CollectionDraft, ViewDraft } from "$lib/blocks/presentation.ts";
 	import InboxIcon from "@lucide/svelte/icons/inbox";
 
 	let {
@@ -13,8 +13,8 @@
 		type,
 	}: {
 		rows: Array<Record<string, unknown>> | null;
-		view: ViewDef;
-		type?: TypeDef;
+		view: ViewDraft;
+		type?: CollectionDraft;
 	} = $props();
 
 	const fields = $derived(view.fields.length ? view.fields : ["id"]);

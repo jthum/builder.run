@@ -36,7 +36,7 @@
 	import UserIcon from "@lucide/svelte/icons/user";
 	import UsersIcon from "@lucide/svelte/icons/users";
 	import WorkflowIcon from "@lucide/svelte/icons/workflow";
-	import type { PageDef } from "$lib/runtime/model.ts";
+	import type { PagePresentation } from "$lib/blocks/presentation.ts";
 	import type { CollectionDraft } from "@jthum/framework/svelte/studio";
 	import { pageIconEntry } from "$lib/runtime/page-icons.ts";
 	import { groupPagesByFolder, pageHref } from "$lib/runtime/blocks.ts";
@@ -130,7 +130,7 @@
 	</Sidebar.MenuSubItem>
 {/snippet}
 
-{#snippet pageLink(item: PageDef)}
+{#snippet pageLink(item: PagePresentation)}
 	{@const Icon = pageIconEntry(item.icon).icon}
 	<Sidebar.MenuItem>
 		<Sidebar.MenuButton

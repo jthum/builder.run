@@ -1,6 +1,3 @@
-import type { EditorContext } from "@jthum/framework/svelte/studio";
-import type { AppSpec } from "$lib/runtime/model.ts";
-
 export const studioItems = [
   {
     href: "/build/types",
@@ -68,11 +65,3 @@ export const studioItems = [
 export const studioGroupOrder = ["Build", "Behaviour", "Library", "Space"] as const;
 
 /** Only authoring data crosses into Studio, never the Host or its session. */
-export function editorContext(spec: AppSpec | undefined): EditorContext {
-  return {
-    collections: spec?.types ?? [],
-    views: spec?.views ?? [],
-    forms: spec?.forms ?? [],
-    rules: spec?.workflows ?? [],
-  };
-}

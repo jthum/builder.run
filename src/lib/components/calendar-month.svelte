@@ -4,7 +4,7 @@
 	import * as Card from "@jthum/framework/svelte/ui/card";
 	import { Skeleton } from "@jthum/framework/svelte/ui/skeleton";
 	import { asDayKey, cellValue } from "$lib/runtime/chart-data.ts";
-	import type { TypeDef, ViewDef } from "$lib/runtime/model.ts";
+	import type { CollectionDraft, ViewDraft } from "$lib/blocks/presentation.ts";
 	import ChevronLeftIcon from "@lucide/svelte/icons/chevron-left";
 	import ChevronRightIcon from "@lucide/svelte/icons/chevron-right";
 
@@ -16,8 +16,8 @@
 		rows,
 		ready = true,
 	}: {
-		view: ViewDef;
-		type?: TypeDef;
+		view: ViewDraft;
+		type?: CollectionDraft;
 		title?: string;
 		dateField: string;
 		rows: Array<Record<string, unknown>> | null;

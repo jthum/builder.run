@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vite-plus/test";
-import type { AppSpec, PageLayoutNode, PageDef } from "./model.ts";
+import type { PageContext, PageNode, PagePresentation } from "$lib/blocks/presentation.ts";
 import {
   appendInGroup,
   collectViewKeys,
@@ -34,7 +34,7 @@ describe("page folders", () => {
       { key: "a", label: "A" },
       { key: "b", label: "B" },
       { key: "c", label: "C", folder: "Ops" },
-    ] as PageDef[];
+    ] as PagePresentation[];
     const intoOps = moveAuthoredPage(pages, "a", { folder: "Ops", beforeKey: "c" });
     expect(intoOps.map((page) => [page.key, page.folder ?? null])).toEqual([
       ["b", null],
@@ -53,7 +53,7 @@ describe("page folders", () => {
       { key: "welcome", label: "Welcome" },
       { key: "cash", label: "Cash", folder: "Finance" },
       { key: "invoices", label: "Invoices", folder: "Finance" },
-    ] as PageDef[];
+    ] as PagePresentation[];
     expect(groupPagesByFolder(pages)).toEqual([
       { folder: null, pages: [pages[1]] },
       { folder: "Ops", pages: [pages[0]] },
@@ -283,8 +283,8 @@ describe("page blocks", () => {
         { key: "unpaid_invoices", label: "Unpaid invoices", source: "invoice", implicit: false },
         { key: "project_list", label: "Projects", source: "project", implicit: true },
       ],
-      types: [{ key: "project", store: "local" }],
-    } as AppSpec;
+      types: [{ key: "project" }],
+    } as unknown as PageContext;
     const home = implicitHomePage(spec);
     expect(collectViewKeys(home.blocks)).toEqual(["active_projects", "unpaid_invoices"]);
     const stats = home.blocks[0];
@@ -307,8 +307,8 @@ describe("page blocks", () => {
 
   it("inserts, updates, and removes nested blocks", () => {
     expect.hasAssertions();
-    const heading: PageLayoutNode = { kind: "block", block: "heading", config: { title: "Hi" } };
-    const group: PageLayoutNode = { kind: "group", columns: 2, blocks: [heading] };
+    const heading: PageNode = { kind: "block", block: "heading", config: { title: "Hi" } };
+    const group: PageNode = { kind: "group", columns: 2, blocks: [heading] };
     const withGroup = insertBlock([], [0], group);
     const next = appendInGroup(withGroup, [0], {
       kind: "block",
@@ -330,11 +330,11 @@ describe("page blocks", () => {
 
   it("reorders rows and blocks, and keeps blocks when shrinking columns", () => {
     expect.hasAssertions();
-    const a: PageLayoutNode = { kind: "block", block: "text", config: { text: "A" } };
-    const b: PageLayoutNode = { kind: "block", block: "text", config: { text: "B" } };
-    const c: PageLayoutNode = { kind: "block", block: "text", config: { text: "C" } };
-    const row: PageLayoutNode = { kind: "group", columns: 2, blocks: [a, b, c] };
-    const other: PageLayoutNode = { kind: "group", columns: 1, blocks: [a] };
+    const a: PageNode = { kind: "block", block: "text", config: { text: "A" } };
+    const b: PageNode = { kind: "block", block: "text", config: { text: "B" } };
+    const c: PageNode = { kind: "block", block: "text", config: { text: "C" } };
+    const row: PageNode = { kind: "group", columns: 2, blocks: [a, b, c] };
+    const other: PageNode = { kind: "group", columns: 1, blocks: [a] };
     expect(
       moveSibling([row, other], 1, 0).map((item) => item.kind === "group" && item.columns),
     ).toEqual([1, 2]);
@@ -364,10 +364,10 @@ describe("page blocks", () => {
 
   it("gives automatic chart rows enough plot space while respecting explicit heights", () => {
     expect.hasAssertions();
-    const chart: PageLayoutNode = { kind: "block", block: "bar", config: {} };
-    const heading: PageLayoutNode = { kind: "block", block: "heading", config: {} };
-    const automatic: PageLayoutNode = { kind: "group", columns: 2, blocks: [heading, chart] };
-    const compact: PageLayoutNode = { ...automatic, min_height: "s" };
+    const chart: PageNode = { kind: "block", block: "bar", config: {} };
+    const heading: PageNode = { kind: "block", block: "heading", config: {} };
+    const automatic: PageNode = { kind: "group", columns: 2, blocks: [heading, chart] };
+    const compact: PageNode = { ...automatic, min_height: "s" };
 
     expect(defaultRowHeight([heading])).toBeUndefined();
     expect(defaultRowHeight([chart])).toBe("m");

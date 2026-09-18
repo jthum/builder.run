@@ -8,7 +8,7 @@ import {
   statusDotClass,
   statusTone,
 } from "./labels.ts";
-import type { AppSpec, TypeDef, ViewDef } from "$lib/runtime/model.ts";
+import type { PageContext, CollectionDraft, ViewDraft } from "$lib/blocks/presentation.ts";
 
 describe("status tones", () => {
   it("maps invoice and project statuses to distinct tones", () => {
@@ -32,11 +32,10 @@ describe("cell formatting", () => {
 });
 
 describe("aggregate rating formatting", () => {
-  const type: TypeDef = {
+  const type: CollectionDraft = {
     id: "B000000000000001",
     key: "review",
     label: "Review",
-    store: "local",
     fields: [
       {
         id: "A000000000000007",
@@ -57,7 +56,7 @@ describe("aggregate rating formatting", () => {
       { id: "A000000000000005", key: "budget", label: "Budget", type: "number" },
     ],
   };
-  const view: ViewDef = {
+  const view: ViewDraft = {
     id: "vie_scores",
     key: "scores",
     label: "Scores",
@@ -95,14 +94,14 @@ describe("home copy", () => {
       label: "Expense",
       store: "local",
       fields: [],
-    } as TypeDef;
+    } as CollectionDraft;
     const featured = {
       id: "v1",
       key: "active_projects",
       label: "Active projects",
       source: "project",
       fields: [],
-    } as ViewDef;
+    } as ViewDraft;
     const implicit = {
       id: "v2",
       key: "all_expense",
@@ -110,9 +109,9 @@ describe("home copy", () => {
       source: "expense",
       fields: [],
       implicit: true,
-    } as ViewDef;
-    const withFeatured = { views: [featured, implicit], types: [type] } as AppSpec;
-    const localOnly = { views: [implicit], types: [type] } as AppSpec;
+    } as ViewDraft;
+    const withFeatured = { views: [featured, implicit], types: [type] } as PageContext;
+    const localOnly = { views: [implicit], types: [type] } as PageContext;
     expect(homeViews(withFeatured).map((view) => view.key)).toEqual(["active_projects"]);
     expect(homeViews(localOnly).map((view) => view.key)).toEqual(["all_expense"]);
   });
@@ -127,7 +126,7 @@ describe("collection labels", () => {
       collection_label,
       store: "local",
       fields: [],
-    }) as TypeDef;
+    }) as CollectionDraft;
 
   it("infers regular, irregular, already-plural, and uncountable English names", () => {
     expect(collectionLabel(type("Project"))).toBe("Projects");

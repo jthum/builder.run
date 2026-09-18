@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { Skeleton } from "@jthum/framework/svelte/ui/skeleton";
-	import type { AppSpec, PageLayoutNode } from "$lib/runtime/model.ts";
+	import type { PageContext, PageNode } from "$lib/blocks/presentation.ts";
 	import { loadBlock } from "$lib/blocks/registry.ts";
 
 	let {
@@ -9,10 +9,10 @@
 		ready = true,
 		spec,
 	}: {
-		node: PageLayoutNode;
+		node: PageNode;
 		rows: Record<string, Array<Record<string, unknown>>>;
 		ready?: boolean;
-		spec?: AppSpec;
+		spec?: PageContext;
 	} = $props();
 
 	const blockKey = $derived(node.kind === "block" ? node.block : "");

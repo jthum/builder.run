@@ -53,7 +53,7 @@ class CanonicalStudioState {
       if (token !== this.generation || runtime !== session.framework) return;
       const shared = new Set(loaded.spec.sources.map((source) => source.key));
       this.spec = loaded.spec;
-      publishToolSpec(loaded.spec);
+      publishToolSpec(runtime.app.id, loaded.spec);
       this.schemas = loaded.schemas;
       this.spaceSchemas = space.schemas;
       this.spaceContext = space.context;

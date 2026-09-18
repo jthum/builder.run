@@ -103,7 +103,7 @@
   <PageHeader title="Workflow runs" description={workspaceName ? `Durable workflows in ${workspaceName}.` : "Inspect runs and respond to workflow requests."}>
     {#snippet actions()}<Button variant="outline" href="/build/automations">Automations</Button>{/snippet}
   </PageHeader>
-  <Alert.Root><Alert.Title>Framework runtime preview</Alert.Title><Alert.Description>These runs use the canonical Framework catalog. Current Host editor changes and business records are not yet synchronized with this runtime. The approval example is independent and does not modify business records.</Alert.Description></Alert.Root>
+  <Alert.Root><Alert.Title>Workflow runs</Alert.Title><Alert.Description>Runs use this App's records and workflows. The optional approval example is independent and does not modify business records.</Alert.Description></Alert.Root>
   {#if error}<Alert.Root variant="destructive"><Alert.Title>Unable to load or update runs</Alert.Title><Alert.Description>{error}</Alert.Description></Alert.Root>{/if}
   {#if client}
     {#if runId}
@@ -120,7 +120,7 @@
       {#if selected && canonicalSpec}
         {#if selected.meta?.example === "durable_approval"}<div class="flex gap-2"><Button variant="outline" onclick={() => editing = !editing}>{editing ? "Close editor" : "Edit preview workflow"}</Button></div>{/if}
         {#if editing && selected.meta?.example === "durable_approval"}
-          <Alert.Root><Alert.Title>Canonical workflow authoring</Alert.Title><Alert.Description>Edits here affect future runs only; existing runs retain their saved workflow. This preview exposes independent workflow steps, not Host business-record authoring.</Alert.Description></Alert.Root>
+          <Alert.Root><Alert.Title>Workflow authoring</Alert.Title><Alert.Description>Edits affect future runs only; existing runs retain their saved workflow and execution context.</Alert.Description></Alert.Root>
           {#key selected.id}<RuleEditor rule={ruleDraftFromDefinition(selected, canonicalSpec)} {context} actorRequests actions={{ save: saveRule, remove: removeRule }} onDeleted={refresh} />{/key}
         {:else}{#key selected.id}<RuleLauncher rule={selected} {client} onStarted={selectRun} />{/key}{/if}
       {/if}

@@ -6,7 +6,7 @@
 	import { breadcrumbFor } from "$lib/app/labels.ts";
 	import { boot, session } from "$lib/app/session.svelte.ts";
 	import { canonicalStudio } from "$lib/app/canonical-studio.svelte.ts";
-	import { blockPresentationSpec } from "$lib/app/pages.ts";
+	import { pageContext } from "$lib/app/pages.ts";
 	import AppSidebar from "$lib/components/app-sidebar.svelte";
 	import * as Breadcrumb from "@jthum/framework/svelte/ui/breadcrumb";
 	import * as Sidebar from "@jthum/framework/svelte/ui/sidebar";
@@ -30,7 +30,7 @@
 			: breadcrumbFor(
 					page.url.pathname,
 					canonicalStudio.spec && canonicalStudio.context
-						? blockPresentationSpec(canonicalStudio.spec, canonicalStudio.context)
+						? pageContext(canonicalStudio.spec, canonicalStudio.context)
 						: undefined,
 				),
 	);

@@ -1,4 +1,4 @@
-import type { FieldCondition, FieldDef, FilterClause } from "./model.ts";
+import type { FieldCondition, FieldDraft, FilterClause } from "$lib/blocks/presentation.ts";
 import { scalarEqual, scalarString } from "./values.ts";
 
 export interface ResolvedFieldState {
@@ -8,7 +8,7 @@ export interface ResolvedFieldState {
 }
 
 export function resolveFieldState(
-  field: FieldDef,
+  field: FieldDraft,
   values: Record<string, unknown>,
 ): ResolvedFieldState {
   const visible = field.visible_when ? evaluateFieldCondition(field.visible_when, values) : true;

@@ -7,7 +7,7 @@
 	import { Skeleton } from "@jthum/framework/svelte/ui/skeleton";
 	import { cellValue } from "$lib/runtime/chart-data.ts";
 	import { labelFromKey } from "$lib/runtime/ids.ts";
-	import type { TypeDef, ViewDef } from "$lib/runtime/model.ts";
+	import type { CollectionDraft, ViewDraft } from "$lib/blocks/presentation.ts";
 	import InboxIcon from "@lucide/svelte/icons/inbox";
 
 	let {
@@ -18,8 +18,8 @@
 		rows,
 		ready = true,
 	}: {
-		view: ViewDef;
-		type?: TypeDef;
+		view: ViewDraft;
+		type?: CollectionDraft;
 		title?: string;
 		field: string;
 		rows: Array<Record<string, unknown>> | null;
