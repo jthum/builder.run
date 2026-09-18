@@ -125,7 +125,20 @@ async function openDb(name) {
   const sqlite = await boot();
   const existing = dbs.get(name);
   if (existing != null) return existing;
-  const db = await sqlite.open_v2(name, undefined, selectedVfs);
+  let db;
+  try {
+    db = await sqlite.open_v2(name, undefined, selectedVfs);
+  } catch (error) {
+    const usage =
+      typeof vfsInstance?.getSize === "function" && typeof vfsInstance?.getCapacity === "function"
+        ? ` (${vfsInstance.getSize()}/${vfsInstance.getCapacity()} files in use)`
+        : "";
+    throw new Error(
+      `Could not open SQLite database ${JSON.stringify(name)} on ${backend}${usage}: ${
+        error instanceof Error ? error.message : String(error)
+      }`,
+    );
+  }
   dbs.set(name, db);
   return db;
 }

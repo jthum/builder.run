@@ -43,7 +43,7 @@ export function createKernelSqlitePersistence(
 }
 
 export function workspaceDatabaseName(workspaceId: string, catalogName = CATALOG_DATABASE): string {
-  return `${databasePrefix(catalogName)}--workspace-${encodeDatabaseIdentity(workspaceId)}.db`;
+  return routedDatabaseName(catalogName, "w", workspaceId);
 }
 
 export function scopeDatabaseName(
@@ -52,17 +52,37 @@ export function scopeDatabaseName(
   id: string,
   catalogName = CATALOG_DATABASE,
 ): string {
-  return `${databasePrefix(catalogName)}--scope-${encodeDatabaseIdentity([workspaceId, kind, id])}.db`;
+  return routedDatabaseName(catalogName, "s", [workspaceId, kind, id]);
 }
 
 function databasePrefix(catalogName: string): string {
-  return catalogName.endsWith(".db") ? catalogName.slice(0, -3) : catalogName;
+  const stem = catalogName.endsWith(".db") ? catalogName.slice(0, -3) : catalogName;
+  return (
+    stem
+      .replace(/[^a-zA-Z0-9_-]+/g, "-")
+      .replace(/^-+|-+$/g, "")
+      .slice(0, 12) || "db"
+  );
 }
 
-function encodeDatabaseIdentity(value: string | readonly string[]): string {
-  return [...new TextEncoder().encode(JSON.stringify(value))]
-    .map((byte) => byte.toString(16).padStart(2, "0"))
-    .join("");
+function routedDatabaseName(
+  catalogName: string,
+  kind: "w" | "s",
+  identity: string | readonly string[],
+): string {
+  const digest = fnv1a128(JSON.stringify([catalogName, kind, identity]));
+  return `${databasePrefix(catalogName)}-${kind}-${digest}.db`;
+}
+
+function fnv1a128(value: string): string {
+  const bytes = new TextEncoder().encode(value);
+  const mask = (1n << 128n) - 1n;
+  let hash = 0x6c62272e07bb014262b821756295c58dn;
+  for (const byte of bytes) {
+    hash ^= BigInt(byte);
+    hash = (hash * 0x0000000001000000000000000000013bn) & mask;
+  }
+  return hash.toString(16).padStart(32, "0");
 }
 
 function acquireDatabaseLease(gateway: SqlGateway, name: string): void {

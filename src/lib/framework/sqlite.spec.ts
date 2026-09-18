@@ -4,10 +4,25 @@ import { createNodeGateway } from "$lib/runtime/persistence/sqlite/node-gateway.
 import {
   createKernelSqlitePersistence,
   CATALOG_DATABASE,
+  scopeDatabaseName,
   workspaceDatabaseName,
 } from "./sqlite.ts";
 
 describe("Framework SQLite persistence", () => {
+  it("uses compact, stable names for routed databases", () => {
+    const workspace = workspaceDatabaseName("H0GLM4X_ozqrtEfe0QwwA");
+    const scope = scopeDatabaseName(
+      "H0GLM4X_ozqrtEfe0QwwA",
+      "data",
+      "a-scope-identity-that-may-be-considerably-longer-than-a-workspace-id",
+    );
+
+    expect(workspace).toBe(workspaceDatabaseName("H0GLM4X_ozqrtEfe0QwwA"));
+    expect(scope).not.toBe(workspace);
+    expect(workspace.length).toBeLessThanOrEqual(56);
+    expect(scope.length).toBeLessThanOrEqual(56);
+  });
+
   it("persists the Framework catalog and records through the application gateway", async () => {
     expect.hasAssertions();
     const gateway = createNodeGateway();
