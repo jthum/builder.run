@@ -36,6 +36,8 @@ import {
   type ToolContext,
   type WebMcpBridge,
 } from "./webmcp.ts";
+import { createAuthoringInferenceTools } from "$lib/inference/authoring-tools.ts";
+import { createBrowserInferenceRuntime } from "$lib/inference/runtime.ts";
 
 export interface AppSummary {
   readonly id: string;
@@ -221,8 +223,14 @@ export function boot(): Promise<void> {
       opened = await openRuntime({
         preferredSelection: readSelection(localStorage),
         kernel: {
-          environment: { ...LOCAL_BROWSER_ENVIRONMENT, durableRuleExecution: true },
+          environment: {
+            ...LOCAL_BROWSER_ENVIRONMENT,
+            durableRuleExecution: true,
+            inference: true,
+          },
           persistence: createKernelSqlitePersistence(gateway),
+          inference: createBrowserInferenceRuntime(),
+          inferenceTools: [createAuthoringInferenceTools(toolContext)],
         },
         seed: {
           spaceName: "Personal Space",

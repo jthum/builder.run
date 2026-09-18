@@ -222,6 +222,12 @@ importers:
       '@jthum/framework':
         specifier: link:../framework
         version: link:../framework
+      '@jthum/yair':
+        specifier: link:../framework/packages/inference/yair/core
+        version: link:../framework/packages/inference/yair/core
+      '@jthum/yair-openai':
+        specifier: link:../framework/packages/inference/yair/providers/openai
+        version: link:../framework/packages/inference/yair/providers/openai
       nanoid:
         specifier: ^6.0.1
         version: 6.0.1

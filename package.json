@@ -20,6 +20,8 @@
   },
   "dependencies": {
     "@jthum/framework": "link:../framework",
+    "@jthum/yair": "link:../framework/packages/inference/yair/core",
+    "@jthum/yair-openai": "link:../framework/packages/inference/yair/providers/openai",
     "nanoid": "^6.0.1",
     "pluralize": "^8.0.0",
     "wa-sqlite": "^1.0.0",

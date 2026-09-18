@@ -1,6 +1,12 @@
 <script lang="ts">
 	import { initialsFromName, toneFromName } from "$lib/app/color.ts";
+	import { assistant } from "$lib/app/assistant.svelte.ts";
 	import { session, updateProfile } from "$lib/app/session.svelte.ts";
+	import {
+		DEFAULT_ASSISTANT_SETTINGS,
+		loadAssistantSettings,
+		saveAssistantSettings,
+	} from "$lib/inference/settings.ts";
 	import SettingsDialogShell from "$lib/components/settings-dialog-shell.svelte";
 	import * as Avatar from "@jthum/framework/svelte/ui/avatar";
 	import { Button } from "@jthum/framework/svelte/ui/button";
@@ -14,10 +20,14 @@
 	import PaletteIcon from "@lucide/svelte/icons/palette";
 	import SunIcon from "@lucide/svelte/icons/sun";
 	import UserIcon from "@lucide/svelte/icons/user";
+	import BotIcon from "@lucide/svelte/icons/bot";
 	import { setMode, userPrefersMode } from "mode-watcher";
 	import { toast } from "svelte-sonner";
 
-	let { open = $bindable(false) }: { open?: boolean } = $props();
+	let {
+		open = $bindable(false),
+		initialSection = "general",
+	}: { open?: boolean; initialSection?: string } = $props();
 
 	let name = $state("");
 	let email = $state("");
@@ -27,8 +37,13 @@
 	let initialAppearance = $state<"system" | "light" | "dark">("system");
 	let initialized = $state(false);
 	let committed = $state(false);
+	let assistantBaseUrl = $state(DEFAULT_ASSISTANT_SETTINGS.baseUrl);
+	let assistantModel = $state("");
+	let assistantApiKey = $state("");
+	let assistantLoaded = $state(false);
 	const sections = [
 		{ value: "general", label: "General", icon: UserIcon },
+		{ value: "assistant", label: "Assistant", icon: BotIcon },
 		{ value: "appearance", label: "Appearance", icon: PaletteIcon },
 	];
 
@@ -45,9 +60,17 @@
 		email = session.actor?.email ?? "";
 		appearance = userPrefersMode.current;
 		initialAppearance = appearance;
-		section = "general";
+		section = initialSection;
 		committed = false;
 		initialized = true;
+		assistantLoaded = false;
+		void loadAssistantSettings().then((settings) => {
+			if (!open) return;
+			assistantBaseUrl = settings.baseUrl;
+			assistantModel = settings.model;
+			assistantApiKey = settings.apiKey;
+			assistantLoaded = true;
+		});
 	});
 
 	function setOpen(value: boolean) {
@@ -66,7 +89,14 @@
 		if (!name.trim()) return;
 		pending = true;
 		try {
-			await updateProfile({ name: name.trim(), email: email.trim() });
+			const provider = assistantLoaded
+				? { baseUrl: assistantBaseUrl, model: assistantModel, apiKey: assistantApiKey }
+				: await loadAssistantSettings();
+			await Promise.all([
+				updateProfile({ name: name.trim(), email: email.trim() }),
+				saveAssistantSettings(provider),
+			]);
+			await assistant.refreshConfiguration();
 			committed = true;
 			toast.success("Profile saved");
 			open = false;
@@ -113,6 +143,46 @@
 									<Field.Label for="profile-email">Email</Field.Label>
 									<Input id="profile-email" bind:value={email} type="email" placeholder="ada@example.com" autocomplete="email" />
 									<Field.Description>Used in this space only. Sign-in comes later.</Field.Description>
+								</Field.Field>
+							</Field.Group>
+						</Field.Set>
+					</Tabs.Content>
+
+					<Tabs.Content value="assistant" class="min-w-0 overflow-y-auto p-6">
+						<Field.Set>
+							<div class="flex flex-col gap-1">
+								<Field.Legend class="mb-0">Assistant</Field.Legend>
+								<Field.Description>
+									Connect an OpenAI-compatible model for the app-building assistant.
+								</Field.Description>
+							</div>
+							<Field.Group>
+								<Field.Field>
+									<Field.Label for="assistant-base-url">API endpoint</Field.Label>
+									<Input
+										id="assistant-base-url"
+										bind:value={assistantBaseUrl}
+										type="url"
+										placeholder="https://api.openai.com/v1"
+									/>
+									<Field.Description>The base URL containing the Chat Completions endpoint.</Field.Description>
+								</Field.Field>
+								<Field.Field>
+									<Field.Label for="assistant-model">Model</Field.Label>
+									<Input id="assistant-model" bind:value={assistantModel} placeholder="Model identifier" />
+								</Field.Field>
+								<Field.Field>
+									<Field.Label for="assistant-api-key">API key</Field.Label>
+									<Input
+										id="assistant-api-key"
+										bind:value={assistantApiKey}
+										type="password"
+										placeholder="API key"
+										autocomplete="off"
+									/>
+									<Field.Description>
+										Stored only in this browser. It is not part of an exported app or Framework Spec.
+									</Field.Description>
 								</Field.Field>
 							</Field.Group>
 						</Field.Set>

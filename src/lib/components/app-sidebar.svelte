@@ -7,6 +7,7 @@
 	import { chrome, createSpace, openNewApp, selectApp, selectSpace, session } from "$lib/app/session.svelte.ts";
 	import { studioGroupOrder, studioItems } from "$lib/app/studio.ts";
 	import AppSettingsDialog from "$lib/components/app-settings-dialog.svelte";
+	import AssistantSheet from "$lib/components/assistant-sheet.svelte";
 	import SidebarNavGroup from "$lib/components/sidebar-nav-group.svelte";
 	import NameDialog from "@jthum/framework/svelte/studio/name-dialog";
 	import { isStudioManaged } from "@jthum/framework/svelte/studio/data";
@@ -75,6 +76,7 @@
 
 	let spaceOpen = $state(false);
 	let profileOpen = $state(false);
+	let profileSection = $state("general");
 	let settingsOpen = $state(false);
 	let appSettingsOpen = $state(false);
 	let appMenuOpen = $state(false);
@@ -117,6 +119,11 @@
 	function editAppSettings() {
 		appMenuOpen = false;
 		appSettingsOpen = true;
+	}
+
+	function openProfile(section = "general") {
+		profileSection = section;
+		profileOpen = true;
 	}
 </script>
 
@@ -365,7 +372,7 @@
 							</DropdownMenu.Label>
 						</DropdownMenu.Group>
 						<DropdownMenu.Separator />
-						<DropdownMenu.Item onSelect={() => (profileOpen = true)}>
+						<DropdownMenu.Item onSelect={() => openProfile()}>
 							<UserIcon />
 							Profile
 						</DropdownMenu.Item>
@@ -406,8 +413,9 @@
 
 <NewAppDialog bind:open={chrome.newAppOpen} preset={chrome.newAppPreset} />
 <AppSettingsDialog bind:open={appSettingsOpen} />
-<ProfileDialog bind:open={profileOpen} />
+<ProfileDialog bind:open={profileOpen} initialSection={profileSection} />
 <SpaceSettingsDialog bind:open={settingsOpen} />
+<AssistantSheet onConfigure={() => openProfile("assistant")} />
 <NameDialog
 	bind:open={spaceOpen}
 	title="New space"
