@@ -45,3 +45,17 @@ export function pageDefinition(page: PageDef): PageDefinition {
     layout: pageLayout(normalized.blocks ?? []),
   };
 }
+
+/** Temporary presentation projection while Builder's block catalog still uses PageDef. */
+export function pagePresentation(page: PageDefinition): PageDef {
+  return {
+    id: page.id,
+    key: page.key,
+    label: page.label,
+    ...(page.meta ? { meta: page.meta } : {}),
+    ...(typeof page.meta?.icon === "string" ? { icon: page.meta.icon } : {}),
+    ...(typeof page.meta?.folder === "string" ? { folder: page.meta.folder } : {}),
+    ...(typeof page.meta?.path === "string" ? { path: page.meta.path } : {}),
+    blocks: pageBlocks(page.layout),
+  };
+}

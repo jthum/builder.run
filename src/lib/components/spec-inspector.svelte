@@ -1,29 +1,30 @@
 <script lang="ts">
-	import { runtime, session } from "$lib/app/session.svelte.ts";
+	import { canonicalStudio } from "$lib/app/canonical-studio.svelte.ts";
+	import { assertValidSpec } from "@jthum/framework/spec";
 	import * as Alert from "@jthum/framework/svelte/ui/alert";
 	import { Button } from "@jthum/framework/svelte/ui/button";
 	import * as Card from "@jthum/framework/svelte/ui/card";
 	import * as Field from "@jthum/framework/svelte/ui/field";
 	import { Textarea } from "@jthum/framework/svelte/ui/textarea";
 	import * as ToggleGroup from "@jthum/framework/svelte/ui/toggle-group";
-	import { sharedTypeDependencies } from "$lib/runtime/serialize.ts";
 	import TriangleAlertIcon from "@lucide/svelte/icons/triangle-alert";
 	import { toast } from "svelte-sonner";
+	import { parse, stringify } from "yaml";
 
 	let format = $state<"yaml" | "json">("yaml");
 	let draft = $state("");
-	const sharedDependencies = $derived(
-		session.authoredSpec
-			? sharedTypeDependencies(session.authoredSpec, [...session.sharedTypes])
-			: [],
-	);
+	const sharedDependencies = $derived(canonicalStudio.spec?.sources ?? []);
 
 	$effect(() => {
-		draft = format === "json" ? runtime().exportJson() : runtime().exportYaml();
+		const spec = canonicalStudio.spec;
+		if (!spec) return;
+		draft = format === "json" ? JSON.stringify(spec, null, 2) : stringify(spec);
 	});
 
 	async function apply() {
-		await runtime().replaceSpecText(draft);
+		const input: unknown = format === "json" ? JSON.parse(draft) : parse(draft);
+		assertValidSpec(input);
+		await canonicalStudio.replaceSpec(input);
 		toast.success("Spec applied");
 	}
 

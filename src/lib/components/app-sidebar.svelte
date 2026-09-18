@@ -1,12 +1,14 @@
 <script lang="ts">
 	import { page } from "$app/state";
 	import { initialsFromName, toneFromAccent, toneFromName } from "$lib/app/color.ts";
-	import { collectionLabel, featuredViews, spaceLabel } from "$lib/app/labels.ts";
+	import { collectionLabel, spaceLabel } from "$lib/app/labels.ts";
+	import { canonicalStudio } from "$lib/app/canonical-studio.svelte.ts";
+	import { pagePresentation } from "$lib/app/pages.ts";
 	import { chrome, createSpace, openNewApp, selectApp, selectSpace, session } from "$lib/app/session.svelte.ts";
 	import { studioGroupOrder, studioItems } from "$lib/app/studio.ts";
 	import AppSettingsDialog from "$lib/components/app-settings-dialog.svelte";
 	import SidebarNavGroup from "$lib/components/sidebar-nav-group.svelte";
-	import { NameDialog } from "@jthum/framework/svelte/studio";
+	import { isStudioManaged, NameDialog } from "@jthum/framework/svelte/studio";
 	import NewAppDialog from "$lib/components/new-app-dialog.svelte";
 	import ProfileDialog from "$lib/components/profile-dialog.svelte";
 	import SpaceSettingsDialog from "$lib/components/space-settings-dialog.svelte";
@@ -34,23 +36,27 @@
 	import UserIcon from "@lucide/svelte/icons/user";
 	import UsersIcon from "@lucide/svelte/icons/users";
 	import WorkflowIcon from "@lucide/svelte/icons/workflow";
-	import type { PageDef, TypeDef } from "$lib/runtime/model.ts";
+	import type { PageDef } from "$lib/runtime/model.ts";
+	import type { CollectionDraft } from "@jthum/framework/svelte/studio";
 	import { pageIconEntry } from "$lib/runtime/page-icons.ts";
-	import { authoredNavPages, groupPagesByFolder, pageHref } from "$lib/runtime/blocks.ts";
+	import { groupPagesByFolder, pageHref } from "$lib/runtime/blocks.ts";
 	import type { Component, ComponentProps } from "svelte";
 
 	let { ref = $bindable(null), ...restProps }: ComponentProps<typeof Sidebar.Root> = $props();
 
-	const spec = $derived(session.resolvedSpec);
 	const path = $derived(page.url.pathname);
 	const studio = $derived(path.startsWith("/build") || path.startsWith("/library") || path.startsWith("/diagnostics"));
 	const space = $derived(spaceLabel(session.space?.name));
 
-	const views = $derived(spec ? featuredViews(spec) : []);
-	const types = $derived(spec?.types ?? []);
+	const views = $derived((canonicalStudio.context?.views ?? []).filter((view) => !view.implicit));
+	const types = $derived(canonicalStudio.context?.collections ?? []);
 	const localTypes = $derived(types.filter((type) => !type.expose));
 	const sharedTypes = $derived(types.filter((type) => type.expose));
-	const navPages = $derived(spec ? authoredNavPages(spec) : []);
+	const navPages = $derived(
+		(canonicalStudio.spec?.pages ?? [])
+			.filter((item) => item.key !== "home" && item.meta?.path !== "/" && !isStudioManaged(item.meta))
+			.map(pagePresentation),
+	);
 	const pageGroups = $derived(groupPagesByFolder(navPages));
 	const appChoices = $derived(
 		[...session.apps].sort((left, right) => {
@@ -113,7 +119,7 @@
 	}
 </script>
 
-{#snippet recordLink(type: TypeDef)}
+{#snippet recordLink(type: CollectionDraft)}
 	<Sidebar.MenuSubItem>
 		<Sidebar.MenuSubButton
 			href="/t/{type.key}"

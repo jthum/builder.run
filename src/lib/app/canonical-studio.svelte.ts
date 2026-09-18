@@ -217,6 +217,13 @@ class CanonicalStudioState {
     this.revision += 1;
   }
 
+  async replaceSpec(spec: Spec): Promise<void> {
+    const runtime = session.framework;
+    if (!runtime) throw new Error("The Framework runtime is not ready.");
+    await runtime.appClient.applySpec(spec);
+    await this.refresh();
+  }
+
   private recordClient(collectionKey: string) {
     const runtime = session.framework;
     if (!runtime) throw new Error("The Framework runtime is not ready.");
