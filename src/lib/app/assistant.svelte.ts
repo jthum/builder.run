@@ -65,6 +65,7 @@ class AssistantState {
       ...this.history,
       { role: "user", content: prompt },
     ];
+    let responseContent = "";
     this.running = true;
     this.error = null;
     this.status = "Thinking";
@@ -83,8 +84,8 @@ class AssistantState {
       });
       for await (const event of events) {
         if (event.type === "text_delta") {
-          response.content += event.delta;
-          this.messages = [...this.messages];
+          responseContent += event.delta;
+          this.updateMessage(response.id, responseContent);
           this.status = "Writing";
         } else if (event.type === "tool_call") {
           this.status = `Using ${readableTool(event.toolId)}`;
@@ -95,28 +96,30 @@ class AssistantState {
         } else if (event.type === "completed") {
           this.history = event.messages ?? [
             ...messages,
-            { role: "assistant", content: response.content || outputText(event.output) },
+            { role: "assistant", content: responseContent || outputText(event.output) },
           ];
-          if (!response.content) response.content = outputText(event.output);
-          response.content = response.content.trim();
+          if (!responseContent) responseContent = outputText(event.output);
+          responseContent = responseContent.trim();
+          this.updateMessage(response.id, responseContent);
         } else if (event.type === "failed") {
           throw new Error(event.error.message);
         } else if (event.type === "refused") {
           throw new Error(event.reason ?? "The model declined this request.");
         } else if (event.type === "cancelled") {
-          if (!response.content) response.content = "Stopped.";
+          if (!responseContent) responseContent = "Stopped.";
+          this.updateMessage(response.id, responseContent);
         }
       }
-      if (!response.content) response.content = "Done.";
-      this.messages = [...this.messages];
+      if (!responseContent) responseContent = "Done.";
+      this.updateMessage(response.id, responseContent);
     } catch (error) {
       if (this.controller?.signal.aborted) {
-        if (!response.content) response.content = "Stopped.";
+        if (!responseContent) responseContent = "Stopped.";
       } else {
         this.error = error instanceof Error ? error.message : "The assistant could not finish.";
-        if (!response.content) response.content = "I couldn’t complete that request.";
+        if (!responseContent) responseContent = "I couldn’t complete that request.";
       }
-      this.messages = [...this.messages];
+      this.updateMessage(response.id, responseContent);
     } finally {
       this.running = false;
       this.status = "";
@@ -134,6 +137,12 @@ class AssistantState {
     this.messages = [];
     this.error = null;
     this.status = "";
+  }
+
+  private updateMessage(id: string, content: string): void {
+    this.messages = this.messages.map((message) =>
+      message.id === id ? { ...message, content } : message,
+    );
   }
 }
 
