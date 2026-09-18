@@ -107,7 +107,7 @@ async function publishFrameworkPreferences(runtime: LiveRuntime): Promise<void> 
   if (runtime !== live || runtime.framework !== framework || !actor) return;
   session.actor = {
     id: actor.id,
-    kind: actor.kind,
+    kind: actor.kind === "user" ? "human" : actor.kind,
     name: actor.name,
     ...(actor.email ? { email: actor.email } : {}),
     roles: session.actor?.roles ?? ["owner"],
@@ -174,7 +174,11 @@ function publishSnapshot(snapshot: HostSnapshot) {
     id: snapshot.space.id,
     name: session.framework?.space.name ?? snapshot.space.name,
   };
-  session.spaces = snapshot.spaces;
+  session.spaces = snapshot.spaces.map((space) =>
+    space.id === snapshot.space.id
+      ? { ...space, name: session.framework?.space.name ?? space.name }
+      : space,
+  );
   session.resolvedSpec = snapshot.spec;
   session.authoredSpec = snapshot.app.spec;
   session.sharedTypes = snapshot.sharedTypes;
@@ -247,7 +251,7 @@ export async function updateProfile(input: { name: string; email?: string }): Pr
   const actor = await live.framework.spaceClient.updateActor(live.framework.actorId, input);
   session.actor = {
     id: actor.id,
-    kind: actor.kind,
+    kind: actor.kind === "user" ? "human" : actor.kind,
     name: actor.name,
     ...(actor.email ? { email: actor.email } : {}),
     roles: session.actor?.roles ?? ["owner"],
@@ -276,6 +280,9 @@ export async function updateSpaceSettings(name: string, accent: SpaceAccent): Pr
   live.framework = { ...live.framework, space: { ...renamed, spec: updated.spec } };
   session.framework = live.framework;
   session.space = { id: session.space?.id ?? renamed.id, name: renamed.name };
+  session.spaces = session.spaces.map((space) =>
+    space.id === session.space?.id ? { ...space, name: renamed.name } : space,
+  );
   session.accent = accent;
 }
 
