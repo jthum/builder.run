@@ -1,6 +1,6 @@
 import { Host, type HostSnapshot } from "$lib/runtime/host.ts";
 import type { Actor, AppSpec, TypeDef } from "$lib/runtime/model.ts";
-import type { SpaceAccent } from "$lib/runtime/platform.ts";
+import { SPACE_ACCENT_KEYS, type SpaceAccent } from "$lib/runtime/platform.ts";
 import { sampleApps } from "$lib/runtime/samples.ts";
 import { seedTemplateRecords } from "$lib/app/template-records.ts";
 import {
@@ -96,6 +96,32 @@ function publish(runtime: LiveRuntime) {
   session.ready = true;
   session.error = null;
   clearStorageLockReload();
+  void publishFrameworkPreferences(runtime).catch((error: unknown) => {
+    session.error = error instanceof Error ? error.message : "Unable to load profile settings.";
+  });
+}
+
+async function publishFrameworkPreferences(runtime: LiveRuntime): Promise<void> {
+  const framework = runtime.framework;
+  const actor = await framework.spaceClient.getActor(framework.actorId);
+  if (runtime !== live || runtime.framework !== framework || !actor) return;
+  session.actor = {
+    id: actor.id,
+    kind: actor.kind,
+    name: actor.name,
+    ...(actor.email ? { email: actor.email } : {}),
+    roles: session.actor?.roles ?? ["owner"],
+  };
+  session.space = {
+    id: session.space?.id ?? runtime.framework.space.id,
+    name: runtime.framework.space.name,
+  };
+  const accent = runtime.framework.space.spec.meta?.appearance;
+  session.accent = "blue";
+  if (accent && typeof accent === "object" && !Array.isArray(accent) && "accent" in accent) {
+    const value = accent.accent;
+    if (SPACE_ACCENT_KEYS.includes(value as SpaceAccent)) session.accent = value as SpaceAccent;
+  }
 }
 
 async function alignFrameworkApp(runtime: LiveRuntime): Promise<void> {
@@ -111,6 +137,7 @@ async function alignFrameworkApp(runtime: LiveRuntime): Promise<void> {
   );
   runtime.framework = { ...runtime.framework, ...aligned };
   session.framework = runtime.framework;
+  await publishFrameworkPreferences(runtime);
 }
 
 async function reopenFramework(runtime: LiveRuntime): Promise<void> {
@@ -131,6 +158,7 @@ async function reopenFramework(runtime: LiveRuntime): Promise<void> {
     },
   });
   session.framework = runtime.framework;
+  await publishFrameworkPreferences(runtime);
 }
 
 function publishSnapshot(snapshot: HostSnapshot) {
@@ -142,14 +170,17 @@ function publishSnapshot(snapshot: HostSnapshot) {
   };
   session.app = { id: snapshot.app.id, name: snapshot.app.name };
   session.apps = snapshot.apps;
-  session.space = { id: snapshot.space.id, name: snapshot.space.name };
+  session.space = {
+    id: snapshot.space.id,
+    name: session.framework?.space.name ?? snapshot.space.name,
+  };
   session.spaces = snapshot.spaces;
   session.resolvedSpec = snapshot.spec;
   session.authoredSpec = snapshot.app.spec;
   session.sharedTypes = snapshot.sharedTypes;
-  session.actor = snapshot.actor;
+  if (!session.framework) session.actor = snapshot.actor;
   session.actors = snapshot.space.actors;
-  session.accent = snapshot.space.appearance?.accent ?? "blue";
+  if (!session.framework) session.accent = snapshot.space.appearance?.accent ?? "blue";
 }
 
 function adoptLive(runtime: LiveRuntime) {
@@ -209,6 +240,43 @@ export function boot(): Promise<void> {
 export function runtime(): Host {
   if (!session.host) throw new Error("builder.run runtime is not ready");
   return session.host;
+}
+
+export async function updateProfile(input: { name: string; email?: string }): Promise<void> {
+  if (!live) throw new Error("The Framework runtime is not ready.");
+  const actor = await live.framework.spaceClient.updateActor(live.framework.actorId, input);
+  session.actor = {
+    id: actor.id,
+    kind: actor.kind,
+    name: actor.name,
+    ...(actor.email ? { email: actor.email } : {}),
+    roles: session.actor?.roles ?? ["owner"],
+  };
+}
+
+export async function updateSpaceSettings(name: string, accent: SpaceAccent): Promise<void> {
+  if (!live) throw new Error("The Framework runtime is not ready.");
+  const renamed = await live.framework.kernel.renameWorkspace(live.framework.spaceContext, {
+    name,
+  });
+  const current = await live.framework.spaceClient.getWorkspace();
+  const appearance = current.spec.meta?.appearance;
+  const updated = await live.framework.spaceClient.applySpec({
+    ...current.spec,
+    meta: {
+      ...current.spec.meta,
+      appearance: {
+        ...(appearance && typeof appearance === "object" && !Array.isArray(appearance)
+          ? appearance
+          : {}),
+        accent,
+      },
+    },
+  });
+  live.framework = { ...live.framework, space: { ...renamed, spec: updated.spec } };
+  session.framework = live.framework;
+  session.space = { id: session.space?.id ?? renamed.id, name: renamed.name };
+  session.accent = accent;
 }
 
 /** App-shell commands stay behind this boundary while their implementation moves to the Framework. */

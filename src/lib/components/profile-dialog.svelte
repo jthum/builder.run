@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { initialsFromName, toneFromName } from "$lib/app/color.ts";
-	import { runtime, session } from "$lib/app/session.svelte.ts";
+	import { session, updateProfile } from "$lib/app/session.svelte.ts";
 	import SettingsDialogShell from "$lib/components/settings-dialog-shell.svelte";
 	import * as Avatar from "@jthum/framework/svelte/ui/avatar";
 	import { Button } from "@jthum/framework/svelte/ui/button";
@@ -66,7 +66,7 @@
 		if (!name.trim()) return;
 		pending = true;
 		try {
-			await runtime().updateActor({ name: name.trim(), email: email.trim() });
+			await updateProfile({ name: name.trim(), email: email.trim() });
 			committed = true;
 			toast.success("Profile saved");
 			open = false;

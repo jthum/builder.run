@@ -3,8 +3,8 @@
 	import { applySpaceAccent, SPACE_ACCENTS, toneFromAccent } from "$lib/app/color.ts";
 	import {
 		configureWebMcpAppToolMode,
-		runtime,
 		session,
+		updateSpaceSettings,
 	} from "$lib/app/session.svelte.ts";
 	import SettingsDialogShell from "$lib/components/settings-dialog-shell.svelte";
 	import { Button } from "@jthum/framework/svelte/ui/button";
@@ -68,8 +68,7 @@
 		if (!name.trim()) return;
 		pending = true;
 		try {
-			await runtime().updateSpaceAppearance(accent);
-			await runtime().renameSpace(name.trim());
+			await updateSpaceSettings(name.trim(), accent);
 			configureWebMcpAppToolMode(typedTools ? "typed" : "compact");
 			committed = true;
 			toast.success("Space saved");
