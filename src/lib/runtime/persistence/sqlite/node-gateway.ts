@@ -38,6 +38,13 @@ export function createNodeGateway(): SqlGateway {
       }
       return new NodeConnection(db);
     },
+    async inspect() {
+      return {
+        databases: [...dbs.keys()]
+          .sort((left, right) => left.localeCompare(right))
+          .map((name) => ({ name, open: true })),
+      };
+    },
     async remove(name: string) {
       const db = dbs.get(name);
       if (!db) return;

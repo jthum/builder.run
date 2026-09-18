@@ -65,6 +65,9 @@ async function openWorkerGateway(): Promise<SqlGateway> {
         },
       } satisfies SqlConnection;
     },
+    async inspect() {
+      return (await rpc({ method: "inspect" })) as Awaited<ReturnType<SqlGateway["inspect"]>>;
+    },
     async remove(name: string) {
       await rpc({ method: "remove", db: name });
     },

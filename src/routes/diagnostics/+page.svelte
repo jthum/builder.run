@@ -7,6 +7,7 @@
 	import * as Card from "@jthum/framework/svelte/ui/card";
 	import * as Empty from "@jthum/framework/svelte/ui/empty";
 	import { Spinner } from "@jthum/framework/svelte/ui/spinner";
+	import * as Table from "@jthum/framework/svelte/ui/table";
 	import * as Tabs from "@jthum/framework/svelte/ui/tabs";
 	import { buildTools, toolSurface, webmcpSupported } from "$lib/app/webmcp.ts";
 	import { toast } from "svelte-sonner";
@@ -21,6 +22,22 @@
 
 	let wipeOpen = $state(false);
 	let wiping = $state(false);
+	const databases = $derived(session.diagnostics?.databases ?? []);
+
+	function databaseKind(kind: (typeof databases)[number]["kind"]): string {
+		if (kind === "control") return "Control";
+		if (kind === "space") return "Space";
+		if (kind === "app") return "App";
+		if (kind === "scope") return "Scope";
+		return "Database";
+	}
+
+	function formatBytes(bytes?: number): string {
+		if (bytes == null) return "—";
+		if (bytes < 1024) return `${bytes} B`;
+		if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+		return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+	}
 
 	async function wipe() {
 		wiping = true;
@@ -43,14 +60,16 @@
 			</Card.Header>
 			<Card.Content class="flex flex-col gap-2">
 				<Badge>{session.diagnostics?.engine} · {session.diagnostics?.backend}</Badge>
-				{#if session.diagnostics?.database}
-					<div class="text-sm">
-						<div class="font-medium">Control</div>
-						<div class="text-muted-foreground">
-							{session.diagnostics.database}
-						</div>
+				<div class="text-sm">
+					<div class="font-medium">{databases.length} database{databases.length === 1 ? "" : "s"}</div>
+					<div class="text-muted-foreground">
+						{#if session.diagnostics?.capacity}
+							{session.diagnostics.capacity.used} of {session.diagnostics.capacity.total} OPFS file slots in use
+						{:else}
+							{session.diagnostics?.database}
+						{/if}
 					</div>
-				{/if}
+				</div>
 			</Card.Content>
 		</Card.Root>
 		<Card.Root>
@@ -75,6 +94,55 @@
 			<Card.Content class="text-sm">{session.actor?.name}</Card.Content>
 		</Card.Root>
 	</div>
+	<Card.Root>
+		<Card.Header>
+			<Card.Title>Database files</Card.Title>
+			<Card.Description>
+				The catalog holds control data. Spaces, apps, and configured module scopes keep their records isolated.
+			</Card.Description>
+		</Card.Header>
+		<Card.Content>
+			{#if databases.length}
+				<Table.Root
+					class="overflow-hidden rounded-2xl bg-surface-chrome p-[4px] [border-collapse:separate] [border-spacing:0]"
+				>
+					<Table.Header class="bg-transparent">
+						<Table.Row>
+							<Table.Head>Owner</Table.Head>
+							<Table.Head>Role</Table.Head>
+							<Table.Head>Logical file</Table.Head>
+							<Table.Head class="text-end">Size</Table.Head>
+							<Table.Head class="text-end">State</Table.Head>
+						</Table.Row>
+					</Table.Header>
+					<Table.Body
+						class="bg-transparent drop-shadow-xs [&_td]:bg-card [&_tr:not(:last-child)>td]:border-b [&_tr:not(:last-child)>td]:border-border/60 [&_tr:first-child>td:first-child]:rounded-tl-[calc(var(--radius-2xl)-4px)] [&_tr:first-child>td:last-child]:rounded-tr-[calc(var(--radius-2xl)-4px)] [&_tr:last-child>td:first-child]:rounded-bl-[calc(var(--radius-2xl)-4px)] [&_tr:last-child>td:last-child]:rounded-br-[calc(var(--radius-2xl)-4px)]"
+					>
+						{#each databases as database (database.name)}
+							<Table.Row>
+								<Table.Cell class="font-medium">{database.label}</Table.Cell>
+								<Table.Cell><Badge variant="secondary">{databaseKind(database.kind)}</Badge></Table.Cell>
+								<Table.Cell class="font-mono text-xs text-muted-foreground">{database.name}</Table.Cell>
+								<Table.Cell class="text-end tabular-nums">{formatBytes(database.bytes)}</Table.Cell>
+								<Table.Cell class="text-end">
+									<Badge variant={database.open ? "default" : "outline"}>
+										{database.open ? "Open" : "Stored"}
+									</Badge>
+								</Table.Cell>
+							</Table.Row>
+						{/each}
+					</Table.Body>
+				</Table.Root>
+			{:else}
+				<Empty.Root>
+					<Empty.Header>
+						<Empty.Title>No database files reported</Empty.Title>
+						<Empty.Description>The active persistence backend did not expose a file inventory.</Empty.Description>
+					</Empty.Header>
+				</Empty.Root>
+			{/if}
+		</Card.Content>
+	</Card.Root>
 	<Card.Root>
 		<Card.Header>
 			<Card.Title>Tools</Card.Title>

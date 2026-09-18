@@ -15,7 +15,11 @@ import {
   renameApp as updateAppName,
   type OpenedRuntime,
 } from "$lib/framework/bootstrap.ts";
-import { createKernelSqlitePersistence, CATALOG_DATABASE } from "$lib/framework/sqlite.ts";
+import {
+  createKernelSqlitePersistence,
+  CATALOG_DATABASE,
+  workspaceDatabaseName,
+} from "$lib/framework/sqlite.ts";
 import { openSqlGateway, type SqlGateway } from "$lib/runtime/persistence/sqlite/gateway.ts";
 import {
   clearStorageLockReload,
@@ -45,6 +49,18 @@ export interface RuntimeDiagnostics {
   readonly backend: string;
   readonly engine: string;
   readonly database: string;
+  readonly databases: readonly RuntimeDatabaseDiagnostic[];
+  readonly capacity?: {
+    readonly used: number;
+    readonly total: number;
+  };
+}
+export interface RuntimeDatabaseDiagnostic {
+  readonly name: string;
+  readonly label: string;
+  readonly kind: "control" | "space" | "app" | "scope" | "database";
+  readonly bytes?: number;
+  readonly open: boolean;
 }
 type ProfileActor = Actor & { readonly roles: readonly string[] };
 class SessionState {
@@ -122,12 +138,14 @@ async function refreshContext(): Promise<void> {
 }
 async function publishContext(runtime: LiveRuntime): Promise<void> {
   const framework = runtime.framework;
-  const [actor, apps, spaces, actors, memberships] = await Promise.all([
+  const [actor, apps, spaces, actors, memberships, workspaces, storage] = await Promise.all([
     framework.spaceClient.getActor(framework.actorId),
     listApps(framework.kernel, framework.spaceContext),
     framework.kernel.listRootWorkspaces(framework.spaceContext),
     framework.kernel.listActorsByOrigin(framework.spaceContext, framework.space.id),
     framework.kernel.listMembershipsForWorkspace(framework.spaceContext, framework.space.id),
+    framework.kernel.listWorkspacesByRoot(framework.spaceContext),
+    runtime.gateway.inspect(),
   ]);
   if (runtime !== live || runtime.framework !== framework || !actor) return;
   const role = (id: string): readonly string[] =>
@@ -156,11 +174,36 @@ async function publishContext(runtime: LiveRuntime): Promise<void> {
     backend: runtime.gateway.backend,
     engine: "SQLite",
     database: CATALOG_DATABASE,
+    databases: describeDatabases(storage.databases, workspaces),
+    ...(storage.capacity ? { capacity: storage.capacity } : {}),
   };
   session.webmcp = webmcpSupported();
   session.webmcpToolMode = getWebMcpAppToolMode();
   session.revision += 1;
   listeners.forEach((listener) => listener());
+}
+
+function describeDatabases(
+  databases: Awaited<ReturnType<SqlGateway["inspect"]>>["databases"],
+  workspaces: Awaited<ReturnType<OpenedRuntime["kernel"]["listWorkspacesByRoot"]>>,
+): RuntimeDatabaseDiagnostic[] {
+  const workspaceNames = new Map(
+    workspaces.map((workspace) => [
+      workspaceDatabaseName(workspace.id),
+      { label: workspace.name, kind: workspace.isRoot ? ("space" as const) : ("app" as const) },
+    ]),
+  );
+  return databases
+    .filter(({ name }) => name.endsWith(".db"))
+    .map((database) => {
+      if (database.name === CATALOG_DATABASE)
+        return { ...database, label: "Catalog", kind: "control" as const };
+      const workspace = workspaceNames.get(database.name);
+      if (workspace) return { ...database, ...workspace };
+      if (database.name.startsWith("catalog-s-"))
+        return { ...database, label: "Module scope", kind: "scope" as const };
+      return { ...database, label: "SQLite database", kind: "database" as const };
+    });
 }
 
 export function boot(): Promise<void> {

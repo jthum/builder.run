@@ -10,13 +10,18 @@ import syncWasmUrl from "wa-sqlite/dist/wa-sqlite.wasm?url";
 import { STORAGE_LOCKED } from "./storage-lock.ts";
 
 const OPFS_DIR = "/builder-run-sqlite";
-const OPFS_CAPACITY = 24;
+const OPFS_INITIAL_CAPACITY = 24;
+const OPFS_CAPACITY_INCREMENT = 24;
+const OPFS_MIN_HEADROOM = 4;
+const OPFS_HEADER_PATH_BYTES = 512;
+const OPFS_HEADER_BYTES = 4096;
 
 let sqlite3 = null;
 let backend = "memory";
 let selectedVfs = null;
 let vfsInstance = null;
 const dbs = new Map();
+const activeTransactions = new Set();
 
 async function boot() {
   if (sqlite3) return sqlite3;
@@ -59,10 +64,10 @@ async function tryOpfs() {
       const sqlite = Factory(module);
       const vfs = new AccessHandlePoolVFS(OPFS_DIR);
       await vfs.isReady;
-      const extra = OPFS_CAPACITY - vfs.getCapacity();
+      const extra = OPFS_INITIAL_CAPACITY - vfs.getCapacity();
       if (extra > 0) await vfs.addCapacity(extra);
       sqlite.vfs_register(vfs, false);
-      await probe(sqlite, vfs.name);
+      await probe(sqlite, vfs.name, vfs);
       return { sqlite, vfsName: vfs.name, vfs };
     } catch (error) {
       lastError = error;
@@ -97,7 +102,7 @@ async function registerAsyncVfs(sqlite) {
       const vfs = candidate.create();
       if (vfs.isReady) await vfs.isReady;
       sqlite.vfs_register(vfs, false);
-      await probe(sqlite, vfs.name);
+      await probe(sqlite, vfs.name, vfs);
       selectedVfs = vfs.name;
       vfsInstance = vfs;
       return candidate.backend;
@@ -109,8 +114,9 @@ async function registerAsyncVfs(sqlite) {
   throw lastError ?? new Error("No SQLite VFS could be registered");
 }
 
-async function probe(sqlite, vfsName) {
-  const db = await sqlite.open_v2("__builder_run_probe__", undefined, vfsName);
+async function probe(sqlite, vfsName, vfs) {
+  const name = "__builder_run_probe__";
+  const db = await sqlite.open_v2(name, undefined, vfsName);
   try {
     await sqlite.exec(
       db,
@@ -118,11 +124,13 @@ async function probe(sqlite, vfsName) {
     );
   } finally {
     await sqlite.close(db);
+    await vfs.xDelete?.(name, 1);
   }
 }
 
 async function openDb(name) {
   const sqlite = await boot();
+  await ensureOpfsHeadroom();
   const existing = dbs.get(name);
   if (existing != null) return existing;
   let db;
@@ -141,6 +149,25 @@ async function openDb(name) {
   }
   dbs.set(name, db);
   return db;
+}
+
+async function ensureOpfsHeadroom() {
+  if (
+    backend !== "opfs" ||
+    !vfsInstance ||
+    typeof vfsInstance.getSize !== "function" ||
+    typeof vfsInstance.getCapacity !== "function" ||
+    typeof vfsInstance.reset !== "function" ||
+    typeof vfsInstance.addCapacity !== "function" ||
+    activeTransactions.size > 0 ||
+    vfsInstance.getCapacity() - vfsInstance.getSize() > OPFS_MIN_HEADROOM
+  )
+    return;
+
+  for (const handle of dbs.values()) await sqlite3.close(handle);
+  dbs.clear();
+  await vfsInstance.reset();
+  await vfsInstance.addCapacity(OPFS_CAPACITY_INCREMENT);
 }
 
 function bindParams(sqlite, stmt, params) {
@@ -167,6 +194,13 @@ async function run(dbName, sql, params = []) {
       // drain
     }
   }
+  trackTransaction(dbName, sql);
+}
+
+function trackTransaction(dbName, sql) {
+  const statement = String(sql).trim().toUpperCase();
+  if (/^BEGIN\b/.test(statement)) activeTransactions.add(dbName);
+  else if (/^(?:COMMIT|END|ROLLBACK)\b/.test(statement)) activeTransactions.delete(dbName);
 }
 
 async function closeAll() {
@@ -179,6 +213,7 @@ async function closeAll() {
       }
     }
     dbs.clear();
+    activeTransactions.clear();
   }
   if (vfsInstance && typeof vfsInstance.close === "function") {
     try {
@@ -219,7 +254,49 @@ async function removeDb(name) {
     await sqlite.close(handle);
     dbs.delete(name);
   }
+  activeTransactions.delete(name);
   if (vfsInstance?.xDelete) await vfsInstance.xDelete(name, 1);
+}
+
+async function inspectStorage() {
+  const databases =
+    backend === "opfs"
+      ? await inspectOpfsDatabases()
+      : [...dbs.keys()]
+          .sort((left, right) => left.localeCompare(right))
+          .map((name) => ({ name, open: true }));
+  const capacity =
+    typeof vfsInstance?.getSize === "function" && typeof vfsInstance?.getCapacity === "function"
+      ? { used: vfsInstance.getSize(), total: vfsInstance.getCapacity() }
+      : undefined;
+  return { databases, ...(capacity ? { capacity } : {}) };
+}
+
+async function inspectOpfsDatabases() {
+  const root = await navigator.storage.getDirectory();
+  let directory = root;
+  for (const part of OPFS_DIR.split("/").filter(Boolean))
+    directory = await directory.getDirectoryHandle(part);
+
+  const open = new Set(dbs.keys());
+  const databases = [];
+  for await (const [, handle] of directory.entries()) {
+    if (handle.kind !== "file") continue;
+    const file = await handle.getFile();
+    const header = new Uint8Array(await file.slice(0, OPFS_HEADER_PATH_BYTES).arrayBuffer());
+    const terminator = header.indexOf(0);
+    const path = new TextDecoder().decode(
+      header.subarray(0, terminator < 0 ? OPFS_HEADER_PATH_BYTES : terminator),
+    );
+    if (!path) continue;
+    const name = path.replace(/^\//, "");
+    databases.push({
+      name,
+      bytes: Math.max(0, file.size - OPFS_HEADER_BYTES),
+      open: open.has(name),
+    });
+  }
+  return databases.sort((left, right) => left.name.localeCompare(right.name));
 }
 
 async function query(dbName, sql, params = []) {
@@ -259,6 +336,11 @@ async function handleMessage(event) {
       self.postMessage({ id, result: { backend } });
       return;
     }
+    if (method === "inspect") {
+      await boot();
+      self.postMessage({ id, result: await inspectStorage() });
+      return;
+    }
     if (method === "close") {
       const sqlite = await boot();
       const handle = dbs.get(db);
@@ -266,6 +348,7 @@ async function handleMessage(event) {
         await sqlite.close(handle);
         dbs.delete(db);
       }
+      activeTransactions.delete(db);
       self.postMessage({ id, result: true });
       return;
     }

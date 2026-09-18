@@ -98,6 +98,13 @@ describe("Framework SQLite persistence", () => {
       { collection_id: "A000000000000002" },
     ]);
     await appDatabase.close();
+    await expect(gateway.inspect()).resolves.toMatchObject({
+      databases: expect.arrayContaining([
+        expect.objectContaining({ name: CATALOG_DATABASE }),
+        expect.objectContaining({ name: workspaceDatabaseName(context.workspaceId) }),
+        expect.objectContaining({ name: workspaceDatabaseName(app.id) }),
+      ]),
+    });
     await first.close();
 
     const second = await Kernel.open({ persistence });

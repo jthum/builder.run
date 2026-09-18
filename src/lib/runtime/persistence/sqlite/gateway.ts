@@ -6,9 +6,24 @@ export interface SqlConnection {
   close(): Promise<void>;
 }
 
+export interface SqlDatabaseDiagnostic {
+  readonly name: string;
+  readonly bytes?: number;
+  readonly open: boolean;
+}
+
+export interface SqlGatewayDiagnostics {
+  readonly databases: readonly SqlDatabaseDiagnostic[];
+  readonly capacity?: {
+    readonly used: number;
+    readonly total: number;
+  };
+}
+
 export interface SqlGateway {
   readonly backend: PersistenceBackend;
   open(name: string): Promise<SqlConnection>;
+  inspect(): Promise<SqlGatewayDiagnostics>;
   /** Remove one closed logical database. Missing databases are a successful no-op. */
   remove(name: string): Promise<void>;
   wipe(): Promise<void>;
