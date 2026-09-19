@@ -38,6 +38,7 @@ import {
 } from "./webmcp.ts";
 import { createAuthoringInferenceTools } from "$lib/inference/authoring-tools.ts";
 import { createBrowserInferenceRuntime } from "$lib/inference/runtime.ts";
+import { browserSecrets, delegateAction } from "$lib/framework/actions.ts";
 
 export interface AppSummary {
   readonly id: string;
@@ -230,6 +231,8 @@ export function boot(): Promise<void> {
           },
           persistence: createKernelSqlitePersistence(gateway),
           inference: createBrowserInferenceRuntime(),
+          secrets: browserSecrets(localStorage),
+          actionExecutors: [delegateAction],
           inferenceTools: [createAuthoringInferenceTools(toolContext)],
         },
         seed: {

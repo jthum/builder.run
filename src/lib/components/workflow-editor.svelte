@@ -6,9 +6,21 @@
   import { CORE_RULE_EFFECTS, type RuleDraft, type RuleCompatibility } from "@jthum/framework/svelte/studio/data";
   import { ruleDefinitionFromDraft } from "@jthum/framework/svelte/studio/adapters";
   import { checkRuleCompatibility, requiresDurableExecution } from "@jthum/framework/kernel";
+  import type { RuntimeAction } from "@jthum/framework/kernel";
   let { workflow }: { workflow: RuleDraft } = $props();
   const context = $derived(canonicalStudio.context!);
   const actions = $derived(canonicalStudio.ruleActions());
+  let runtimeActions = $state<readonly RuntimeAction[]>([]);
+  $effect(() => {
+    const client = session.framework?.appClient;
+    const revision = session.revision;
+    if (!client) { runtimeActions = []; return; }
+    let active = true;
+    void client.listRuntimeActions()
+      .then((items) => { if (active && revision === session.revision) runtimeActions = items; })
+      .catch(() => { if (active) runtimeActions = []; });
+    return () => { active = false; };
+  });
   function compatibility(draft: RuleDraft): RuleCompatibility {
     const runtime = session.framework;
     const spec = canonicalStudio.spec;
@@ -22,7 +34,8 @@
       const profile = durable
         ? { ...runtime.kernel.getDurableRuleRuntimeProfile(), events: shortProfile.events }
         : shortProfile;
-      return { diagnostics: checkRuleCompatibility(rule, profile).diagnostics.map(item => ({
+      const available = new Set([...profile.actions, ...runtimeActions.filter((item) => item.implementation.kind === "delegate").map((item) => item.key)]);
+      return { diagnostics: checkRuleCompatibility(rule, { ...profile, actions: available }).diagnostics.map(item => ({
         capability: item.key, support: item.support, message: item.message,
       })) };
     } catch (error) {
@@ -31,7 +44,7 @@
   }
 </script>
 <RuleEditor rule={workflow} {context} {actions}
-  effects={[...CORE_RULE_EFFECTS]}
+  effects={[...CORE_RULE_EFFECTS, ...runtimeActions.map((action) => ({ key: action.key, label: action.label, description: action.description, input: action.input.properties }))]}
   actorRequests={session.framework?.kernel.getDurableRuleRuntimeProfile().capabilities.actor_requests === "supported"}
   checkCompatibility={compatibility}
   onDeleted={() => goto("/build/automations")}
