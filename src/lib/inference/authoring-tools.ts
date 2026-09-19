@@ -26,10 +26,7 @@ function projectTool(tool: ToolDefinition, context: ToolContext): ContextualInfe
     id: `builder:${tool.name}`,
     label: tool.title ?? readableName(tool.name),
     description: tool.description,
-    input:
-      tool.name === "upsert_collection"
-        ? COLLECTION_AUTHORING_INPUT
-        : inputSchema(tool.inputSchema),
+    input: AUTHORING_INPUTS[tool.name] ?? inputSchema(tool.inputSchema),
     availability: eager ? "eager" : "discoverable",
     keywords: [tool.name, tool.description],
     execute: async (input) =>
@@ -131,21 +128,184 @@ const COLLECTION_AUTHORING_INPUT: InferenceToolInputSchema = {
     },
     shared: {
       type: "boolean",
-      description: "True installs the Collection in the Space; false keeps it local to this App.",
+      description:
+        "False keeps it local to this App and is the default. Use true only when the user explicitly requests sharing across Apps in the Space.",
     },
   },
   required: ["definition"],
   additionalProperties: false,
 };
 
+const IDENTITY_PROPERTIES = {
+  id: { type: "string", description: "Existing stable definition ID when updating." },
+  key: { type: "string", description: "Stable machine-readable key." },
+  label: { type: "string", description: "Human-readable label." },
+  description: { type: "string" },
+  meta: { type: "json" },
+} as const satisfies Record<string, InferenceToolValueSchema>;
+
+const VIEW_AUTHORING_INPUT: InferenceToolInputSchema = definitionInput(
+  {
+    ...IDENTITY_PROPERTIES,
+    source: { type: "string", description: "Collection key or attached Source key." },
+    query: { type: "json", description: "Optional canonical Source query." },
+    parameters: {
+      type: "array",
+      items: {
+        type: "object",
+        properties: {
+          key: { type: "string" },
+          label: { type: "string" },
+          path: { type: "array", items: { type: "string" } },
+          operator: {
+            type: "string",
+            enum: ["eq", "neq", "contains", "empty", "notEmpty", "gt", "gte", "lt", "lte"],
+          },
+          required: { type: "boolean" },
+          source: { type: "string", enum: ["input", "context"] },
+        },
+        required: ["key", "path"],
+        additionalProperties: false,
+      },
+    },
+    presentation: {
+      type: "object",
+      properties: { block: { type: "string" }, config: { type: "json" } },
+      required: ["block"],
+      additionalProperties: false,
+    },
+  },
+  ["key", "label", "source"],
+);
+
+const FORM_AUTHORING_INPUT: InferenceToolInputSchema = definitionInput(
+  {
+    ...IDENTITY_PROPERTIES,
+    mode: { type: "string", enum: ["create", "edit", "standalone"] },
+    collectionId: {
+      type: "string",
+      description: "Stable Collection ID; required for create and edit forms.",
+    },
+    fieldIds: {
+      type: "array",
+      description: "Ordered stable field IDs; required for create and edit forms.",
+      items: { type: "string" },
+    },
+    fields: {
+      type: "array",
+      description: "Form-owned fields; required for standalone forms.",
+      items: FIELD_AUTHORING_SCHEMA,
+    },
+    submit: { type: "json" },
+  },
+  ["key", "label", "mode"],
+);
+
+const PAGE_AUTHORING_INPUT: InferenceToolInputSchema = definitionInput(
+  {
+    ...IDENTITY_PROPERTIES,
+    layout: {
+      type: "array",
+      description:
+        "Ordered canonical Page layout nodes. Each node is a block or a group with children.",
+      items: { type: "json" },
+    },
+  },
+  ["key", "label", "layout"],
+);
+
+const RULE_AUTHORING_INPUT: InferenceToolInputSchema = definitionInput(
+  {
+    ...IDENTITY_PROPERTIES,
+    enabled: { type: "boolean" },
+    priority: { type: "number" },
+    input: { type: "json" },
+    trigger: { type: "json" },
+    expose: { type: "array", items: { type: "string", enum: ["ui", "agent"] } },
+    steps: {
+      type: "array",
+      description:
+        "Ordered canonical Rule steps. Use get_automation_primitives for supported shapes.",
+      items: { type: "json" },
+    },
+  },
+  ["key", "label", "steps"],
+);
+
+const AUTHORING_INPUTS: Readonly<Record<string, InferenceToolInputSchema>> = {
+  upsert_collection: COLLECTION_AUTHORING_INPUT,
+  upsert_view: VIEW_AUTHORING_INPUT,
+  upsert_form: FORM_AUTHORING_INPUT,
+  upsert_rule: RULE_AUTHORING_INPUT,
+  upsert_page: PAGE_AUTHORING_INPUT,
+};
+
+function definitionInput(
+  properties: Readonly<Record<string, InferenceToolValueSchema>>,
+  required: readonly string[],
+): InferenceToolInputSchema {
+  return {
+    type: "object",
+    properties: {
+      definition: {
+        type: "object",
+        description:
+          "A complete canonical definition. Omit a new definition's ID; preserve it from get_spec when updating.",
+        properties,
+        required,
+        additionalProperties: false,
+      },
+    },
+    required: ["definition"],
+    additionalProperties: false,
+  };
+}
+
 function normalizeAuthoringInput(
   toolName: string,
   input: Readonly<Record<string, JsonValue>>,
   context: ToolContext,
 ): Readonly<Record<string, unknown>> {
-  if (toolName !== "upsert_collection") return input;
+  if (!toolName.startsWith("upsert_")) return input;
   const definition = record(input.definition);
   if (!definition) return input;
+  const kind = toolName.slice("upsert_".length);
+  const definitions = definitionList(context.spec(), kind);
+  const existingDefinition = definitions.find(
+    (candidate) => candidate.id === definition.id || candidate.key === definition.key,
+  );
+  const id = existingDefinition?.id ?? nanoid();
+  if (toolName !== "upsert_collection") {
+    const existingForm =
+      toolName === "upsert_form"
+        ? context
+            .spec()
+            .forms.find(
+              (candidate) => candidate.id === definition.id || candidate.key === definition.key,
+            )
+        : undefined;
+    return {
+      ...input,
+      definition: {
+        ...definition,
+        id,
+        ...(toolName === "upsert_form" && Array.isArray(definition.fields)
+          ? {
+              fields: normalizeFields(
+                definition.fields,
+                existingForm?.mode === "standalone" ? existingForm.fields : [],
+              )?.values,
+            }
+          : {}),
+        ...(toolName === "upsert_page" && Array.isArray(definition.layout)
+          ? { layout: normalizeNodeIds(definition.layout) }
+          : {}),
+        ...(toolName === "upsert_rule" && Array.isArray(definition.steps)
+          ? { steps: normalizeNodeIds(definition.steps) }
+          : {}),
+      },
+    };
+  }
   const collections = context.spec().collections;
   const existing = collections.find(
     (candidate) => candidate.id === definition.id || candidate.key === definition.key,
@@ -156,7 +316,7 @@ function normalizeAuthoringInput(
     ...input,
     definition: {
       ...definition,
-      id: existing?.id ?? nanoid(),
+      id,
       ...(fields === undefined ? {} : { fields: fields.values }),
       ...(typeof definition.titleFieldId === "string"
         ? { titleFieldId: fields?.resolveId(definition.titleFieldId) ?? definition.titleFieldId }
@@ -164,6 +324,61 @@ function normalizeAuthoringInput(
       ...(lifecycle === undefined ? {} : { lifecycle }),
     },
   };
+}
+
+function definitionList(
+  spec: ReturnType<ToolContext["spec"]>,
+  kind: string,
+): readonly { readonly id: string; readonly key: string }[] {
+  if (kind === "collection") return spec.collections;
+  if (kind === "view") return spec.views;
+  if (kind === "form") return spec.forms;
+  if (kind === "rule") return spec.rules;
+  if (kind === "page") return spec.pages;
+  return [];
+}
+
+function normalizeNodeIds(values: readonly unknown[]): readonly unknown[] {
+  return values.map((value) => {
+    const node = record(value);
+    if (!node) return value;
+    const nestedKeys = ["children", "steps", "pass", "fail", "onSignal", "onTimeout"];
+    const normalized: Record<string, unknown> = { ...node, id: node.id ?? nanoid() };
+    for (const key of nestedKeys) {
+      if (Array.isArray(node[key])) normalized[key] = normalizeNodeIds(node[key]);
+    }
+    if (record(node.gate)) normalized.gate = normalizeNestedStepContainer(record(node.gate)!);
+    if (record(node.foreach))
+      normalized.foreach = normalizeNestedStepContainer(record(node.foreach)!);
+    if (record(node.repeat)) normalized.repeat = normalizeNestedStepContainer(record(node.repeat)!);
+    if (record(node.wait)) normalized.wait = normalizeNestedStepContainer(record(node.wait)!);
+    if (record(node.parallel) && Array.isArray(record(node.parallel)!.branches)) {
+      normalized.parallel = {
+        ...record(node.parallel),
+        branches: (record(node.parallel)!.branches as readonly unknown[]).map((branch) => {
+          const item = record(branch) ?? {};
+          return {
+            ...item,
+            id: item.id ?? nanoid(),
+            ...(Array.isArray(item.steps) ? { steps: normalizeNodeIds(item.steps) } : {}),
+          };
+        }),
+      };
+    }
+    return normalized;
+  });
+}
+
+function normalizeNestedStepContainer(value: Record<string, unknown>): Record<string, unknown> {
+  return Object.fromEntries(
+    Object.entries(value).map(([key, item]) => [
+      key,
+      ["children", "steps", "pass", "fail", "onSignal", "onTimeout"].includes(key) &&
+      Array.isArray(item)
+        ? normalizeNodeIds(item)
+        : item,
+    ]),
+  );
 }
 
 function normalizeFields(

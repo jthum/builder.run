@@ -147,7 +147,7 @@ class AssistantState {
 }
 
 const AUTHORING_INSTRUCTIONS = `You help the user build and refine the currently selected Builder.run app.
-Inspect the current app before changing it. Prefer focused authoring tools that preserve unrelated definitions. Use apply_spec only when the user explicitly asks to replace the complete app definition. Ask a concise clarifying question when a material product choice is missing. Keep stable definition IDs when updating existing items. Never claim a mutation succeeded unless its tool returned a successful result; correct invalid input or explain the failure. After making changes, briefly explain what changed.`;
+Inspect the current app before changing it. Prefer focused authoring tools that preserve unrelated definitions. Collections belong to the current app by default; set shared to true only when the user explicitly asks to share a Collection across apps in the Space. Use apply_spec only when the user explicitly asks to replace the complete app definition. Ask a concise clarifying question when a material product choice is missing. Keep stable definition IDs when updating existing items. Never claim a mutation succeeded unless its tool returned a successful result; correct invalid input or explain the failure. After making changes, briefly explain what changed.`;
 
 function readableTool(id: string): string {
   return id

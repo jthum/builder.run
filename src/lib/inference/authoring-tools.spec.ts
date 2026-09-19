@@ -84,4 +84,81 @@ describe("authoring inference tools", () => {
       }),
     ]);
   });
+
+  it("generates definition and nested IDs across the complete authoring surface", async () => {
+    let spec = createEmptySpec({ id: "spec", key: "test", label: "Test" });
+    const provider = createAuthoringInferenceTools({
+      runtime: () =>
+        ({
+          appClient: {
+            getWorkspace: async () => ({ spec }),
+            applySpec: async (next: typeof spec) => {
+              spec = next;
+              return { spec };
+            },
+          },
+        }) as never,
+      spec: () => spec,
+      changed: async () => undefined,
+      createApp: async () => undefined,
+      selectApp: async () => undefined,
+      deleteApp: async () => undefined,
+      createSpace: async () => undefined,
+    });
+    const tools = new Map((await provider.resolve({} as never)).map((tool) => [tool.id, tool]));
+
+    await tools.get("builder:upsert_collection")!.execute(
+      {
+        definition: {
+          key: "note",
+          label: "Note",
+          fields: [{ key: "title", label: "Title", type: "text" }],
+        },
+      },
+      {} as never,
+    );
+    const collection = spec.collections[0]!;
+    await tools
+      .get("builder:upsert_view")!
+      .execute({ definition: { key: "notes", label: "Notes", source: "note" } }, {} as never);
+    await tools.get("builder:upsert_form")!.execute(
+      {
+        definition: {
+          key: "new_note",
+          label: "New note",
+          mode: "create",
+          collectionId: collection.id,
+          fieldIds: [collection.fields[0]!.id],
+        },
+      },
+      {} as never,
+    );
+    await tools.get("builder:upsert_page")!.execute(
+      {
+        definition: {
+          key: "overview",
+          label: "Overview",
+          layout: [{ kind: "block", block: "heading", config: { text: "Overview" } }],
+        },
+      },
+      {} as never,
+    );
+    await tools.get("builder:upsert_rule")!.execute(
+      {
+        definition: {
+          key: "note_created",
+          label: "Note created",
+          steps: [{ delay: { duration: 1 } }],
+        },
+      },
+      {} as never,
+    );
+
+    expect(spec.views[0]?.id).toMatch(/^.{21}$/);
+    expect(spec.forms[0]?.id).toMatch(/^.{21}$/);
+    expect(spec.pages[0]?.id).toMatch(/^.{21}$/);
+    expect(spec.pages[0]?.layout[0]?.id).toMatch(/^.{21}$/);
+    expect(spec.rules[0]?.id).toMatch(/^.{21}$/);
+    expect(spec.rules[0]?.steps[0]?.id).toMatch(/^.{21}$/);
+  });
 });

@@ -13,6 +13,7 @@ class BrowserInferenceRuntime implements InferenceRuntime {
     ]);
     const settings = await loadAssistantSettings();
     const runtime = yair({
+      maxSteps: 32,
       provider: openAI({
         baseUrl: settings.baseUrl,
         apiKey: settings.apiKey,
