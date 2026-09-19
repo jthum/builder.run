@@ -13,6 +13,7 @@
 		isStatusPath,
 	} from "$lib/app/labels.ts";
 	import { canonicalStudio } from "$lib/app/canonical-studio.svelte.ts";
+	import { viewOutputKey } from "$lib/app/view-results.ts";
 	import type { DataTableColumn } from "$lib/components/data-table.ts";
 	import DataTable from "$lib/components/data-table.svelte";
 	import FormattedValue from "$lib/components/formatted-value.svelte";
@@ -60,6 +61,7 @@
 	const columns = $derived.by((): DataTableColumn[] => {
 		const keys = view.fields.length ? view.fields : ["id"];
 		return keys.map((key) => {
+			const outputKey = viewOutputKey(view, key);
 			const fieldKey = key.split(".")[0] ?? key;
 			const field = type?.fields.find((item) => item.key === fieldKey);
 			const valueSemantics =
@@ -70,6 +72,7 @@
 					: undefined;
 			return {
 				id: key,
+				accessor: outputKey === key ? undefined : (row) => row[outputKey],
 				label: columnLabel(key, type),
 				sortable: true,
 				numeric: isAmountPath(key) || field?.type === "number" || Boolean(view.measures?.[key]),

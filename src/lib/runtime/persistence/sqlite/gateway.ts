@@ -22,6 +22,8 @@ export interface SqlGatewayDiagnostics {
 
 export interface SqlGateway {
   readonly backend: PersistenceBackend;
+  /** SQLite-visible name for ATTACH, when logical databases are independently attachable. */
+  attachName?(name: string): string | undefined;
   open(name: string): Promise<SqlConnection>;
   inspect(): Promise<SqlGatewayDiagnostics>;
   /** Remove one closed logical database. Missing databases are a successful no-op. */

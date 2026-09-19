@@ -49,6 +49,7 @@ async function openWorkerGateway(): Promise<SqlGateway> {
 
   return {
     backend: init.backend,
+    attachName: (name: string) => name,
     async open(name: string) {
       await rpc({ method: "open", db: name });
       return {

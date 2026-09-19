@@ -20,7 +20,7 @@ export function createKernelSqlitePersistence(
     acquireDatabaseLease(gateway, name);
     try {
       const connection = await gateway.open(name);
-      return new GatewaySqliteDatabase(connection, () => {
+      return new GatewaySqliteDatabase(gateway.attachName?.(name), connection, () => {
         releaseDatabaseLease(gateway, name);
       });
     } catch (error) {
@@ -105,6 +105,7 @@ class GatewaySqliteDatabase implements SqliteDatabase {
   private closed = false;
 
   constructor(
+    readonly name: string | undefined,
     private readonly connection: SqlConnection,
     private readonly release: () => void,
   ) {}
