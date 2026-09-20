@@ -2,13 +2,13 @@
 	import { canonicalStudio } from "$lib/app/canonical-studio.svelte.ts";
 	import PageBuilder from "$lib/components/page-builder.svelte";
 	import type { PageDefinition } from "@jthum/framework/spec";
-	import { isStudioManaged } from "@jthum/framework/svelte/studio/data";
+	import { isAuthoringManaged } from "@jthum/framework/svelte/authoring/data";
 
 	const definitions = $derived(
 		canonicalStudio.spec
 			? canonicalStudio.spec.pages.filter(
 					(page) =>
-						page.key !== "home" && page.meta?.path !== "/" && !isStudioManaged(page.meta),
+						page.key !== "home" && page.meta?.path !== "/" && !isAuthoringManaged(page.meta),
 				)
 			: [],
 	);

@@ -1,9 +1,9 @@
 <script lang="ts">
   import { canonicalStudio } from "$lib/app/canonical-studio.svelte.ts";
   import { goto } from "$app/navigation";
-  import FormEditor from "@jthum/framework/svelte/studio/form-editor";
-  import { ruleSummary } from "@jthum/framework/svelte/studio/data";
-  import type { FormDraft } from "@jthum/framework/svelte/studio/data";
+  import FormEditor from "@jthum/framework/svelte/authoring/form-editor";
+  import { ruleSummary } from "@jthum/framework/svelte/authoring/data";
+  import type { FormDraft } from "@jthum/framework/svelte/authoring/data";
   import { uniqueKey } from "$lib/runtime/ids.ts";
   import RecordForm from "./record-form.svelte";
   let { form }: { form: FormDraft } = $props();

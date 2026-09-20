@@ -6,7 +6,7 @@ import {
   createPageActions,
   createRule,
   createRuleActions,
-  isStudioManaged,
+  isAuthoringManaged,
   createViewActions,
   loadEditorContext,
   type CollectionActions,
@@ -18,7 +18,7 @@ import {
   type RuleActions,
   type ViewActions,
   type ViewAuthoringSchemas,
-} from "@jthum/framework/svelte/studio/data";
+} from "@jthum/framework/svelte/authoring/data";
 import type { Spec } from "@jthum/framework/spec";
 import { launchRule, type RuleLaunch } from "@jthum/framework/client";
 import { installCollectionStarters } from "$lib/app/collection-starters.ts";
@@ -125,7 +125,7 @@ class CanonicalStudioState {
     if (!runtime) throw new Error("The Framework runtime is not ready.");
     return createPageActions(runtime.appClient, {
       include: (page) =>
-        page.key !== "home" && page.meta?.path !== "/" && !isStudioManaged(page.meta),
+        page.key !== "home" && page.meta?.path !== "/" && !isAuthoringManaged(page.meta),
       onChange: () => this.refresh(),
     });
   }

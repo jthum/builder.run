@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { session } from "$lib/app/session.svelte.ts";
-	import PageHeader from "@jthum/framework/svelte/studio/page-header";
+	import { PageHeader } from "@jthum/framework/svelte/ui/page-header";
 	import * as Alert from "@jthum/framework/svelte/ui/alert";
 	import { Badge } from "@jthum/framework/svelte/ui/badge";
 	import * as Table from "@jthum/framework/svelte/ui/table";

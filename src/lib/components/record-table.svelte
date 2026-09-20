@@ -20,7 +20,7 @@
 	import ViewExposeBar from "$lib/components/view-expose-bar.svelte";
 	import * as AlertDialog from "@jthum/framework/svelte/ui/alert-dialog";
 	import * as Table from "@jthum/framework/svelte/ui/table";
-	import type { CollectionDraft, FieldDraft, ViewDraft } from "@jthum/framework/svelte/studio/data";
+	import type { CollectionDraft, FieldDraft, ViewDraft } from "@jthum/framework/svelte/authoring/data";
 	import { toast } from "svelte-sonner";
 
 	let {

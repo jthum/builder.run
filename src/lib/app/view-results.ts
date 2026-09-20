@@ -1,4 +1,4 @@
-import type { ViewDraft } from "@jthum/framework/svelte/studio/data";
+import type { ViewDraft } from "@jthum/framework/svelte/authoring/data";
 
 /** Resolve a Studio-readable field path to the key emitted by its canonical View query. */
 export function viewOutputKey(view: ViewDraft, field: string): string {

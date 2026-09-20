@@ -3,7 +3,7 @@
 	import { session } from "$lib/app/session.svelte.ts";
 	import { canonicalStudio } from "$lib/app/canonical-studio.svelte.ts";
 	import NewTypeDialog from "$lib/components/new-type-dialog.svelte";
-	import PageHeader from "@jthum/framework/svelte/studio/page-header";
+	import { PageHeader } from "@jthum/framework/svelte/ui/page-header";
 	import { Badge } from "@jthum/framework/svelte/ui/badge";
 	import { Button } from "@jthum/framework/svelte/ui/button";
 	import * as Card from "@jthum/framework/svelte/ui/card";

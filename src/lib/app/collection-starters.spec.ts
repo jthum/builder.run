@@ -5,8 +5,8 @@ import { MemoryPersistenceAdapter } from "@jthum/framework/persistence";
 import {
   createCollection,
   editorContextFromSpec,
-  isStudioManaged,
-} from "@jthum/framework/svelte/studio/data";
+  isAuthoringManaged,
+} from "@jthum/framework/svelte/authoring/data";
 import { installCollectionStarters } from "./collection-starters.ts";
 
 describe("Builder Collection starters", () => {
@@ -41,7 +41,7 @@ describe("Builder Collection starters", () => {
       }),
     ]);
     expect(
-      [...spec.views, ...spec.forms, ...spec.pages].every((item) => isStudioManaged(item.meta)),
+      [...spec.views, ...spec.forms, ...spec.pages].every((item) => isAuthoringManaged(item.meta)),
     ).toBe(true);
     const studio = editorContextFromSpec(spec, { schemas: { project: collection } });
     expect(studio.views[0]?.implicit).toBe(true);

@@ -1,6 +1,6 @@
 <script lang="ts">
   import { goto } from "$app/navigation";
-  import PageEditor from "@jthum/framework/svelte/studio/page-editor";
+  import PageEditor from "@jthum/framework/svelte/authoring/page-editor";
   import type { PageDefinition, SpecMeta } from "@jthum/framework/spec";
   import Block from "./block.svelte";
   import { blocks, blockCategories, preloadBlock } from "$lib/blocks/registry.ts";

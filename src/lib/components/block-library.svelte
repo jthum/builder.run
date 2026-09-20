@@ -1,6 +1,6 @@
 <script lang="ts">
-	import OptionSelect from "@jthum/framework/svelte/studio/option-select";
-	import PageHeader from "@jthum/framework/svelte/studio/page-header";
+	import { OptionSelect } from "@jthum/framework/svelte/ui/option-select";
+	import { PageHeader } from "@jthum/framework/svelte/ui/page-header";
 	import BlockLibraryItem from "$lib/components/block-library-item.svelte";
 	import { Badge } from "@jthum/framework/svelte/ui/badge";
 	import { Button } from "@jthum/framework/svelte/ui/button";

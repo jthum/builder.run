@@ -3,7 +3,7 @@
 	import { page } from "$app/state";
 	import { addLabel, recordTitle } from "$lib/app/labels.ts";
 	import { canonicalStudio } from "$lib/app/canonical-studio.svelte.ts";
-	import PageHeader from "@jthum/framework/svelte/studio/page-header";
+	import { PageHeader } from "@jthum/framework/svelte/ui/page-header";
 	import RecordForm from "$lib/components/record-form.svelte";
 	import { implicitCreateFormKey } from "$lib/runtime/defaults.ts";
 

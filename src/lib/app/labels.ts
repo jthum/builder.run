@@ -1,6 +1,10 @@
 import { isId, labelFromKey } from "$lib/runtime/ids.ts";
 import type { PageContext, FieldKind, ValueSemantic } from "$lib/blocks/presentation.ts";
-import type { CollectionDraft, FieldDraft, ViewDraft } from "@jthum/framework/svelte/studio/data";
+import type {
+  CollectionDraft,
+  FieldDraft,
+  ViewDraft,
+} from "@jthum/framework/svelte/authoring/data";
 import { FIELD_CAPABILITIES, FIELD_KINDS } from "$lib/blocks/presentation.ts";
 import { scalarString } from "$lib/runtime/values.ts";
 import pluralize from "pluralize";

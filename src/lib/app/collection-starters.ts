@@ -6,7 +6,7 @@ import {
   formDefinitionFromDraft,
   viewDefinitionFromDraft,
   type ViewAuthoringSchemas,
-} from "@jthum/framework/svelte/studio/data";
+} from "@jthum/framework/svelte/authoring/data";
 
 export async function installCollectionStarters(
   client: WorkspaceClient,
@@ -73,7 +73,7 @@ export async function installCollectionStarters(
           id: nanoid(),
           key: pageKey,
           label: collection.label,
-          meta: { studio: { managed: true }, path: `/t/${collection.key}` },
+          meta: { authoring: { managed: true }, path: `/t/${collection.key}` },
           layout: [
             {
               id: nanoid(),

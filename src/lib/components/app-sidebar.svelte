@@ -9,8 +9,8 @@
 	import AppSettingsDialog from "$lib/components/app-settings-dialog.svelte";
 	import AssistantSheet from "$lib/components/assistant-sheet.svelte";
 	import SidebarNavGroup from "$lib/components/sidebar-nav-group.svelte";
-	import NameDialog from "@jthum/framework/svelte/studio/name-dialog";
-	import { isStudioManaged } from "@jthum/framework/svelte/studio/data";
+	import { NameDialog } from "@jthum/framework/svelte/ui/name-dialog";
+	import { isAuthoringManaged } from "@jthum/framework/svelte/authoring/data";
 	import NewAppDialog from "$lib/components/new-app-dialog.svelte";
 	import ProfileDialog from "$lib/components/profile-dialog.svelte";
 	import SpaceSettingsDialog from "$lib/components/space-settings-dialog.svelte";
@@ -39,7 +39,7 @@
 	import UsersIcon from "@lucide/svelte/icons/users";
 	import WorkflowIcon from "@lucide/svelte/icons/workflow";
 	import type { PagePresentation } from "$lib/blocks/presentation.ts";
-	import type { CollectionDraft } from "@jthum/framework/svelte/studio/data";
+	import type { CollectionDraft } from "@jthum/framework/svelte/authoring/data";
 	import { pageIconEntry } from "$lib/runtime/page-icons.ts";
 	import { groupPagesByFolder, pageHref } from "$lib/runtime/blocks.ts";
 	import type { Component, ComponentProps } from "svelte";
@@ -56,7 +56,7 @@
 	const sharedTypes = $derived(types.filter((type) => type.expose));
 	const navPages = $derived(
 		(canonicalStudio.spec?.pages ?? [])
-			.filter((item) => item.key !== "home" && item.meta?.path !== "/" && !isStudioManaged(item.meta))
+			.filter((item) => item.key !== "home" && item.meta?.path !== "/" && !isAuthoringManaged(item.meta))
 			.map(pagePresentation),
 	);
 	const pageGroups = $derived(groupPagesByFolder(navPages));

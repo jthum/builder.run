@@ -1,6 +1,6 @@
 <script lang="ts">
   import { goto } from "$app/navigation";
-  import PageList from "@jthum/framework/svelte/studio/page-list";
+  import PageList from "@jthum/framework/svelte/authoring/page-list";
   import type { PageDefinition } from "@jthum/framework/spec";
 
   let { definitions, upsertPage, deletePage, replacePages }: {

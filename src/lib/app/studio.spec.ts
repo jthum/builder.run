@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vite-plus/test";
 import { emptySpec } from "$lib/framework/bootstrap.ts";
-import { editorContextFromSpec } from "@jthum/framework/svelte/studio/adapters";
+import { editorContextFromSpec } from "@jthum/framework/svelte/authoring/adapters";
 describe("Studio host boundary", () => {
   it("does not expose platform, persistence or session state", () => {
     const context = editorContextFromSpec(emptySpec("test", "Test"));

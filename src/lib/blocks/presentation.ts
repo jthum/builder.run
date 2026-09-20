@@ -4,7 +4,7 @@ import type {
   ViewDraft,
   FormDraft,
   RuleDraft,
-} from "@jthum/framework/svelte/studio/data";
+} from "@jthum/framework/svelte/authoring/data";
 export type {
   CollectionDraft,
   FieldDraft,
@@ -16,8 +16,8 @@ export type {
   FilterClause,
   FilterOp,
   ValueSemantic,
-} from "@jthum/framework/svelte/studio/data";
-export { FIELD_CAPABILITIES, FIELD_KINDS } from "@jthum/framework/svelte/studio/data";
+} from "@jthum/framework/svelte/authoring/data";
+export { FIELD_CAPABILITIES, FIELD_KINDS } from "@jthum/framework/svelte/authoring/data";
 
 export type RowHeight = "s" | "m" | "l" | "xl";
 export type PageNode =

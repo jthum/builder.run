@@ -8,7 +8,7 @@ import {
   supportsFieldFormat,
   supportsFieldPresentation,
   prepareFormField,
-} from "@jthum/framework/svelte/studio/data";
+} from "@jthum/framework/svelte/authoring/data";
 
 describe("Framework field affordances", () => {
   it("owns every public kind, format and presentation exactly once", () => {

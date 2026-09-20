@@ -7,7 +7,7 @@ import { installApprovalExample } from "./approval-example.ts";
 import {
   ruleDraftFromDefinition,
   ruleDefinitionFromDraft,
-} from "@jthum/framework/svelte/studio/adapters";
+} from "@jthum/framework/svelte/authoring/adapters";
 
 describe("Framework approval UI contract", () => {
   it.each([true, false])(

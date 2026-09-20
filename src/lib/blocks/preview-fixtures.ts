@@ -1,7 +1,7 @@
 import type { PageContext } from "$lib/blocks/presentation.ts";
 import { appTemplates } from "$lib/app/templates/index.ts";
 import { pageContext } from "$lib/app/pages.ts";
-import { editorContextFromSpec } from "@jthum/framework/svelte/studio/adapters";
+import { editorContextFromSpec } from "@jthum/framework/svelte/authoring/adapters";
 import type { BlockPreview } from "./types.ts";
 
 const template = appTemplates.find((sample) => sample.key === "project_tracker")!;

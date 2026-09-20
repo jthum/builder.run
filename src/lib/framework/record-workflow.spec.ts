@@ -6,7 +6,7 @@ import {
   ruleDefinitionFromDraft,
   ruleDraftFromDefinition,
   type RuleDraft,
-} from "@jthum/framework/svelte/studio/adapters";
+} from "@jthum/framework/svelte/authoring/adapters";
 import { createNodeGateway } from "$lib/runtime/persistence/sqlite/node-gateway.ts";
 import { createKernelSqlitePersistence } from "./sqlite.ts";
 

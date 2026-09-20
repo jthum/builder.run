@@ -1,9 +1,9 @@
 <script lang="ts">
 	import { goto } from "$app/navigation";
 	import { canonicalStudio } from "$lib/app/canonical-studio.svelte.ts";
-	import OptionSelect from "@jthum/framework/svelte/studio/option-select";
-	import FormPurposePicker from "@jthum/framework/svelte/studio/form-purpose-picker";
-	import PageHeader from "@jthum/framework/svelte/studio/page-header";
+	import { OptionSelect } from "@jthum/framework/svelte/ui/option-select";
+	import FormPurposePicker from "@jthum/framework/svelte/authoring/form-purpose-picker";
+	import { PageHeader } from "@jthum/framework/svelte/ui/page-header";
 	import { Badge } from "@jthum/framework/svelte/ui/badge";
 	import { Button } from "@jthum/framework/svelte/ui/button";
 	import * as Card from "@jthum/framework/svelte/ui/card";
@@ -12,7 +12,7 @@
 	import * as Field from "@jthum/framework/svelte/ui/field";
 	import { Input } from "@jthum/framework/svelte/ui/input";
 	import { slugify } from "$lib/runtime/ids.ts";
-	import type { FormDraft } from "@jthum/framework/svelte/studio/data";
+	import type { FormDraft } from "@jthum/framework/svelte/authoring/data";
 	import FormInputIcon from "@lucide/svelte/icons/form-input";
 	import PlusIcon from "@lucide/svelte/icons/plus";
 	import { toast } from "svelte-sonner";

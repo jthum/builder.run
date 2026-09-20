@@ -5,7 +5,7 @@
 	import { canonicalStudio } from "$lib/app/canonical-studio.svelte.ts";
 	import { runWorkflow } from "$lib/app/workflow-launch.ts";
 	import FormattedValue from "$lib/components/formatted-value.svelte";
-	import PageHeader from "@jthum/framework/svelte/studio/page-header";
+	import { PageHeader } from "@jthum/framework/svelte/ui/page-header";
 	import RecordForm from "$lib/components/record-form.svelte";
 	import RecordTable from "$lib/components/record-table.svelte";
 	import * as AlertDialog from "@jthum/framework/svelte/ui/alert-dialog";
@@ -18,7 +18,7 @@
 		implicitEditFormKey,
 		implicitViewKey,
 	} from "$lib/runtime/defaults.ts";
-	import type { CollectionDraft, FieldDraft, FormDraft, ViewDraft } from "@jthum/framework/svelte/studio/data";
+	import type { CollectionDraft, FieldDraft, FormDraft, ViewDraft } from "@jthum/framework/svelte/authoring/data";
 	import EllipsisIcon from "@lucide/svelte/icons/ellipsis";
 	import PencilIcon from "@lucide/svelte/icons/pencil";
 	import { toast } from "svelte-sonner";

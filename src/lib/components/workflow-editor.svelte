@@ -2,9 +2,9 @@
   import { canonicalStudio } from "$lib/app/canonical-studio.svelte.ts";
   import { session } from "$lib/app/session.svelte.ts";
   import { goto } from "$app/navigation";
-  import RuleEditor from "@jthum/framework/svelte/studio/rule-editor";
-  import { CORE_RULE_EFFECTS, type RuleDraft, type RuleCompatibility } from "@jthum/framework/svelte/studio/data";
-  import { ruleDefinitionFromDraft } from "@jthum/framework/svelte/studio/adapters";
+  import RuleEditor from "@jthum/framework/svelte/authoring/rule-editor";
+  import { CORE_RULE_EFFECTS, type RuleDraft, type RuleCompatibility } from "@jthum/framework/svelte/authoring/data";
+  import { ruleDefinitionFromDraft } from "@jthum/framework/svelte/authoring/adapters";
   import { checkRuleCompatibility, requiresDurableExecution } from "@jthum/framework/kernel";
   let { workflow }: { workflow: RuleDraft } = $props();
   const context = $derived(canonicalStudio.context!);

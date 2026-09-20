@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { renameApp, session } from "$lib/app/session.svelte.ts";
 	import AppNameField from "$lib/components/app-name-field.svelte";
-	import PageHeader from "@jthum/framework/svelte/studio/page-header";
+	import { PageHeader } from "@jthum/framework/svelte/ui/page-header";
 	import { Button } from "@jthum/framework/svelte/ui/button";
 	import * as Card from "@jthum/framework/svelte/ui/card";
 	import { Spinner } from "@jthum/framework/svelte/ui/spinner";

@@ -1,7 +1,7 @@
 import type { PageDefinition, PageLayoutNode as LayoutNode } from "@jthum/framework/spec";
 import type { PagePresentation, PageNode } from "$lib/blocks/presentation.ts";
 import type { PageContext } from "$lib/blocks/presentation.ts";
-import type { EditorContext } from "@jthum/framework/svelte/studio/data";
+import type { EditorContext } from "@jthum/framework/svelte/authoring/data";
 import type { Spec } from "@jthum/framework/spec";
 
 export function pageBlocks(nodes: readonly LayoutNode[]): PageNode[] {

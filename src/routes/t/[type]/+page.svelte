@@ -2,7 +2,7 @@
 	import { page } from "$app/state";
 	import { addLabel, collectionLabel } from "$lib/app/labels.ts";
 	import { canonicalStudio } from "$lib/app/canonical-studio.svelte.ts";
-	import PageHeader from "@jthum/framework/svelte/studio/page-header";
+	import { PageHeader } from "@jthum/framework/svelte/ui/page-header";
 	import RecordTable from "$lib/components/record-table.svelte";
 	import { Button } from "@jthum/framework/svelte/ui/button";
 	import { implicitViewKey } from "$lib/runtime/defaults.ts";

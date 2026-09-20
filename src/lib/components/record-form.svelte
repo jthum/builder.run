@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { addLabel, recordTitle } from "$lib/app/labels.ts";
 	import { canonicalStudio } from "$lib/app/canonical-studio.svelte.ts";
-	import OptionSelect from "@jthum/framework/svelte/studio/option-select";
+	import { OptionSelect } from "@jthum/framework/svelte/ui/option-select";
 	import ReferencePicker from "$lib/components/reference-picker.svelte";
 	import RatingInput from "$lib/components/rating-input.svelte";
 	import * as Alert from "@jthum/framework/svelte/ui/alert";
@@ -12,9 +12,9 @@
 	import { Spinner } from "@jthum/framework/svelte/ui/spinner";
 	import { Switch } from "@jthum/framework/svelte/ui/switch";
 	import { labelFromKey } from "$lib/runtime/ids.ts";
-	import type { CollectionDraft, FieldDraft, FormDraft } from "@jthum/framework/svelte/studio/data";
+	import type { CollectionDraft, FieldDraft, FormDraft } from "@jthum/framework/svelte/authoring/data";
 	import { resolveFieldState } from "$lib/runtime/field-state.ts";
-	import { fieldWidgetFor } from "@jthum/framework/svelte/studio/data";
+	import { fieldWidgetFor } from "@jthum/framework/svelte/authoring/data";
 	import { cn } from "$lib/utils.ts";
 	import CircleCheckIcon from "@lucide/svelte/icons/circle-check";
 
