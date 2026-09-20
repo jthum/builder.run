@@ -99,18 +99,15 @@ await page.waitForFunction(
 await page.reload({ waitUntil: "networkidle0" });
 await page.waitForFunction(
   () =>
-    document.body.innerText.includes("builder.run") ||
-    document.body.innerText.includes("Freelance CRM"),
+    document.body.innerText.includes("Freelance CRM") && document.body.innerText.includes("Acme"),
 );
-await page.goto(`${base}/t/organisation`, { waitUntil: "networkidle0" });
-await page.waitForFunction(() => document.body.innerText.includes("Acme"));
 
 await page.goto(`${base}/diagnostics`, { waitUntil: "networkidle0" });
-await page.waitForFunction(() => document.body.innerText.includes("sqlite"));
+await page.waitForFunction(() => document.body.innerText.toLowerCase().includes("sqlite"));
 
 const diagnostics = await page.evaluate(() => document.body.innerText);
-if (!diagnostics.includes("organisation")) {
-  throw new Error(`Diagnostics did not list organisation table:\n${diagnostics}`);
+if (!diagnostics.includes("catalog.db") || !diagnostics.includes("Freelance CRM\tApp")) {
+  throw new Error(`Diagnostics did not list the catalog and app database:\n${diagnostics}`);
 }
 
 await browser.close();
