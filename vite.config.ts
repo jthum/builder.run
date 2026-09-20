@@ -1,4 +1,5 @@
 import path from "node:path";
+import { realpathSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { defineConfig, lazyPlugins } from "vite-plus";
 import tailwindcss from "@tailwindcss/vite";
@@ -6,6 +7,7 @@ import adapter from "@sveltejs/adapter-static";
 import { sveltekit } from "@sveltejs/kit/vite";
 
 const root = path.dirname(fileURLToPath(import.meta.url));
+const frameworkRoot = realpathSync(path.resolve(root, "node_modules/@jthum/framework"));
 
 export default defineConfig({
   resolve: {
@@ -19,6 +21,12 @@ export default defineConfig({
   assetsInclude: ["**/*.wasm"],
   worker: {
     format: "es",
+  },
+  server: {
+    fs: {
+      // Local development consumes Framework source through the linked package.
+      allow: [root, frameworkRoot],
+    },
   },
   staged: {
     "*.{js,ts,tsx,vue,svelte}": "vp check --fix",
