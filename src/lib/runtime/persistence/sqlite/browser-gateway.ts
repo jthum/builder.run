@@ -1,14 +1,10 @@
-import { wipeLocalData, type PersistenceBackend } from "./browser-storage.ts";
+import { createBrowserSqlitePool, type BrowserSqlitePool } from "@jthum/framework-sqlite-browser";
+import type { SqliteParameters } from "@jthum/framework/sqlite";
+
 import type { SqlConnection, SqlGateway } from "./gateway.ts";
 
-type RpcResult = {
-  id: number;
-  result?: unknown;
-  error?: string;
-};
-
 let connecting: Promise<SqlGateway> | null = null;
-let workerRef: Worker | null = null;
+let poolRef: BrowserSqlitePool | null = null;
 
 export async function connectWorkerGateway(): Promise<SqlGateway> {
   connecting ??= openWorkerGateway();
@@ -16,81 +12,48 @@ export async function connectWorkerGateway(): Promise<SqlGateway> {
 }
 
 async function openWorkerGateway(): Promise<SqlGateway> {
-  const worker = new Worker(new URL("./worker.ts", import.meta.url), { type: "module" });
-  workerRef = worker;
-  const pending = new Map<
-    number,
-    { resolve: (value: unknown) => void; reject: (error: Error) => void }
-  >();
-  let nextId = 1;
-
-  worker.addEventListener("message", (event: MessageEvent<RpcResult>) => {
-    const waiter = pending.get(event.data.id);
-    if (!waiter) return;
-    pending.delete(event.data.id);
-    if (event.data.error) waiter.reject(new Error(event.data.error));
-    else waiter.resolve(event.data.result);
-  });
-  worker.addEventListener("error", (event) => {
-    for (const waiter of pending.values())
-      waiter.reject(event.error ?? new Error("SQLite worker failed"));
-    pending.clear();
-  });
-
-  function rpc(payload: Record<string, unknown>): Promise<unknown> {
-    const id = nextId++;
-    return new Promise((resolve, reject) => {
-      pending.set(id, { resolve, reject });
-      worker.postMessage({ id, ...payload });
-    });
-  }
-
-  const init = (await rpc({ method: "init" })) as { backend: PersistenceBackend };
+  const pool = await createBrowserSqlitePool({ namespace: "builder-run-sqlite" });
+  poolRef = pool;
 
   return {
-    backend: init.backend,
+    backend: pool.backend,
     attachName: (name: string) => name,
     async open(name: string) {
-      await rpc({ method: "open", db: name });
+      const database = await pool.open(name);
       return {
         async exec(sql: string, params: unknown[] = []) {
-          await rpc({ method: "exec", db: name, sql, params });
+          if (params.length) await database.run(sql, params as SqliteParameters);
+          else await database.execute(sql);
         },
         async query(sql: string, params: unknown[] = []) {
-          return (await rpc({ method: "query", db: name, sql, params })) as Array<
-            Record<string, unknown>
+          return database.all(sql, params as SqliteParameters) as Promise<
+            Array<Record<string, unknown>>
           >;
         },
         async close() {
-          await rpc({ method: "close", db: name });
+          await database.close();
         },
       } satisfies SqlConnection;
     },
     async inspect() {
-      return (await rpc({ method: "inspect" })) as Awaited<ReturnType<SqlGateway["inspect"]>>;
+      const { databases, capacity } = await pool.inspect();
+      return { databases, ...(capacity ? { capacity } : {}) };
     },
     async remove(name: string) {
-      await rpc({ method: "remove", db: name });
+      await pool.remove(name);
     },
     async wipe() {
-      try {
-        await rpc({ method: "wipe" });
-      } catch {
-        // Worker may already be gone; still drop files from this thread.
-      }
-      worker.terminate();
-      pending.clear();
+      await pool.wipe();
       connecting = null;
-      workerRef = null;
-      await wipeLocalData();
+      poolRef = null;
     },
   };
 }
 
 if (import.meta.hot) {
   import.meta.hot.dispose(() => {
-    workerRef?.terminate();
-    workerRef = null;
+    void poolRef?.close();
+    poolRef = null;
     connecting = null;
   });
   import.meta.hot.accept(() => {

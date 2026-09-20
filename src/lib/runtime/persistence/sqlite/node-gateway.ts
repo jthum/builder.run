@@ -1,6 +1,5 @@
 import { DatabaseSync } from "node:sqlite";
-import type { PersistenceBackend } from "./browser-storage.ts";
-import type { SqlConnection, SqlGateway } from "./gateway.ts";
+import type { PersistenceBackend, SqlConnection, SqlGateway } from "./gateway.ts";
 import { bindValue } from "./sql.ts";
 
 class NodeConnection implements SqlConnection {

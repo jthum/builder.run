@@ -1,4 +1,4 @@
-import type { PersistenceBackend } from "./browser-storage.ts";
+export type PersistenceBackend = "opfs" | "indexeddb" | "memory";
 
 export interface SqlConnection {
   exec(sql: string, params?: unknown[]): Promise<void>;

@@ -222,6 +222,9 @@ importers:
       '@jthum/framework':
         specifier: link:../framework
         version: link:../framework
+      '@jthum/framework-sqlite-browser':
+        specifier: link:../framework/packages/sqlite/browser
+        version: link:../framework/packages/sqlite/browser
       '@jthum/yair':
         specifier: link:../framework/packages/inference/yair/core
         version: link:../framework/packages/inference/yair/core
@@ -234,9 +237,6 @@ importers:
       pluralize:
         specifier: ^8.0.0
         version: 8.0.0
-      wa-sqlite:
-        specifier: ^1.0.0
-        version: 1.0.0
       yaml:
         specifier: ^2.9.0
         version: 2.9.0
@@ -1766,9 +1766,6 @@ packages:
       jsdom:
         optional: true
 
-  wa-sqlite@1.0.0:
-    resolution: {integrity: sha512-Kyybo5/BaJp76z7gDWGk2J6Hthl4NIPsE+swgraEjy3IY6r5zIR02wAs1OJH4XtJp1y3puj3Onp5eMGS0z7nUA==}
-
   webdriver-bidi-protocol@0.4.2:
     resolution: {integrity: sha512-VSV+fzfChirL3e7jay2yUC7B4HQCGtEWEg/MSSQbK+qWbqeGlRLlXTzPpYr3XGUvbpDHumWZBJxgesg4N7dbtA==}
 
@@ -2952,8 +2949,6 @@ snapshots:
       '@vitest/browser-preview': 4.1.11(@voidzero-dev/vite-plus-core@0.3.0(@types/node@26.4.0)(jiti@2.7.0)(typescript@6.0.3)(yaml@2.9.0))(vitest@4.1.11)
     transitivePeerDependencies:
       - msw
-
-  wa-sqlite@1.0.0: {}
 
   webdriver-bidi-protocol@0.4.2: {}
 
