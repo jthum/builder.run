@@ -1,191 +1,88 @@
 # Core concepts
 
-builder.run is intentionally based on a small set of composable primitives. The aim is to let more complex application behaviour emerge from combinations of those primitives instead of adding a separate subsystem for every use case.
+Builder.run uses a small set of composable definitions. Simple apps can start with a few fields; more complex apps add relationships, screens, and workflows.
 
-## The application spec
+## Spec
 
-The **application spec** is the source of truth for an app.
+The application **Spec** defines Collections, Sources, Views, Forms, Pages, and Rules. It contains structure and behavior, while records and operational state belong to the runtime.
 
-It describes things such as:
+Builder.run exports Framework's canonical Spec as YAML or JSON. Definitions have a stable `id`, editable semantic `key`, and human-readable `label`. References between definitions use stable IDs where required. Optional `meta` holds JSON-compatible host information.
 
-- Types and fields
-- Views
-- Forms
-- Pages and blocks
-- Automations (Workflows)
-- exposure to humans and agents
-
-The runtime reads the spec and materialises a working application from it.
-
-Changing the spec is therefore not code generation. It changes the live application model, and the runtime reconciles the UI, storage, and WebMCP capability surface around it.
+The [Framework Spec model](https://github.com/jthum/framework/blob/main/src/spec/model.ts) is the contract; the visual editors adapt it to friendly working models.
 
 ## Space and App
 
-A **Space** is the root context in which apps and shared data live.
+A **Space** is Builder.run's root Workspace. An **App** is a child Workspace with its own Spec and records.
 
-An **App** is a specialised child space with its own application model and local data. The current UI deliberately presents the simpler concepts of Spaces and Apps, even though the underlying model can be recursive.
-
-A useful example is:
+Framework Workspaces are authority boundaries. Membership, Workspace permissions, and Attachments determine access; parent/root grouping describes topology.
 
 ```text
 Personal Space
-├── Organisations   (shared)
-├── Contacts        (shared)
-└── Conference App
-    ├── Sessions    (app-local)
-    └── Venues      (app-local)
+├── Clients             shared Collection
+├── Project tracker     App
+│   ├── Client Source   attached to shared Clients
+│   └── Projects        local Collection
+└── Billing             App
+    └── Invoices        local Collection
 ```
 
-A type exposed by the parent Space can be reused by child apps. This avoids forcing every app into a data silo.
+A Source declaration is portable. The Attachment that connects it to another Workspace's Collection is instance data.
 
-## Types
+## Data and fields
 
-A **Type** describes a kind of record: Project, Contact, Submission, Session, Expense, and so on.
+A **record type** in Builder.run is a Framework **Collection**. It defines fields, a title field, and an optional lifecycle. The runtime derives storage and basic record screens and forms from it.
 
-Type names describe one record. builder.run infers the collection name used in navigation and lists
-(`Person` → `People`, `Category` → `Categories`), and an optional collection name can override that
-default for domain-specific or translated terminology.
+| Canonical kind | Typical use                         |
+| -------------- | ----------------------------------- |
+| `text`         | Names, notes, email addresses, URLs |
+| `number`       | Amounts, counts, percentages        |
+| `boolean`      | Yes/no values                       |
+| `date`         | Calendar dates                      |
+| `datetime`     | Instants with a timezone            |
+| `choice`       | One or more declared options        |
+| `reference`    | One or more related records         |
+| `json`         | Structured values                   |
 
-A type is more than a database declaration. It gives the runtime enough information to derive useful defaults such as:
-
-- a real SQLite table;
-- create/read/update/delete operations;
-- basic create/edit forms;
-- navigation and record screens;
-- agent-facing operations when the type is exposed.
-
-This is one of builder.run's core principles: **strong primitives should remove repetitive setup**.
-
-### Fields
-
-The current field vocabulary includes:
-
-| Kind      | Typical use                    |
-| --------- | ------------------------------ |
-| Text      | names, titles, notes, URLs     |
-| Number    | amounts, counts, scores        |
-| Date      | deadlines and dates            |
-| Date/time | appointments and timestamps    |
-| Boolean   | yes/no state                   |
-| Choice    | one value from a fixed set     |
-| Reference | a relationship to another type |
-
-Fields can carry optional formats, presentation hints, validation constraints, and conditional visible/enabled/required behavior. These capabilities are shared by the runtime's form and record input paths. See [Fields](fields.md).
+The field editor presents Choices using friendly option controls; its internal working model may call them enum fields. Exported Specs use `choice` and option definitions. See [Fields](fields.md).
 
 ## Views
 
-A **View** is a reusable query/projection over application data.
+A **View** is a saved query over a local Collection or attached Source. It can filter, sort, project selected fields, aggregate, and accept declared parameters. Reference paths allow related data to participate in queries.
 
-Views define what records are interesting to a particular part of the app: active projects, submissions awaiting review, upcoming sessions, high-priority work, and so on.
-
-They can select fields, filter records, order results, and traverse declared relationships where the runtime supports it.
-
-Views are intentionally not limited to "reports". They are a general application primitive and can drive many presentation surfaces.
+Views support record lists and reporting. Pages can use the same View in different blocks.
 
 ## Forms
 
-Types generate sensible create/edit forms by default.
+Create and edit Forms write a local Collection. A Custom Form uses Framework's `standalone` mode and owns its fields.
 
-A **Form** becomes useful when the app needs a deliberate input surface rather than the implicit type form: a different field order, a subset of fields, or behaviour attached to submission.
+All use the same validation and conditional field behavior. Custom Form answers are transient unless a workflow stores them. Successful submissions publish `form.submitted`; workflows can select a particular Form using its stable `formId`.
 
-Forms can also be standalone. A standalone form owns its input definitions, uses the same formats, validation, and conditional behaviour as type fields, and does not imply record storage. Successful submissions emit `form.submitted` with the form key and validated answers. A workflow can listen for one form using trigger configuration:
-
-```yaml
-forms:
-  contact_us:
-    mode: standalone
-    inputs:
-      name:
-        type: text
-        required: true
-      email:
-        type: text
-        format: email
-    submit:
-      success:
-        title: Thanks for getting in touch
-        description: We received your message and will reply shortly.
-
-workflows:
-  capture_contact:
-    input:
-      values:
-        value: object
-    trigger:
-      key: form.submitted
-      config:
-        form: contact_us
-    steps: []
-```
-
-Submission data is transient unless a workflow deliberately stores it. This keeps persistence a runtime or application decision rather than a hidden consequence of rendering a form.
-
-Standalone forms may define an optional success title and description under `submit.success`. This is presentation only; it does not alter delivery or persistence semantics.
+Success text under `submit.success` controls presentation, while the related Rules control business behavior.
 
 ## Pages and blocks
 
-A **Page** is a user-facing application surface composed from blocks.
+A **Page** composes visual **blocks** and layout groups. Blocks can show content or use Views, Forms, and Rules.
 
-Pages are deliberately first-class navigation. They are not merely generated CRUD screens.
-
-The official library is organised into five user-facing groups:
-
-- **Highlights** — heroes, progress, comparisons, record spotlights, and activity feeds;
-- **Content** — headings, section headings, text, and callouts;
-- **Data** — number and metric cards, tables, cards, lists, leaderboards, timelines, boards, and calendars;
-- **Charts** — bar, line, donut, stacked-bar, funnel, scatter, and activity heatmap visualisations;
-- **Actions** — forms, workflow buttons, and compact quick-action groups.
-
-Blocks reuse other primitives instead of inventing their own data model. A table or chart, for example, is backed by a View.
-
-The registry keeps each block's small declarative definition separate from its Svelte component. Definitions are available immediately to editors, validation, and agents; components are loaded only when a page uses them. This lets the official library grow without putting every block implementation—or a heavy dependency used by one block—into the initial page bundle.
-
-Pages can be organised into folders when an app needs navigation hierarchy.
+The official categories are Highlights, Content, Data, Charts, and Actions. Block definitions are available to editors and agents immediately; each implementation and preview loads on demand. The [Library](building.md#extending-the-block-library) shows mock examples.
 
 ## Automations
 
-A **Workflow** is builder.run's behaviour-composition primitive.
+Builder.run presents Framework Rules as workflows in **Automations**.
 
-A callable workflow can become an action a person or agent invokes. A workflow with a trigger behaves like an automation.
+A workflow may run manually or react to an event. Its ordered steps can call Actions, compute values, branch, invoke another Rule, loop, run parallel work, or wait. A workflow can be exposed to the human UI or agents and may return a result.
 
-This means "actions", "abilities", and "automations" can emerge from one primitive rather than requiring independent engines.
+A **lifecycle** belongs to the Collection and determines which state changes are legal. Workflows add behavior around those changes. See [Automations](workflows.md) and [Lifecycles](lifecycles.md).
 
-See [Automations and workflows](workflows.md).
+## Actors and agents
 
-## Actors
+An **Actor** is an identity that can act: a user, Agent, or System. Actors are issued in a Workspace; memberships determine where they can participate.
 
-An **Actor** is an identity that can act.
+Builder.run starts with a local user and uses Framework's authorization model. Local Actor selection is host behavior, not server authentication.
 
-Humans, agents, and system processes can all be actors. Authentication identities are a separate concern: every authenticated user can act as an actor, but an actor does not necessarily need to be a user.
+The built-in Assistant runs inference on behalf of the selected user's execution context. External agents can use WebMCP when the browser supports it. Neither requires a separate application data model.
 
-The current browser runtime starts with one local human administrator. The actor model exists so ownership, permissions, and audit semantics have somewhere coherent to attach as the runtime grows.
+## Definition and instance data
 
-## Exposure
+Exporting an App carries its Spec. Records, Workspace topology, Actors, memberships, Attachments, settings, credentials, and execution history remain instance state. Moving a Spec to another host may require installing compatible blocks and Actions and binding its shared Sources.
 
-Exposure controls which parts of the model are available outside their immediate scope.
-
-Two especially important forms are:
-
-- **Space exposure** — make a parent Space type available to child apps.
-- **Agent exposure** — make an application capability available through WebMCP.
-
-Exposure is explicit. An agent does not automatically receive unrestricted access to everything in the runtime.
-
-## Putting the primitives together
-
-A typical app may be only:
-
-```text
-Types
-  ↓
-Views
-  ↓
-Pages
-
-+ Forms where defaults are not enough
-+ Workflows where explicit behaviour is needed
-```
-
-The result is still captured as one portable spec.
-
-That same spec drives the human UI, the local database materialisation, and the dynamic WebMCP surface.
+See [Data and persistence](data-and-persistence.md).

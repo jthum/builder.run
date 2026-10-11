@@ -1,165 +1,80 @@
 # Architecture
 
-builder.run separates the portable application model from the runtime that executes it.
+Builder.run is an application built on [Framework](https://github.com/jthum/framework). Framework owns portable definitions, runtime semantics, authorization, persistence contracts, and reusable Svelte integration. Builder.run owns the app-building product experience.
 
-## Spec first
-
-The canonical artefact is the application spec.
-
-The browser implementation is one consumer of that spec, not the product definition itself.
+## Runtime composition
 
 ```text
-Application spec
-      │
-      ├──> Browser runtime
-      │       ├── Svelte UI
-      │       ├── SQLite materialisation
-      │       └── WebMCP tool surface
-      │
-      └──> future runtimes / generators
+Builder.run editors, record screens, pages, and agent tools
+                         │
+                  WorkspaceClient
+                         │
+                  Framework Kernel
+                         │
+              persistence and inference contracts
+                 │                   │
+          SQLite adapter       YAIR + provider
+                 │
+           browser worker
 ```
 
-A future hosted or native runtime should be able to consume the same semantic model while choosing different UI and persistence technologies.
+Framework's [Spec model](https://github.com/jthum/framework/blob/main/src/spec/model.ts) and [validator](https://github.com/jthum/framework/blob/main/src/spec/validate.ts) define the canonical format. Its [Kernel](https://github.com/jthum/framework/blob/main/src/kernel/kernel.ts) composes focused services. The [WorkspaceClient](https://github.com/jthum/framework/blob/main/src/client/workspace-client.ts) exposes context-bound operations to UI and host code.
 
-## Portable identity
+The reusable Svelte editors live in Framework's `svelte/authoring` integration; execution history and inspectors live in `svelte/operations`. Builder.run passes actions, theme styles, navigation, and product context into them.
 
-Durable spec definitions use opaque, stable 16-character base-62 IDs. The ID remains fixed when a human-readable key or label changes, which lets a runtime reconcile schema renames without treating the definition as deleted and recreated.
+## Spaces and Apps
 
-IDs are globally unique across the portable definition rather than carrying redundant type prefixes. The containing collection and schema already distinguish a type from a field, view, form, workflow, or page.
+Builder.run maps a Space to a root Workspace and an App to a child Workspace. The host creates the local user, chooses the current Space/App, and binds clients to that Actor's contexts.
 
-This convention applies only to spec nodes. Record, actor, run, database, and other operational identities belong to the runtime and are deliberately not prescribed by the portable spec.
+Shared Collections live in the Space. Apps declare Sources and receive instance Attachments that resolve those Sources. Grouping columns describe Workspace relationships; access is checked at the relevant Workspace.
 
-## Optional metadata
+[bootstrap.ts](../src/lib/framework/bootstrap.ts) contains local bootstrap and selection. Its local Actor discovery must not be reused as server authentication. Framework's [deployment guidance](https://github.com/jthum/framework/blob/main/docs/deployment-modes.md) describes embedded and server hosts; Builder.run currently ships a browser-local deployment.
 
-The app spec and each durable spec definition may carry an optional `meta` JSON object. The core preserves this data without interpreting it. Runtimes may read and write their own optional information there using conventions that suit them:
+## Definition and identity
 
-```yaml
-meta:
-  wordpress:
-    post_type: invoice
-```
+A canonical Spec has versioned arrays of Collections, Sources, Views, Forms, Pages, and Rules. Each definition retains its stable ID when a key or label changes.
 
-Metadata remains JSON-compatible so the complete spec can be exported and round-tripped. Runtime-specific metadata can supplement the portable definition without expanding the core vocabulary.
+Editors project the canonical definition into a working model and save it through Framework's authoring adapters. Export uses the canonical Spec directly. Instance identities and credentials are excluded from that export.
 
-## Runtime layers
+Optional `meta` JSON is preserved. Builder.run uses metadata for presentation and navigation conventions; runtimes may add their own information without changing core semantics.
 
-At a high level:
+## Persistence
 
-```text
-Human UI ─────────────┐
-                     │
-WebMCP tools ─────────┼──> Runtime services ───> persistence contracts
-                     │          ▲                       │
-Spec editor ─────────┘          │                       └──> SQLite adapter
-                                │
-                         Application spec
-```
+[sqlite.ts](../src/lib/framework/sqlite.ts) composes Framework's SQLite adapter with Builder.run's gateway. The central `catalog.db` holds Workspace and Actor state, Specs, and operational metadata. Workspace and scope databases hold routed record storage.
 
-The runtime services are the important shared boundary.
+The browser gateway uses Framework's optional browser SQLite package. A Node gateway supports deterministic tests. Framework's adapter owns physical names, field encoding, schema reconciliation, and SQL query compilation.
 
-A record mutation initiated from a form and the equivalent mutation initiated from WebMCP should pass through the same validation and persistence path.
+Tables and columns derive from stable IDs. Scalar fields use native SQLite values; structured fields use JSON text. Database filtering, sorting, and aggregation are handled through the adapter, including supported reference paths across routed databases. See [Data and persistence](data-and-persistence.md).
 
-The browser runtime currently separates that boundary into three roles:
+## Agent surfaces
 
-- `SpecService` owns authored spec mutations, reference-safe renames, and definition validation. It does not know how a runtime persists or materialises a spec.
-- `RecordService` owns record operations, form submission, view execution, and the workflow cascade caused by data events.
-- `PortableQueryExecutor` turns views into storage-neutral record query plans and completes relation traversal, projection, and aggregation above persistence.
-- `Host` composes those services with a `RuntimePersistence` plug-in. Its commit path stages and validates spec changes, persists the catalog, reconciles record stores, rolls back failures, and only then publishes a new snapshot.
+[webmcp.ts](../src/lib/app/webmcp.ts) projects authoring and application tools from the active context. Record contents do not determine the advertised tool catalog.
 
-The persistence boundary is intentionally split by responsibility:
+The built-in Assistant uses [authoring-tools.ts](../src/lib/inference/authoring-tools.ts) to project those authoring operations into Framework's inference tool boundary. [runtime.ts](../src/lib/inference/runtime.ts) loads YAIR and an OpenAI-compatible provider when inference runs.
 
-- `RecordStore` receives logical record operations against a `TypeDef`, rather than table names or SQL.
-- `SchemaMaterializer` reconciles a set of portable Types with the active persistence technology. SQLite performs DDL; a schemaless runtime can implement different semantics.
-- `CatalogRepository` persists runtime-owned spaces, actors, preferences, and specs.
-- `RuntimePersistence` opens those components and reports the active implementation.
+The Assistant and WebMCP are two host surfaces over the same canonical definitions. Their advertised tool names and input affordances can differ, so consult their respective implementations when extending them.
 
-SQLite remains the reference adapter. Its catalog SQL, lower-level table engine, schema reconciler, worker, and gateway live together under `runtime/persistence/sqlite`. They are implementation details below these contracts rather than dependencies of forms, views, workflows, or `Host`.
+## Code map
 
-Schema commits use four phases: validate every affected store, apply non-destructive additions and renames, save the catalog, and finally prune obsolete physical fields and collections. This keeps destructive cleanup out of the failure-sensitive portion of a multi-store commit. If cleanup itself fails, the accepted spec remains usable and the inaccessible physical leftovers can be pruned on a later reconciliation.
+| Concern                                         | Builder.run entry point                                                 |
+| ----------------------------------------------- | ----------------------------------------------------------------------- |
+| Browser state and runtime composition           | [session.svelte.ts](../src/lib/app/session.svelte.ts)                   |
+| Space/App bootstrap and selection               | [bootstrap.ts](../src/lib/framework/bootstrap.ts)                       |
+| Framework SQLite routing and gateway adaptation | [sqlite.ts](../src/lib/framework/sqlite.ts)                             |
+| Canonical authoring bridge                      | [canonical-studio.svelte.ts](../src/lib/app/canonical-studio.svelte.ts) |
+| Product editor wrappers                         | [components](../src/lib/components)                                     |
+| WebMCP tools                                    | [webmcp.ts](../src/lib/app/webmcp.ts)                                   |
+| Assistant state                                 | [assistant.svelte.ts](../src/lib/app/assistant.svelte.ts)               |
+| Inference composition                           | [inference](../src/lib/inference)                                       |
+| Official blocks and lazy loading                | [registry.ts](../src/lib/blocks/registry.ts)                            |
+| App templates                                   | [templates](../src/lib/app/templates)                                   |
+| Collection starters                             | [collection-starters.ts](../src/lib/app/collection-starters.ts)         |
+| Navigation and editor entries                   | [studio.ts](../src/lib/app/studio.ts)                                   |
 
-The UI and WebMCP use `Host` as the browser-runtime facade, but its methods are not part of the portable application format. A future runtime can provide a different facade while consuming the same canonical spec and preserving the same semantic contracts.
+## Development boundaries
 
-## Browser stack
+Builder.run controls its product shell, templates, and host integration. Reusable Spec, Kernel, adapter, or editor changes belong in Framework when they apply across consumers.
 
-The current implementation uses:
+This repository currently links Framework packages locally for active development. Public Framework references use its GitHub repository; consult the checked-out package version for exact APIs.
 
-- SvelteKit 3 RC
-- Svelte 5
-- TypeScript
-- Vite+
-- Tailwind CSS 4
-- shadcn-svelte / Bits UI
-- `wa-sqlite`
-- a dedicated SQLite Web Worker
-- OPFS / IndexedDB / memory persistence adapters
-- the WebMCP imperative API
-
-No server is required for application data in this runtime.
-
-## Materialisation
-
-The spec does not merely describe a mock UI.
-
-Types become real SQLite tables. Fields become columns. Views become runtime queries. Pages compose blocks. Workflows execute application behaviour.
-
-When the spec evolves, the runtime reconciles its materialised state.
-
-Record identity is allocated by the persistence engine when a record is inserted. The current SQLite engine uses its native integer primary keys and exposes them to the rest of the runtime as opaque strings. Other runtimes may use their own native identity strategy without changing the app spec or record service.
-
-The runtime's `_meta` table is intentionally different: its text primary keys are the stable IDs of portable spec definitions used during schema reconciliation.
-
-## Two WebMCP projections
-
-builder.run exposes two categories of WebMCP tools.
-
-### Builder projection
-
-A stable set of tools operates on the application definition itself.
-
-This lets an agent mould the software.
-
-### Application projection
-
-The current app spec is projected into tools for the domain the user created.
-
-This lets an agent use the software.
-
-The second surface is dynamic. A schema/exposure change may result in a different tool schema or tool set.
-
-## Why this matters
-
-Without the dynamic projection, builder.run would simply be an app builder that happens to expose a static automation API.
-
-With it, WebMCP becomes part of the malleability model:
-
-```text
-agent changes software
-        ↓
-software exposes new capabilities
-        ↓
-agent uses those capabilities
-```
-
-The feedback loop is the architectural centre of the project.
-
-## Current boundaries
-
-This first runtime intentionally keeps several concerns narrow:
-
-- application data is browser-local;
-- there is one local human administrator;
-- the spec export is not a full record-data backup;
-- WebMCP remains an experimental browser capability;
-- hosted multiplayer and cross-device persistence are future runtime concerns.
-
-These are runtime boundaries, not reasons to bake browser-specific assumptions into the portable spec.
-
-Persistence implementations are not expected to pretend that every technology has identical semantics. Realtime subscriptions, offline conflict handling, durable workflow execution, advanced joins, and analytical scans should be added as explicit capabilities when a concrete runtime needs them. The core contracts do not currently promise those behaviours. A reusable persistence contract suite checks the semantics that are promised today: catalog round-tripping, logical record CRUD and queries, schema materialisation, and data-preserving stable-ID renames.
-
-## Evolution policy
-
-Builder.run is still pre-user and its application format is allowed to change cleanly. A schema change updates the model, runtime, editors, agent contracts, templates, tests, and documentation together. Previous shapes are rejected; they are not carried through converters, dual readers, deprecated fields, or hidden compatibility branches.
-
-Add a migration only when real persisted user data creates a deliberate compatibility requirement. Until then, prefer one current representation and a lean implementation over speculative legacy support.
-
-The browser runtime therefore reads platform state only from its current SQLite catalog. It does not probe previous JSON stores or accept compatibility-only startup options.
+The project remains pre-user. Format changes should update the current model, editors, tools, templates, tests, and docs together. There is no requirement to preserve old shapes through compatibility readers.

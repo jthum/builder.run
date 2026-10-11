@@ -1,104 +1,85 @@
 # Fields
 
-Fields are the shared value-definition primitive used by Types and standalone Forms. On a Type they also define stored columns; on a standalone Form they define validated submission inputs without implying storage. A basic field stays deliberately small:
+Fields are shared value definitions for Collections and Custom Forms. A Collection field describes stored record data; a Custom Form field describes validated input.
+
+## Canonical shape
+
+Exported fields are objects in a `fields` array, with stable IDs, keys, labels, and a value kind:
 
 ```yaml
-email:
-  type: text
-  required: true
+id: A000000000000001
+key: email
+label: Work email
+type: text
+required: true
+format: email
+description: We use this for project updates.
+validation:
+  maxLength: 120
+meta:
+  presentation:
+    placeholder: person@example.com
 ```
 
-Optional capabilities are added only when the field needs them:
+The authoritative shapes are in Framework's [Spec model](https://github.com/jthum/framework/blob/main/src/spec/model.ts) and [validation](https://github.com/jthum/framework/blob/main/src/spec/validate.ts).
 
-```yaml
-email:
-  type: text
-  label: Work email
-  format: email
-  placeholder: person@example.com
-  description: We use this for approval updates.
-  validation:
-    max_length: 120
-```
+Canonical kinds are `text`, `number`, `boolean`, `date`, `datetime`, `choice`, `reference`, and `json`.
 
-## Kinds, formats, and presentation
+Choice fields declare options with their own IDs, keys, and labels. Reference fields use a stable `sourceId` pointing to a local Collection or Source declaration. Choices and references can use `multiple: true` for arrays.
 
-`type` defines the stored value. The current kinds are `text`, `number`, `date`, `datetime`, `boolean`, `enum`, and `reference`.
+## Formats and presentation
 
-`format` gives a scalar value additional meaning without changing its storage kind. Text supports `email`, `url`, and `phone`. Numbers support `currency` and `percentage`; currency fields also declare a three-letter `currency` code.
+Formats refine scalar meaning: text supports email, URL, and phone; numbers support currency and percentage. Currency uses a three-letter `currency` code and retains ordinary JavaScript number precision.
 
-`presentation` selects a deliberate control or display treatment. Text can use `textarea`, numbers can use `rating`, and enum values can use semantic `badge` presentation.
+Presentation conventions such as textarea, rating, badges, and placeholders live under `meta.presentation`. They control the input or display treatment without changing the stored kind.
 
-This separation keeps storage stable when an input or display treatment changes.
+The visual field editor uses a working model with friendly names; Framework's [field adapter](https://github.com/jthum/framework/blob/main/src/svelte/authoring/field-adapter.ts) saves it to the canonical shape. Do not copy working-model properties such as `enum`, `min_length`, or top-level `presentation` into an exported Spec.
 
 ## Validation
 
-Validation belongs to the field so every input path applies the same rule, including forms, imports, and agent calls.
+Validation follows the field kind. Text uses `minLength`, `maxLength`, and `pattern`; numbers use `min`, `max`, and optional `integer`; dates and datetimes use valid date bounds.
 
 ```yaml
-amount:
-  type: number
-  validation:
-    min: 0
-    max: 10000
-
-reference_code:
-  type: text
-  validation:
-    min_length: 6
-    max_length: 20
-    pattern: "^[A-Z0-9-]+$"
-    message: Use 6–20 uppercase letters, numbers, or hyphens.
+id: A000000000000002
+key: amount
+label: Amount
+type: number
+format: currency
+currency: USD
+validation:
+  min: 0
+  max: 10000
 ```
+
+The Kernel validates values from supported record and Form input paths. Presentation does not replace validation.
 
 ## Conditional behavior
 
-Fields can react to sibling answers with `visible_when`, `enabled_when`, and `required_when`. Hidden answers are preserved by default. Set `hidden_value: clear` when a hidden answer must be discarded.
+Conditions use stable sibling Field IDs under `behavior`:
 
 ```yaml
-state:
-  type: text
-  visible_when:
-    field: country
-    op: eq
+id: A000000000000003
+key: state
+label: State
+type: text
+behavior:
+  visibleWhen:
+    fieldId: A000000000000004
+    operator: eq
     value: us
-  required_when:
-    field: country
-    op: eq
+  requiredWhen:
+    fieldId: A000000000000004
+    operator: eq
     value: us
-  hidden_value: clear
+  hiddenValue: clear
 ```
 
-Conditions can be grouped with `all`, `any`, and `not` when the simple leaf form is not enough:
+This fragment assumes sibling Field `A000000000000004` represents country. `visibleWhen`, `enabledWhen`, and `requiredWhen` can compose `all`, `any`, and `not` groups. Hidden values are preserved unless `hiddenValue: clear` is set.
 
-```yaml
-visible_when:
-  all:
-    - field: customer_kind
-      op: eq
-      value: business
-    - any:
-        - field: country
-          op: eq
-          value: us
-        - field: annual_spend
-          op: gte
-          value: 10000
-```
+The UI resolves friendly field choices to those stable IDs. Renaming a field key therefore preserves the condition's target.
 
-The visual field editor optimises for the common single-condition case. Grouped conditions remain part of the same canonical model and can be authored in the application spec.
+## Adding capabilities
 
-## Capability catalogue
+Framework owns Field definitions, value validation, and shared authoring/rendering behavior. Builder.run supplies host formatting and input surfaces through those contracts.
 
-Field compatibility is defined once in `field-capabilities.ts`. Each kind declares its default input widget, supported formats, supported presentations, validation rules, and any additional configuration it requires. The Type editor, form renderer, model validation, and agent-facing schemas consume this catalogue rather than maintaining separate lists.
-
-Adding a capability therefore has an explicit path:
-
-1. Add the kind, format, or presentation to the catalogue.
-2. Add its renderer or formatter when it introduces new behavior.
-3. Add its value validation when it introduces new constraints.
-4. Add catalogue and behavior tests.
-
-The runtime rejects incompatible combinations instead of silently dropping them. For example, a date field cannot use currency formatting and a text field cannot use rating presentation.
-
-There is one canonical field shape. Authored field objects use `type`; the `upsert_field` tool uses `kind` because its `type` parameter identifies the containing record type. No legacy aliases or migration fallbacks are accepted. The compact scalar form (`title: text`) is an intentional canonical shorthand for a field with no optional configuration.
+A new kind or capability should update the relevant Framework model, validator, adapter, controls, tests, and any Builder.run integration that consumes it. Consult the current source rather than maintaining a second field schema in these docs.

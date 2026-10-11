@@ -1,113 +1,70 @@
-# builder.run
+# Builder.run
 
-**builder.run is a local-first application runtime that humans and agents can mould together.**
+Builder.run is a local-first app builder for people and agents. Define the information you want to manage, then compose the forms, views, pages, and workflows that make it useful.
 
-The application **spec is the canonical product artefact**. The browser runtime materialises that spec into a working app: real SQLite tables, forms, views, pages, rules, and an agent-facing capability surface.
+The application Spec is the portable definition of an app. Builder.run uses [Framework](https://github.com/jthum/framework) to validate and execute that definition, with SQLite storage in the browser and reusable Svelte editors.
 
-The WebMCP integration has two layers:
+## What you can build
 
-```text
-Agent
-  │
-  ├── builder tools ──> change the application spec
-  │                         │
-  │                         ▼
-  │                    builder.run
-  │                    materialises
-  │                         │
-  │              ┌──────────┴──────────┐
-  │              ▼                     ▼
-  │          Human UI          generated WebMCP tools
-  │                                    │
-  └────────────────────────────────────┘
-                    uses the app
-```
+- **Spaces and Apps** — independent Spaces with Apps and shared data.
+- **Data and fields** — record types, relationships, validation, conditional inputs, and lifecycles.
+- **Views** — saved queries with filtering, sorting, projections, and aggregation.
+- **Forms** — create/edit forms and custom forms that collect information for workflows.
+- **Pages and blocks** — dashboards and screens composed from content, metrics, charts, lists, tables, and actions.
+- **Automations** — manual or event-triggered workflows using Framework Rules.
+- **Portable Specs** — export and edit the application definition as YAML or JSON.
 
-An agent can therefore **build an application and then immediately use the new tools created from the application it just built**.
+Defining a record type gives you storage, record screens, and basic create/edit forms. Add further structure as the app needs it.
 
-## Why WebMCP
+## Build with an agent
 
-Most application integrations expose a fixed API designed separately from the product.
+The built-in **Assistant** can inspect and refine the selected app. Configure an OpenAI-compatible endpoint, model, and API key in profile settings. Inference runs through Framework and the demand-loaded YAIR runtime.
 
-builder.run takes a different approach: WebMCP is a **projection of the live application spec**. When the spec changes, the application changes and its agent-facing tools can change with it.
+Builder.run also exposes tools through **WebMCP** when the browser provides that API. Authoring tools change the app definition; application tools let an external agent use its data and workflows. Both use Framework's validation and persistence operations.
 
-This creates two complementary surfaces:
+The human interface works without an AI provider or WebMCP. See [WebMCP and agents](docs/webmcp.md).
 
-- **Builder tools** let an agent create and mould apps: types, fields, views, pages, widgets, forms, rules, and related primitives.
-- **Application tools** are generated from the resulting app so an agent can work with its records, views, and exposed actions.
+## Local storage
 
-The human interface and agent tools meet at the same runtime boundary, rather than maintaining a second machine-only implementation.
+SQLite runs in a browser worker. The runtime prefers OPFS, falls back to IndexedDB, and can use memory when persistent storage is unavailable. **Inspect** reports the selected backend and databases.
 
-## What the runtime can build
+A central `catalog.db` holds Workspace and Actor state, Specs, and operational metadata. Record storage is routed into separate databases for Spaces, Apps, and scopes as needed. Data remains local to the browser profile; exporting a Spec does not export records or credentials.
 
-The current browser runtime supports:
-
-- **Spaces and Apps** — apps can keep local data while reusing types exposed by their parent Space.
-- **Types and fields** — including text, number, date, boolean, choice, and reference fields.
-- **Views** — reusable filtered and ordered projections over application data.
-- **Forms** — implicit create/edit forms from types plus standalone, validated input surfaces that can drive workflows without creating records.
-- **Pages and widgets** — dashboards and app screens composed from content, number cards, lists, tables, and bar/donut/line charts.
-- **Rules (Flows)** — callable actions and triggered behaviour composed from runtime steps.
-- **Actors** — the runtime models actions against an actor identity; this version starts with one local human administrator.
-- **Portable specs** — export the application definition as YAML or JSON.
-
-Types are intentionally powerful defaults: defining a type already gives the runtime enough information to create storage, CRUD, basic forms, and navigation.
-
-## Local-first by design
-
-Application data is stored in **SQLite inside the browser** using `wa-sqlite` in a worker.
-
-Persistence falls back through:
-
-1. OPFS
-2. IndexedDB
-3. in-memory SQLite
-
-The catalogue tracks Spaces, actors, and the active Space. Application types materialise as real SQLite tables.
-
-The current runtime is intentionally browser-local. A spec can be exported and imported elsewhere, but record data remains in the browser where it was created.
-
-## Try it
-
-For WebMCP-enabled agent interaction, use either:
-
-- ChatGPT's in-app browser, where WebMCP is available for judging; or
-- Google Chrome 149+ with `chrome://flags/#enable-webmcp-testing` enabled.
-
-The app itself does not require WebMCP. In a browser without the API, the human interface still works; agent tools simply are not registered.
-
-See [WebMCP and agents](docs/webmcp.md) for a concise test flow.
+See [Data and persistence](docs/data-and-persistence.md).
 
 ## Run locally
+
+This checkout uses local package links to Framework and its optional packages. Clone [jthum/framework](https://github.com/jthum/framework) alongside this repository as `framework`, matching the links in [package.json](package.json).
 
 ```bash
 vp install
 vp dev
 ```
 
-Useful development commands:
+Quality checks:
 
 ```bash
 vp check
+vp run check
 vp test
 vp build
 ```
 
-The project uses Vite+, pnpm, SvelteKit 3 RC, Svelte 5, Tailwind CSS 4, shadcn-svelte/Bits UI, and `wa-sqlite`.
+`vp check` runs formatting and linting; `vp run check` runs the project's Svelte/TypeScript diagnostics. The stack is SvelteKit, Svelte 5, TypeScript, Vite+, Tailwind CSS, shadcn-svelte/Bits UI, and browser SQLite.
 
 ## Documentation
+
+Start with the [documentation index](docs/README.md), or go directly to:
 
 - [Getting started](docs/getting-started.md)
 - [Core concepts](docs/concepts.md)
 - [Building an app](docs/building.md)
 - [WebMCP and agents](docs/webmcp.md)
-- [Rules and flows](docs/flows.md)
+- [Automations and workflows](docs/workflows.md)
 - [Data and persistence](docs/data-and-persistence.md)
 - [Architecture](docs/architecture.md)
-- [Judge / reviewer test guide](docs/testing.md)
+- [Testing](docs/testing.md)
 
 ## Project status
 
-This repository is the first browser runtime for a broader schema-first application model. It is deliberately experimental: the goal is to test how far a small set of composable primitives can go when the same application can be shaped by a person or an agent.
-
-The WebMCP integration is not an add-on to a finished app. It is part of the runtime model itself: **agents can mould the software, and the software can expose newly created capabilities back to agents.**
+Builder.run is under active development and remains pre-user. Its current deployment is browser-local. Framework supplies reusable Spec, Kernel, persistence, and Svelte integration contracts; Builder.run supplies the app-building experience, templates, block library, navigation, and browser composition.

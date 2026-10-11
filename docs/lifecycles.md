@@ -1,65 +1,66 @@
 # Record lifecycles
 
-A type may attach a lifecycle to one enum field. The enum choices are the complete set of states;
-the lifecycle identifies the initial and terminal states and the named transitions allowed between
-them.
+A record type can attach a lifecycle to one single-choice Field. The choices define all states; the lifecycle selects the initial state, terminal states, and allowed transitions.
+
+Configure it under **Data → Advanced → Lifecycle** when the type needs a controlled journey.
+
+## Canonical definition
+
+This is a Collection fragment from an App Spec:
 
 ```yaml
-types:
-  submission:
-    fields:
-      stage:
-        type: enum
-        required: true
-        values: [draft, submitted, shortlisted, rejected]
-    lifecycle:
-      field: stage
-      initial: draft
-      terminal: [shortlisted, rejected]
-      transitions:
-        - key: submit
-          from: [draft]
-          to: submitted
-        - key: shortlist
-          from: [submitted]
-          to: shortlisted
-        - key: reject
-          from: [submitted]
-          to: rejected
+id: A000000000000030
+key: invoice
+label: Invoice
+fields:
+  - id: A000000000000031
+    key: status
+    label: Status
+    type: choice
+    required: true
+    options:
+      - { id: A000000000000032, key: draft, label: Draft }
+      - { id: A000000000000033, key: sent, label: Sent }
+      - { id: A000000000000034, key: paid, label: Paid }
+      - { id: A000000000000035, key: void, label: Void }
+lifecycle:
+  fieldId: A000000000000031
+  initial: draft
+  terminal: [paid, void]
+  transitions:
+    - id: A000000000000036
+      key: send
+      label: Send
+      from: [draft]
+      to: sent
+    - id: A000000000000037
+      key: mark_paid
+      label: Mark paid
+      from: [sent]
+      to: paid
+    - id: A000000000000038
+      key: void
+      label: Void
+      from: [draft, sent]
+      to: void
 ```
 
-`from` is always an array, even for one source state. This keeps one canonical shape while allowing
-a transition such as `cancel` to be available from several non-terminal states.
+The lifecycle points to the stable Field ID, while state values use choice keys. `from` is an array so a transition can start in more than one state.
 
-## Runtime contract
+## Enforcement
 
-- New records always begin in `initial`; callers do not supply the lifecycle field.
-- State changes must match one configured transition.
-- Terminal states cannot have outgoing transitions.
-- Transition keys and each source/target pair must be unambiguous.
-- Renaming the lifecycle field updates the lifecycle. Removing it is rejected until the lifecycle is
-  removed.
+New records begin in `initial`. Callers can omit the state or supply that initial value; a different starting state is rejected.
 
-Record pages show the transitions available from the current state. WebMCP exposes the same action
-as `transition_<type>`, alongside ordinary CRUD tools. Direct updates to the state field are also
-validated, so no client can bypass the lifecycle merely by avoiding the named action.
+Updates must follow an allowed transition. Terminal states cannot have outgoing transitions, and transitions must be unambiguous. Directly patching the status does not bypass enforcement.
 
-## Automations around transitions
+Stable Field IDs preserve the lifecycle association across key renames. Removing the state Field requires removing or changing the lifecycle too.
 
-A successful named transition emits `<type>.<transition>.transitioned`. For example, an automation
-can use `submission.shortlist.transitioned` and receive the record plus this payload:
+Builder.run's record screen and WebMCP transition tools expose the currently allowed named moves. Framework validates the resulting record update.
 
-```yaml
-transition:
-  key: shortlist
-  field: stage
-  from: submitted
-  to: shortlisted
-```
+## Workflows around state changes
 
-The type lifecycle decides whether the transition is legal. Automations add consequences such as
-notifications, audit entries, assignments, or integrations. Keeping those responsibilities separate
-makes the state model inspectable even when no automation runtime is present.
+A workflow can react to `record.field_changed`, narrowed by the Collection's `sourceId` and lifecycle `fieldId`, when a mutation Action publishes that change. Direct lower-level record updates do not automatically publish workflow events.
 
-Schema migrations remain a separate concern because they change the information model itself rather
-than moving one record through it.
+The lifecycle controls legality; workflows add consequences such as assigning follow-up work or collecting input. Schema reconciliation handles changes to the definition itself.
+
+The reference contracts are Framework's [Spec model](https://github.com/jthum/framework/blob/main/src/spec/model.ts), [validator](https://github.com/jthum/framework/blob/main/src/spec/validate.ts), and [record value validation](https://github.com/jthum/framework/blob/main/src/kernel/record-values.ts).

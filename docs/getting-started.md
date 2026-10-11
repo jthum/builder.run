@@ -1,68 +1,51 @@
 # Getting started
 
-builder.run runs entirely in the browser. The current runtime is local-first: application structure and records are materialised locally, without requiring a backend service.
+Builder.run stores app definitions and records in the browser. You can start building without an account, backend, or AI provider.
 
 ## Run the project
 
-From the repository root:
+This checkout links Framework packages from a sibling `framework` directory. Clone [jthum/framework](https://github.com/jthum/framework) there, then run from the Builder.run repository:
 
 ```bash
 vp install
 vp dev
 ```
 
-Open the URL printed by the development server.
-
-Useful checks before committing or deploying:
-
-```bash
-vp check
-vp test
-vp build
-```
-
-## Browser support
-
-For ordinary human use, builder.run does not require WebMCP.
-
-For agent interaction during the WebMCP Challenge, use either:
-
-- ChatGPT's in-app browser; or
-- Google Chrome 149+ with `chrome://flags/#enable-webmcp-testing` enabled.
-
-When WebMCP is available, the **Inspect** screen shows the agent connection and the tools registered from the live spec.
+Open the URL printed by the development server. See [Testing](testing.md) for development checks.
 
 ## Create an app
 
-You can start from a blank app or from one of the sample apps available in the UI.
+Use the app switcher to open the starter library. Choose a template or start blank; rename the app later in App settings.
 
-The useful sequence is:
-
-1. Define the **Types** the app needs.
+1. Open **Edit App → Data** and define the record types you need.
 2. Add fields and relationships.
-3. Create useful **Views** over those records.
+3. Create **Views** for useful queries.
 4. Compose **Pages** from blocks backed by those views.
-5. Add **Automations** when the app needs explicit behaviour.
-6. Use the app immediately; there is no separate code-generation or rebuild step.
+5. Add **Forms** for specific input experiences.
+6. Add **Automations** for manual actions or reactions to events.
 
-Types provide strong defaults, so a small spec becomes useful quickly. A type can immediately produce storage, CRUD, basic forms, and navigation.
+A record type already provides storage and basic create/edit forms. The app updates as you save its definitions; you do not need a code-generation step.
 
-## Build with an agent
+## Build with the Assistant
 
-If the browser exposes WebMCP, an agent can perform the same process through builder.run's fixed builder tools.
+Open **Assistant** and configure its model through profile settings: an OpenAI-compatible API endpoint, model, and API key.
 
-For example:
+Try:
 
-> Build a judging workspace for a software hackathon. Track submissions and reviews, score each review across several criteria, and create useful dashboard pages and views.
+> Help me build a client project tracker. Track projects and tasks, relate projects to clients, and create a dashboard showing active work and outstanding tasks.
 
-The agent can create the application model first. builder.run then derives a second WebMCP surface from that model, allowing the agent to populate and operate the newly created app.
+The Assistant works on the selected app. Ask for focused changes and review the resulting data model and screens. Provider requests leave the browser and may include context supplied through tools.
 
-See [WebMCP and agents](webmcp.md).
+## Use an external agent
 
-## Export the application
+If your browser and agent client support WebMCP, the agent can discover Builder.run's authoring and application tools. **Inspect** reports WebMCP availability and registered tools.
 
-Open **Export** to download or copy the application spec as YAML or JSON.
+Without WebMCP, the human interface and configured built-in Assistant remain available. See [WebMCP and agents](webmcp.md).
 
-The spec is the portable **definition** of the app. It captures application structure and behaviour, not a complete backup of every record stored in the browser.
+## Export or edit the definition
+
+Open **Edit App → Export** to copy or download the Spec as YAML or JSON. The same screen can validate and apply an edited definition.
+
+Preserve existing definition IDs when changing keys or labels. Shared Source declarations need compatible instance Attachments in the destination; the export does not include shared records, Actors, credentials, or local operational state.
 
 See [Data and persistence](data-and-persistence.md).

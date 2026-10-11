@@ -1,29 +1,45 @@
 # Automations and workflows
 
-The product area is **Automations**. Each portable behavioural definition is a **Workflow**, whether it starts automatically or is invoked manually.
+Builder.run's **Automations** area edits Framework Rules. A workflow can run manually or respond to an event; both use the same canonical definition and runtime.
 
-There is one canonical structured format, documented in the [automation language](automations-spec.md). The browser runtime, visual editor, imported/exported spec, templates, and WebMCP tools all consume that same structure.
+## Manual workflows
 
-## Callable workflows
+A Rule without a trigger runs on demand. It may declare inputs and be exposed to the human UI, agents, or both. For example, “complete project” can accept a Project record and update its status.
 
-A workflow without a trigger is an explicit action such as “mark project complete” or “approve expense”. It can be exposed to the human UI, to agents through WebMCP, or both. Both surfaces invoke the same runtime path.
+Commands need no result definition. If another workflow or agent needs a value, declare `result` and optionally an output contract.
 
-## Triggered workflows
+## Event-triggered workflows
 
-Adding a trigger makes the workflow respond to an application event. For example, an `invoice.status.changed` trigger can gate on the new value being `paid` and set `paid_at` to the run time.
+Record mutation Actions publish `record.created`, `record.updated`, `record.field_changed`, and `record.deleted`. A trigger can narrow its target using stable `sourceId` and `fieldId`.
 
-`form.submitted` responds to validated form input. Its optional `config.form` selects one form, while `vars.values` contains that form's normalized answers. The event does not persist a submission by itself; record creation or external delivery is an explicit workflow step. Forms emit this event but do not embed workflow behavior, keeping business logic in one discoverable system.
+Form submission publishes `form.submitted`. A Rule can select a Form using `formId`. Answers arrive in the trigger payload; Builder.run's Form authoring bridge supplies the friendly submission bindings used by the editor.
+
+A Custom Form validates information without creating a record. Its related workflows decide whether to persist data or take another action. Create/edit Forms perform their declared record mutation and then publish the Form event.
+
+Direct low-level record CRUD is deliberately quiet in Framework. Use mutation Actions or Form submission when event publication is required; callers should not assume every direct record write dispatches workflows.
 
 ## Composition
 
-Workflows are ordered steps. A step may call a registered effect, compute variables, invoke another workflow, gate nested branches, iterate, run parallel branches, delay, or wait. The structure is recursive, so a simple workflow remains a short list while advanced behaviour pays complexity only where it uses it.
+Steps can call Actions, assign variables, branch on conditions, invoke another Rule, loop, run parallel work, delay, or wait. Optional `as` captures a step result for later steps.
 
-Registered effect and condition keys keep the document portable. A browser, Laravel application, or Convex-backed multiplayer host can implement a key with its own authorization and persistence adapter without changing the spec.
+Actions use registered semantic keys. The canonical Spec stores `action.key` and `action.input`; the visual editor adapts friendly effect terminology to that shape. Unknown executable contracts fail runtime compatibility checks.
 
-## Workflows and record state
+See [Canonical automation format](automations-spec.md) for examples and links to the language contract.
 
-Workflows supply behaviour around a record's journey but are not the authority for allowed state transitions. A record lifecycle belongs to its type definition: the state field, initial and terminal states, and named transitions are declarative type metadata. Workflows can respond to those transitions for notifications, assignments, audit work, or integrations.
+## Actor and authority
 
-The lifecycle shape and enforcement rules are documented in [Record lifecycles](lifecycles.md).
+Steps inherit the execution Actor. An optional `runAs` chooses System or a semantic Actor binding resolved by the Workspace instance. The effective Actor must still have current authority for each operation.
 
-Schema evolution is a third concern with its own migration lifecycle. Keeping these contracts separate lets the system describe an information system without turning automation into arbitrary schema mutation.
+Rule ownership does not implicitly grant the owner's permissions to a run.
+
+## Runs and User requests
+
+Builder.run enables Framework's durable Rule execution. A workflow with waits or User requests creates persisted execution state. The **Runs** screen at `/build/automations/runs` uses Framework's launcher, history, and inspector.
+
+A User request collects structured input before continuing. Resuming a paused execution uses its saved definition and state. Framework provides the continuation mechanics; a deployment supplies scheduling, signals, and external event delivery.
+
+## Lifecycles
+
+A Collection lifecycle defines which state changes are legal. A workflow adds consequences around those changes, such as creating follow-up work or collecting approval.
+
+See [Record lifecycles](lifecycles.md). Structural schema changes are handled by Spec validation and persistence reconciliation, separately from moving a record between lifecycle states.

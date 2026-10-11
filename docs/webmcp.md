@@ -1,81 +1,34 @@
 # WebMCP and agents
 
-WebMCP is central to builder.run's architecture, not a wrapper added around a static application.
+Builder.run supports external agents through WebMCP and a built-in Assistant through Framework inference. Both can work with the live application definition.
 
-The runtime exposes **two different tool surfaces**.
+## Browser support
 
-## 1. Builder tools
+WebMCP requires a browser and agent client that expose the API. Open **Inspect** to check availability and registered tools. A browser without WebMCP can still use the human interface and configured Assistant.
 
-Builder tools are stable capabilities provided by builder.run itself.
+Browser setup varies by client and release. Builder.run checks API availability at runtime rather than requiring a particular browser version.
 
-They let an agent inspect and mould the application model, including operations such as:
+## Authoring tools
 
-- inspect the active Space and app;
-- inspect or export the current spec;
-- create an app;
-- add or update Types and fields;
-- add or update Views;
-- compose Pages and blocks;
-- create or change Forms and Workflows.
+The WebMCP authoring surface can inspect or change the selected Space and App:
 
-The exact tool set follows the implementation, but the important distinction is that these tools operate on **the application definition**.
+- `get_space`, `get_spec`, and `export_spec` inspect context and definitions.
+- `create_app`, `switch_app`, `delete_app`, and `create_space` manage selection and topology.
+- `list_templates` and `get_blocks` discover bundled building resources.
+- `upsert_collection`, `upsert_view`, `upsert_form`, `upsert_rule`, and `upsert_page` save canonical definitions.
+- `apply_spec` replaces the complete App Spec.
+- `get_automation_primitives` reports installed Action/Condition keys and runtime capabilities.
 
-## 2. Generated application tools
+Inspect the current Spec before editing. Preserve existing definition IDs and unrelated items. Each WebMCP upsert receives a complete canonical definition with its ID. A Collection can be installed in the Space and attached to the App using `shared: true`.
 
-Once an app exists, builder.run derives a second tool surface from the live spec.
+Tool contracts live in [webmcp.ts](../src/lib/app/webmcp.ts); the canonical format lives in Framework's [Spec model](https://github.com/jthum/framework/blob/main/src/spec/model.ts).
 
-These tools let an agent operate the app itself:
+## Application tools
 
-- read exposed application data;
-- create/update/delete records for exposed Types;
-- apply the named lifecycle transitions currently available to a record;
-- use exposed Views;
-- invoke exposed callable Workflows.
-
-When the application model changes, this capability surface can change with it.
-
-In the default compact mode, changing a Type does not replace the registered CRUD schemas. Instead,
-the agent discovers the current contract when it needs it:
+The compact record surface uses semantic Collection or Source keys:
 
 ```text
-Agent adds `priority` to Project
-          │
-          ▼
-Application spec changes
-          │
-          ├── UI now understands Project.priority
-          └── describe_type({ type: "project" }) now includes priority
-```
-
-The agent can then immediately use the capability it just created.
-
-This recursive loop is the main WebMCP idea behind builder.run:
-
-> **Build the app with an agent. Then let the agent use the app it just built.**
-
-## One runtime boundary
-
-The human UI and WebMCP tools should not implement separate business logic.
-
-Both call into the same application runtime services, so validation, persistence, references, and Workflow execution behave consistently whichever surface initiated the operation.
-
-Page blocks follow the same rule. An agent can call `get_blocks` with a block key and optional View key to discover required inputs and compatible fields. The same block registry drives the human editor, agent discovery, safe defaults, and `upsert_page` validation, so adding a block does not require a separate agent-specific contract.
-
-Structured workflows are discoverable in the same way. `get_automation_primitives` returns the canonical composition shapes, registered condition and effect keys, their parameter contracts, and the active runtime capability profile. Agents should inspect it before `upsert_workflow` rather than guessing a block- or domain-specific workflow shape.
-
-WebMCP is therefore best understood as a **projection of the live spec**, not a second API.
-
-## Scalable application tool projection
-
-Generated per-Type CRUD tools are convenient for small applications: names such as
-`create_invoice` are immediately legible, and their input schemas can describe every field. They do
-not scale as the default, however, because the number and total schema size of registered tools grow
-with the application model.
-
-The default application surface is therefore a compact, stable set of generic operations:
-
-```text
-describe_type
+describe_collection
 list_records
 get_record
 create_record
@@ -84,79 +37,38 @@ delete_record
 transition_record
 ```
 
-`describe_type` supplies field constraints and lifecycle metadata on demand. The mutation tools pass
-their type key and values to the same runtime validation used by the human interface. Agent-exposed
-Workflows remain individually named because they communicate business intent rather than repeating
-mechanical CRUD. If an application eventually exposes many Workflows, action discovery can use the same
-list-and-invoke pattern.
+`describe_collection` returns the current schema. Record input values use field keys. Lifecycle transitions are checked against the Collection's current definition.
 
-An optional **typed tools** runtime setting projects per-Type aliases for small applications or
-smaller models that benefit from explicit names and fully expanded schemas. This is a lightweight
-adapter over the generic operations, not another implementation:
+`query_view` queries a named View with its declared parameters. `submit_form` uses the canonical Form submission path and dispatches related Rules. Enabled manual Rules exposed to agents become `invoke_<rule-key>` tools. A durable invocation returns execution state and a link to the run inspector.
 
-```text
-create_invoice(input)      → create_record({ type: "invoice", values: input })
-transition_invoice(input)  → transition_record({ type: "invoice", ...input })
-```
+Optional **Typed WebMCP tools** in Space settings add per-Collection aliases with expanded schemas, such as `create_project`. The compact operations remain available. The setting changes tool advertisement, not the portable Spec.
 
-Compact and typed modes replace one another rather than registering duplicate ways to perform the
-same operation. In the browser runtime, enable **Typed WebMCP tools** in Space settings; the choice is
-stored for that browser and applies across its apps. This setting belongs to the runtime or WebMCP
-host—not the portable application spec—because it changes how a capability is advertised, not what
-the application means. It should normally remain stable during an agent session to avoid unnecessary
-tool-change churn.
+## Registry lifecycle
 
-## Tool lifecycle
+The tool registry tracks capabilities rather than record contents. Ordinary record changes should not refresh it; Spec or exposure changes can update it. Compact tools discover the current schema when used, while typed aliases also depend on field definitions.
 
-The WebMCP registry should represent the application's **capability surface**, not its record contents.
+The [WebMCP tests](../src/lib/app/webmcp.spec.ts) cover the projection and its interaction with the Kernel.
 
-That gives the runtime an important invariant:
+## Built-in Assistant
 
-```text
-record created/updated/deleted
-    → no tool-registry change
+The Assistant uses Framework's inference gateway and YAIR with an OpenAI-compatible provider. Configure its endpoint, model, and API key in profile settings.
 
-type/field/view/workflow exposure changes
-    → registry may change
-```
+Its authoring projection reuses the WebMCP implementation but adds inference-specific input affordances, including generating missing IDs for new definitions. It targets the selected App; its authoring projection excludes Space/App creation, switching, and deletion.
 
-This avoids noisy `toolchange` events and prevents an in-flight tool invocation from being invalidated just because ordinary application data changed.
+Framework also supplies its own inference tools for record operations and exposed Rules. These are separate tool projections over the same runtime contracts.
 
-## Exposure and control
+See [authoring-tools.ts](../src/lib/inference/authoring-tools.ts), [runtime.ts](../src/lib/inference/runtime.ts), and [assistant.svelte.ts](../src/lib/app/assistant.svelte.ts) for the host wiring.
 
-Agent access is explicit.
+## Try the complete flow
 
-Only capabilities that the spec exposes to agents should become agent-callable. Shared parent-Space data and app-local data remain distinct even when both appear in one app.
+1. Open Builder.run and inspect WebMCP availability.
+2. Ask the external agent to describe the current Space and App without changing it.
+3. Ask it to create a client project tracker or refine an existing App.
+4. Review the saved definitions and screens.
+5. Ask it to add fictional clients, projects, and tasks.
+6. Add a field and confirm `describe_collection` reports it.
+7. Use the new field through the record tools; check typed aliases too if enabled.
 
-The current local runtime has one human administrator, but the underlying actor model leaves room for more precise permissions and ownership later.
+This exercises authoring, schema discovery, and application use together. The built-in Assistant can exercise similar behavior within the selected App.
 
-## Browser requirements
-
-For the WebMCP Challenge, use either:
-
-- ChatGPT's in-app browser; or
-- Google Chrome 149+ with `chrome://flags/#enable-webmcp-testing` enabled.
-
-Without WebMCP, builder.run remains a normal browser application and simply skips tool registration.
-
-Some instrumented browsers may emit a `reportAllChanges`/`startTime` console warning from a `VM…` or
-`<anonymous>` script. This comes from browser-injected performance measurement rather than the
-builder.run bundle and does not affect WebMCP operation. See the
-[judge / reviewer test guide](testing.md#browser-injected-performance-warning) for details.
-
-## Quick test
-
-A useful end-to-end test is:
-
-1. Open builder.run in a WebMCP-capable browser.
-2. Confirm **Inspect** reports that an agent connection is available.
-3. Ask the agent to inspect the current Space/app.
-4. Ask it to create or modify an application through the builder tools.
-5. Inspect the application tools. Compact mode is the default; optionally enable typed tools in Space
-   settings for a small app.
-6. Ask the agent to populate the new application through those tools.
-7. Change the schema again (for example, add a choice field).
-8. Confirm `describe_type` reports the new field and the agent can immediately use it. In typed mode,
-   confirm the corresponding per-Type tool schema changes instead.
-
-That sequence exercises the distinctive part of the project rather than only proving that a static tool can be called.
+See [Testing](testing.md) for deterministic checks and a manual smoke checklist.

@@ -1,114 +1,76 @@
 # Data and persistence
 
-builder.run's current runtime stores application data locally in the browser.
+Builder.run's current deployment stores definitions and records in the browser. Framework's Spec describes the app; SQLite materializes its instance data.
 
-The application spec remains the canonical description of the software, while SQLite is the materialised runtime storage.
+## Browser SQLite
 
-## SQLite in the browser
+Framework's optional browser SQLite package runs `wa-sqlite` in a worker. Storage prefers OPFS, falls back to IndexedDB, and uses memory if persistent storage is unavailable. Memory storage does not survive closing the session.
 
-Application data is stored with **wa-sqlite** running in a Web Worker.
+**Inspect** reports the selected backend and databases. Storage belongs to the browser profile and origin; another profile or device does not automatically share it.
 
-The runtime chooses the best available persistence backend:
+## Catalog and routed databases
 
-1. **OPFS** — preferred when available.
-2. **IndexedDB** — fallback persistent storage.
-3. **Memory** — emergency fallback; data does not survive the browser session.
+Builder.run opens `catalog.db` for Workspace and Actor state, memberships, Attachments, Specs, settings, and workflow execution metadata.
 
-The **Inspect** screen reports the active backend and the databases currently in use.
+Record tables are routed into separate Workspace databases for Spaces and Apps, with scope databases opened as needed. The host chooses filenames in [sqlite.ts](../src/lib/framework/sqlite.ts); Framework owns schema and record semantics.
 
-All SQLite-specific code, including catalog SQL, is contained in the browser runtime's SQLite persistence adapter. Runtime services depend on logical `RecordStore`, `SchemaMaterializer`, and `CatalogRepository` contracts rather than SQL connections.
+Physical table and column names derive from stable definition IDs. Human-readable keys and labels remain in the Spec and APIs. Renaming a field does not require changing its physical column name.
 
-## Catalogue and application databases
+## Field storage
 
-The runtime maintains a small catalogue for information such as:
+Framework's SQLite adapter converts logical values at its persistence boundary:
 
-- Spaces;
-- actors;
-- the active Space.
+| Logical field                         | SQLite representation           |
+| ------------------------------------- | ------------------------------- |
+| Text, single choice, single reference | `TEXT`                          |
+| Number                                | `REAL`                          |
+| Number with `validation.integer`      | `INTEGER`                       |
+| Boolean                               | `INTEGER`, 0 or 1               |
+| Date                                  | `TEXT`, `YYYY-MM-DD`            |
+| Datetime                              | `TEXT`, normalized UTC ISO-8601 |
+| JSON, multiple choices/references     | JSON `TEXT`                     |
+| Null                                  | SQL `NULL`                      |
 
-Each Space/App materialises its own application data in SQLite.
+Currency is a display format on a JavaScript number, not an exact-decimal type. It retains floating-point semantics. The adapter also preserves the distinction between omitted and explicitly null fields.
 
-Types become real tables and readable field keys become real columns. The spec, rather than the physical schema, remains authoritative.
+Mappings live in Framework's [field-storage.ts](https://github.com/jthum/framework/blob/main/src/sqlite/field-storage.ts). Filtering, sorting, and aggregation use SQL; scalar fields do not need JSON extraction. Supported relation queries can cross routed SQLite databases. Indexing remains an adapter decision, with no default index on every scalar field.
 
-The browser Host does not issue SQL or DDL itself. It talks to logical persistence contracts, with SQLite supplied by the current `SqlitePersistence` adapter. This keeps record behaviour and the portable query model independent from the physical database without pretending that unlike databases share every capability.
+## Schema changes
 
-The current split is:
+Saving a Spec validates its structure, references, and compatibility with existing records before applying it.
 
-- record CRUD and direct filtering/sorting/limits through `RecordStore`;
-- portable view execution through `PortableQueryExecutor`;
-- physical type reconciliation through `SchemaMaterializer`;
-- runtime workspace state through `CatalogRepository`.
+Stable Field IDs let the runtime preserve values through key renames. Adding or removing definitions changes the materialized schema; destructive edits can remove records or values. Multi-database lifecycle changes use Framework's recovery mechanism. A pending recovery requires reopening persistence before further storage lifecycle work.
 
-A future operational adapter can implement those contracts natively. An analytical engine such as DuckDB may instead sit alongside the operational store when that better matches its workload; storage interchangeability is not a requirement that every engine serve the same role.
+Use the editors for ordinary changes. Direct Spec edits should preserve IDs for definitions that still represent the same thing.
 
-## Schema reconciliation
+## Shared data
 
-When the application spec changes, builder.run reconciles the materialised SQLite schema.
-
-Reconciliation validates every affected store before changing any of them. Additions and stable-ID renames are applied before the catalog accepts the new spec; destructive pruning happens only after that commit. An interrupted cleanup can therefore leave an unused table or column to prune later, but it cannot make the accepted logical spec unusable.
-
-Typical changes include:
-
-- adding a Type → create a table;
-- adding a field → add a column;
-- renaming a field → reconcile the existing column;
-- removing a field or Type → remove the corresponding materialisation.
-
-The goal is to let the application model evolve without asking the user to perform manual database migrations.
-
-## Shared Space data
-
-Apps do not have to duplicate records that belong at the parent Space level.
-
-A parent Space can expose Types such as Organisation or Contact. Child apps can then reference those records while keeping app-specific Types in their own scope.
-
-Conceptually:
+A Space Collection can be used by several Apps through Source declarations and Attachments.
 
 ```text
 Personal Space
-│
-├── Organisation
-├── Contact
-│
-├── CRM App
-│   └── Opportunity → Organisation
-│
-└── Projects App
-    └── Project → Organisation
+├── Clients
+├── Project tracker → Client Source
+└── Billing         → Client Source
 ```
 
-The reference is part of the application model; the portable spec does not depend on a particular SQLite cross-database mechanism.
+The portable Source declaration names the dependency. The Attachment supplies the instance connection, permissions, and optional restriction. Workspace ancestry alone does not authorize access.
 
 ## Export and import
 
-builder.run can export the application spec as YAML or JSON.
+**Export** copies or downloads the current App Spec as YAML or JSON. Applying an edited Spec uses Framework validation and the same runtime persistence boundary.
 
-The export captures the **definition** of the app: its model, presentation, and behaviour.
+Export includes the App's Collections, Source declarations, Views, Forms, Pages, and Rules. It excludes:
 
-It is not currently a full backup of the records stored in the local SQLite databases.
+- Records and shared Collection data.
+- Concrete Attachments and Workspace topology.
+- Actors and memberships.
+- Settings, credentials, and workflow execution history.
 
-That distinction matters:
+A destination must supply compatible shared Source bindings and host capabilities. A Spec export is an application definition, not a complete database backup.
 
-```text
-Spec
-  → portable application definition
+## External communication
 
-SQLite data
-  → local runtime records
-```
+A backend is not required for local app storage. An AI provider receives inference requests, and agents can read or change data through tools available to them. Browser-local storage does not mean every configured integration is offline.
 
-A future runtime can consume the same spec while choosing a different persistence model.
-
-## Browser-local scope
-
-Because the current runtime is local-first, records belong to the browser context in which they were created.
-
-If an agent builds an app inside one browser profile, another browser profile will not automatically see that local SQLite data.
-
-The portable spec is the current bridge between runtimes. Cross-device/shared persistence is a separate deployment concern rather than something encoded into the application definition.
-
-## Privacy
-
-There is no required application-data backend in this runtime. Records remain in the browser unless the user deliberately moves or exposes them through another mechanism.
-
-As with any browser application, agents that are granted WebMCP access can act on the data and capabilities explicitly exposed to them.
+See [WebMCP and agents](webmcp.md) for the agent surfaces and [Architecture](architecture.md) for the host boundaries.

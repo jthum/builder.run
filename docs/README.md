@@ -1,14 +1,8 @@
-# builder.run documentation
+# Builder.run documentation
 
-builder.run is a local-first application runtime driven by a portable application spec.
+Builder.run turns a portable application Spec into an app people and agents can shape and use.
 
-If you are evaluating the WebMCP Challenge submission, start with:
-
-1. [WebMCP and agents](webmcp.md)
-2. [Judge / reviewer test guide](testing.md)
-3. [Architecture](architecture.md)
-
-If you are using or building an app, start with:
+## Using Builder.run
 
 1. [Getting started](getting-started.md)
 2. [Core concepts](concepts.md)
@@ -16,11 +10,15 @@ If you are using or building an app, start with:
 4. [Fields and input behavior](fields.md)
 5. [Automations and workflows](workflows.md)
 6. [Record lifecycles](lifecycles.md)
-7. [Automation language](automations-spec.md)
+7. [WebMCP and agents](webmcp.md)
 8. [Data and persistence](data-and-persistence.md)
 
-The central idea throughout the project is simple:
+## Developing Builder.run
 
-> **The application spec is the canonical product artefact.**
+- [Architecture and code map](architecture.md)
+- [Canonical automation format](automations-spec.md)
+- [Testing](testing.md)
 
-The browser runtime materialises that spec into both a human-facing application and an agent-facing WebMCP capability surface.
+These docs describe Builder.run's product and its integration with [Framework](https://github.com/jthum/framework). Framework owns the portable Spec and runtime contracts; its [docs](https://github.com/jthum/framework/tree/main/docs) and [source](https://github.com/jthum/framework/tree/main/src) are the reference for those APIs.
+
+The visual editors use friendly working models, but exported YAML and JSON contain the same canonical Framework Spec. Instance data such as records, Actors, memberships, and Attachments is separate from that definition.

@@ -1,152 +1,93 @@
 # Building an app
 
-builder.run is designed so that a useful app can emerge from a small number of decisions.
+Start with the information you need to track, then add the screens and behavior that make it useful.
 
-## 1. Model the things you need to track
+## Model the records
 
-Start with nouns.
+For a client project tracker, start with Client, Project, and Task. These are record types in the Data editor and Collections in the canonical Spec.
 
-For a conference app, for example:
-
-- Person
-- Organisation
-- Session
-- Venue
-
-For a judging workspace:
-
-- Submission
-- Review
-- Track
-
-These become **Types**.
-
-Name a Type in the singular, such as `Person` rather than `People`. builder.run infers its collection
-name, and you can override that name in the Type editor when the terminology requires it.
-
-Then decide what each record needs to know. Those become fields.
-
-Example:
+Name a type in the singular, such as `Project`. Builder.run infers its plural display name; you can override it when your terminology requires it.
 
 ```text
-Submission
+Project
 ├── name
-├── project_url
-├── repository_url
+├── client → Client
 ├── status
-└── track → Track
+├── budget
+└── due_date
 ```
 
-Use **Reference** fields when one record relates to another.
+Use reference fields for relationships rather than repeating a client's details on every project. Give fields validation and conditionals where needed; see [Fields](fields.md).
 
-## 2. Decide what belongs to the Space
+## Choose where data belongs
 
-Not every type has to be app-local.
-
-Data that naturally belongs to the person rather than one app can live in the parent Space and be exposed to apps.
-
-For example:
+Keep app-specific records inside the App. Data reused across Apps can live in the Space and be attached to an App as a Source.
 
 ```text
 Personal Space
-├── People
-├── Organisations
-└── Event Manager
-    ├── Sessions
-    └── Venues
+├── Clients
+├── Project tracker
+│   ├── Projects → Client
+│   └── Tasks → Project
+└── Billing
+    └── Invoices → Client
 ```
 
-This lets multiple apps reuse one canonical set of organisations or contacts.
+An Attachment is the instance connection to shared data. Workspace ancestry alone does not grant access. See [Core concepts](concepts.md).
 
-## 3. Add Views
+## Create useful Views
 
-Create Views for questions the user asks repeatedly:
+A View answers a recurring question:
 
-- Upcoming sessions
-- Reviews still required
-- Active projects
-- High-priority work
-- Top-rated submissions
+- Which projects are active?
+- Which tasks are overdue?
+- What is the total budget by client?
+- Which projects need attention?
 
-Keep the View semantic. It should describe _which data matters_; the Page decides whether that data appears as a table, list, number, or chart.
+Views can filter, sort, select fields, traverse declared references, and aggregate data. Page blocks use the query result; a View may also declare a preferred presentation.
 
-## 4. Compose Pages
+## Compose Pages
 
-Pages are the application's primary user-facing surfaces.
-
-A simple dashboard often needs only:
-
-1. a heading/description;
-2. a few number cards;
-3. one chart;
-4. a table or list for the work that needs attention.
-
-For example:
+Keep the page focused on what someone needs to understand or do.
 
 ```text
-Judging Dashboard
+Project overview
 
-[ Total submissions ] [ Reviewed ] [ Average score ]
+[ Active projects ] [ Open tasks ] [ Total budget ]
 
-[ Bar chart: average score by submission ]
+[ Chart: budget by client ]
 
-[ Table: review queue ]
+[ List: work needing attention ]
 ```
 
-The current chart blocks include **bar**, **donut**, **line**, **stacked bar**, **funnel**, **scatter**, and **activity heatmap**. Use them where the underlying data naturally supports the visualisation rather than adding charts only for decoration.
+The official library includes Highlights, Content, Data, Charts, and Actions. Browse previews at `/library/blocks`.
 
-### Growing the official block library
+Pages can be grouped in navigation. Page URLs use `/p/<page-key>`; navigation hierarchy does not imply nested page routes.
 
-Every official block lives in its own folder under `src/lib/blocks`. A block has three independently useful parts:
+## Add Forms and Automations
 
-- `definition.ts` describes its stable key, category, configuration inputs, and editor copy;
-- `block.svelte` renders it;
-- `preview.ts` provides deterministic example configuration and optional mock context for the Library.
+Record types provide basic create/edit forms. Add a Form when you want a particular field order, subset, or input experience.
 
-Folders may be nested to keep a large library navigable. The registry discovers all three files recursively, so a new block does not require another central switch statement. Keep the definition lightweight: it is loaded for discovery and validation. Block components and previews are independent lazy imports. A component may import specialised libraries; those dependencies are fetched only when that block is displayed, while dependencies shared by several loaded blocks are deduplicated by the module graph.
+A **Custom Form** owns its fields and collects information without automatically creating a record. Related workflows listen for `form.submitted` and decide what happens next.
 
-Use `/library/blocks` to browse the complete installed block library with deterministic preview data. The official catalog is bundled, but each preview and component is loaded only when its category is opened. Registry sources share a small normalized contract so trusted catalogs can be added later without coupling the page builder to their storage or packaging; arbitrary remote code is not loaded.
+Automations can be manual actions or event-triggered workflows. For example, a workflow can update a project's status, create follow-up records, or request a user's response. Configure a lifecycle when the type needs a restricted set of state transitions.
 
-Pages may also be organised into folders when the app needs explicit navigation hierarchy.
+See [Automations and workflows](workflows.md) and [Record lifecycles](lifecycles.md).
 
-## 5. Add Forms only where defaults are insufficient
+## Check and export
 
-Every Type already has useful create/edit behaviour.
+Use the app through its human interface. If you use an agent, check that it can inspect the model and use the resulting tools. Preserve stable IDs when refining existing definitions.
 
-Add or customise Forms when the default generated form is not the right product experience.
+Export the Spec once the model is useful. It captures the definition; records and shared-data connections are separate instance concerns.
 
-## 6. Add Automations when the app needs behaviour
+## Extending the block library
 
-Use workflows for meaningful actions and automations.
+Each official block lives under `src/lib/blocks`, with:
 
-Examples:
+- `definition.ts` — stable key, category, configuration inputs, and editor copy.
+- `block.svelte` — its Svelte implementation.
+- `preview.ts` — deterministic example configuration and mock context.
 
-- Mark a project complete.
-- Approve an expense.
-- Move an item into a new state.
-- Stamp a timestamp when a status changes.
+The [registry](../src/lib/blocks/registry.ts) discovers nested folders recursively. Definitions load for discovery; components and previews load on demand. A block can import specialized dependencies, with shared dependencies deduplicated by the module graph.
 
-Avoid turning ordinary CRUD into bespoke workflows. Types already provide that capability.
-
-See [Automations and workflows](workflows.md).
-
-## 7. Test both human and agent surfaces
-
-Use the app yourself first.
-
-If WebMCP is available, then test the same app through an agent:
-
-- Can it inspect the Space and app?
-- Can it create or update the application model through builder tools?
-- Do the generated application tools reflect the resulting spec?
-- Can it use those tools to create and work with real records?
-
-A useful invariant is:
-
-> **Record changes should not change the WebMCP registry. Capability/spec changes may change it.**
-
-## 8. Export the spec
-
-When the app model is useful, export it as YAML or JSON.
-
-The export is intentionally the application **definition**, not a database dump. The spec should remain understandable and portable independently of this browser runtime.
+Builder.run owns the official block catalog and templates. Framework provides the shared catalog and block contracts. Installed catalogs are declared by the host; entering an arbitrary remote URL does not install executable code.
