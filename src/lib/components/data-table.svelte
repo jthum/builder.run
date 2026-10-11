@@ -400,20 +400,19 @@
 		</div>
 	{/if}
 
-	<div class="flex flex-col gap-[2px] overflow-hidden [--chrome:4px] [--frame-radius:var(--radius-2xl)]">
+	<div class="min-w-0">
 		{#if rows === null}
-			<div
-				class="flex flex-col gap-2 rounded-[calc(var(--frame-radius)-var(--chrome))] bg-card p-4 shadow-xs"
-			>
+			<div class="rounded-2xl border border-border/80 bg-surface-chrome p-1">
+			<div class="flex flex-col gap-2 rounded-[calc(var(--radius-2xl)-4px)] border border-border bg-card p-4">
 				<Skeleton class="h-10 w-full" />
 				<Skeleton class="h-10 w-full" />
 				<Skeleton class="h-10 w-full" />
 			</div>
+			</div>
 		{:else if sorted.length === 0}
+			<div class="rounded-2xl border border-border/80 bg-surface-chrome p-1">
 			<Empty.Root
-				class="rounded-[calc(var(--frame-radius)-var(--chrome))] border-0 bg-card shadow-xs {compact
-					? 'py-8'
-					: 'py-12'}"
+				class={cn("rounded-[calc(var(--radius-2xl)-4px)] border-solid bg-card", compact ? "py-8" : "py-12")}
 			>
 				<Empty.Header>
 					<Empty.Media variant="icon">
@@ -430,11 +429,10 @@
 					</Empty.Content>
 				{/if}
 			</Empty.Root>
+			</div>
 		{:else}
-			<Table.Root
-				class="overflow-hidden rounded-2xl bg-surface-chrome p-[4px] [border-collapse:separate] [border-spacing:0]"
-			>
-				<Table.Header class="bg-transparent">
+			<Table.Root>
+				<Table.Header>
 					<Table.Row>
 						{#if !compact}
 							<Table.Head class="w-10">
@@ -447,20 +445,16 @@
 							</Table.Head>
 						{/if}
 						{#each visible as column (column.id)}
-							<Table.Head class={column.numeric ? "text-end" : undefined}>
+							<Table.Head class={column.numeric ? "text-end" : undefined} aria-sort={!compact && sortKey === column.id ? (sortDir === "asc" ? "ascending" : "descending") : undefined}>
 								{#if !compact && column.sortable !== false}
 									<button
 										type="button"
-										class="inline-flex items-center gap-1 hover:text-foreground {column.numeric ? 'ms-auto' : ''}"
+										class={cn("inline-flex items-center gap-2 hover:text-foreground", column.numeric && "ms-auto")}
 										onclick={() => toggleSort(column.id)}
 									>
 										{column.label}
 										<ChevronDownIcon
-											class="size-3.5 {sortKey === column.id
-												? 'text-foreground'
-												: 'text-muted-foreground/50'} {sortKey === column.id && sortDir === 'asc'
-												? 'rotate-180'
-												: ''}"
+											class={cn("size-3.5", sortKey === column.id ? "text-primary" : "text-muted-foreground/50", sortKey === column.id && sortDir === "asc" && "rotate-180")}
 										/>
 									</button>
 								{:else}
@@ -473,9 +467,7 @@
 						{/if}
 					</Table.Row>
 				</Table.Header>
-				<Table.Body
-					class="bg-transparent drop-shadow-xs [&_td]:bg-card [&_tr:not(:last-child)>td]:border-b [&_tr:not(:last-child)>td]:border-border/60 [&_tr:hover>td]:bg-muted/40 [&_tr[data-state=selected]>td]:bg-muted/50 [&_tr[data-state=selected]:hover>td]:bg-muted/60 [&_tr:first-child>td:first-child]:rounded-tl-[calc(var(--frame-radius)-var(--chrome))] [&_tr:first-child>td:last-child]:rounded-tr-[calc(var(--frame-radius)-var(--chrome))] [&_tr:last-child>td:first-child]:rounded-bl-[calc(var(--frame-radius)-var(--chrome))] [&_tr:last-child>td:last-child]:rounded-br-[calc(var(--frame-radius)-var(--chrome))]"
-				>
+				<Table.Body>
 					{#each pageRows as row, index (rowId(row) || index)}
 						{@const id = rowId(row)}
 						<Table.Row
@@ -530,7 +522,7 @@
 					{/each}
 				</Table.Body>
 				{#if footer && !compact}
-					<Table.Footer class="bg-transparent">
+					<Table.Footer>
 						{@render footer({ rows: sorted, columns: visible })}
 					</Table.Footer>
 				{/if}

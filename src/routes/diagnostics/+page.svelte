@@ -103,10 +103,8 @@
 		</Card.Header>
 		<Card.Content>
 			{#if databases.length}
-				<Table.Root
-					class="overflow-hidden rounded-2xl bg-surface-chrome p-[4px] [border-collapse:separate] [border-spacing:0]"
-				>
-					<Table.Header class="bg-transparent">
+				<Table.Root>
+					<Table.Header>
 						<Table.Row>
 							<Table.Head>Owner</Table.Head>
 							<Table.Head>Role</Table.Head>
@@ -115,9 +113,7 @@
 							<Table.Head class="text-end">State</Table.Head>
 						</Table.Row>
 					</Table.Header>
-					<Table.Body
-						class="bg-transparent drop-shadow-xs [&_td]:bg-card [&_tr:not(:last-child)>td]:border-b [&_tr:not(:last-child)>td]:border-border/60 [&_tr:first-child>td:first-child]:rounded-tl-[calc(var(--radius-2xl)-4px)] [&_tr:first-child>td:last-child]:rounded-tr-[calc(var(--radius-2xl)-4px)] [&_tr:last-child>td:first-child]:rounded-bl-[calc(var(--radius-2xl)-4px)] [&_tr:last-child>td:last-child]:rounded-br-[calc(var(--radius-2xl)-4px)]"
-					>
+					<Table.Body>
 						{#each databases as database (database.name)}
 							<Table.Row>
 								<Table.Cell class="font-medium">{database.label}</Table.Cell>
