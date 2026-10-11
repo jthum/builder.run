@@ -63,6 +63,17 @@ describe("page folders", () => {
 });
 
 describe("page blocks", () => {
+  it("preserves opaque canonical IDs without imposing a length or alphabet", () => {
+    const block: PageNode = {
+      id: "long_framework-id_with-underscores",
+      kind: "block",
+      block: "text",
+      config: { text: "Note" },
+    };
+    const group: PageNode = { id: "root-layout", kind: "group", blocks: [block] };
+    expect(normalizeBlock(group)).toMatchObject({ id: group.id, blocks: [{ id: block.id }] });
+    expect(normalizeBlock(block)).toEqual(block);
+  });
   it("assigns stable layout identity and preserves it through reordering", () => {
     expect.hasAssertions();
     const first = normalizePage({

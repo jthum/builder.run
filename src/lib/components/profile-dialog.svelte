@@ -8,6 +8,7 @@
 		saveAssistantSettings,
 	} from "$lib/inference/settings.ts";
 	import SettingsDialogShell from "$lib/components/settings-dialog-shell.svelte";
+	import AssistantSettingsFields from "$lib/components/assistant-settings-fields.svelte";
 	import * as Avatar from "@jthum/framework/svelte/ui/avatar";
 	import { Button } from "@jthum/framework/svelte/ui/button";
 	import * as Field from "@jthum/framework/svelte/ui/field";
@@ -70,6 +71,8 @@
 			assistantModel = settings.model;
 			assistantApiKey = settings.apiKey;
 			assistantLoaded = true;
+		}).catch((error) => {
+			toast.error(error instanceof Error ? error.message : "Could not load assistant settings.");
 		});
 	});
 
@@ -100,6 +103,8 @@
 			committed = true;
 			toast.success("Profile saved");
 			open = false;
+		} catch (error) {
+			toast.error(error instanceof Error ? error.message : "Could not save profile settings.");
 		} finally {
 			pending = false;
 		}
@@ -156,35 +161,7 @@
 									Connect an OpenAI-compatible model for the app-building assistant.
 								</Field.Description>
 							</div>
-							<Field.Group>
-								<Field.Field>
-									<Field.Label for="assistant-base-url">API endpoint</Field.Label>
-									<Input
-										id="assistant-base-url"
-										bind:value={assistantBaseUrl}
-										type="url"
-										placeholder="https://api.openai.com/v1"
-									/>
-									<Field.Description>The base URL containing the Chat Completions endpoint.</Field.Description>
-								</Field.Field>
-								<Field.Field>
-									<Field.Label for="assistant-model">Model</Field.Label>
-									<Input id="assistant-model" bind:value={assistantModel} placeholder="Model identifier" />
-								</Field.Field>
-								<Field.Field>
-									<Field.Label for="assistant-api-key">API key</Field.Label>
-									<Input
-										id="assistant-api-key"
-										bind:value={assistantApiKey}
-										type="password"
-										placeholder="API key"
-										autocomplete="off"
-									/>
-									<Field.Description>
-										Stored only in this browser. It is not part of an exported app or Framework Spec.
-									</Field.Description>
-								</Field.Field>
-							</Field.Group>
+							<AssistantSettingsFields bind:baseUrl={assistantBaseUrl} bind:model={assistantModel} bind:apiKey={assistantApiKey} disabled={!assistantLoaded || pending} />
 						</Field.Set>
 					</Tabs.Content>
 

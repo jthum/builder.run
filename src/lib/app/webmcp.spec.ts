@@ -101,6 +101,21 @@ async function fixture() {
 }
 
 describe("canonical WebMCP", () => {
+  it("advertises the enabled durable runtime rather than short-runner limitations", async () => {
+    const { close, context } = await fixture();
+    try {
+      const tool = buildTools(context).find((item) => item.name === "get_automation_primitives")!;
+      const result = await tool.execute({});
+      expect(result).toMatchObject({
+        profile: {
+          capabilities: { durable_waits: "supported", actor_requests: "supported" },
+          events: expect.arrayContaining(["form.submitted", "record.created"]),
+        },
+      });
+    } finally {
+      await close();
+    }
+  });
   it("keeps a lifecycle change bound to its original App while awaiting its schema", async () => {
     const value = await fixture();
     const original = value.context.runtime().appClient;

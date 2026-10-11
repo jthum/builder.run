@@ -6,7 +6,7 @@ import {
 } from "@jthum/framework/kernel";
 import { createEmptySpec, type Spec } from "@jthum/framework/spec";
 import { createWorkspaceClient, type WorkspaceClient } from "@jthum/framework/client";
-import { nanoid } from "nanoid";
+import { createSpecId } from "$lib/runtime/ids.ts";
 
 export interface RuntimeSeed {
   readonly spaceName: string;
@@ -49,7 +49,7 @@ export type OpenedRuntime = AppRuntime & {
 };
 
 export function emptySpec(key: string, label: string): Spec {
-  return createEmptySpec({ id: nanoid(), key, label });
+  return createEmptySpec({ id: createSpecId(), key, label });
 }
 
 /** Local host bootstrap; server hosts choose Actor identity from authenticated credentials. */

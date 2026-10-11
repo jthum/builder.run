@@ -1,4 +1,3 @@
-import { nanoid } from "nanoid";
 import { assertValidSpec, type CollectionDefinition, type Spec } from "@jthum/framework/spec";
 import {
   createApp,
@@ -6,7 +5,7 @@ import {
   type AppContext,
   type AppRuntime,
 } from "$lib/framework/bootstrap.ts";
-import { slugify } from "$lib/runtime/ids.ts";
+import { createSpecId, slugify } from "$lib/runtime/ids.ts";
 import { appTemplates } from "./templates/index.ts";
 import { seedTemplateRecords } from "./template-records.ts";
 
@@ -42,7 +41,7 @@ export function instantiateDefinitions<T>(value: T, identities = new Map<string,
       )
         continue;
       if (key === "id" && typeof child === "string" && !identities.has(child))
-        identities.set(child, nanoid());
+        identities.set(child, createSpecId());
       else collect(child);
     }
   };

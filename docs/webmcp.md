@@ -51,13 +51,23 @@ The [WebMCP tests](../src/lib/app/webmcp.spec.ts) cover the projection and its i
 
 ## Built-in Assistant
 
-The Assistant uses Framework's inference gateway and YAIR with an OpenAI-compatible provider. Configure its endpoint, model, and API key in profile settings.
+The Assistant uses Framework's inference gateway and YAIR with an OpenAI-compatible provider. Configure its endpoint, model, and optional API key from **Assistant → Model settings** or **Profile settings → Assistant**. The endpoint must support browser requests (CORS). The personal key is stored unencrypted in this browser, not in exported Specs.
 
-Its authoring projection reuses the WebMCP implementation but adds inference-specific input affordances, including generating missing IDs for new definitions. It targets the selected App; its authoring projection excludes Space/App creation, switching, and deletion.
+The personal Assistant runs as the current User with an ad hoc model selection. Its browser-local profile configuration is host-owned; it does not pretend to be a Workspace credential reference.
+
+Configured Agent Actors use Framework's persisted `ModelConfig` and `modelConfigId` APIs. The browser runtime installs the provider key `openai-compatible`. A Workspace can set the non-secret `inference.openai.base_url` setting for a compatible endpoint; otherwise it uses OpenAI's default endpoint. A ModelConfig's `credentialRef` selects an encrypted secret setting in its owning Workspace. Agent execution keeps the issuing Workspace's configuration when acting elsewhere, and never falls back to the personal Assistant key.
+
+Its projection reuses the complete WebMCP catalog, including app creation, selection and deletion, canonical authoring, records, Views, Form submission and exposed manual Rules. It uses the configured compact/typed tool mode and preserves model-facing WebMCP names. Additional inference input affordances generate missing IDs for new definitions.
+
+Personal conversations run in the current Space's User context, so deleting or switching Apps does not invalidate the inference run. Tool calls target the selected App through its Workspace client. The host gateway offers only this MCP projection, with `get_space` and `get_spec` available initially and other tools discoverable through `search_tools`; it does not offer duplicate, root-scoped Kernel actions. A different Actor or a different Space cannot borrow the interface User's clients. Configured Agents retain Framework's own context-authorized tools.
+
+The conversation displays streamed responses, provider-supplied reasoning and tool activity, with Stop and New conversation controls. Tool-driven App switches preserve history; manual switches clear it. Creating a Space changes User identity and stops the current turn. Cancelling does not undo completed tool calls. When a turn fails after mutations, the next turn receives a textual activity handoff; full provider replay history is preserved on successful turns.
+
+The projection includes Rule results, output assertions, model-facing tool metadata, and User-request fields. Its property lists are checked against Framework's definition types so new canonical properties cannot silently disappear from these tool schemas.
 
 Framework also supplies its own inference tools for record operations and exposed Rules. These are separate tool projections over the same runtime contracts.
 
-See [authoring-tools.ts](../src/lib/inference/authoring-tools.ts), [runtime.ts](../src/lib/inference/runtime.ts), and [assistant.svelte.ts](../src/lib/app/assistant.svelte.ts) for the host wiring.
+See [assistant-tools.ts](../src/lib/inference/assistant-tools.ts), [assistant-gateway.ts](../src/lib/inference/assistant-gateway.ts), [runtime.ts](../src/lib/inference/runtime.ts), and [assistant.svelte.ts](../src/lib/app/assistant.svelte.ts) for the host wiring.
 
 ## Try the complete flow
 

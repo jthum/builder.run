@@ -28,13 +28,17 @@ A record type already provides storage and basic create/edit forms. The app upda
 
 ## Build with the Assistant
 
-Open **Assistant** and configure its model through profile settings: an OpenAI-compatible API endpoint, model, and API key.
+Open **Assistant** in the sidebar, then use **Model settings** to configure an OpenAI-compatible API endpoint, model, and API key. The key is optional for local providers that do not require authentication. The same connection is available in **Profile settings → Assistant**.
 
 Try:
 
 > Help me build a client project tracker. Track projects and tasks, relate projects to clients, and create a dashboard showing active work and outstanding tasks.
 
-The Assistant works on the selected app. Ask for focused changes and review the resulting data model and screens. Provider requests leave the browser and may include context supplied through tools.
+The Assistant can build Apps and use their data, Views, Forms and exposed Automations. Its available-tools list matches WebMCP, without requiring a WebMCP-enabled browser. Tools are discovered as needed and run under your User's permissions; tool activity and errors are shown in the conversation.
+
+App creation and switching move the conversation to the selected App. Switching manually clears the conversation; creating an independent Space changes User identity and stops the current turn. Use **New conversation** to clear history or **Stop** to cancel inference. Cancellation does not undo changes already made.
+
+Review changes in the regular editors. Provider requests leave the browser and can include Specs, records and conversation history. Connection settings are browser-local; the personal API key is not encrypted or included in exported Specs. Providers must allow browser requests (CORS).
 
 ## Use an external agent
 

@@ -11,6 +11,8 @@ const frameworkRoot = realpathSync(path.resolve(root, "node_modules/@jthum/frame
 
 export default defineConfig({
   resolve: {
+    // Linked Framework UI shares the host's runtime and icon package, not its dev install.
+    dedupe: ["svelte", "@lucide/svelte"],
     alias: {
       $lib: path.resolve(root, "src/lib"),
     },

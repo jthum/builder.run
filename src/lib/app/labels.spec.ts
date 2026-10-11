@@ -25,6 +25,10 @@ describe("status tones", () => {
 });
 
 describe("cell formatting", () => {
+  it("does not treat arbitrary text prefixes as Actor or execution identities", () => {
+    expect(formatCell("description", "act_now")).toBe("Act Now");
+    expect(formatCell("description", "run_book")).toBe("Run Book");
+  });
   it("can limit aggregate presentation to two decimal places", () => {
     expect(formatCell("overall_score", 4.6666, { maximumFractionDigits: 2 })).toBe("4.67");
     expect(formatCell("overall_score", 4.5, { maximumFractionDigits: 2 })).toBe("4.5");

@@ -20,5 +20,11 @@ describe("browser assistant settings", () => {
         apiKey: "key",
       }),
     ).toBe(true);
+    expect(
+      assistantConfigured({ baseUrl: "http://localhost:8000/v1", model: "local", apiKey: "" }),
+    ).toBe(true);
+    expect(
+      assistantConfigured({ baseUrl: "https://example.test/v1", model: " ", apiKey: "key" }),
+    ).toBe(false);
   });
 });

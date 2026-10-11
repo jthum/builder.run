@@ -128,10 +128,11 @@ export function buildTools(
     ),
     tool(
       "get_automation_primitives",
-      "Inspect runtime Action capabilities and contracts.",
+      "Inspect installed Action/Condition keys and workflow runtime capabilities.",
       object(),
       () => {
-        const profile = runtime().kernel.getRuleRuntimeProfile(
+        const kernel = runtime().kernel;
+        const short = kernel.getRuleRuntimeProfile(
           new Set([
             "record.created",
             "record.updated",
@@ -140,6 +141,9 @@ export function buildTools(
             "form.submitted",
           ]),
         );
+        const profile = kernel.environment.durableRuleExecution
+          ? { ...kernel.getDurableRuleRuntimeProfile(), events: short.events }
+          : short;
         return {
           actions: [...profile.actions],
           conditions: [...profile.conditions],

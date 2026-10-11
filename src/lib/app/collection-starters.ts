@@ -1,4 +1,4 @@
-import { nanoid } from "nanoid";
+import { createSpecId } from "$lib/runtime/ids.ts";
 import type { WorkspaceClient } from "@jthum/framework/client";
 import type { CollectionDefinition, PageDefinition, Spec } from "@jthum/framework/spec";
 import {
@@ -33,7 +33,7 @@ export async function installCollectionStarters(
         ...workspace.spec.views,
         viewDefinitionFromDraft(
           {
-            id: nanoid(),
+            id: createSpecId(),
             key: viewKey,
             label: collection.label,
             source: collection.key,
@@ -52,7 +52,7 @@ export async function installCollectionStarters(
     forms.push(
       formDefinitionFromDraft(
         {
-          id: nanoid(),
+          id: createSpecId(),
           key,
           label,
           mode,
@@ -70,18 +70,18 @@ export async function installCollectionStarters(
     : [
         ...workspace.spec.pages,
         {
-          id: nanoid(),
+          id: createSpecId(),
           key: pageKey,
           label: collection.label,
           meta: { authoring: { managed: true }, path: `/t/${collection.key}` },
           layout: [
             {
-              id: nanoid(),
+              id: createSpecId(),
               kind: "group",
               columns: 1,
               children: [
                 {
-                  id: nanoid(),
+                  id: createSpecId(),
                   kind: "block",
                   block: "table",
                   config: { view: viewKey },

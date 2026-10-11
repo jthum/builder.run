@@ -60,11 +60,15 @@ describe("Framework approval UI contract", () => {
         expect(paused.status).toBe("waiting");
         expect(paused).not.toHaveProperty("checkpoint");
         expect(paused.vars?.request).toBe("New laptop");
-        const agent = await kernel.createAgent(context, {
-          name: "Agent",
-          instructions: "Review requests.",
+        const model = await client.createModelConfig({
+          name: "Test model",
           provider: "test",
           model: "test",
+        });
+        const agent = await client.createAgent({
+          name: "Agent",
+          instructions: "Review requests.",
+          modelConfigId: model.id,
           permissions: ["read"],
           tools: { include: [], search: false },
         });

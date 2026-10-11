@@ -1,13 +1,13 @@
 import type { WorkspaceClient } from "@jthum/framework/client";
 import type { RuleDefinition } from "@jthum/framework/spec";
-import { nanoid } from "nanoid";
+import { createSpecId } from "$lib/runtime/ids.ts";
 
 /** Explicit example installation; never modifies business records or unrelated definitions. */
 export async function installApprovalExample(client: WorkspaceClient): Promise<RuleDefinition> {
   const workspace = await client.getWorkspace();
   const existing = workspace.spec.rules.find((rule) => rule.meta?.example === "durable_approval");
   if (existing) return existing;
-  const id = nanoid();
+  const id = createSpecId();
   let key = "approval_example";
   let suffix = 1;
   while (workspace.spec.rules.some((rule) => rule.key === key))
@@ -21,22 +21,22 @@ export async function installApprovalExample(client: WorkspaceClient): Promise<R
     meta: { example: "durable_approval" },
     input: { request: { value: "text", required: true } },
     steps: [
-      { id: nanoid(), compute: { assign: { submitted: { $ref: "vars.request" } } } },
+      { id: createSpecId(), compute: { assign: { submitted: { $ref: "vars.request" } } } },
       {
-        id: nanoid(),
+        id: createSpecId(),
         wait: {
           request: {
             label: "Review the request",
             fields: [
               {
-                id: nanoid(),
+                id: createSpecId(),
                 key: "approved",
                 label: "Approve this request?",
                 type: "boolean",
                 required: true,
               },
               {
-                id: nanoid(),
+                id: createSpecId(),
                 key: "note",
                 label: "Review note",
                 type: "text",
@@ -48,11 +48,11 @@ export async function installApprovalExample(client: WorkspaceClient): Promise<R
         },
       },
       {
-        id: nanoid(),
+        id: createSpecId(),
         gate: {
           predicate: { op: "context.equals", path: "vars.review.approved", value: true },
-          pass: [{ id: nanoid(), compute: { assign: { outcome: "approved" } } }],
-          fail: [{ id: nanoid(), compute: { assign: { outcome: "declined" } } }],
+          pass: [{ id: createSpecId(), compute: { assign: { outcome: "approved" } } }],
+          fail: [{ id: createSpecId(), compute: { assign: { outcome: "declined" } } }],
         },
       },
     ],

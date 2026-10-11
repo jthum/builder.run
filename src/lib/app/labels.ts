@@ -1,4 +1,4 @@
-import { isId, labelFromKey } from "$lib/runtime/ids.ts";
+import { labelFromKey } from "$lib/runtime/ids.ts";
 import type { PageContext, FieldKind, ValueSemantic } from "$lib/blocks/presentation.ts";
 import type {
   CollectionDraft,
@@ -199,7 +199,6 @@ export function formatCell(
       });
     }
   }
-  if (typeof value === "string" && isId(value)) return "—";
   if (typeof value === "string" && /^[a-z0-9]+(?:_[a-z0-9]+)*$/i.test(value)) {
     return labelFromKey(value);
   }

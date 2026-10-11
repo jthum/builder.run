@@ -4,26 +4,56 @@ import type {
   InferenceToolProvider,
   InferenceToolValueSchema,
 } from "@jthum/framework/kernel";
-import type { FieldDefinition, JsonValue } from "@jthum/framework/spec";
-import { nanoid } from "nanoid";
-import { buildTools, toolSurface, type ToolContext, type ToolDefinition } from "$lib/app/webmcp.ts";
+import type {
+  CollectionDefinition,
+  FieldDefinition,
+  FormDefinition,
+  JsonValue,
+  PageDefinition,
+  RuleDefinition,
+  ViewDefinition,
+} from "@jthum/framework/spec";
+import { createSpecId } from "$lib/runtime/ids.ts";
+import { invalidInput } from "@jthum/framework/errors";
+import {
+  buildTools,
+  getWebMcpAppToolMode,
+  type ToolContext,
+  type ToolDefinition,
+} from "$lib/app/webmcp.ts";
 
-/** Projects Builder.run's canonical authoring tools into Framework inference. */
-export function createAuthoringInferenceTools(context: ToolContext): InferenceToolProvider {
+/** Projects the complete WebMCP surface into Framework inference. */
+export function createAssistantTools(context: ToolContext): InferenceToolProvider {
   return {
-    resolve: () =>
-      buildTools(context)
-        .filter((tool) => toolSurface(tool) === "builder" && !APP_LIFECYCLE_TOOLS.has(tool.name))
-        .map((tool) => projectTool(tool, context)),
+    resolve: (caller) => {
+      const runtime = context.runtime();
+      const active = runtime.appContext;
+      // The personal Assistant runs in the Space so its own App switches/deletes can finish.
+      // All actual operations still use the selected App's authorized Workspace client.
+      const assistantInSpace =
+        caller.metadata?.surface === "assistant" &&
+        caller.execution.workspaceId === runtime.spaceContext?.workspaceId;
+      if (
+        (!assistantInSpace && caller.execution.workspaceId !== active.workspaceId) ||
+        caller.execution.actorId !== active.actorId
+      )
+        return [];
+      return buildTools(context, { appTools: getWebMcpAppToolMode() }).map((tool) =>
+        projectTool(tool, context),
+      );
+    },
   };
 }
 
-const APP_LIFECYCLE_TOOLS = new Set(["create_app", "switch_app", "delete_app", "create_space"]);
+// Keep model-facing property lists complete as the canonical definition types evolve.
+type DefinitionKeys<T> = T extends unknown ? keyof T : never;
+type DefinitionProperties<T> = Readonly<Record<DefinitionKeys<T>, InferenceToolValueSchema>>;
 
 function projectTool(tool: ToolDefinition, context: ToolContext): ContextualInferenceTool {
   const eager = tool.name === "get_space" || tool.name === "get_spec";
   return {
     id: `builder:${tool.name}`,
+    name: tool.name,
     label: tool.title ?? readableName(tool.name),
     description: tool.description,
     input: AUTHORING_INPUTS[tool.name] ?? inputSchema(tool.inputSchema),
@@ -40,7 +70,7 @@ const FIELD_AUTHORING_SCHEMA: InferenceToolInputSchema = {
     "A canonical field definition. Omit id when creating a field; it is generated safely.",
   properties: {
     id: { type: "string", description: "Existing stable field ID when updating a field." },
-    key: { type: "string", description: "Stable machine-readable field key." },
+    key: { type: "string", description: "Machine-readable field key; identity comes from id." },
     label: { type: "string", description: "Human-readable field label." },
     description: { type: "string" },
     type: {
@@ -71,7 +101,7 @@ const FIELD_AUTHORING_SCHEMA: InferenceToolInputSchema = {
         additionalProperties: false,
       },
     },
-  },
+  } satisfies DefinitionProperties<FieldDefinition>,
   required: ["key", "label", "type"],
   additionalProperties: false,
 };
@@ -85,7 +115,10 @@ const COLLECTION_AUTHORING_INPUT: InferenceToolInputSchema = {
         "A complete canonical Collection definition. Omit new IDs; preserve IDs from get_spec when updating.",
       properties: {
         id: { type: "string", description: "Existing stable Collection ID when updating." },
-        key: { type: "string", description: "Stable singular machine-readable key." },
+        key: {
+          type: "string",
+          description: "Singular machine-readable key; identity comes from id.",
+        },
         label: { type: "string", description: "Human-readable singular label." },
         collectionLabel: { type: "string", description: "Optional plural label." },
         description: { type: "string" },
@@ -122,7 +155,7 @@ const COLLECTION_AUTHORING_INPUT: InferenceToolInputSchema = {
           additionalProperties: false,
         },
         meta: { type: "json" },
-      },
+      } satisfies DefinitionProperties<CollectionDefinition>,
       required: ["key", "label", "fields"],
       additionalProperties: false,
     },
@@ -138,13 +171,13 @@ const COLLECTION_AUTHORING_INPUT: InferenceToolInputSchema = {
 
 const IDENTITY_PROPERTIES = {
   id: { type: "string", description: "Existing stable definition ID when updating." },
-  key: { type: "string", description: "Stable machine-readable key." },
+  key: { type: "string", description: "Machine-readable key; identity comes from id." },
   label: { type: "string", description: "Human-readable label." },
   description: { type: "string" },
   meta: { type: "json" },
 } as const satisfies Record<string, InferenceToolValueSchema>;
 
-const VIEW_AUTHORING_INPUT: InferenceToolInputSchema = definitionInput(
+const VIEW_AUTHORING_INPUT: InferenceToolInputSchema = definitionInput<ViewDefinition>(
   {
     ...IDENTITY_PROPERTIES,
     source: { type: "string", description: "Collection key or attached Source key." },
@@ -178,7 +211,7 @@ const VIEW_AUTHORING_INPUT: InferenceToolInputSchema = definitionInput(
   ["key", "label", "source"],
 );
 
-const FORM_AUTHORING_INPUT: InferenceToolInputSchema = definitionInput(
+const FORM_AUTHORING_INPUT: InferenceToolInputSchema = definitionInput<FormDefinition>(
   {
     ...IDENTITY_PROPERTIES,
     mode: { type: "string", enum: ["create", "edit", "standalone"] },
@@ -201,7 +234,7 @@ const FORM_AUTHORING_INPUT: InferenceToolInputSchema = definitionInput(
   ["key", "label", "mode"],
 );
 
-const PAGE_AUTHORING_INPUT: InferenceToolInputSchema = definitionInput(
+const PAGE_AUTHORING_INPUT: InferenceToolInputSchema = definitionInput<PageDefinition>(
   {
     ...IDENTITY_PROPERTIES,
     layout: {
@@ -214,7 +247,7 @@ const PAGE_AUTHORING_INPUT: InferenceToolInputSchema = definitionInput(
   ["key", "label", "layout"],
 );
 
-const RULE_AUTHORING_INPUT: InferenceToolInputSchema = definitionInput(
+const RULE_AUTHORING_INPUT: InferenceToolInputSchema = definitionInput<RuleDefinition>(
   {
     ...IDENTITY_PROPERTIES,
     enabled: { type: "boolean" },
@@ -222,11 +255,25 @@ const RULE_AUTHORING_INPUT: InferenceToolInputSchema = definitionInput(
     input: { type: "json" },
     trigger: { type: "json" },
     expose: { type: "array", items: { type: "string", enum: ["ui", "agent"] } },
+    tool: {
+      type: "object",
+      description: "Optional model-facing name and description when exposed to agents.",
+      properties: { name: { type: "string" }, description: { type: "string" } },
+      additionalProperties: false,
+    },
     steps: {
       type: "array",
       description:
-        "Ordered canonical Rule steps. Use get_automation_primitives for supported shapes.",
+        "Ordered canonical Rule steps. Use get_automation_primitives to check runtime capabilities.",
       items: { type: "json" },
+    },
+    result: {
+      type: "json",
+      description: "Optional canonical RuleValue returned to callers, including $ref bindings.",
+    },
+    output: {
+      type: "json",
+      description: "Optional RuleOutputContract asserting the resolved result's type and fields.",
     },
   },
   ["key", "label", "steps"],
@@ -240,8 +287,8 @@ const AUTHORING_INPUTS: Readonly<Record<string, InferenceToolInputSchema>> = {
   upsert_page: PAGE_AUTHORING_INPUT,
 };
 
-function definitionInput(
-  properties: Readonly<Record<string, InferenceToolValueSchema>>,
+function definitionInput<T>(
+  properties: DefinitionProperties<T>,
   required: readonly string[],
 ): InferenceToolInputSchema {
   return {
@@ -274,7 +321,7 @@ function normalizeAuthoringInput(
   const existingDefinition = definitions.find(
     (candidate) => candidate.id === definition.id || candidate.key === definition.key,
   );
-  const id = existingDefinition?.id ?? nanoid();
+  const id = existingDefinition?.id ?? definitionId(definition.id);
   if (toolName !== "upsert_collection") {
     const existingForm =
       toolName === "upsert_form"
@@ -338,12 +385,19 @@ function definitionList(
   return [];
 }
 
+function definitionId(value: unknown): string {
+  if (value == null) return createSpecId();
+  if (typeof value !== "string" || !value.trim())
+    throw invalidInput("Definition IDs must be non-empty strings.");
+  return value;
+}
+
 function normalizeNodeIds(values: readonly unknown[]): readonly unknown[] {
   return values.map((value) => {
     const node = record(value);
     if (!node) return value;
     const nestedKeys = ["children", "steps", "pass", "fail", "onSignal", "onTimeout"];
-    const normalized: Record<string, unknown> = { ...node, id: node.id ?? nanoid() };
+    const normalized: Record<string, unknown> = { ...node, id: definitionId(node.id) };
     for (const key of nestedKeys) {
       if (Array.isArray(node[key])) normalized[key] = normalizeNodeIds(node[key]);
     }
@@ -351,7 +405,16 @@ function normalizeNodeIds(values: readonly unknown[]): readonly unknown[] {
     if (record(node.foreach))
       normalized.foreach = normalizeNestedStepContainer(record(node.foreach)!);
     if (record(node.repeat)) normalized.repeat = normalizeNestedStepContainer(record(node.repeat)!);
-    if (record(node.wait)) normalized.wait = normalizeNestedStepContainer(record(node.wait)!);
+    if (record(node.wait)) {
+      const wait = normalizeNestedStepContainer(record(node.wait)!);
+      const request = record(wait.request);
+      normalized.wait = {
+        ...wait,
+        ...(request && Array.isArray(request.fields)
+          ? { request: { ...request, fields: normalizeFields(request.fields, [])?.values } }
+          : {}),
+      };
+    }
     if (record(node.parallel) && Array.isArray(record(node.parallel)!.branches)) {
       normalized.parallel = {
         ...record(node.parallel),
@@ -359,7 +422,7 @@ function normalizeNodeIds(values: readonly unknown[]): readonly unknown[] {
           const item = record(branch) ?? {};
           return {
             ...item,
-            id: item.id ?? nanoid(),
+            id: definitionId(item.id),
             ...(Array.isArray(item.steps) ? { steps: normalizeNodeIds(item.steps) } : {}),
           };
         }),
@@ -390,7 +453,7 @@ function normalizeFields(
       readonly resolveId: (value: string) => string;
     }
   | undefined {
-  const values = Array.isArray(value) ? value : legacyArrayShape(value);
+  const values = Array.isArray(value) ? value : wrappedArrayShape(value);
   if (!values) return undefined;
   const normalized = values.map((value) => {
     const field = record(value) ?? {};
@@ -399,7 +462,7 @@ function normalizeFields(
     );
     return {
       ...field,
-      id: previous?.id ?? nanoid(),
+      id: previous?.id ?? definitionId(field.id),
       ...(Array.isArray(field.options)
         ? { options: normalizeOptions(field.options, previous) }
         : {}),
@@ -432,7 +495,7 @@ function normalizeOptions(
     const previous = existing.find(
       (candidate) => candidate.id === option.id || candidate.key === option.key,
     );
-    return { ...option, id: previous?.id ?? nanoid() };
+    return { ...option, id: previous?.id ?? definitionId(option.id) };
   });
 }
 
@@ -457,14 +520,15 @@ function normalizeLifecycle(
             const previous = existing?.transitions.find(
               (candidate) => candidate.id === transition.id || candidate.key === transition.key,
             );
-            return { ...transition, id: previous?.id ?? nanoid() };
+            return { ...transition, id: previous?.id ?? definitionId(transition.id) };
           }),
         }
       : {}),
   };
 }
 
-function legacyArrayShape(value: unknown): readonly unknown[] | undefined {
+/** Repair a model's wrapped array argument; this is not an alternative persisted Spec format. */
+function wrappedArrayShape(value: unknown): readonly unknown[] | undefined {
   const shape = record(value);
   if (!shape || !("item" in shape)) return undefined;
   return Array.isArray(shape.item) ? shape.item : [shape.item];

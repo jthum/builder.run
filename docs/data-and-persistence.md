@@ -12,6 +12,8 @@ Framework's optional browser SQLite package runs `wa-sqlite` in a worker. Storag
 
 Builder.run opens `catalog.db` for Workspace and Actor state, memberships, Attachments, Specs, settings, and workflow execution metadata.
 
+Workspace secret settings are encrypted by Framework using the host's `SecretCipher`; ordinary settings APIs return masked summaries. Builder.run keeps the encryption key in this browser's local storage. This does not protect against scripts with origin access, and losing that key requires re-entering secrets. The personal Assistant's profile settings remain separate, browser-local host state.
+
 Record tables are routed into separate Workspace databases for Spaces and Apps, with scope databases opened as needed. The host chooses filenames in [sqlite.ts](../src/lib/framework/sqlite.ts); Framework owns schema and record semantics.
 
 Physical table and column names derive from stable definition IDs. Human-readable keys and labels remain in the Spec and APIs. Renaming a field does not require changing its physical column name.

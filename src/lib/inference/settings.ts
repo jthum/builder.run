@@ -39,7 +39,7 @@ export async function saveAssistantSettings(input: AssistantSettings): Promise<v
 }
 
 export function assistantConfigured(settings: AssistantSettings): boolean {
-  return Boolean(settings.baseUrl && settings.model && settings.apiKey);
+  return Boolean(settings.baseUrl.trim() && settings.model.trim());
 }
 
 function readAssistantSettings(value: unknown): AssistantSettings {

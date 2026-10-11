@@ -50,9 +50,9 @@ Tables and columns derive from stable IDs. Scalar fields use native SQLite value
 
 [webmcp.ts](../src/lib/app/webmcp.ts) projects authoring and application tools from the active context. Record contents do not determine the advertised tool catalog.
 
-The built-in Assistant uses [authoring-tools.ts](../src/lib/inference/authoring-tools.ts) to project those authoring operations into Framework's inference tool boundary. [runtime.ts](../src/lib/inference/runtime.ts) loads YAIR and an OpenAI-compatible provider when inference runs.
+The built-in Assistant uses [assistant-tools.ts](../src/lib/inference/assistant-tools.ts) to project the complete WebMCP catalog into Framework's inference boundary. [runtime.ts](../src/lib/inference/runtime.ts) loads YAIR and an OpenAI-compatible provider when inference runs.
 
-The Assistant and WebMCP are two host surfaces over the same canonical definitions. Their advertised tool names and input affordances can differ, so consult their respective implementations when extending them.
+The Assistant and WebMCP share tool names and implementations. The inference projection adds input affordances such as generating missing IDs. [assistant-gateway.ts](../src/lib/inference/assistant-gateway.ts) presents this authorized catalog through per-step discovery, excluding root-scoped Kernel tools from selected-App conversations. Execution delegates to Framework's gateway for live availability checks and the Workspace clients for authorization.
 
 ## Code map
 

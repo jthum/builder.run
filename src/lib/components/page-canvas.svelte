@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { goto } from "$app/navigation";
+  import { beforeNavigate, goto } from "$app/navigation";
   import PageEditor from "@jthum/framework/svelte/authoring/page-editor";
   import type { PageDefinition, SpecMeta } from "@jthum/framework/spec";
   import Block from "./block.svelte";
@@ -23,6 +23,12 @@
 
   let rows = $state<Record<string, Array<Record<string, unknown>>>>({});
   let ready = $state(false);
+  let unsaved = $state(false);
+
+  // Framework handles editor closing/unloading; SPA navigation belongs to this host.
+  beforeNavigate(({ willUnload, cancel }) => {
+    if (!willUnload && unsaved && !window.confirm("Discard unapplied changes?")) cancel();
+  });
 
   $effect(() => {
     void revision;
@@ -50,7 +56,8 @@
   getInputs={block => blockInputs(block as BlockDefinition)}
   getOptions={(input, config) => spec ? blockInputOptions(spec, input, config) : []}
   onSave={save}
-  onFinish={() => { if (startEditing) void goto(location.pathname, { replace: true, shallow: true }); }}
+  onUnsavedChange={dirty => { unsaved = dirty; }}
+  onFinish={() => { unsaved = false; if (startEditing) void goto(location.pathname, { replace: true, shallow: true }); }}
 >
   {#snippet renderBlock(node)}
     <Block node={pageBlocks([node])[0]} {rows} {ready} {spec} />

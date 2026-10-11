@@ -415,7 +415,7 @@
 <AppSettingsDialog bind:open={appSettingsOpen} />
 <ProfileDialog bind:open={profileOpen} initialSection={profileSection} />
 <SpaceSettingsDialog bind:open={settingsOpen} />
-<AssistantSheet onConfigure={() => openProfile("assistant")} />
+<AssistantSheet />
 <NameDialog
 	bind:open={spaceOpen}
 	title="New space"

@@ -33,7 +33,10 @@ Framework has its own tests and package checks in its repository. Run the releva
 | Record workflows                  | [record-workflow.spec.ts](../src/lib/framework/record-workflow.spec.ts)                                                            |
 | User approval flow                | [approval-example.spec.ts](../src/lib/framework/approval-example.spec.ts)                                                          |
 | WebMCP tools                      | [webmcp.spec.ts](../src/lib/app/webmcp.spec.ts)                                                                                    |
-| Assistant authoring tools         | [authoring-tools.spec.ts](../src/lib/inference/authoring-tools.spec.ts)                                                            |
+| Assistant MCP projection          | [assistant-tools.spec.ts](../src/lib/inference/assistant-tools.spec.ts)                                                            |
+| Conversation and cancellation     | [assistant.spec.ts](../src/lib/app/assistant.spec.ts)                                                                              |
+| Inference integration and replay  | [runtime.spec.ts](../src/lib/inference/runtime.spec.ts)                                                                            |
+| Encrypted Workspace settings      | [secrets.spec.ts](../src/lib/framework/secrets.spec.ts)                                                                            |
 | Templates and example records     | [app-templates.spec.ts](../src/lib/app/app-templates.spec.ts), [template-records.spec.ts](../src/lib/app/template-records.spec.ts) |
 | Official block registry           | [registry.spec.ts](../src/lib/blocks/registry.spec.ts)                                                                             |
 
@@ -56,7 +59,7 @@ The optional `vp run test:browser` script uses Puppeteer and a local browser. Re
 
 ## Agent checks
 
-If WebMCP is available, ask an external agent to inspect, refine, and use an App. If using the built-in Assistant, configure its provider in profile settings first.
+If WebMCP is available, ask an external agent to inspect, refine, and use an App. If using the built-in Assistant, configure its provider from the Assistant's Model settings first. Check the available-tools list, streamed response, tool activity, Stop and New conversation. Try creating an App, adding a Collection, writing a record and querying a View in one conversation. Provider access is not covered by mocked deterministic tests; check your provider's browser/CORS support manually.
 
 For example:
 

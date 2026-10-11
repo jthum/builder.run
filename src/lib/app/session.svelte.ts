@@ -36,9 +36,9 @@ import {
   type ToolContext,
   type WebMcpBridge,
 } from "./webmcp.ts";
-import { createAuthoringInferenceTools } from "$lib/inference/authoring-tools.ts";
+import { createAssistantTools } from "$lib/inference/assistant-tools.ts";
 import { createBrowserInferenceRuntime } from "$lib/inference/runtime.ts";
-import { browserSecrets } from "$lib/framework/secrets.ts";
+import { browserSecretCipher } from "$lib/framework/secrets.ts";
 
 export interface AppSummary {
   readonly id: string;
@@ -221,6 +221,7 @@ export function boot(): Promise<void> {
     let opened: OpenedRuntime | undefined;
     try {
       const gateway = await openSqlGateway();
+      const assistantTools = createAssistantTools(toolContext);
       opened = await openRuntime({
         preferredSelection: readSelection(localStorage),
         kernel: {
@@ -230,9 +231,11 @@ export function boot(): Promise<void> {
             inference: true,
           },
           persistence: createKernelSqlitePersistence(gateway),
-          inference: createBrowserInferenceRuntime(),
-          secrets: browserSecrets(localStorage),
-          inferenceTools: [createAuthoringInferenceTools(toolContext)],
+          inference: createBrowserInferenceRuntime({
+            assistantTools,
+          }),
+          secretCipher: browserSecretCipher(localStorage),
+          inferenceTools: [assistantTools],
         },
         seed: {
           spaceName: "Personal Space",

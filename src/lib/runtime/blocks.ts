@@ -15,7 +15,7 @@ import type {
   RowHeight,
   CollectionDraft,
 } from "$lib/blocks/presentation.ts";
-import { createSpecId, isSpecId, labelFromKey } from "./ids.ts";
+import { createSpecId, labelFromKey } from "./ids.ts";
 
 export const HOME_PAGE_KEY = "home";
 export { blockCategories, blocks };
@@ -225,7 +225,7 @@ export function groupHeightClass(group: PageNode): string {
 
 export function normalizeBlock(block: PageNode): PageNode {
   const currentId = block.id;
-  const id = currentId && isSpecId(currentId) ? currentId : createSpecId();
+  const id = currentId || createSpecId();
   if (block.kind === "group") {
     const height = rowHeight(block.min_height);
     return {
