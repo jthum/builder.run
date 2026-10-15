@@ -1,15 +1,18 @@
 <script lang="ts">
+	import type { ViewDraft } from "@jthum/framework/svelte/authoring/data";
+	import { viewCellValue } from "$lib/app/view-results.ts";
 	import { toneFromAccent } from "$lib/app/color.ts";
 	import { session } from "$lib/app/session.svelte.ts";
 	import * as Card from "@jthum/framework/svelte/ui/card";
 	import { Skeleton } from "@jthum/framework/svelte/ui/skeleton";
-	import { asNumber, cellValue, groupChart, sparkline } from "$lib/runtime/chart-data.ts";
+	import { asNumber, groupChart, sparkline } from "$lib/runtime/chart-data.ts";
 	import { areaPath, chartPalette, linear, polyline } from "$lib/runtime/chart-geometry.ts";
 	import ArrowUpRightIcon from "@lucide/svelte/icons/arrow-up-right";
 
 	let {
 		title,
 		rows,
+		view,
 		value = "",
 		date = "created_at",
 		description = "",
@@ -19,6 +22,7 @@
 	}: {
 		title: string;
 		rows: Array<Record<string, unknown>> | null;
+		view: ViewDraft;
 		value?: string;
 		date?: string;
 		description?: string;
@@ -32,11 +36,11 @@
 	const total = $derived.by(() => {
 		if (!rows) return 0;
 		if (!value) return rows.length;
-		return rows.reduce((sum, row) => sum + asNumber(cellValue(row, value)), 0);
+		return rows.reduce((sum, row) => sum + asNumber(viewCellValue(view, row, value)), 0);
 	});
 	const trend = $derived.by(() => {
 		if (!rows?.length) return [];
-		return sparkline(groupChart(rows, { category: date || "created_at", value: value || undefined, time: true }));
+		return sparkline(groupChart(rows, { category: date || "created_at", value: value || undefined, time: true }, (row, path) => viewCellValue(view, row, path)));
 	});
 	const label = $derived(
 		total >= 1000 && Number.isInteger(total) ? total.toLocaleString() : String(total),

@@ -1,7 +1,8 @@
 <script lang="ts">
 	import * as Card from "@jthum/framework/svelte/ui/card";
 	import { Skeleton } from "@jthum/framework/svelte/ui/skeleton";
-	import { asDayKey, asNumber, cellValue } from "$lib/runtime/chart-data.ts";
+	import { asDayKey, asNumber } from "$lib/runtime/chart-data.ts";
+	import { viewCellValue } from "$lib/app/view-results.ts";
 	import { cn } from "$lib/utils.ts";
 	import type { BlockProps } from "$lib/blocks/types.ts";
 
@@ -13,9 +14,9 @@
 	const amounts = $derived.by(() => {
 		const result = new Map<string, number>();
 		for (const item of rows[viewKey] ?? []) {
-			const day = asDayKey(cellValue(item, dateField));
+			const day = asDayKey(viewCellValue(view, item, dateField));
 			if (!day) continue;
-			result.set(day, (result.get(day) ?? 0) + (valueField ? asNumber(cellValue(item, valueField)) : 1));
+			result.set(day, (result.get(day) ?? 0) + (valueField ? asNumber(viewCellValue(view, item, valueField)) : 1));
 		}
 		return result;
 	});

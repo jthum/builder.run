@@ -3,7 +3,8 @@
 	import { session } from "$lib/app/session.svelte.ts";
 	import ChartFrame from "$lib/components/chart-frame.svelte";
 	import ChartPlot from "$lib/components/chart-plot.svelte";
-	import { asLabel, asNumber, cellValue } from "$lib/runtime/chart-data.ts";
+	import { asLabel } from "$lib/runtime/chart-data.ts";
+	import { viewCellValue } from "$lib/app/view-results.ts";
 	import { chartPalette, extent, linear, niceTicks } from "$lib/runtime/chart-geometry.ts";
 	import type { BlockProps } from "$lib/blocks/types.ts";
 
@@ -14,16 +15,23 @@
 	const yField = $derived(String(config.y ?? ""));
 	const labelField = $derived(String(config.label ?? ""));
 	const points = $derived(
-		(rows[viewKey] ?? []).map((item, index) => ({
-			id: String(item.id ?? index),
-			x: asNumber(cellValue(item, xField)),
-			y: asNumber(cellValue(item, yField)),
-			label: labelField ? asLabel(cellValue(item, labelField)) : `Record ${index + 1}`,
-		})),
+		(rows[viewKey] ?? []).flatMap((item, index) => {
+			const x = coordinate(viewCellValue(view, item, xField));
+			const y = coordinate(viewCellValue(view, item, yField));
+			if (x === undefined || y === undefined) return [];
+			return [{ id: String(item.id ?? index), x, y,
+				label: labelField ? asLabel(viewCellValue(view, item, labelField)) : `Record ${index + 1}` }];
+		}),
 	);
 	const hue = $derived(toneFromAccent(session.accent).hue);
 	const color = $derived(chartPalette(hue, 1)[0]);
 	let hover = $state<{ x: number; y: number; text: string } | null>(null);
+
+	function coordinate(value: unknown): number | undefined {
+		if (typeof value !== "number" && (typeof value !== "string" || !value.trim())) return undefined;
+		const number = Number(value);
+		return Number.isFinite(number) ? number : undefined;
+	}
 
 	function formatTick(value: number): string {
 		if (Math.abs(value) >= 1000) return `${(value / 1000).toFixed(value % 1000 === 0 ? 0 : 1)}k`;

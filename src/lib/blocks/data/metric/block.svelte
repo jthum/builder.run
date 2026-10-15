@@ -9,4 +9,4 @@
 	const viewRows = $derived(rows[viewKey] ?? []);
 </script>
 
-{#if view}<MetricBlock title={String(config.title || view.label)} rows={ready ? viewRows : null} value={String(config.value ?? "")} date={String(config.date ?? "created_at")} description={String(config.description ?? "").trim()} context={view.group_by || !type ? "" : `Across ${viewRows.length} ${(viewRows.length === 1 ? type.label : collectionLabel(type)).toLocaleLowerCase()}`} href={listHref(view)} {ready} />{:else}<p class="text-sm text-muted-foreground">Pick a view for this block.</p>{/if}
+{#if view}<MetricBlock title={String(config.title || view.label)} rows={ready ? viewRows : null} value={String(config.value ?? "")} date={String(config.date ?? "created_at")} description={String(config.description ?? "").trim()} context={view.group_by || !type ? "" : `Across ${viewRows.length} ${(viewRows.length === 1 ? type.label : collectionLabel(type)).toLocaleLowerCase()}`} href={listHref(view)} {view} {ready} />{:else}<p class="text-sm text-muted-foreground">Pick a view for this block.</p>{/if}

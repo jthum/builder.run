@@ -6,4 +6,4 @@
 	const view = $derived(spec?.views.find((item) => item.key === viewKey));
 </script>
 
-{#if view}<ChartMark mark="line" title={String(config.title || view.label)} rows={ready ? (rows[viewKey] ?? []) : null} category={String(config.category ?? "")} value={String(config.value ?? "")} series="" time {ready} />{:else}<p class="text-sm text-muted-foreground">Pick a view for this block.</p>{/if}
+{#if view}<ChartMark mark="line" title={String(config.title || view.label)} rows={ready ? (rows[viewKey] ?? []) : null} category={String(config.category ?? "")} value={String(config.value ?? "")} series="" time {view} {ready} />{:else}<p class="text-sm text-muted-foreground">Pick a view for this block.</p>{/if}

@@ -49,6 +49,7 @@ export interface GroupedChart {
 export function groupChart(
   rows: Array<Record<string, unknown>>,
   options: { category: string; value?: string; series?: string; time?: boolean },
+  valueAt: (row: Record<string, unknown>, path: string) => unknown = cellValue,
 ): GroupedChart {
   const categories: ChartCategory[] = [];
   const categoryIndex = new Map<string, number>();
@@ -58,11 +59,11 @@ export function groupChart(
 
   function categoryOf(row: Record<string, unknown>): ChartCategory | null {
     if (options.time) {
-      const day = asDayKey(cellValue(row, options.category));
+      const day = asDayKey(valueAt(row, options.category));
       if (!day) return null;
       return { key: day, label: day };
     }
-    const raw = cellValue(row, options.category);
+    const raw = valueAt(row, options.category);
     const key = asLabel(raw);
     return { key, label: key };
   }
@@ -74,13 +75,13 @@ export function groupChart(
       categoryIndex.set(category.key, categories.length);
       categories.push(category);
     }
-    const seriesRaw = options.series ? cellValue(row, options.series) : "value";
+    const seriesRaw = options.series ? valueAt(row, options.series) : "value";
     const seriesKey = options.series ? asLabel(seriesRaw) : "value";
     if (!seriesIndex.has(seriesKey)) {
       seriesIndex.set(seriesKey, seriesMeta.length);
       seriesMeta.push({ key: seriesKey, label: options.series ? seriesKey : "Value" });
     }
-    const amount = options.value ? asNumber(cellValue(row, options.value)) : 1;
+    const amount = options.value ? asNumber(valueAt(row, options.value)) : 1;
     const token = `${category.key}\0${seriesKey}`;
     counts.set(token, (counts.get(token) ?? 0) + amount);
   }

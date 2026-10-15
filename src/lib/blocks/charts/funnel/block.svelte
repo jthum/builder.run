@@ -1,20 +1,21 @@
 <script lang="ts">
 	import { session } from "$lib/app/session.svelte.ts";
 	import { toneFromAccent } from "$lib/app/color.ts";
-	import * as Card from "@jthum/framework/svelte/ui/card";
-	import { asLabel, asNumber, cellValue } from "$lib/runtime/chart-data.ts";
+	import ChartFrame from "$lib/components/chart-frame.svelte";
+	import { asLabel, asNumber } from "$lib/runtime/chart-data.ts";
+	import { viewCellValue } from "$lib/app/view-results.ts";
 	import { chartPalette } from "$lib/runtime/chart-geometry.ts";
 	import type { BlockProps } from "$lib/blocks/types.ts";
 
-	let { config, rows, spec }: BlockProps = $props();
+	let { config, rows, ready = true, spec }: BlockProps = $props();
 	const viewKey = $derived(String(config.view ?? ""));
 	const view = $derived(spec?.views.find((item) => item.key === viewKey));
 	const stageField = $derived(String(config.stage ?? ""));
 	const valueField = $derived(String(config.value ?? ""));
 	const stages = $derived(
 		(rows[viewKey] ?? []).map((item) => ({
-			label: asLabel(cellValue(item, stageField)),
-			value: valueField ? asNumber(cellValue(item, valueField)) : 1,
+			label: asLabel(viewCellValue(view, item, stageField)),
+			value: valueField ? asNumber(viewCellValue(view, item, valueField)) : 1,
 		})),
 	);
 	const maximum = $derived(Math.max(...stages.map((stage) => stage.value), 1));
@@ -23,9 +24,8 @@
 </script>
 
 {#if view}
-	<Card.Root class="h-full">
-		<Card.Header><Card.Title>{String(config.title || view.label)}</Card.Title></Card.Header>
-		<Card.Content class="flex flex-col justify-center gap-3">
+	<ChartFrame title={String(config.title || view.label)} {ready} empty={!stages.length}>
+		<div class="flex flex-1 flex-col justify-center gap-3">
 			{#each stages as stage, index (`${stage.label}-${index}`)}
 				<div class="flex flex-col items-center gap-1">
 					<div
@@ -39,8 +39,8 @@
 					{#if index < stages.length - 1}<span class="h-2 w-px bg-border"></span>{/if}
 				</div>
 			{/each}
-		</Card.Content>
-	</Card.Root>
+		</div>
+	</ChartFrame>
 {:else}
 	<p class="text-sm text-muted-foreground">Pick a view for this block.</p>
 {/if}

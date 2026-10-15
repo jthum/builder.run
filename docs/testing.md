@@ -39,6 +39,9 @@ Framework has its own tests and package checks in its repository. Run the releva
 | Encrypted Workspace settings      | [secrets.spec.ts](../src/lib/framework/secrets.spec.ts)                                                                            |
 | Templates and example records     | [app-templates.spec.ts](../src/lib/app/app-templates.spec.ts), [template-records.spec.ts](../src/lib/app/template-records.spec.ts) |
 | Official block registry           | [registry.spec.ts](../src/lib/blocks/registry.spec.ts)                                                                             |
+| Analytics projections and states  | [analytics.spec.ts](../src/lib/blocks/analytics.spec.ts), [chart-data.spec.ts](../src/lib/runtime/chart-data.spec.ts)              |
+
+Analytics tests render the real block components and SVG markup with a fixed-size plot fixture. They cover flat and nested View aliases, aggregate output, independent comparison Views, count mode, zero/null values, loading and empty results, and Library previews without requiring a browser or `ResizeObserver`.
 
 ## Manual browser checks
 

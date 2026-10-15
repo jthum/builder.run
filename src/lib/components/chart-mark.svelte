@@ -1,4 +1,6 @@
 <script lang="ts">
+	import type { ViewDraft } from "@jthum/framework/svelte/authoring/data";
+	import { viewCellValue } from "$lib/app/view-results.ts";
 	import { toneFromAccent } from "$lib/app/color.ts";
 	import { session } from "$lib/app/session.svelte.ts";
 	import ChartFrame from "$lib/components/chart-frame.svelte";
@@ -21,6 +23,7 @@
 		mark,
 		title,
 		rows,
+		view,
 		category,
 		value = "",
 		series = "",
@@ -30,6 +33,7 @@
 		mark: "bar" | "line" | "donut" | "stacked";
 		title: string;
 		rows: Array<Record<string, unknown>> | null;
+		view: ViewDraft;
 		category: string;
 		value?: string;
 		series?: string;
@@ -46,9 +50,9 @@
 		return groupChart(rows, {
 			category,
 			value: value || undefined,
-			series: mark === "stacked" ? series || undefined : series || undefined,
+			series: series || undefined,
 			time: time || mark === "line",
-		});
+		}, (row, path) => viewCellValue(view, row, path));
 	});
 	const visible = $derived(grouped.series.filter((item) => !hidden.has(item.key)));
 	const colors = $derived(
