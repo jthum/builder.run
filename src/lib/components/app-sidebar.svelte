@@ -3,6 +3,7 @@
 	import { initialsFromName, toneFromAccent, toneFromName } from "$lib/app/color.ts";
 	import { collectionLabel, spaceLabel } from "$lib/app/labels.ts";
 	import { canonicalStudio } from "$lib/app/canonical-studio.svelte.ts";
+	import { assistant } from "$lib/app/assistant.svelte.ts";
 	import { pagePresentation } from "$lib/app/pages.ts";
 	import { chrome, createSpace, openNewApp, selectApp, selectSpace, session } from "$lib/app/session.svelte.ts";
 	import { studioGroupOrder, studioItems } from "$lib/app/studio.ts";
@@ -34,6 +35,7 @@
 	import PlusIcon from "@lucide/svelte/icons/plus";
 	import SearchIcon from "@lucide/svelte/icons/search";
 	import SettingsIcon from "@lucide/svelte/icons/settings";
+	import SparklesIcon from "@lucide/svelte/icons/sparkles";
 	import TableIcon from "@lucide/svelte/icons/table";
 	import UserIcon from "@lucide/svelte/icons/user";
 	import UsersIcon from "@lucide/svelte/icons/users";
@@ -45,6 +47,8 @@
 	import type { Component, ComponentProps } from "svelte";
 
 	let { ref = $bindable(null), ...restProps }: ComponentProps<typeof Sidebar.Root> = $props();
+	const sidebar = Sidebar.useSidebar();
+	const assistantGradientId = $props.id();
 
 	const path = $derived(page.url.pathname);
 	const studio = $derived(path.startsWith("/build") || path.startsWith("/library") || path.startsWith("/diagnostics"));
@@ -124,6 +128,11 @@
 	function openProfile(section = "general") {
 		profileSection = section;
 		profileOpen = true;
+	}
+
+	function openAssistant() {
+		sidebar.setOpenMobile(false);
+		assistant.open = true;
 	}
 </script>
 
@@ -214,20 +223,6 @@
 	</Sidebar.Header>
 	<Sidebar.Content>
 		{#if studio}
-			<Sidebar.Group>
-				<Sidebar.Menu>
-					<Sidebar.MenuItem>
-						<Sidebar.MenuButton tooltipContent="Back to app">
-							{#snippet child({ props })}
-								<a href="/" {...props}>
-									<ArrowLeftIcon />
-									<span>Back to app</span>
-								</a>
-							{/snippet}
-						</Sidebar.MenuButton>
-					</Sidebar.MenuItem>
-				</Sidebar.Menu>
-			</Sidebar.Group>
 			<Sidebar.Group>
 				<Sidebar.Menu>
 					{#each studioSections as section, index (section.label)}
@@ -329,12 +324,46 @@
 		{/if}
 	</Sidebar.Content>
 	<Sidebar.Footer class="gap-3">
-		{#if !studio}
-			<Button href="/build" variant="outline" size="sm" class="w-full justify-start">
-				<PencilIcon data-icon="inline-start" />
-				Edit app
-			</Button>
-		{/if}
+		<Sidebar.Menu aria-label="App tools" class="grid grid-cols-2 gap-2 group-data-[collapsible=icon]:grid-cols-1">
+			<Sidebar.MenuItem>
+				<Sidebar.MenuButton
+					variant="outline"
+					size="sm"
+					tooltipContent={studio ? "Back to app" : "Edit app"}
+				>
+					{#snippet child({ props })}
+						<a href={studio ? "/" : "/build"} {...props} onclick={() => sidebar.setOpenMobile(false)}>
+							{#if studio}<ArrowLeftIcon />{:else}<PencilIcon />{/if}
+							<span>{studio ? "Back to app" : "Edit app"}</span>
+						</a>
+					{/snippet}
+				</Sidebar.MenuButton>
+			</Sidebar.MenuItem>
+			<Sidebar.MenuItem>
+				<Sidebar.MenuButton
+					variant="outline"
+					size="sm"
+					tooltipContent="Assistant"
+					data-appearance="assistant"
+					isActive={assistant.open}
+					aria-label="Assistant"
+					aria-haspopup="dialog"
+					aria-expanded={assistant.open}
+					onclick={openAssistant}
+				>
+					<SparklesIcon color={`url(#${assistantGradientId})`} aria-hidden="true">
+						<defs>
+							<linearGradient id={assistantGradientId} x1="0%" y1="100%" x2="100%" y2="0%">
+								<stop offset="0%" style="stop-color: var(--assistant-blue)" />
+								<stop offset="50%" style="stop-color: var(--assistant-violet)" />
+								<stop offset="100%" style="stop-color: var(--assistant-pink)" />
+							</linearGradient>
+						</defs>
+					</SparklesIcon>
+					<span>Assistant</span>
+				</Sidebar.MenuButton>
+			</Sidebar.MenuItem>
+		</Sidebar.Menu>
 		<Sidebar.Menu>
 			<Sidebar.MenuItem>
 				<DropdownMenu.Root>
