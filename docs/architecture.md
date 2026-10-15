@@ -46,6 +46,19 @@ The browser gateway uses Framework's optional browser SQLite package. A Node gat
 
 Tables and columns derive from stable IDs. Scalar fields use native SQLite values; structured fields use JSON text. Database filtering, sorting, and aggregation are handled through the adapter, including supported reference paths across routed databases. See [Data and persistence](data-and-persistence.md).
 
+## View result presentation
+
+Views explicitly select values using flat aliases or nested output paths. The host's
+[value lookup](../src/lib/app/view-results.ts) maps authoring field paths to those outputs.
+A nested reference can include its ID and selected label without loading its whole record.
+Record displays omit a reference's identity-only column when its nested label is also selected;
+the identity remains available for links. An unpaired identity column stays visible.
+
+The Project tracker template uses this for task Project names. Leaderboard and timeline labels
+link to the selected Project, while task titles link to their tasks. Updating a template does
+not rewrite existing Apps. [Rendering tests](../src/lib/blocks/data/reference-fields.spec.ts)
+exercise seeded query results and previews without requiring a browser.
+
 ## Agent surfaces
 
 [webmcp.ts](../src/lib/app/webmcp.ts) projects authoring and application tools from the active context. Record contents do not determine the advertised tool catalog.

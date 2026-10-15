@@ -45,7 +45,7 @@ const projects = [
   {
     id: "project-1",
     name: "Website launch",
-    "client.name": "Northwind",
+    client_name: "Northwind",
     status: "active",
     priority: "critical",
     budget: 12_000,
@@ -57,7 +57,7 @@ const projects = [
   {
     id: "project-2",
     name: "Brand audit",
-    "client.name": "Northwind",
+    client_name: "Northwind",
     status: "planned",
     priority: "medium",
     budget: 4_000,
@@ -69,7 +69,7 @@ const projects = [
   {
     id: "project-3",
     name: "Autumn campaign",
-    "client.name": "Contoso Labs",
+    client_name: "Contoso Labs",
     status: "active",
     priority: "high",
     budget: 18_500,
@@ -84,7 +84,7 @@ const tasks = [
   {
     id: "task-1",
     title: "Approve final homepage copy",
-    "project.name": "Website launch",
+    project: { id: "project-1", name: "Website launch" },
     assignee: "Maya",
     priority: "critical",
     status: "blocked",
@@ -94,7 +94,7 @@ const tasks = [
   {
     id: "task-2",
     title: "Run accessibility pass",
-    "project.name": "Website launch",
+    project: { id: "project-1", name: "Website launch" },
     assignee: "Jon",
     priority: "high",
     status: "doing",
@@ -104,7 +104,7 @@ const tasks = [
   {
     id: "task-3",
     title: "Configure production analytics",
-    "project.name": "Website launch",
+    project: { id: "project-1", name: "Website launch" },
     assignee: "Iris",
     priority: "medium",
     status: "todo",
@@ -114,7 +114,7 @@ const tasks = [
   {
     id: "task-4",
     title: "Inventory brand touchpoints",
-    "project.name": "Brand audit",
+    project: { id: "project-2", name: "Brand audit" },
     assignee: "Maya",
     priority: "medium",
     status: "done",
@@ -124,7 +124,7 @@ const tasks = [
   {
     id: "task-5",
     title: "Review campaign concepts",
-    "project.name": "Autumn campaign",
+    project: { id: "project-3", name: "Autumn campaign" },
     assignee: "Jon",
     priority: "high",
     status: "doing",
@@ -134,7 +134,7 @@ const tasks = [
   {
     id: "task-6",
     title: "Prepare launch checklist",
-    "project.name": "Website launch",
+    project: { id: "project-1", name: "Website launch" },
     assignee: "Iris",
     priority: "medium",
     status: "todo",
@@ -144,7 +144,7 @@ const tasks = [
   {
     id: "task-7",
     title: "Confirm media plan",
-    "project.name": "Autumn campaign",
+    project: { id: "project-3", name: "Autumn campaign" },
     assignee: "Maya",
     priority: "high",
     status: "todo",
@@ -154,7 +154,7 @@ const tasks = [
   {
     id: "task-8",
     title: "Present audit findings",
-    "project.name": "Brand audit",
+    project: { id: "project-2", name: "Brand audit" },
     assignee: "Jon",
     priority: "medium",
     status: "todo",

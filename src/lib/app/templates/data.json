@@ -350,7 +350,11 @@
               },
               {
                 "path": ["RGfdQeG4GG00Qbv4", "p7hxOFQQTgjO7NSR"],
-                "as": "project_name"
+                "as": ["project", "name"]
+              },
+              {
+                "path": ["RGfdQeG4GG00Qbv4"],
+                "as": ["project", "id"]
               },
               {
                 "path": ["ytWQNpVpReTwbUvD"],
@@ -399,7 +403,11 @@
               },
               {
                 "path": ["RGfdQeG4GG00Qbv4", "p7hxOFQQTgjO7NSR"],
-                "as": "project_name"
+                "as": ["project", "name"]
+              },
+              {
+                "path": ["RGfdQeG4GG00Qbv4"],
+                "as": ["project", "id"]
               },
               {
                 "path": ["ytWQNpVpReTwbUvD"],

@@ -1,5 +1,6 @@
 <script lang="ts">
 	import FormattedValue from "$lib/components/formatted-value.svelte";
+	import { viewCellValue } from "$lib/app/view-results.ts";
 	import { Button } from "@jthum/framework/svelte/ui/button";
 	import * as Card from "@jthum/framework/svelte/ui/card";
 	import type { BlockProps } from "$lib/blocks/types.ts";
@@ -16,10 +17,10 @@
 
 {#if view && record}
 	<Card.Root class="h-full">
-		<Card.Header><Card.Title>{String(config.title || `Featured ${type?.label ?? "record"}`)}</Card.Title>{#if statusField}<Card.Action><FormattedValue path={statusField} value={record[statusField]} {type} badge /></Card.Action>{/if}</Card.Header>
+		<Card.Header><Card.Title>{String(config.title || `Featured ${type?.label ?? "record"}`)}</Card.Title>{#if statusField}<Card.Action><FormattedValue path={statusField} value={viewCellValue(view, record, statusField)} {type} badge /></Card.Action>{/if}</Card.Header>
 		<Card.Content class="flex min-h-40 flex-col justify-center gap-3">
-			<p class="text-2xl font-semibold tracking-tight"><FormattedValue path={titleField} value={record[titleField]} {type} /></p>
-			{#if descriptionField}<p class="max-w-2xl text-muted-foreground"><FormattedValue path={descriptionField} value={record[descriptionField]} {type} /></p>{/if}
+			<p class="text-2xl font-semibold tracking-tight"><FormattedValue path={titleField} value={viewCellValue(view, record, titleField)} {type} /></p>
+			{#if descriptionField}<p class="max-w-2xl text-muted-foreground"><FormattedValue path={descriptionField} value={viewCellValue(view, record, descriptionField)} {type} /></p>{/if}
 		</Card.Content>
 		<Card.Footer class="justify-end"><Button href={`/t/${view.source}/${record.id}`} variant="ghost" size="sm">{String(config.action_label || "Open record")}<ArrowRightIcon data-icon="inline-end" /></Button></Card.Footer>
 	</Card.Root>

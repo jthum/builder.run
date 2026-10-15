@@ -1,5 +1,6 @@
 <script lang="ts">
 	import FormattedValue from "$lib/components/formatted-value.svelte";
+	import { viewCellValue } from "$lib/app/view-results.ts";
 	import * as Card from "@jthum/framework/svelte/ui/card";
 	import { Separator } from "@jthum/framework/svelte/ui/separator";
 	import type { BlockProps } from "$lib/blocks/types.ts";
@@ -21,8 +22,8 @@
 			{#each items as item, index (String(item.id ?? index))}
 				<a href={`/t/${view.source}/${item.id}`} class="group flex items-start gap-3 rounded-lg py-3 outline-none focus-visible:ring-2 focus-visible:ring-ring">
 					<div class="mt-1.5 size-2 shrink-0 rounded-full bg-primary ring-4 ring-primary/10"></div>
-					<div class="min-w-0 flex-1"><p class="font-medium group-hover:underline"><FormattedValue path={titleField} value={item[titleField]} {type} /></p>{#if descriptionField}<p class="truncate text-sm text-muted-foreground"><FormattedValue path={descriptionField} value={item[descriptionField]} {type} /></p>{/if}</div>
-					<span class="shrink-0 text-xs text-muted-foreground"><FormattedValue path={dateField} value={item[dateField]} {type} /></span>
+					<div class="min-w-0 flex-1"><p class="font-medium group-hover:underline"><FormattedValue path={titleField} value={viewCellValue(view, item, titleField)} {type} /></p>{#if descriptionField}<p class="truncate text-sm text-muted-foreground"><FormattedValue path={descriptionField} value={viewCellValue(view, item, descriptionField)} {type} /></p>{/if}</div>
+					<span class="shrink-0 text-xs text-muted-foreground"><FormattedValue path={dateField} value={viewCellValue(view, item, dateField)} {type} /></span>
 				</a>
 				{#if index < items.length - 1}<Separator />{/if}
 			{/each}

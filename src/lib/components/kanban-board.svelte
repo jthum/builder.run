@@ -5,7 +5,7 @@
 	import * as Card from "@jthum/framework/svelte/ui/card";
 	import * as Empty from "@jthum/framework/svelte/ui/empty";
 	import { Skeleton } from "@jthum/framework/svelte/ui/skeleton";
-	import { cellValue } from "$lib/runtime/chart-data.ts";
+	import { viewCellValue, viewDisplayFields } from "$lib/app/view-results.ts";
 	import { labelFromKey } from "$lib/runtime/ids.ts";
 	import type { CollectionDraft, ViewDraft } from "$lib/blocks/presentation.ts";
 	import InboxIcon from "@lucide/svelte/icons/inbox";
@@ -26,14 +26,15 @@
 		ready?: boolean;
 	} = $props();
 
-	const titleField = $derived(view.fields[0] ?? "id");
-	const rest = $derived(view.fields.filter((item) => item !== field).slice(1, 3));
+	const fields = $derived(viewDisplayFields(view, type));
+	const titleField = $derived(fields[0] ?? "id");
+	const rest = $derived(fields.filter((item) => item !== field).slice(1, 3));
 	const columns = $derived.by(() => {
 		const defined = type?.fields.find((item) => item.key === field)?.values ?? [];
 		const seen = new Set(defined);
 		const extra: string[] = [];
 		for (const row of rows ?? []) {
-			const raw = cellValue(row, field);
+			const raw = viewCellValue(view, row, field);
 			const key = raw == null || raw === "" ? "None" : String(raw);
 			if (!seen.has(key)) {
 				seen.add(key);
@@ -46,7 +47,7 @@
 		const map = new Map<string, Array<Record<string, unknown>>>();
 		for (const key of columns) map.set(key, []);
 		for (const row of rows ?? []) {
-			const raw = cellValue(row, field);
+			const raw = viewCellValue(view, row, field);
 			const key = raw == null || raw === "" ? "None" : String(raw);
 			const list = map.get(key) ?? [];
 			list.push(row);
@@ -94,12 +95,12 @@
 								<Card.Root variant="inset" class="transition-all hover:-translate-y-px hover:shadow-sm">
 									<Card.Content class="flex flex-col gap-1.5 p-3.5">
 											<p class="text-sm font-medium">
-												<FormattedValue path={titleField} value={row[titleField]} {type} />
+												<FormattedValue path={titleField} value={viewCellValue(view, row, titleField)} {type} />
 											</p>
 											{#each rest as path (path)}
 											<p class="flex items-center gap-1 text-xs text-muted-foreground">
 												<span>{columnLabel(path, type)}:</span>
-													<FormattedValue {path} value={row[path]} {type} badge={isStatusPath(path)} />
+													<FormattedValue {path} value={viewCellValue(view, row, path)} {type} badge={isStatusPath(path)} />
 												</p>
 											{/each}
 										</Card.Content>

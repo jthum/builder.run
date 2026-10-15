@@ -1,4 +1,5 @@
 import { columnLabel, homeViews, isBlankApp } from "$lib/app/labels.ts";
+import { viewDisplayFields } from "$lib/app/view-results.ts";
 import { blockCategories, blocks } from "$lib/blocks/registry.ts";
 import type {
   BlockCategory,
@@ -385,7 +386,7 @@ export function fieldsForView(spec: PageContext, viewKey: string): FieldDraft[] 
   if (!view || !type) return [];
   if (!view.group_by) {
     if (!view.fields.length) return type.fields;
-    return view.fields.map((path) => fieldForViewPath(spec, type, path));
+    return viewDisplayFields(view, type).map((path) => fieldForViewPath(spec, type, path));
   }
   const groupField = type?.fields.find((field) => field.key === view.group_by) ?? {
     id: `group_${view.group_by}`,

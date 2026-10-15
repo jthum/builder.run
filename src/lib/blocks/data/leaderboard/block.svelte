@@ -3,7 +3,8 @@
 	import { Badge } from "@jthum/framework/svelte/ui/badge";
 	import * as Card from "@jthum/framework/svelte/ui/card";
 	import { Progress } from "@jthum/framework/svelte/ui/progress";
-	import { asNumber, cellValue } from "$lib/runtime/chart-data.ts";
+	import { asNumber } from "$lib/runtime/chart-data.ts";
+	import { viewCellValue, viewReferenceHref } from "$lib/app/view-results.ts";
 	import type { BlockProps } from "$lib/blocks/types.ts";
 
 	let { config, rows, spec }: BlockProps = $props();
@@ -16,10 +17,10 @@
 	const limit = $derived(Math.max(1, Math.min(20, Number(config.limit) || 5)));
 	const ranked = $derived(
 		[...(rows[viewKey] ?? [])]
-			.sort((left, right) => asNumber(cellValue(right, valueField)) - asNumber(cellValue(left, valueField)))
+			.sort((left, right) => asNumber(viewCellValue(view, right, valueField)) - asNumber(viewCellValue(view, left, valueField)))
 			.slice(0, limit),
 	);
-	const maximum = $derived(Math.max(...ranked.map((item) => asNumber(cellValue(item, valueField))), 1));
+	const maximum = $derived(Math.max(...ranked.map((item) => asNumber(viewCellValue(view, item, valueField))), 1));
 </script>
 
 {#if view}
@@ -30,15 +31,15 @@
 		</Card.Header>
 		<Card.Content class="flex flex-col py-2">
 			{#each ranked as item, index (String(item.id ?? index))}
-				<a href={`/t/${view.source}/${item.id}`} class="group grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-x-3 gap-y-2 rounded-xl px-1 py-3 outline-none focus-visible:ring-2 focus-visible:ring-ring">
+				<div class="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-x-3 gap-y-2 rounded-xl px-1 py-3">
 					<Badge variant={index < 3 ? "secondary" : "outline"}>{index + 1}</Badge>
 					<div class="min-w-0">
-						<p class="truncate font-medium group-hover:underline"><FormattedValue path={labelField} value={item[labelField]} {type} /></p>
-						{#if detailField}<p class="truncate text-sm text-muted-foreground"><FormattedValue path={detailField} value={item[detailField]} {type} /></p>{/if}
+						<p class="truncate"><FormattedValue path={labelField} value={viewCellValue(view, item, labelField)} {type} href={`/t/${view.source}/${item.id}`} /></p>
+						{#if detailField}<p class="truncate text-sm text-muted-foreground"><FormattedValue path={detailField} value={viewCellValue(view, item, detailField)} {type} href={viewReferenceHref(view, item, detailField, spec?.types ?? [])} /></p>{/if}
 					</div>
-					<p class="font-medium tabular-nums"><FormattedValue path={valueField} value={item[valueField]} {type} maximumFractionDigits={1} /></p>
-					<div class="col-start-2 col-end-4"><Progress value={(asNumber(cellValue(item, valueField)) / maximum) * 100} max={100} class="h-1.5" /></div>
-				</a>
+					<p class="font-medium tabular-nums"><FormattedValue path={valueField} value={viewCellValue(view, item, valueField)} {type} maximumFractionDigits={1} /></p>
+					<div class="col-start-2 col-end-4"><Progress value={(asNumber(viewCellValue(view, item, valueField)) / maximum) * 100} max={100} class="h-1.5" /></div>
+				</div>
 			{/each}
 		</Card.Content>
 	</Card.Root>

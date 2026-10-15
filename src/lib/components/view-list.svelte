@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { isStatusPath } from "$lib/app/labels.ts";
 	import FormattedValue from "$lib/components/formatted-value.svelte";
+	import { viewCellValue, viewDisplayFields } from "$lib/app/view-results.ts";
 	import { Separator } from "@jthum/framework/svelte/ui/separator";
 	import * as Empty from "@jthum/framework/svelte/ui/empty";
 	import { Skeleton } from "@jthum/framework/svelte/ui/skeleton";
@@ -17,7 +18,8 @@
 		type?: CollectionDraft;
 	} = $props();
 
-	const fields = $derived(view.fields.length ? view.fields : ["id"]);
+	const visibleFields = $derived(viewDisplayFields(view, type));
+	const fields = $derived(visibleFields.length ? visibleFields : ["id"]);
 	const titleField = $derived(fields[0] ?? "id");
 	const secondary = $derived(fields[1]);
 </script>
@@ -45,13 +47,13 @@
 			>
 				<div class="min-w-0 flex flex-col gap-0.5">
 					<span class="truncate font-medium">
-						<FormattedValue path={titleField} value={row[titleField]} {type} />
+						<FormattedValue path={titleField} value={viewCellValue(view, row, titleField)} {type} />
 					</span>
 					{#if secondary}
 						<span class="truncate text-sm text-muted-foreground">
 							<FormattedValue
 								path={secondary}
-								value={row[secondary]}
+								value={viewCellValue(view, row, secondary)}
 								{type}
 								badge={isStatusPath(secondary)}
 							/>
@@ -62,7 +64,7 @@
 					<span class="shrink-0 text-sm text-muted-foreground">
 						<FormattedValue
 							path={fields[2]}
-							value={row[fields[2]]}
+							value={viewCellValue(view, row, fields[2])}
 							{type}
 							badge={isStatusPath(fields[2])}
 						/>

@@ -13,7 +13,7 @@
 		isStatusPath,
 	} from "$lib/app/labels.ts";
 	import { canonicalStudio } from "$lib/app/canonical-studio.svelte.ts";
-	import { viewOutputKey } from "$lib/app/view-results.ts";
+	import { viewCellValue, viewDisplayFields } from "$lib/app/view-results.ts";
 	import type { DataTableColumn } from "$lib/components/data-table.ts";
 	import DataTable from "$lib/components/data-table.svelte";
 	import FormattedValue from "$lib/components/formatted-value.svelte";
@@ -59,9 +59,9 @@
 	const aggregated = $derived(Boolean(view.group_by));
 	const add = $derived(createLabel ?? (type ? addLabel(type) : "Add"));
 	const columns = $derived.by((): DataTableColumn[] => {
-		const keys = view.fields.length ? view.fields : ["id"];
+		const visible = viewDisplayFields(view, type);
+		const keys = visible.length ? visible : ["id"];
 		return keys.map((key) => {
-			const outputKey = viewOutputKey(view, key);
 			const fieldKey = key.split(".")[0] ?? key;
 			const field = type?.fields.find((item) => item.key === fieldKey);
 			const valueSemantics =
@@ -72,7 +72,7 @@
 					: undefined;
 			return {
 				id: key,
-				accessor: outputKey === key ? undefined : (row) => row[outputKey],
+				accessor: (row) => viewCellValue(view, row, key),
 				label: columnLabel(key, type),
 				sortable: true,
 				numeric: isAmountPath(key) || field?.type === "number" || Boolean(view.measures?.[key]),
@@ -120,7 +120,7 @@
 		if (pending.length === 1) {
 			const row = pending[0];
 			const key = columns[0]?.id ?? "id";
-			return formatCell(key, row?.[key]);
+			return formatCell(key, row ? viewCellValue(view, row, key) : undefined);
 		}
 		if (pending.length > 1) return `${pending.length} records`;
 		return "this";
@@ -176,7 +176,7 @@
 						{:else if isAmountPath(column.id)}
 							{formatMoney(
 								visibleRows.reduce((sum, row) => {
-									const numeric = Number(row[column.id]);
+									const numeric = Number(viewCellValue(view, row, column.id));
 									return sum + (Number.isNaN(numeric) ? 0 : numeric);
 								}, 0),
 							)}

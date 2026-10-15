@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { columnLabel, isStatusPath } from "$lib/app/labels.ts";
 	import FormattedValue from "$lib/components/formatted-value.svelte";
+	import { viewCellValue, viewDisplayFields } from "$lib/app/view-results.ts";
 	import * as Card from "@jthum/framework/svelte/ui/card";
 	import * as Empty from "@jthum/framework/svelte/ui/empty";
 	import { Skeleton } from "@jthum/framework/svelte/ui/skeleton";
@@ -17,7 +18,8 @@
 		type?: CollectionDraft;
 	} = $props();
 
-	const fields = $derived(view.fields.length ? view.fields : ["id"]);
+	const visibleFields = $derived(viewDisplayFields(view, type));
+	const fields = $derived(visibleFields.length ? visibleFields : ["id"]);
 	const titleField = $derived(fields[0] ?? "id");
 	const rest = $derived(fields.slice(1, 4));
 </script>
@@ -42,7 +44,7 @@
 				<Card.Root class="h-full transition-all hover:ring-foreground/20">
 					<Card.Content class="flex flex-col gap-3 p-5">
 						<p class="font-medium">
-							<FormattedValue path={titleField} value={row[titleField]} {type} />
+							<FormattedValue path={titleField} value={viewCellValue(view, row, titleField)} {type} />
 						</p>
 						{#if rest.length}
 							<dl class="flex flex-col gap-1.5">
@@ -50,7 +52,7 @@
 									<div class="flex items-center justify-between gap-3 text-sm">
 										<dt class="text-muted-foreground">{columnLabel(path, type)}</dt>
 										<dd>
-											<FormattedValue {path} value={row[path]} {type} badge={isStatusPath(path)} />
+											<FormattedValue {path} value={viewCellValue(view, row, path)} {type} badge={isStatusPath(path)} />
 										</dd>
 									</div>
 								{/each}

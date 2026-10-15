@@ -3,7 +3,8 @@
 	import { Button } from "@jthum/framework/svelte/ui/button";
 	import * as Card from "@jthum/framework/svelte/ui/card";
 	import { Skeleton } from "@jthum/framework/svelte/ui/skeleton";
-	import { asDayKey, cellValue } from "$lib/runtime/chart-data.ts";
+	import { asDayKey } from "$lib/runtime/chart-data.ts";
+	import { viewCellValue } from "$lib/app/view-results.ts";
 	import type { CollectionDraft, ViewDraft } from "$lib/blocks/presentation.ts";
 	import ChevronLeftIcon from "@lucide/svelte/icons/chevron-left";
 	import ChevronRightIcon from "@lucide/svelte/icons/chevron-right";
@@ -52,7 +53,7 @@
 	const byDay = $derived.by(() => {
 		const map = new Map<string, Array<Record<string, unknown>>>();
 		for (const row of rows ?? []) {
-			const key = asDayKey(cellValue(row, dateField));
+			const key = asDayKey(viewCellValue(view, row, dateField));
 			if (!key) continue;
 			const list = map.get(key) ?? [];
 			list.push(row);
@@ -110,7 +111,7 @@
 										href="/t/{view.source}/{row.id}"
 										class="truncate rounded-md bg-background px-1 py-0.5 text-[11px] hover:bg-muted"
 									>
-										<FormattedValue path={titleField} value={row[titleField]} {type} />
+										<FormattedValue path={titleField} value={viewCellValue(view, row, titleField)} {type} />
 									</a>
 								{/each}
 								{#if items.length > 3}
