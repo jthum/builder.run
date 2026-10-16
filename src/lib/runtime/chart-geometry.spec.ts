@@ -12,6 +12,9 @@ import {
 } from "./chart-geometry.ts";
 
 describe("chart geometry", () => {
+  it("stacks positive and negative values on separate sides of zero", () => {
+    expect(stackOffsets([[3, -2, 4, -5, 0]])).toEqual([[0, 0, 3, -2, 7]]);
+  });
   it("maps values onto a pixel range and keeps zero in domain when all values are positive", () => {
     expect.hasAssertions();
     expect(extent([3, 8, 5])).toEqual([0, 8]);

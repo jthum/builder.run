@@ -1,0 +1,53 @@
+.chart-frame [data-chart-mark],
+.chart-frame [data-chart-legend] {
+  transition:
+    opacity 140ms ease,
+    stroke-width 140ms ease,
+    background-color 140ms ease;
+}
+.chart-frame [data-chart-mark] {
+  outline: none;
+}
+.chart-frame [data-chart-mark][data-chart-muted] {
+  opacity: 0.2;
+}
+.chart-frame [data-chart-mark][data-chart-active] {
+  opacity: 1;
+}
+.chart-frame [data-chart-mark][data-chart-selected],
+.chart-frame [data-chart-mark]:focus-visible {
+  stroke: var(--foreground);
+  stroke-width: 2;
+  stroke-opacity: 1;
+}
+.chart-frame [data-chart-legend][data-chart-muted] svg {
+  opacity: 0.55;
+}
+.chart-frame [data-chart-legend][data-chart-active] {
+  background: var(--muted);
+}
+.chart-frame [data-chart-line] {
+  fill: none;
+  stroke-width: 2;
+}
+.chart-frame [data-chart-line][data-chart-active] {
+  stroke-width: 3;
+}
+@media (prefers-reduced-motion: reduce) {
+  .chart-frame [data-chart-mark],
+  .chart-frame [data-chart-legend] {
+    transition: none;
+  }
+}
+@media (forced-colors: active) {
+  .chart-frame [data-chart-mark] {
+    stroke: CanvasText;
+  }
+  .chart-frame [data-chart-line] {
+    stroke: CanvasText;
+  }
+  .chart-frame [data-chart-mark]:focus-visible {
+    stroke: Highlight;
+    stroke-width: 3;
+  }
+}

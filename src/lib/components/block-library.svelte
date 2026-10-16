@@ -13,8 +13,8 @@
 	import SparklesIcon from "@lucide/svelte/icons/sparkles";
 	import type { Component } from "svelte";
 
-	const wide = new Set(["hero", "section_heading", "table", "cards", "timeline", "kanban", "calendar", "form"]);
-	const tall = new Set(["bar", "line", "donut", "stacked_bar", "funnel", "scatter", "heatmap", "kanban", "calendar"]);
+	const wide = new Set(["hero", "section_heading", "table", "cards", "timeline", "kanban", "calendar", "form", "gallery"]);
+	const tall = new Set(["bar", "line", "donut", "stacked_bar", "funnel", "scatter", "heatmap", "kanban", "calendar", "agenda", "gallery"]);
 	const categoryDetails: Record<BlockCategory, { description: string; icon: Component }> = {
 		highlights: {
 			description: "Prominent summaries and signals that establish the purpose of a page.",

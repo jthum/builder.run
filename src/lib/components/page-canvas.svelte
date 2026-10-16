@@ -8,6 +8,18 @@
   import { blockInputs, blockInputOptions, collectViewKeys, defaultBlockConfig } from "$lib/runtime/blocks.ts";
   import type { PageContext } from "$lib/blocks/presentation.ts";
   import { pageBlocks } from "$lib/app/pages.ts";
+  import type { Component } from "svelte";
+  import ArrowUpRightIcon from "@lucide/svelte/icons/arrow-up-right";
+  import CalendarDaysIcon from "@lucide/svelte/icons/calendar-days";
+  import ImagesIcon from "@lucide/svelte/icons/images";
+  import ChartNoAxesColumnIncreasingIcon from "@lucide/svelte/icons/chart-no-axes-column-increasing";
+
+  const blockIcons: Record<string, Component> = {
+    navigation_card: ArrowUpRightIcon,
+    agenda: CalendarDaysIcon,
+    gallery: ImagesIcon,
+    status_breakdown: ChartNoAxesColumnIncreasingIcon,
+  };
 
   let { page, title, description, editable = true, startEditing = false, spec, revision, queryView, upsertPage }: {
     page: PageDefinition;
@@ -52,6 +64,7 @@
 {#key `${spec?.id}:${page.key}`}
 <PageEditor {page} {title} {description} {editable} {startEditing}
   {blocks} categories={blockCategories} onPreview={preloadBlock}
+  getIcon={block => blockIcons[block.key]}
   getConfig={block => spec ? defaultBlockConfig(block as BlockDefinition, spec) as SpecMeta : {}}
   getInputs={block => blockInputs(block as BlockDefinition)}
   getOptions={(input, config) => spec ? blockInputOptions(spec, input, config) : []}

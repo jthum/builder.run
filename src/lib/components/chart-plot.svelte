@@ -24,7 +24,7 @@
 	});
 </script>
 
-<div bind:this={node} class="relative min-h-0 w-full flex-1">
+<div bind:this={node} class="relative min-h-40 w-full flex-1">
 	{#if width > 16 && height > 16}
 		{@render children({ width, height })}
 	{/if}

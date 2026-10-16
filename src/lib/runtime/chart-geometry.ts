@@ -101,10 +101,12 @@ export function areaPath(points: Array<[number, number]>, y0: number): string {
 
 export function stackOffsets(columns: number[][]): number[][] {
   return columns.map((column) => {
-    let offset = 0;
+    let positive = 0;
+    let negative = 0;
     return column.map((value) => {
-      const start = offset;
-      offset += Math.max(value, 0);
+      const start = value < 0 ? negative : positive;
+      if (value < 0) negative += value;
+      else positive += value;
       return start;
     });
   });
@@ -118,8 +120,4 @@ export function chartPalette(hue: number, count: number): string[] {
     const light = 0.62 - (index % 2) * 0.06;
     return `oklch(${light} ${chroma} ${next})`;
   });
-}
-
-export function hatchId(index: number): string {
-  return `chart-hatch-${index}`;
 }

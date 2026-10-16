@@ -26,22 +26,25 @@ Framework has its own tests and package checks in its repository. Run the releva
 
 ## Useful test entry points
 
-| Area                              | Tests                                                                                                                              |
-| --------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
-| Bootstrap and Space/App selection | [bootstrap.spec.ts](../src/lib/framework/bootstrap.spec.ts)                                                                        |
-| Routed SQLite persistence         | [sqlite.spec.ts](../src/lib/framework/sqlite.spec.ts)                                                                              |
-| Record workflows                  | [record-workflow.spec.ts](../src/lib/framework/record-workflow.spec.ts)                                                            |
-| User approval flow                | [approval-example.spec.ts](../src/lib/framework/approval-example.spec.ts)                                                          |
-| WebMCP tools                      | [webmcp.spec.ts](../src/lib/app/webmcp.spec.ts)                                                                                    |
-| Assistant MCP projection          | [assistant-tools.spec.ts](../src/lib/inference/assistant-tools.spec.ts)                                                            |
-| Conversation and cancellation     | [assistant.spec.ts](../src/lib/app/assistant.spec.ts)                                                                              |
-| Inference integration and replay  | [runtime.spec.ts](../src/lib/inference/runtime.spec.ts)                                                                            |
-| Encrypted Workspace settings      | [secrets.spec.ts](../src/lib/framework/secrets.spec.ts)                                                                            |
-| Templates and example records     | [app-templates.spec.ts](../src/lib/app/app-templates.spec.ts), [template-records.spec.ts](../src/lib/app/template-records.spec.ts) |
-| Official block registry           | [registry.spec.ts](../src/lib/blocks/registry.spec.ts)                                                                             |
-| Analytics projections and states  | [analytics.spec.ts](../src/lib/blocks/analytics.spec.ts), [chart-data.spec.ts](../src/lib/runtime/chart-data.spec.ts)              |
+| Area                                             | Tests                                                                                                                                                                                                                                                     |
+| ------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Bootstrap and Space/App selection                | [bootstrap.spec.ts](../src/lib/framework/bootstrap.spec.ts)                                                                                                                                                                                               |
+| Routed SQLite persistence                        | [sqlite.spec.ts](../src/lib/framework/sqlite.spec.ts)                                                                                                                                                                                                     |
+| Record workflows                                 | [record-workflow.spec.ts](../src/lib/framework/record-workflow.spec.ts)                                                                                                                                                                                   |
+| User approval flow                               | [approval-example.spec.ts](../src/lib/framework/approval-example.spec.ts)                                                                                                                                                                                 |
+| WebMCP tools                                     | [webmcp.spec.ts](../src/lib/app/webmcp.spec.ts)                                                                                                                                                                                                           |
+| Assistant MCP projection                         | [assistant-tools.spec.ts](../src/lib/inference/assistant-tools.spec.ts)                                                                                                                                                                                   |
+| Conversation and cancellation                    | [assistant.spec.ts](../src/lib/app/assistant.spec.ts)                                                                                                                                                                                                     |
+| Inference integration and replay                 | [runtime.spec.ts](../src/lib/inference/runtime.spec.ts)                                                                                                                                                                                                   |
+| Encrypted Workspace settings                     | [secrets.spec.ts](../src/lib/framework/secrets.spec.ts)                                                                                                                                                                                                   |
+| Templates and example records                    | [app-templates.spec.ts](../src/lib/app/app-templates.spec.ts), [template-records.spec.ts](../src/lib/app/template-records.spec.ts)                                                                                                                        |
+| Official block registry                          | [registry.spec.ts](../src/lib/blocks/registry.spec.ts)                                                                                                                                                                                                    |
+| Analytics projections and states                 | [analytics.spec.ts](../src/lib/blocks/analytics.spec.ts), [chart-data.spec.ts](../src/lib/runtime/chart-data.spec.ts)                                                                                                                                     |
+| Navigation, agenda, gallery and status breakdown | [page-blocks.spec.ts](../src/lib/blocks/page-blocks.spec.ts), [links.spec.ts](../src/lib/blocks/links.spec.ts), [agenda dates](../src/lib/blocks/data/agenda/data.spec.ts), [status grouping](../src/lib/blocks/highlights/status-breakdown/data.spec.ts) |
 
 Analytics tests render the real block components and SVG markup with a fixed-size plot fixture. They cover flat and nested View aliases, aggregate output, independent comparison Views, count mode, zero/null values, loading and empty results, and Library previews without requiring a browser or `ResizeObserver`.
+
+[Chart accessibility markup](../src/lib/components/chart-accessibility.spec.ts) and [interaction](../src/lib/runtime/chart-interaction.spec.ts) tests cover unique pattern references, matching legend states, one tab stop per plot, arrow/Home/End navigation, Escape, pointer/focus precedence and stale-state cleanup. They use server-rendered SVG and deterministic event targets, not browser screenshots. Screen-reader behaviour, forced-colour appearance and pointer hit areas still benefit from manual checks.
 
 ## Manual browser checks
 

@@ -355,7 +355,7 @@ export function fieldsMatching(fields: FieldDraft[], of?: BlockFieldKind): Field
   if (!of || of === "any") return fields;
   if (of === "date") {
     return [
-      ...fields.filter((field) => field.type === "date"),
+      ...fields.filter((field) => field.type === "date" || field.type === "datetime"),
       {
         id: "created_at",
         key: "created_at",
@@ -440,7 +440,7 @@ export function defaultBlockConfig(
     else if (input.type === "rule") config[input.key] = firstWorkflow;
     else if (input.type === "boolean") config[input.key] = Boolean(input.default);
     else if (input.type === "field") {
-      config[input.key] = fieldsMatching(fields, input.fieldKind)[0]?.key ?? "";
+      config[input.key] = input.default ?? fieldsMatching(fields, input.fieldKind)[0]?.key ?? "";
     } else if (input.type === "select") {
       config[input.key] = input.default ?? input.options?.[0]?.value ?? "";
     } else config[input.key] = input.default ?? "";

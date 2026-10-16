@@ -3,6 +3,8 @@
 	import { session } from "$lib/app/session.svelte.ts";
 	import ChartFrame from "$lib/components/chart-frame.svelte";
 	import ChartPlot from "$lib/components/chart-plot.svelte";
+	import ChartPattern from "$lib/components/chart-pattern.svelte";
+	import { ChartInteraction, chartPatternId } from "$lib/runtime/chart-interaction.svelte.ts";
 	import { asLabel } from "$lib/runtime/chart-data.ts";
 	import { viewCellValue } from "$lib/app/view-results.ts";
 	import { chartPalette, extent, linear, niceTicks } from "$lib/runtime/chart-geometry.ts";
@@ -25,7 +27,11 @@
 	);
 	const hue = $derived(toneFromAccent(session.accent).hue);
 	const color = $derived(chartPalette(hue, 1)[0]);
-	let hover = $state<{ x: number; y: number; text: string } | null>(null);
+	const prefix = $props.id();
+	const interaction = new ChartInteraction();
+	const ids = $derived(points.map((point, index) => JSON.stringify([point.id, index])));
+	$effect(() => interaction.reconcile(ids, ids));
+	const data = $derived({ columns: [labelField || "Record", xField, yField], rows: points.map((point) => [point.label, point.x, point.y]) });
 
 	function coordinate(value: unknown): number | undefined {
 		if (typeof value !== "number" && (typeof value !== "string" || !value.trim())) return undefined;
@@ -40,7 +46,7 @@
 </script>
 
 {#if view}
-	<ChartFrame title={String(config.title || view.label)} {ready} empty={ready && !points.length}>
+	<ChartFrame title={String(config.title || view.label)} {ready} empty={ready && !points.length} {interaction} {data}>
 		<ChartPlot>
 			{#snippet children({ width, height })}
 				{@const padL = 42}
@@ -51,7 +57,10 @@
 				{@const yDomain = extent(points.map((point) => point.y))}
 				{@const xScale = linear(xDomain, [padL, width - padR])}
 				{@const yScale = linear(yDomain, [height - padB, padT])}
-				<svg width={width} height={height} viewBox="0 0 {width} {height}" class="block size-full" role="img" aria-label={String(config.title || view.label)} onmouseleave={() => (hover = null)}>
+				<svg width={width} height={height} viewBox="0 0 {width} {height}" class="block size-full" role="group" aria-label={String(config.title || view.label)} data-chart-plot aria-describedby={`${prefix}-help`}>
+					<desc id={`${prefix}-help`}>Use arrow keys to explore points, Home and End to reach the endpoints, and Escape to clear the highlight. Horizontal axis: {xField}. Vertical axis: {yField}.</desc>
+					<defs><ChartPattern id={chartPatternId(prefix, 0)} index={0} color={color!} /></defs>
+					<g aria-hidden="true">
 					{#each niceTicks(yDomain[0], yDomain[1], 4) as tick (tick)}
 						<line x1={padL} x2={width - padR} y1={yScale(tick)} y2={yScale(tick)} class="stroke-border" />
 						<text x={padL - 6} y={yScale(tick)} text-anchor="end" dominant-baseline="middle" class="fill-muted-foreground" font-size="10">{formatTick(tick)}</text>
@@ -59,13 +68,13 @@
 					{#each niceTicks(xDomain[0], xDomain[1], 4) as tick (tick)}
 						<text x={xScale(tick)} y={height - 8} text-anchor="middle" class="fill-muted-foreground" font-size="10">{formatTick(tick)}</text>
 					{/each}
-					{#each points as point (point.id)}
-						<circle cx={xScale(point.x)} cy={yScale(point.y)} r="5" fill={color} opacity="0.88" role="presentation" onmouseenter={(event) => (hover = { x: event.offsetX, y: event.offsetY, text: `${point.label}: ${formatTick(point.x)} × ${formatTick(point.y)}` })}>
+					</g>
+					{#each points as point, index (ids[index])}
+						<circle cx={xScale(point.x)} cy={yScale(point.y)} r="6" fill={`url(#${chartPatternId(prefix, 0)})`} data-chart-mark {...interaction.mark({ id: ids[index]!, key: ids[index]!, text: `${point.label}: ${point.x} × ${point.y} (${xField} × ${yField})` }, ids)}>
 							<title>{point.label}: {point.x} × {point.y}</title>
 						</circle>
 					{/each}
 				</svg>
-				{#if hover}<div class="pointer-events-none absolute rounded-md border bg-popover px-2 py-1 text-xs text-popover-foreground shadow-sm" style="left: {Math.min(hover.x + 8, width - 8)}px; top: {Math.max(hover.y - 28, 4)}px">{hover.text}</div>{/if}
 			{/snippet}
 		</ChartPlot>
 	</ChartFrame>
