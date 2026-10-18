@@ -9,6 +9,8 @@ import {
   isAuthoringManaged,
   createViewActions,
   loadEditorContext,
+  viewDefinitionFromDraft,
+  type ViewDraft,
   type CollectionActions,
   type EditorContext,
   type FormActions,
@@ -22,6 +24,7 @@ import {
 import type { Spec } from "@jthum/framework/spec";
 import { launchRule, type RuleLaunch } from "@jthum/framework/client";
 import { installCollectionStarters } from "$lib/app/collection-starters.ts";
+import { relatedRecordQuery } from "./record-details.ts";
 
 class CanonicalStudioState {
   context = $state.raw<EditorContext | null>(null);
@@ -147,10 +150,38 @@ class CanonicalStudioState {
     return result.data.rows.map((row) => ({ id: row.id, ...row.values }));
   }
 
+  async queryRelatedRecords(
+    view: ViewDraft,
+    fieldKey: string,
+    id: string,
+  ): Promise<Array<Record<string, unknown>>> {
+    const runtime = session.framework;
+    const field = this.schemas[view.source]?.fields.find((field) => field.key === fieldKey);
+    if (!runtime || !field) throw new Error("The related collection is unavailable.");
+    const definition = viewDefinitionFromDraft(view, this.schemas);
+    const result = await runtime.appClient.querySource(
+      definition.source,
+      relatedRecordQuery(definition, field.id, id),
+    );
+    return result.rows.map((row) => ({ id: row.id, ...row.values }));
+  }
+
   async getRecord(collectionKey: string, id: string): Promise<Record<string, unknown> | null> {
-    const client = this.recordClient(collectionKey);
-    const record = await client.getRecord(collectionKey, id);
-    return record ? this.recordValue(record) : null;
+    return this.recordReader()(collectionKey, id);
+  }
+
+  /** Bind related reads to the same App/Space even if the user switches Apps mid-request. */
+  recordReader() {
+    const runtime = session.framework;
+    const collections = this.context?.collections ?? [];
+    if (!runtime) throw new Error("The Framework runtime is not ready.");
+    return async (key: string, id: string): Promise<Record<string, unknown> | null> => {
+      const collection = collections.find((item) => item.key === key);
+      if (!collection) throw new Error(`Collection ${key} is unavailable.`);
+      const client = collection.expose ? runtime.spaceClient : runtime.appClient;
+      const record = await client.getRecord(key, id);
+      return record ? this.recordValue(record) : null;
+    };
   }
 
   async listRecords(collectionKey: string): Promise<Array<Record<string, unknown>>> {

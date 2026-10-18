@@ -40,6 +40,9 @@
 		actionHref,
 		actionLabel = "View all",
 		onOpen,
+		activeId,
+		openLabel = "Open",
+		onVisibleRows,
 		onCreate,
 		onDelete,
 		externalFilterIds = [],
@@ -61,7 +64,10 @@
 		compact?: boolean;
 		actionHref?: string;
 		actionLabel?: string;
-		onOpen?: (row: Record<string, unknown>) => void;
+		onOpen?: (row: Record<string, unknown>, trigger?: HTMLElement | null) => void;
+		activeId?: string;
+		openLabel?: string;
+		onVisibleRows?: (rows: Record<string, unknown>[]) => void;
 		onCreate?: () => void;
 		onDelete?: (rows: Array<Record<string, unknown>>) => void;
 		externalFilterIds?: string[];
@@ -133,6 +139,7 @@
 
 	const pageCount = $derived(Math.max(1, Math.ceil(sorted.length / pageSize)));
 	const pageRows = $derived(sorted.slice((page - 1) * pageSize, page * pageSize));
+	$effect(() => { onVisibleRows?.(pageRows); });
 	const selectedRows = $derived((filtered ?? []).filter((row) => selected[rowId(row)]));
 	const selectedCount = $derived(selectedRows.length);
 	const pageIds = $derived(pageRows.map(rowId).filter(Boolean));
@@ -211,8 +218,8 @@
 		clearExternalFilters?.();
 	}
 
-	function openRow(row: Record<string, unknown>) {
-		onOpen?.(row);
+	function openRow(row: Record<string, unknown>, trigger?: HTMLElement | null) {
+		onOpen?.(row, trigger);
 	}
 
 	function filterLabel(column: DataTableColumn): string {
@@ -472,8 +479,13 @@
 						{@const id = rowId(row)}
 						<Table.Row
 							class={onOpen ? "cursor-pointer" : undefined}
-							data-state={selected[id] ? "selected" : undefined}
-							onclick={() => openRow(row)}
+							data-state={selected[id] || (activeId && activeId === id) ? "selected" : undefined}
+							aria-current={activeId && activeId === id ? "true" : undefined}
+							onclick={(event) => {
+								if ((event.target as Element).closest("a,button,input,select,textarea,[role=checkbox]")) return;
+								if (typeof window !== "undefined" && window.getSelection()?.toString()) return;
+								openRow(row, event.currentTarget.querySelector<HTMLElement>("a[href]"));
+							}}
 						>
 							{#if !compact}
 								<Table.Cell class="py-1.5" onclick={(event) => event.stopPropagation()}>
@@ -507,7 +519,7 @@
 										</DropdownMenu.Trigger>
 										<DropdownMenu.Content align="end" class="min-w-40">
 											{#if onOpen}
-												<DropdownMenu.Item onSelect={() => openRow(row)}>Open</DropdownMenu.Item>
+												<DropdownMenu.Item onSelect={() => openRow(row)}>{openLabel}</DropdownMenu.Item>
 											{/if}
 											{#if onDelete}
 												<DropdownMenu.Item variant="destructive" onSelect={() => onDelete([row])}>

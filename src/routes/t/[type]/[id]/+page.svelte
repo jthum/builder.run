@@ -4,8 +4,11 @@
 	import { addLabel, collectionLabel, recordTitle } from "$lib/app/labels.ts";
 	import { canonicalStudio } from "$lib/app/canonical-studio.svelte.ts";
 	import { runWorkflow } from "$lib/app/workflow-launch.ts";
-	import FormattedValue from "$lib/components/formatted-value.svelte";
-	import { PageHeader } from "@jthum/framework/svelte/ui/page-header";
+	import RecordDetails from "$lib/components/record-details.svelte";
+	import { RecordLoader } from "$lib/app/record-loader.svelte.ts";
+	import { untrack } from "svelte";
+	import { Skeleton } from "@jthum/framework/svelte/ui/skeleton";
+	import * as Empty from "@jthum/framework/svelte/ui/empty";
 	import RecordForm from "$lib/components/record-form.svelte";
 	import RecordTable from "$lib/components/record-table.svelte";
 	import * as AlertDialog from "@jthum/framework/svelte/ui/alert-dialog";
@@ -35,12 +38,13 @@
 				.map((field) => ({ type: collection, field })),
 		),
 	);
-	let record = $state<Record<string, unknown> | null>(null);
-	let missing = $state(false);
+	const detailsLoader = new RecordLoader();
+	const record = $derived(detailsLoader.record);
+	let retry = $state(0);
 	let editing = $state(false);
 	let deleteOpen = $state(false);
 	let relatedRows = $state<Record<string, Array<Record<string, unknown>>>>({});
-	let display = $state<Record<string, unknown> | null>(null);
+	let relatedError = $state(false);
 	let creating = $state<{
 		type: CollectionDraft;
 		field: FieldDraft;
@@ -68,60 +72,39 @@
 
 	$effect(() => {
 		void canonicalStudio.revision;
-		void id;
-		missing = false;
+		void retry;
+		const collection = type;
+		const recordId = id;
+		const collections = context?.collections ?? [];
 		editing = false;
-		void (async () => {
-			try {
-				const row = await canonicalStudio.getRecord(typeKey, id);
-				record = row;
-				missing = !row;
-				if (row && type) {
-					const projected = { ...row };
-					for (const field of type.fields) {
-						if (field.type !== "reference" || !row[field.key]) continue;
-						const path = `${field.key}.name`;
-						const target = field.target ?? "";
-						const linked = target
-							? await canonicalStudio.getRecord(target, String(row[field.key]))
-							: null;
-						projected[path] =
-							linked?.name ?? linked?.title ?? linked?.number ?? linked?.email ?? null;
-					}
-					display = projected;
-				} else {
-					display = row;
-				}
-			} catch (err) {
-				console.warn("Couldn't load record", err);
-			}
-		})();
+		if (collection) untrack(() => { void detailsLoader.load(collection, recordId, canonicalStudio.recordReader(), collections); });
+		return () => detailsLoader.cancel();
 	});
 
 	$effect(() => {
 		void canonicalStudio.revision;
-		void id;
+		const recordId = id;
+		const currentRecord = record;
+		const relations = related;
+		let cancelled = false;
+		relatedRows = {};
+		relatedError = false;
 		void (async () => {
-			if (!context || !record) return;
+			if (!context || !currentRecord) return;
 			try {
 				const next: Record<string, Array<Record<string, unknown>>> = {};
-				for (const rel of related) {
+				for (const rel of relations) {
+					if (cancelled) return;
 					const view = relatedViewFor(rel.type.key, rel.field.key);
-					if (view && isContextual(view)) {
-						next[rel.type.key] = await canonicalStudio.queryViewWith(view.key, {
-							record_id: id,
-						});
-						continue;
-					}
-					const rows = await canonicalStudio.listRecords(rel.type.key);
-					const matched = rows.filter((row) => String(row[rel.field.key] ?? "") === id);
-					next[rel.type.key] = matched;
+					if (view) next[rel.field.id] = await canonicalStudio.queryRelatedRecords(view, rel.field.key, recordId);
 				}
-				relatedRows = next;
+				if (!cancelled) relatedRows = next;
 			} catch (err) {
+				if (!cancelled) relatedError = true;
 				console.warn("Couldn't load related records", err);
 			}
 		})();
+		return () => { cancelled = true; };
 	});
 
 	function startRelatedCreate(rel: { type: CollectionDraft; field: FieldDraft }) {
@@ -146,7 +129,7 @@
 	async function applyTransition(transitionKey: string, label: string) {
 		const transition = type?.lifecycle?.transitions.find((item) => item.key === transitionKey);
 		if (!type?.lifecycle || !transition) return;
-		record = await canonicalStudio.updateRecord(typeKey, id, {
+		await canonicalStudio.updateRecord(typeKey, id, {
 			[type.lifecycle.field]: transition.to,
 		});
 		toast.success(label);
@@ -158,9 +141,9 @@
 		await goto(`/t/${typeKey}`);
 	}
 
-	function relatedViewFor(typeKeyRel: string, _fieldKey?: string): ViewDraft | undefined {
+	function relatedViewFor(typeKeyRel: string, fieldKey?: string): ViewDraft | undefined {
 		const views = context?.views.filter((item) => item.source === typeKeyRel) ?? [];
-		const contextual = views.find(isContextual);
+		const contextual = views.find((view) => Array.isArray(view.where) && view.where.some((clause) => clause.field === fieldKey && clause.value === "$record.id"));
 		if (contextual) return contextual;
 		return views.find((item) => item.key === implicitViewKey(typeKeyRel)) ?? views[0];
 	}
@@ -169,19 +152,11 @@
 		return JSON.stringify(view.where ?? {}).includes("$record.id");
 	}
 
-	const updated = $derived(
-		record?.updated_at
-			? new Date(String(record.updated_at)).toLocaleString(undefined, {
-					dateStyle: "medium",
-					timeStyle: "short",
-				})
-			: null,
-	);
 </script>
 
 {#if type && record}
 	<div class="flex flex-col gap-8">
-		<PageHeader {title} description={updated ? `Updated ${updated}` : undefined}>
+		<RecordDetails {type} {record} references={detailsLoader.references} showProperties={!editing}>
 			{#snippet actions()}
 				{#each lifecycleActions as transition (transition.key)}
 					<Button onclick={() => applyTransition(transition.key, transition.label)}>{transition.label}</Button>
@@ -211,7 +186,7 @@
 					</DropdownMenu.Content>
 				</DropdownMenu.Root>
 			{/snippet}
-		</PageHeader>
+		</RecordDetails>
 
 		{#if editing}
 			<Card.Root>
@@ -229,31 +204,6 @@
 					/>
 				</Card.Content>
 			</Card.Root>
-		{:else}
-			<Card.Root>
-				<Card.Content>
-					<dl class="grid gap-6 sm:grid-cols-2">
-						{#each type.fields as field (field.id)}
-							{@const path = field.type === "reference" ? `${field.key}.name` : field.key}
-							{@const target = field.type === "reference" ? String(record[field.key] ?? "") : ""}
-							<div class="flex flex-col gap-1">
-								<dt class="text-sm text-muted-foreground">{field.label}</dt>
-								<dd>
-									<FormattedValue
-										{path}
-										value={display?.[path] ?? record[field.key]}
-										{type}
-										badge={field.type === "enum"}
-										href={field.type === "reference" && target
-											? `/t/${field.target?.split(".").at(-1)}/${target}`
-											: undefined}
-									/>
-								</dd>
-							</div>
-						{/each}
-					</dl>
-				</Card.Content>
-			</Card.Root>
 		{/if}
 
 		{#each related as rel (rel.type.id + rel.field.id)}
@@ -265,14 +215,16 @@
 							? view.label
 							: collectionLabel(rel.type)}
 					</h2>
+					{#if relatedError}<p class="text-sm text-muted-foreground">Couldn't load related records. <button class="underline underline-offset-4" onclick={() => retry++}>Try again</button></p>{:else}
 					<RecordTable
-						rows={relatedRows[rel.type.key] ?? []}
+						rows={relatedRows[rel.field.id] ?? null}
 						{view}
 						typeKey={rel.type.key}
 						createLabel={addLabel(rel.type)}
 						compact
 						onCreate={() => startRelatedCreate(rel)}
 					/>
+					{/if}
 				</div>
 			{/if}
 		{/each}
@@ -322,6 +274,10 @@
 			</AlertDialog.Footer>
 		</AlertDialog.Content>
 	</AlertDialog.Root>
-{:else if missing}
-	<p class="text-muted-foreground">This record is gone, or the link is wrong.</p>
+{:else if detailsLoader.loading}
+	<div class="flex flex-col gap-6" role="status" aria-label="Loading record"><Skeleton class="h-10 w-1/2" /><Skeleton class="h-48 w-full" /></div>
+{:else if detailsLoader.error}
+	<Empty.Root><Empty.Header><Empty.Title>Couldn't open record</Empty.Title><Empty.Description>{detailsLoader.error}</Empty.Description></Empty.Header><Empty.Content><Button variant="outline" onclick={() => retry++}>Try again</Button></Empty.Content></Empty.Root>
+{:else}
+	<Empty.Root><Empty.Header><Empty.Title>Record unavailable</Empty.Title><Empty.Description>It may have been removed, or you may not have access.</Empty.Description></Empty.Header></Empty.Root>
 {/if}

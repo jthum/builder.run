@@ -48,6 +48,15 @@ Analytics tests render the real block components and SVG markup with a fixed-siz
 
 ## Manual browser checks
 
+Record presentation tests are in [record-details.spec.ts](../src/lib/app/record-details.spec.ts),
+[record-preview.spec.ts](../src/lib/app/record-preview.spec.ts) and
+[component rendering](../src/lib/components/record-details.spec.ts). They cover plain/modified
+clicks, preview ordering and focus return, stale loads, retry, reference-read isolation,
+preserved scalar values, record links/selection across list, card, Kanban and calendar Views,
+aggregate/missing-identity guards and query-side related-record filters. Framework separately tests the
+host-neutral details and non-modal panel. These deterministic checks do not verify actual browser
+focus movement or responsive appearance.
+
 Use a disposable browser profile when exercising deletion or storage cleanup.
 
 1. Open the app and confirm the local runtime starts.

@@ -22,11 +22,24 @@ describe("accessible SVG charts", () => {
     const html = render(ChartPattern, {
       props: { id: `pattern-${index}`, index, color: "var(--primary)" },
     }).body;
-    expect(html).toMatch(/<g[^>]+opacity="0.24"/);
-    expect(html).toContain('stroke-width="0.75"');
+    expect(html).toContain(`opacity="${index === 2 ? 0.2 : 0.24}"`);
+    expect(html).toContain(`stroke-width="${index === 2 ? 0.65 : 0.75}"`);
     expect(html).not.toContain("stroke-opacity=");
     if (index === 1) expect(html).toContain('r="0.85"');
   });
+
+  it.each([2, 8])(
+    "uses a dense, fully covered horizontal tile for short chart regions (index %s)",
+    (index) => {
+      const html = render(ChartPattern, {
+        props: { id: "short-region", index, color: "var(--primary)" },
+      }).body;
+      expect(html).toMatch(/<pattern[^>]+height="3"[^>]+patternUnits="userSpaceOnUse"/);
+      expect(html).toMatch(/<rect[^>]+height="3"/);
+      expect(html).toContain('d="M0 1.5H8"');
+      expect(html).toContain('opacity="0.2"');
+    },
+  );
 
   it.each(keys)("exposes a labelled keyboard plot and on-demand data in %s", async (key) => {
     const preview = (await loadBlockPreview(key))!;

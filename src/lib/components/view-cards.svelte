@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { columnLabel, isStatusPath } from "$lib/app/labels.ts";
 	import FormattedValue from "$lib/components/formatted-value.svelte";
+	import RecordLink from "$lib/components/record-link.svelte";
 	import { viewCellValue, viewDisplayFields } from "$lib/app/view-results.ts";
 	import * as Card from "@jthum/framework/svelte/ui/card";
 	import * as Empty from "@jthum/framework/svelte/ui/empty";
@@ -40,7 +41,7 @@
 {:else}
 	<div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
 		{#each rows as row (String(row.id ?? JSON.stringify(row)))}
-			<a href="/t/{view.source}/{row.id}" class="block rounded-2xl outline-none focus-visible:ring-2 focus-visible:ring-ring">
+			<RecordLink {view} {row} {rows} class="block rounded-2xl">
 				<Card.Root class="h-full transition-all hover:ring-foreground/20">
 					<Card.Content class="flex flex-col gap-3 p-5">
 						<p class="font-medium">
@@ -60,7 +61,7 @@
 						{/if}
 					</Card.Content>
 				</Card.Root>
-			</a>
+			</RecordLink>
 		{/each}
 	</div>
 {/if}

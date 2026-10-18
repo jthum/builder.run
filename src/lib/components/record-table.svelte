@@ -1,5 +1,6 @@
 <script lang="ts">
-	import { goto } from "$app/navigation";
+	import { recordPreview } from "$lib/app/record-preview.svelte.ts";
+	import { recordPageHref } from "$lib/app/record-details.ts";
 	import {
 		addLabel,
 		aggregateRatingMax,
@@ -80,7 +81,7 @@
 				filterValues: field?.type === "enum" ? field.values : undefined,
 				valueSemantics,
 				href: (row) => {
-					if (!aggregated) return key === keys[0] ? `/t/${typeKey}/${row.id}` : undefined;
+					if (!aggregated) return key === keys[0] && typeof row.id === "string" && row.id ? recordPageHref(typeKey, row.id) : undefined;
 					if (key !== view.group_by || field?.type !== "reference" || !field.target) return undefined;
 					const id = String(row.id ?? "");
 					const target = field.target.split(".").at(-1);
@@ -96,10 +97,11 @@
 	);
 
 	let pending = $state<Array<Record<string, unknown>>>([]);
+	let previewRows = $state<Array<Record<string, unknown>>>([]);
 
-	function openRow(row: Record<string, unknown>) {
+	function openRow(row: Record<string, unknown>, trigger?: HTMLElement | null) {
 		const id = String(row.id ?? "");
-		if (id) void goto(`/t/${typeKey}/${id}`);
+		if (id) recordPreview.open(typeKey, id, previewRows.flatMap((row) => typeof row.id === "string" ? [row.id] : []), trigger ?? document.activeElement as HTMLElement);
 	}
 
 	function clearExposedFilters() {
@@ -145,6 +147,9 @@
 	{externalFilterCount}
 	clearExternalFilters={clearExposedFilters}
 	onOpen={aggregated ? undefined : openRow}
+	openLabel="Preview"
+	activeId={recordPreview.selection?.typeKey === typeKey ? recordPreview.selection.id : undefined}
+	onVisibleRows={(items) => { previewRows = items; }}
 	onDelete={aggregated ? undefined : (items) => (pending = items)}
 >
 	{#snippet filterControls()}
@@ -163,6 +168,7 @@
 			maximumFractionDigits={view.measures?.[column.id] ? 2 : undefined}
 			ratingMax={aggregateRatingMax(view, type, column.id)}
 			href={column.href?.(row)}
+			onclick={!aggregated && column.href?.(row) && typeof row.id === "string" ? (event) => recordPreview.follow(event, typeKey, row.id, previewRows) : undefined}
 		/>
 	{/snippet}
 	{#snippet footer({ rows: visibleRows, columns: visibleCols })}

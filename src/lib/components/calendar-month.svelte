@@ -1,5 +1,6 @@
 <script lang="ts">
 	import FormattedValue from "$lib/components/formatted-value.svelte";
+	import RecordLink from "$lib/components/record-link.svelte";
 	import { Button } from "@jthum/framework/svelte/ui/button";
 	import * as Card from "@jthum/framework/svelte/ui/card";
 	import { Skeleton } from "@jthum/framework/svelte/ui/skeleton";
@@ -63,6 +64,7 @@
 	});
 
 	const today = $derived(new Date().toISOString().slice(0, 10));
+	const visibleRows = $derived(cells.flatMap((cell) => cell.date ? (byDay.get(cell.date) ?? []).slice(0, 3) : []));
 </script>
 
 <Card.Root class="flex h-full min-h-96 flex-col overflow-hidden">
@@ -107,12 +109,12 @@
 							<span class="text-xs font-medium tabular-nums">{cell.day}</span>
 							<div class="flex min-h-0 flex-1 flex-col gap-0.5 overflow-hidden">
 								{#each items.slice(0, 3) as row (String(row.id ?? JSON.stringify(row)))}
-									<a
-										href="/t/{view.source}/{row.id}"
+									<RecordLink
+										{view} {row} rows={visibleRows}
 										class="truncate rounded-md bg-background px-1 py-0.5 text-[11px] hover:bg-muted"
 									>
 										<FormattedValue path={titleField} value={viewCellValue(view, row, titleField)} {type} />
-									</a>
+									</RecordLink>
 								{/each}
 								{#if items.length > 3}
 									<span class="text-[11px] text-muted-foreground">+{items.length - 3}</span>

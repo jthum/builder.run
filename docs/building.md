@@ -73,7 +73,7 @@ Data-backed blocks present the rows returned by their selected View. For full-da
 
 ### Chart interaction
 
-Charts use lightweight SVG renderers with patterned fills, matching legend swatches and dashed line styles so colour is not the only distinction. Hovering or focusing a mark highlights its category/series and its legend; unrelated series dim. The value readout stays outside the plot so it does not obscure data.
+Charts use lightweight SVG renderers with patterned fills, matching legend swatches and dashed line styles so colour is not the only distinction. Horizontal hatching repeats every 3px with finer, lower-opacity strokes so short regions retain a texture. Hovering or focusing a mark highlights its category/series and its legend; unrelated series dim. The value readout stays outside the plot so it does not obscure data.
 
 Tab enters a plot at one mark. Arrow keys explore values, Home/End reach its endpoints, and Escape clears the highlight. Legend buttons toggle visibility and announce their state. Hiding every item leaves the legend available to restore them. **View chart data** opens a labelled table of all chart values, including hidden items; the table is rendered only when opened.
 
@@ -82,6 +82,43 @@ Pattern IDs are scoped to each chart, and colour/pattern assignments remain stab
 The shared implementation lives in [ChartFrame](../src/lib/components/chart-frame.svelte), [ChartPattern](../src/lib/components/chart-pattern.svelte) and [ChartInteraction](../src/lib/runtime/chart-interaction.svelte.ts). Rendering and interaction tests are listed in [Testing](testing.md); automated markup checks do not replace browser or assistive-technology verification.
 
 Pages can be grouped in navigation. Page URLs use `/p/<page-key>`; navigation hierarchy does not imply nested page routes.
+
+## Inspecting records
+
+In table, list, card, Kanban and calendar Views, an ordinary click previews a record without
+leaving the current View.
+The non-modal drawer floats over the right side without resizing the underlying content or adding
+a backdrop. On small screens it uses the available width. Previous/next follows the displayed
+page's ordering when the preview was opened. Kanban follows column/card order; calendar follows
+the visible month's displayed entries, excluding hidden overflow items.
+The selected record is highlighted separately from bulk-selection checkboxes. **Open full page**,
+modified clicks and opening a link in a new tab retain ordinary navigation.
+
+The drawer uses Chrome for the header and footer around one white (theme card-colour) data surface, with a compact title/status
+header and no collection eyebrow. Navigation and the full-page link sit at the bottom. Its
+facts use an unframed two-column grid with labels above values, followed by Summary,
+longer text and timestamps on the same surface; there is no nested Details card or promoted numeric strip. Changing the selected
+collection/record identity triggers a short slide-and-fade replacement; reopening the same item
+does not. Motion is disabled for reduced-motion preferences.
+
+The drawer and full record page share a details presentation: title and lifecycle status,
+an at-a-glance strip of up to three populated numeric fields on full pages (excluding ratings), properties
+in field-definition order, longer text sections and subtle timestamps. Dates and references remain
+in the property list rather than being separated into inferred categories.
+These are host-owned display defaults, not persisted layout configuration. Long-form content
+and properties sit side-by-side when there is sufficient room, and stack in the drawer.
+Full pages keep editing,
+workflow actions, lifecycle transitions and related records. Data and immediate reference labels
+load only after opening a record; inaccessible references show an unavailable label, not an
+opaque ID. Late responses are ignored after changing selection, and navigation/App changes close
+the preview.
+
+Framework's `svelte/records` components own presentation. The host's
+[record details](../src/lib/app/record-details.ts), [loader](../src/lib/app/record-loader.svelte.ts)
+and [preview selection](../src/lib/app/record-preview.svelte.ts) own defaults, authorized data
+loading and navigation. Related tables apply their reference restriction in the Source query,
+preserving the View's selected aliases and filters rather than fetching an entire collection to
+filter in the browser.
 
 ## Add Forms and Automations
 

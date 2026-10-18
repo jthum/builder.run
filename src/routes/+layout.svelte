@@ -17,8 +17,12 @@
 	import { Toaster } from "@jthum/framework/svelte/ui/sonner";
 	import RefreshCwIcon from "@lucide/svelte/icons/refresh-cw";
 	import { page } from "$app/state";
+	import { beforeNavigate } from "$app/navigation";
+	import { recordPreview } from "$lib/app/record-preview.svelte.ts";
 
 	let { children } = $props();
+	beforeNavigate(() => recordPreview.close(false));
+	$effect(() => { void session.framework; recordPreview.close(false); });
 
 	onMount(() => {
 		void boot();
@@ -101,9 +105,14 @@
 					</Breadcrumb.Root>
 				</div>
 			</header>
-			<div class="flex flex-1 flex-col gap-4 px-6 py-4 pt-0 md:px-8">
+			<div class="flex min-w-0 flex-1 flex-col gap-4 px-6 py-4 pt-0 md:px-8">
 				{@render children()}
 			</div>
 		</Sidebar.Inset>
 	</Sidebar.Provider>
+	{#if recordPreview.selection}
+		{#await import("$lib/components/record-preview.svelte") then preview}
+			<preview.default />
+		{/await}
+	{/if}
 {/if}

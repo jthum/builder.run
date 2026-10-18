@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { columnLabel, isStatusPath } from "$lib/app/labels.ts";
 	import FormattedValue from "$lib/components/formatted-value.svelte";
+	import RecordLink from "$lib/components/record-link.svelte";
 	import { Badge } from "@jthum/framework/svelte/ui/badge";
 	import * as Card from "@jthum/framework/svelte/ui/card";
 	import * as Empty from "@jthum/framework/svelte/ui/empty";
@@ -55,6 +56,7 @@
 		}
 		return map;
 	});
+	const visibleRows = $derived(columns.flatMap((column) => grouped.get(column) ?? []));
 </script>
 
 <Card.Root class="h-full min-h-80 w-full">
@@ -88,11 +90,11 @@
 						</header>
 						<div class="flex flex-1 flex-col gap-2.5">
 							{#each items as row (String(row.id ?? JSON.stringify(row)))}
-								<a
-									href="/t/{view.source}/{row.id}"
-									class="block rounded-2xl outline-none focus-visible:ring-2 focus-visible:ring-ring"
+								<RecordLink
+									{view} {row} rows={visibleRows}
+									class="block rounded-2xl"
 								>
-								<Card.Root variant="inset" class="transition-all hover:-translate-y-px hover:shadow-sm">
+								<Card.Root variant="inset" class="border border-border transition-all hover:-translate-y-px hover:shadow-sm">
 									<Card.Content class="flex flex-col gap-1.5 p-3.5">
 											<p class="text-sm font-medium">
 												<FormattedValue path={titleField} value={viewCellValue(view, row, titleField)} {type} />
@@ -105,7 +107,7 @@
 											{/each}
 										</Card.Content>
 									</Card.Root>
-								</a>
+								</RecordLink>
 							{/each}
 						</div>
 					</section>

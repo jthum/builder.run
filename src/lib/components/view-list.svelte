@@ -7,6 +7,9 @@
 	import { Skeleton } from "@jthum/framework/svelte/ui/skeleton";
 	import type { CollectionDraft, ViewDraft } from "$lib/blocks/presentation.ts";
 	import InboxIcon from "@lucide/svelte/icons/inbox";
+	import { recordPreview } from "$lib/app/record-preview.svelte.ts";
+	import { recordHref } from "$lib/blocks/links.ts";
+	import { cn } from "$lib/utils.ts";
 
 	let {
 		rows,
@@ -41,10 +44,20 @@
 	<div class="overflow-hidden rounded-xl border bg-background">
 		{#each rows as row, index (String(row.id ?? index))}
 			{#if index > 0}<Separator />{/if}
-			<a
-				href="/t/{view.source}/{row.id}"
-				class="flex items-center justify-between gap-3 px-4 py-3 hover:bg-muted/40"
-			>
+
+			{@const href = recordHref(view, row)}
+			{#if href}
+				<a {href} onclick={(event) => recordPreview.follow(event, view.source, row.id, rows ?? [])}
+					aria-current={recordPreview.selection?.typeKey === view.source && recordPreview.selection.id === row.id ? "true" : undefined}
+					class={cn("flex items-center justify-between gap-3 px-4 py-3 hover:bg-muted/40 outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring", recordPreview.selection?.typeKey === view.source && recordPreview.selection.id === row.id && "bg-primary/5")}>
+					{@render itemContent(row)}
+				</a>
+			{:else}<div class="flex items-center justify-between gap-3 px-4 py-3">{@render itemContent(row)}</div>{/if}
+		{/each}
+	</div>
+{/if}
+
+{#snippet itemContent(row: Record<string, unknown>)}
 				<div class="min-w-0 flex flex-col gap-0.5">
 					<span class="truncate font-medium">
 						<FormattedValue path={titleField} value={viewCellValue(view, row, titleField)} {type} />
@@ -70,7 +83,4 @@
 						/>
 					</span>
 				{/if}
-			</a>
-		{/each}
-	</div>
-{/if}
+{/snippet}

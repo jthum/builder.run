@@ -14,6 +14,7 @@
 		maximumFractionDigits,
 		clamp = false,
 		ratingMax,
+		onclick,
 	}: {
 		path: string;
 		value: unknown;
@@ -23,6 +24,7 @@
 		maximumFractionDigits?: number;
 		clamp?: boolean;
 		ratingMax?: number;
+		onclick?: (event: MouseEvent) => void;
 	} = $props();
 
 	const asStatus = $derived(badge || isStatusPath(path));
@@ -80,7 +82,7 @@
 </script>
 
 {#if href}
-	<a class={cn("font-medium hover:underline", textClass)} {href} title={fullText}>
+	<a class={cn("font-medium hover:underline", textClass)} {href} {onclick} title={fullText}>
 		{#if asPill && text !== "—"}
 			<StatusPill {path} {value} tone={enumTone} />
 		{:else if asRating && text !== "—"}
