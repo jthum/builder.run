@@ -1,6 +1,8 @@
 # Data and persistence
 
-Builder.run's current deployment stores definitions and records in the browser. Framework's Spec describes the app; SQLite materializes its instance data.
+Builder.run stores definitions and records in browser-local SQLite or in persistent server-side
+SQLite, depending on the build mode. Framework's Spec describes the app; SQLite materializes its
+instance data. See [deployment](deployment.md) for the server layout, login and backups.
 
 ## Browser SQLite
 
@@ -12,7 +14,7 @@ Framework's optional browser SQLite package runs `wa-sqlite` in a worker. Storag
 
 Builder.run opens `catalog.db` for Workspace and Actor state, memberships, Attachments, Specs, settings, and workflow execution metadata.
 
-Workspace secret settings are encrypted by Framework using the host's `SecretCipher`; ordinary settings APIs return masked summaries. Builder.run keeps the encryption key in this browser's local storage. This does not protect against scripts with origin access, and losing that key requires re-entering secrets. The personal Assistant's profile settings remain separate, browser-local host state.
+Workspace secret settings are encrypted by Framework using the host's `SecretCipher`; ordinary settings APIs return masked summaries. In browser-local mode, Builder.run keeps the encryption key in this browser's local storage. This does not protect against scripts with origin access, and losing that key requires re-entering secrets. The personal Assistant's profile settings remain separate host state. Server mode stores keys in the protected data directory and encrypts Assistant API keys before persistence; browser responses contain only a mask.
 
 Record tables are routed into separate Workspace databases for Spaces and Apps, with scope databases opened as needed. The host chooses filenames in [sqlite.ts](../src/lib/framework/sqlite.ts); Framework owns schema and record semantics.
 

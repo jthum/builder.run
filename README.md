@@ -2,7 +2,7 @@
 
 Builder.run is a local-first app builder for people and agents. Define the information you want to manage, then compose the forms, views, pages, and workflows that make it useful.
 
-The application Spec is the portable definition of an app. Builder.run uses [Framework](https://github.com/jthum/framework) to validate and execute that definition, with SQLite storage in the browser and reusable Svelte editors.
+The application Spec is the portable definition of an app. Builder.run uses [Framework](https://github.com/jthum/framework) to validate and execute that definition, with browser-local or server-side SQLite and reusable Svelte editors.
 
 ## What you can build
 
@@ -64,7 +64,8 @@ Start with the [documentation index](docs/README.md), or go directly to:
 - [Data and persistence](docs/data-and-persistence.md)
 - [Architecture](docs/architecture.md)
 - [Testing](docs/testing.md)
+- [Local and server deployment](docs/deployment.md)
 
 ## Project status
 
-Builder.run is under active development and remains pre-user. Its current deployment is browser-local. Framework supplies reusable Spec, Kernel, persistence, and Svelte integration contracts; Builder.run supplies the app-building experience, templates, block library, navigation, and browser composition.
+Builder.run is under active development and remains pre-user. It supports browser-local and single-process Node server deployments. Framework supplies reusable Spec, Kernel, persistence, HTTP transport and Svelte integration contracts; Builder.run supplies the app-building experience, templates, block library, navigation, authentication and deployment composition.

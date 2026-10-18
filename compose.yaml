@@ -1,0 +1,19 @@
+services:
+  app:
+    build:
+      context: .
+      additional_contexts:
+        framework: ../framework
+    ports:
+      - "3000:3000"
+    environment:
+      ORIGIN: ${ORIGIN:-http://localhost:3000}
+      SERVER_ADMIN_USERNAME: ${SERVER_ADMIN_USERNAME:-admin}
+      SERVER_ADMIN_PASSWORD: ${SERVER_ADMIN_PASSWORD:?Set SERVER_ADMIN_PASSWORD for initial setup}
+    volumes:
+      - app-data:/data
+    restart: unless-stopped
+    stop_grace_period: 40s
+
+volumes:
+  app-data:

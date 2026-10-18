@@ -14,7 +14,13 @@ import {
   resolveSpace,
   renameApp as updateAppName,
   type OpenedRuntime,
+  type AppContext,
 } from "$lib/framework/bootstrap.ts";
+import { SERVER_MODE } from "./deployment.ts";
+import { loadRemoteSnapshot, remoteContext, serverRequest } from "./remote.ts";
+import type { RemoteSnapshot } from "./remote-contract.ts";
+import { readJsonResponse } from "@jthum/framework-http";
+import { FrameworkError } from "@jthum/framework/errors";
 import {
   createKernelSqlitePersistence,
   CATALOG_DATABASE,
@@ -37,7 +43,7 @@ import {
   type WebMcpBridge,
 } from "./webmcp.ts";
 import { createAssistantTools } from "$lib/inference/assistant-tools.ts";
-import { createBrowserInferenceRuntime } from "$lib/inference/runtime.ts";
+import { createInferenceRuntime } from "$lib/inference/runtime.ts";
 import { browserSecretCipher } from "$lib/framework/secrets.ts";
 
 export interface AppSummary {
@@ -68,7 +74,8 @@ export interface RuntimeDatabaseDiagnostic {
 type ProfileActor = Actor & { readonly roles: readonly string[] };
 class SessionState {
   ready = $state(false);
-  framework = $state.raw<OpenedRuntime | null>(null);
+  framework = $state.raw<AppContext | null>(null);
+  loginRequired = $state(false);
   diagnostics = $state.raw<RuntimeDiagnostics | null>(null);
   app = $state.raw<AppSummary | null>(null);
   apps = $state.raw<readonly AppSummary[]>([]);
@@ -93,7 +100,16 @@ const listeners = new Set<() => void>();
 const hot = import.meta.hot;
 let live: LiveRuntime | null = hot?.data.live ?? null;
 let booting: Promise<void> | null = null;
+let remoteSpec: Spec | null = null;
+let remoteRevision: number | undefined;
+let remotePoll: ReturnType<typeof setInterval> | undefined;
+let remoteBridge: WebMcpBridge | undefined;
+let remoteEpoch = 0;
+let polling = false;
+const REMOTE_SELECTION_KEY = "server-app-selection";
 hot?.dispose(() => {
+  if (remotePoll) clearInterval(remotePoll);
+  remoteBridge?.stop();
   live?.bridge?.stop();
   hot.data.live = live;
 });
@@ -102,14 +118,28 @@ function current(): LiveRuntime {
   return live;
 }
 export function publishToolSpec(appId: string, spec: Spec): void {
+  if (SERVER_MODE) {
+    if (appId !== session.app?.id) return;
+    remoteSpec = spec;
+    session.revision += 1;
+    listeners.forEach((listener) => listener());
+    return;
+  }
   if (!live || appId !== live.framework.app.id) return;
   live.spec = spec;
   session.revision += 1;
   listeners.forEach((listener) => listener());
 }
 export const toolContext: ToolContext = {
-  runtime: () => current().framework,
-  spec: () => current().spec,
+  runtime: () => {
+    if (!session.framework) throw new Error("The runtime is not ready.");
+    return session.framework;
+  },
+  spec: () => {
+    const spec = SERVER_MODE ? remoteSpec : current().spec;
+    if (!spec) throw new Error("The runtime is not ready.");
+    return spec;
+  },
   changed: async () => refreshContext(),
   createApp,
   selectApp,
@@ -128,6 +158,12 @@ function connectTools(runtime: LiveRuntime): void {
 }
 
 async function refreshContext(): Promise<void> {
+  if (SERVER_MODE) {
+    const epoch = remoteEpoch;
+    const snapshot = await loadRemoteSnapshot(session.framework?.selection);
+    if (epoch === remoteEpoch) applyRemoteSnapshot(snapshot);
+    return;
+  }
   const runtime = current();
   const previous = runtime.framework;
   const [space, app] = await Promise.all([
@@ -210,6 +246,10 @@ function describeDatabases(
 }
 
 export function boot(): Promise<void> {
+  if (SERVER_MODE) {
+    booting ??= bootRemote();
+    return booting;
+  }
   if (live) {
     booting ??= publishContext(live).then(() => {
       if (live) connectTools(live);
@@ -231,7 +271,7 @@ export function boot(): Promise<void> {
             inference: true,
           },
           persistence: createKernelSqlitePersistence(gateway),
-          inference: createBrowserInferenceRuntime({
+          inference: createInferenceRuntime({
             assistantTools,
           }),
           secretCipher: browserSecretCipher(localStorage),
@@ -265,11 +305,19 @@ export function boot(): Promise<void> {
   return booting;
 }
 export async function updateProfile(input: { name: string; email?: string }): Promise<void> {
+  if (SERVER_MODE) {
+    await remoteCommand("updateProfile", input);
+    return;
+  }
   const runtime = current();
   await runtime.framework.spaceClient.updateActor(runtime.framework.actorId, input);
   await publishContext(runtime);
 }
 export async function updateSpaceSettings(name: string, accent: SpaceAccent): Promise<void> {
+  if (SERVER_MODE) {
+    await remoteCommand("renameSpace", { name, accent });
+    return;
+  }
   const runtime = current();
   await runtime.framework.kernel.renameWorkspace(runtime.framework.spaceContext, { name });
   const space = await runtime.framework.spaceClient.getWorkspace();
@@ -289,6 +337,10 @@ export async function updateSpaceSettings(name: string, accent: SpaceAccent): Pr
   await refreshContext();
 }
 export async function selectApp(id: string): Promise<void> {
+  if (SERVER_MODE) {
+    await selectRemote({ spaceId: session.space?.id, appId: id });
+    return;
+  }
   const runtime = current();
   const selected = await resolveApp(
     runtime.framework.kernel,
@@ -300,6 +352,10 @@ export async function selectApp(id: string): Promise<void> {
   await publishContext(runtime);
 }
 export async function createApp(name: string, template?: string | null): Promise<void> {
+  if (SERVER_MODE) {
+    await remoteCommand("createApp", { name, ...(template ? { template } : {}) });
+    return;
+  }
   const runtime = current();
   const app = await seedApp(runtime.framework, name, template);
   runtime.framework = { ...runtime.framework, ...app };
@@ -307,12 +363,20 @@ export async function createApp(name: string, template?: string | null): Promise
   await publishContext(runtime);
 }
 export async function renameApp(name: string): Promise<void> {
+  if (SERVER_MODE) {
+    await remoteCommand("renameApp", { name });
+    return;
+  }
   const runtime = current();
   const app = await updateAppName(runtime.framework.kernel, runtime.framework, name);
   runtime.framework = { ...runtime.framework, ...app };
   await publishContext(runtime);
 }
 export async function deleteApp(id: string): Promise<void> {
+  if (SERVER_MODE) {
+    await remoteCommand("deleteApp", { id });
+    return;
+  }
   const runtime = current();
   const previous = runtime.framework;
   const fallback = await removeApp(previous.kernel, previous.spaceContext, id);
@@ -325,6 +389,10 @@ export async function deleteApp(id: string): Promise<void> {
   await publishContext(runtime);
 }
 export async function selectSpace(id: string): Promise<void> {
+  if (SERVER_MODE) {
+    await selectRemote({ spaceId: id });
+    return;
+  }
   const runtime = current();
   const actorId = runtime.framework.localActors[id];
   if (!actorId) throw new Error("Space has no locally issued User on this device.");
@@ -334,6 +402,10 @@ export async function selectSpace(id: string): Promise<void> {
   await publishContext(runtime);
 }
 export async function createSpace(name: string): Promise<void> {
+  if (SERVER_MODE) {
+    await remoteCommand("createSpace", { name });
+    return;
+  }
   const runtime = current();
   const selected = await seedSpace(runtime.framework.kernel, {
     spaceName: name,
@@ -357,6 +429,7 @@ export function configureWebMcpAppToolMode(mode: WebMcpAppToolMode): void {
 }
 /** Explicit development reset: remove this product's local persistence and reload. */
 export async function wipeAllLocalData(): Promise<void> {
+  if (SERVER_MODE) throw new Error("Local reset is unavailable for server storage.");
   const runtime = current();
   runtime.bridge?.stop();
   await runtime.framework.kernel.close();
@@ -371,4 +444,174 @@ export const chrome: { newAppOpen: boolean; newAppPreset: string } = $state({
 export function openNewApp(preset = "") {
   chrome.newAppPreset = preset;
   chrome.newAppOpen = true;
+}
+
+function applyRemoteSnapshot(snapshot: RemoteSnapshot): void {
+  session.framework = remoteContext(snapshot);
+  session.actor = snapshot.actor;
+  session.actors = snapshot.actors;
+  session.app = { id: snapshot.app.id, name: snapshot.app.name };
+  session.space = { id: snapshot.space.id, name: snapshot.space.name };
+  session.apps = snapshot.apps.map(({ id, name }) => ({ id, name }));
+  session.spaces = snapshot.spaces.map(({ id, name }) => ({ id, name }));
+  const appearance = snapshot.space.spec.meta?.appearance;
+  session.accent =
+    appearance &&
+    typeof appearance === "object" &&
+    !Array.isArray(appearance) &&
+    "accent" in appearance &&
+    SPACE_ACCENT_KEYS.includes(appearance.accent as SpaceAccent)
+      ? (appearance.accent as SpaceAccent)
+      : "blue";
+  remoteSpec = snapshot.app.spec;
+  remoteRevision = snapshot.revision;
+  session.diagnostics = {
+    backend: "server",
+    engine: "SQLite",
+    database: CATALOG_DATABASE,
+    databases: describeDatabases(snapshot.databases, [snapshot.space, ...snapshot.apps]),
+  };
+  writeSelection(localStorage, snapshot.selection, REMOTE_SELECTION_KEY);
+  session.webmcp = webmcpSupported();
+  session.webmcpToolMode = getWebMcpAppToolMode();
+  session.ready = true;
+  session.loginRequired = false;
+  session.error = null;
+  session.revision += 1;
+  listeners.forEach((listener) => listener());
+}
+
+async function remoteCommand(command: string, input: Record<string, unknown>): Promise<void> {
+  await selectRemote(session.framework?.selection, command, input);
+}
+
+async function selectRemote(
+  selection?: Partial<AppContext["selection"]>,
+  command = "snapshot",
+  input: Record<string, unknown> = {},
+): Promise<void> {
+  const epoch = ++remoteEpoch;
+  const snapshot = await loadRemoteSnapshot(selection, command, input);
+  if (epoch === remoteEpoch) applyRemoteSnapshot(snapshot);
+}
+
+async function bootRemote(): Promise<void> {
+  try {
+    const selection = readSelection(localStorage, REMOTE_SELECTION_KEY);
+    let snapshot: RemoteSnapshot;
+    try {
+      snapshot = await loadRemoteSnapshot(selection);
+    } catch (error) {
+      if (
+        !selection ||
+        !(error instanceof FrameworkError) ||
+        !["AUTH.REQUIRED", "RESOURCE.NOT_FOUND", "PERMISSION.DENIED"].includes(error.code)
+      )
+        throw error;
+      snapshot = await loadRemoteSnapshot();
+    }
+    applyRemoteSnapshot(snapshot);
+    remoteBridge?.stop();
+    remoteBridge = createWebMcpBridge({
+      getTools: (mode) => buildTools(toolContext, { appTools: mode }),
+      subscribe: (listener) => {
+        listeners.add(listener);
+        return () => listeners.delete(listener);
+      },
+    });
+    if (remotePoll) clearInterval(remotePoll);
+    remotePoll = setInterval(() => {
+      void pollRemote();
+    }, 3000);
+  } catch (error) {
+    remoteFailure(error);
+  }
+}
+
+async function pollRemote(): Promise<void> {
+  if (polling || !session.ready || document.visibilityState === "hidden") return;
+  polling = true;
+  const epoch = remoteEpoch;
+  try {
+    const revision = await serverRequest("revision", {}, session.framework?.selection);
+    if (revision !== remoteRevision) {
+      const snapshot = await loadRemoteSnapshot(session.framework?.selection);
+      if (epoch === remoteEpoch) applyRemoteSnapshot(snapshot);
+    }
+  } catch (error) {
+    if (
+      epoch === remoteEpoch &&
+      error instanceof FrameworkError &&
+      (error.code.startsWith("AUTH.") ||
+        error.code === "PERMISSION.DENIED" ||
+        error.code === "RESOURCE.NOT_FOUND")
+    ) {
+      if (error.code === "RESOURCE.NOT_FOUND") {
+        try {
+          const snapshot = await loadRemoteSnapshot({ spaceId: session.space?.id });
+          if (epoch === remoteEpoch) applyRemoteSnapshot(snapshot);
+        } catch (cause) {
+          remoteFailure(cause);
+        }
+      } else remoteFailure(error);
+    }
+  } finally {
+    polling = false;
+  }
+}
+
+function remoteFailure(error: unknown): void {
+  remoteBridge?.stop();
+  if (remotePoll) clearInterval(remotePoll);
+  session.ready = false;
+  session.framework = null;
+  if (error instanceof FrameworkError && error.code.startsWith("AUTH.")) {
+    session.loginRequired = true;
+    session.error = null;
+  } else
+    session.error = error instanceof Error ? error.message : "Unable to connect to the server.";
+}
+
+export async function login(username: string, password: string): Promise<void> {
+  const response = await fetch("/api/login", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({
+      username,
+      password,
+      ...(new URLSearchParams(location.search).get("realm")
+        ? { realmId: new URLSearchParams(location.search).get("realm") }
+        : {}),
+    }),
+  });
+  await readJsonResponse(response);
+  booting = null;
+  await boot();
+}
+
+export async function logout(): Promise<void> {
+  await readJsonResponse(await fetch("/api/logout", { method: "POST" }));
+  if (remotePoll) clearInterval(remotePoll);
+  remoteBridge?.stop();
+  remoteEpoch += 1;
+  booting = null;
+  session.ready = false;
+  session.framework = null;
+  session.loginRequired = true;
+}
+
+/** Follow explicit selection tools without treating remote inference as a global server session. */
+export async function followAssistantSelection(value: unknown): Promise<void> {
+  if (!SERVER_MODE || !value || typeof value !== "object" || !("selection" in value)) return;
+  const selection = value.selection;
+  if (
+    !selection ||
+    typeof selection !== "object" ||
+    !("spaceId" in selection) ||
+    !("appId" in selection) ||
+    typeof selection.spaceId !== "string" ||
+    typeof selection.appId !== "string"
+  )
+    return;
+  await selectRemote({ spaceId: selection.spaceId, appId: selection.appId });
 }

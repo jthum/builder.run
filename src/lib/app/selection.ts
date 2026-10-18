@@ -3,9 +3,12 @@ import type { AppSelection } from "$lib/framework/bootstrap.ts";
 const SELECTION_KEY = "app-selection";
 
 /** Local navigation preference, not an authentication or authorization credential. */
-export function readSelection(storage: Pick<Storage, "getItem">): AppSelection | undefined {
+export function readSelection(
+  storage: Pick<Storage, "getItem">,
+  key = SELECTION_KEY,
+): AppSelection | undefined {
   try {
-    const value: unknown = JSON.parse(storage.getItem(SELECTION_KEY) ?? "null");
+    const value: unknown = JSON.parse(storage.getItem(key) ?? "null");
     if (
       value &&
       typeof value === "object" &&
@@ -21,9 +24,13 @@ export function readSelection(storage: Pick<Storage, "getItem">): AppSelection |
   return undefined;
 }
 
-export function writeSelection(storage: Pick<Storage, "setItem">, selection: AppSelection): void {
+export function writeSelection(
+  storage: Pick<Storage, "setItem">,
+  selection: AppSelection,
+  key = SELECTION_KEY,
+): void {
   try {
-    storage.setItem(SELECTION_KEY, JSON.stringify(selection));
+    storage.setItem(key, JSON.stringify(selection));
   } catch {
     // The catalog remains usable when browser preference storage is unavailable.
   }

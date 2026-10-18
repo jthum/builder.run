@@ -15,13 +15,8 @@
     if (!runtime || !spec) return { diagnostics: [] };
     try {
       const rule = ruleDefinitionFromDraft(draft, spec, canonicalStudio.schemas);
-      const shortProfile = runtime.kernel.getRuleRuntimeProfile(new Set([
-        "record.created", "record.updated", "record.deleted", "record.field_changed", "form.submitted",
-      ]));
       const durable = requiresDurableExecution(rule, spec.rules);
-      const profile = durable
-        ? { ...runtime.kernel.getDurableRuleRuntimeProfile(), events: shortProfile.events }
-        : shortProfile;
+      const profile = durable ? runtime.profiles.durableRules : runtime.profiles.shortRules;
       return { diagnostics: checkRuleCompatibility(rule, profile).diagnostics.map(item => ({
         capability: item.key, support: item.support, message: item.message,
       })) };
@@ -32,7 +27,7 @@
 </script>
 <RuleEditor rule={workflow} {context} {actions}
   effects={[...CORE_RULE_EFFECTS]}
-  actorRequests={session.framework?.kernel.getDurableRuleRuntimeProfile().capabilities.actor_requests === "supported"}
+  actorRequests={session.framework?.profiles.durableRules.capabilities.actor_requests === "supported"}
   checkCompatibility={compatibility}
   onDeleted={() => goto("/build/automations")}
 />

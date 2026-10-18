@@ -18,7 +18,7 @@ import {
 } from "$lib/framework/bootstrap.ts";
 import type { ToolContext } from "$lib/app/webmcp.ts";
 import { createAssistantTools } from "./assistant-tools.ts";
-import { createBrowserInferenceRuntime } from "./runtime.ts";
+import { createInferenceRuntime } from "./runtime.ts";
 
 const PERSONAL_SETTINGS = {
   baseUrl: "https://personal.test/v1",
@@ -125,7 +125,7 @@ async function fixture(
       persistence: new MemoryPersistenceAdapter(),
       environment: { ...LOCAL_BROWSER_ENVIRONMENT, inference: true },
       secretCipher: createAesGcmSecretCipher(async () => key),
-      inference: createBrowserInferenceRuntime({ fetch, loadSettings, assistantTools }),
+      inference: createInferenceRuntime({ fetch, loadSettings, assistantTools }),
       inferenceTools: [assistantTools],
     },
     seed: {

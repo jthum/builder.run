@@ -48,6 +48,10 @@ Analytics tests render the real block components and SVG markup with a fixed-siz
 
 ## Manual browser checks
 
+Server deployment has deterministic tests in [runtime.spec.ts](../src/lib/server/runtime.spec.ts).
+After `vp run build:server`, run `vp run test:server` for the real HTTP/process restart and
+backup/restore proof. See [deployment](deployment.md). It uses only temporary test directories.
+
 Record presentation tests are in [record-details.spec.ts](../src/lib/app/record-details.spec.ts),
 [record-preview.spec.ts](../src/lib/app/record-preview.spec.ts) and
 [component rendering](../src/lib/components/record-details.spec.ts). They cover plain/modified

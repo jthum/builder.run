@@ -1,4 +1,4 @@
-import type { AppRuntime } from "$lib/framework/bootstrap.ts";
+import type { AppContext } from "$lib/framework/bootstrap.ts";
 import { launchRule } from "@jthum/framework/client";
 import { FrameworkError, ERROR_CODES } from "@jthum/framework/errors";
 import type { CollectionDefinition, FieldDefinition, JsonValue, Spec } from "@jthum/framework/spec";
@@ -11,7 +11,7 @@ export interface ToolSource {
   subscribe(listener: () => void): () => void;
 }
 export interface ToolContext {
-  runtime(): AppRuntime;
+  runtime(): AppContext;
   spec(): Spec;
   changed(): Promise<void>;
   createApp(name: string, template?: string): Promise<void>;
@@ -91,6 +91,8 @@ export function buildTools(
     execute: async (input) => {
       const result = await execute(input);
       if (!readOnly) await context.changed();
+      if (["create_app", "switch_app", "delete_app", "create_space"].includes(name))
+        return { selection: context.runtime().selection };
       return result;
     },
   });
@@ -106,8 +108,8 @@ export function buildTools(
         return {
           space: await current.spaceClient.getWorkspace(),
           app: await client().getWorkspace(),
-          actors: await current.kernel.listActorsByOrigin(current.spaceContext, current.space.id),
-          apps: await current.kernel.listChildWorkspaces(current.spaceContext, current.space.id),
+          actors: await current.spaceClient.listActorsByOrigin(),
+          apps: await current.spaceClient.listChildWorkspaces(),
         };
       },
       true,
@@ -131,19 +133,7 @@ export function buildTools(
       "Inspect installed Action/Condition keys and workflow runtime capabilities.",
       object(),
       () => {
-        const kernel = runtime().kernel;
-        const short = kernel.getRuleRuntimeProfile(
-          new Set([
-            "record.created",
-            "record.updated",
-            "record.deleted",
-            "record.field_changed",
-            "form.submitted",
-          ]),
-        );
-        const profile = kernel.environment.durableRuleExecution
-          ? { ...kernel.getDurableRuleRuntimeProfile(), events: short.events }
-          : short;
+        const profile = runtime().profiles.durableRules;
         return {
           actions: [...profile.actions],
           conditions: [...profile.conditions],
@@ -291,11 +281,11 @@ export function buildTools(
           };
           try {
             await current.appClient.applySpec(next);
-            const attached = (await current.kernel.listAttachmentsTo(current.appContext)).some(
+            const attached = (await current.appClient.listAttachmentsTo()).some(
               (binding) => !binding.revokedAt && binding.sourceId === id,
             );
             if (!attached)
-              await current.kernel.createAttachment(current.spaceContext, {
+              await current.spaceClient.createAttachment({
                 collectionKey: source.key,
                 targetId: current.app.id,
                 sourceId: id,

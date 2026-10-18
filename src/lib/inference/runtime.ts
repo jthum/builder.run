@@ -15,20 +15,18 @@ import {
 const PROVIDER = "openai-compatible";
 const ENDPOINT_SETTING = "inference.openai.base_url";
 
-interface BrowserInferenceOptions {
+interface InferenceOptions {
   readonly assistantTools?: InferenceToolProvider;
   readonly loadSettings?: () => Promise<AssistantSettings>;
   readonly fetch?: typeof globalThis.fetch;
 }
 
-export function createBrowserInferenceRuntime(
-  options: BrowserInferenceOptions = {},
-): InferenceRuntime {
-  return new BrowserInferenceRuntime(options);
+export function createInferenceRuntime(options: InferenceOptions = {}): InferenceRuntime {
+  return new AppInferenceRuntime(options);
 }
 
-class BrowserInferenceRuntime implements InferenceRuntime {
-  constructor(private readonly options: BrowserInferenceOptions) {}
+class AppInferenceRuntime implements InferenceRuntime {
+  constructor(private readonly options: InferenceOptions) {}
 
   async *run(context: InferenceContext): AsyncIterable<InferenceEvent> {
     const [{ yair, ModelProviderRegistry }, { openAI }] = await Promise.all([

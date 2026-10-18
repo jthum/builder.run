@@ -5,7 +5,8 @@
 	import { canonicalStudio } from "$lib/app/canonical-studio.svelte.ts";
 	import { assistant } from "$lib/app/assistant.svelte.ts";
 	import { pagePresentation } from "$lib/app/pages.ts";
-	import { chrome, createSpace, openNewApp, selectApp, selectSpace, session } from "$lib/app/session.svelte.ts";
+	import { chrome, createSpace, openNewApp, selectApp, selectSpace, session, logout } from "$lib/app/session.svelte.ts";
+	import { SERVER_MODE } from "$lib/app/deployment.ts";
 	import { studioGroupOrder, studioItems } from "$lib/app/studio.ts";
 	import AppSettingsDialog from "$lib/components/app-settings-dialog.svelte";
 	import AssistantSheet from "$lib/components/assistant-sheet.svelte";
@@ -432,6 +433,7 @@
 							</DropdownMenu.SubContent>
 						</DropdownMenu.Sub>
 						<DropdownMenu.Separator />
+						{#if SERVER_MODE}<DropdownMenu.Item onSelect={() => logout()}>Sign out</DropdownMenu.Item><DropdownMenu.Separator />{/if}
 						<DropdownMenu.Label class="text-xs font-normal text-muted-foreground">builder.run</DropdownMenu.Label>
 					</DropdownMenu.Content>
 				</DropdownMenu.Root>

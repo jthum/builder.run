@@ -1,6 +1,6 @@
 import type { InferenceMessage } from "@jthum/framework/kernel";
 import { nanoid } from "nanoid";
-import { session } from "./session.svelte.ts";
+import { session, followAssistantSelection } from "./session.svelte.ts";
 import {
   assistantConfigured,
   loadAssistantSettings,
@@ -140,6 +140,7 @@ export class AssistantState {
           });
           this.status = `Using ${readableTool(event.toolId)}`;
         } else if (event.type === "tool_result") {
+          if (SELECTION_TOOLS.has(event.toolId)) await followAssistantSelection(event.output);
           this.selectionCalls.delete(event.callId);
           this.updateActivity(response.id, {
             id: event.callId,

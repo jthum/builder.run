@@ -7,6 +7,7 @@ const mocks = vi.hoisted(() => ({
 }));
 vi.mock("./session.svelte.ts", () => ({
   session: { framework: { spaceClient: { runInference: mocks.run } } },
+  followAssistantSelection: async () => {},
 }));
 vi.mock("$lib/inference/settings.ts", async (load) => ({
   ...(await load<object>()),

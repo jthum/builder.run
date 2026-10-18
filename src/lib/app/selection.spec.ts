@@ -2,6 +2,21 @@ import { describe, expect, it } from "vite-plus/test";
 import { readSelection, writeSelection } from "./selection.ts";
 
 describe("App selection preferences", () => {
+  it("keeps local and server navigation preferences independent", () => {
+    const values = new Map<string, string>();
+    const storage = {
+      getItem: (key: string) => values.get(key) ?? null,
+      setItem: (key: string, value: string) => {
+        values.set(key, value);
+      },
+    };
+    const local = { spaceId: "local", appId: "local-app" };
+    const remote = { spaceId: "server", appId: "server-app" };
+    writeSelection(storage, local);
+    writeSelection(storage, remote, "server-app-selection");
+    expect(readSelection(storage)).toEqual(local);
+    expect(readSelection(storage, "server-app-selection")).toEqual(remote);
+  });
   it("round trips navigation identifiers", () => {
     let value: string | null = null;
     const storage = {

@@ -59,7 +59,7 @@
       execution = details; requests = assigned;
       const framework = session.framework;
       if (details && framework) {
-        const actor = await framework.kernel.getActor(framework.appContext, details.actorId);
+        const actor = await framework.appClient.getActor(details.actorId);
         if (token === generation) actorName = actor?.name;
       }
       if (id && !details) error = "This run was not found in this Framework workspace.";

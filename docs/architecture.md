@@ -15,7 +15,7 @@ Builder.run editors, record screens, pages, and agent tools
                  │                   │
           SQLite adapter       YAIR + provider
                  │
-           browser worker
+        browser worker / Node filesystem
 ```
 
 Framework's [Spec model](https://github.com/jthum/framework/blob/main/src/spec/model.ts) and [validator](https://github.com/jthum/framework/blob/main/src/spec/validate.ts) define the canonical format. Its [Kernel](https://github.com/jthum/framework/blob/main/src/kernel/kernel.ts) composes focused services. The [WorkspaceClient](https://github.com/jthum/framework/blob/main/src/client/workspace-client.ts) exposes context-bound operations to UI and host code.
@@ -28,7 +28,7 @@ Builder.run maps a Space to a root Workspace and an App to a child Workspace. Th
 
 Shared Collections live in the Space. Apps declare Sources and receive instance Attachments that resolve those Sources. Grouping columns describe Workspace relationships; access is checked at the relevant Workspace.
 
-[bootstrap.ts](../src/lib/framework/bootstrap.ts) contains local bootstrap and selection. Its local Actor discovery must not be reused as server authentication. Framework's [deployment guidance](https://github.com/jthum/framework/blob/main/docs/deployment-modes.md) describes embedded and server hosts; Builder.run currently ships a browser-local deployment.
+[bootstrap.ts](../src/lib/framework/bootstrap.ts) contains local bootstrap and selection. Its local Actor discovery is not server authentication. In server mode, the [server composition](../src/lib/server) binds an Actor from an authenticated session and the [remote session client](../src/lib/app/remote.ts) supplies the same Workspace clients to the UI. See [deployment](deployment.md) for both builds.
 
 ## Definition and identity
 
@@ -42,7 +42,7 @@ Optional `meta` JSON is preserved. Builder.run uses metadata for presentation an
 
 [sqlite.ts](../src/lib/framework/sqlite.ts) composes Framework's SQLite adapter with Builder.run's gateway. The central `catalog.db` holds Workspace and Actor state, Specs, and operational metadata. Workspace and scope databases hold routed record storage.
 
-The browser gateway uses Framework's optional browser SQLite package. A Node gateway supports deterministic tests. Framework's adapter owns physical names, field encoding, schema reconciliation, and SQL query compilation.
+The browser gateway uses Framework's optional browser SQLite package. The old in-memory Node gateway remains a deterministic test helper; server deployment uses Framework's Node filesystem driver directly through [server storage](../src/lib/server/storage.ts). Framework's adapter owns physical names, field encoding, schema reconciliation, and SQL query compilation.
 
 Tables and columns derive from stable IDs. Scalar fields use native SQLite values; structured fields use JSON text. Database filtering, sorting, and aggregation are handled through the adapter, including supported reference paths across routed databases. See [Data and persistence](data-and-persistence.md).
 

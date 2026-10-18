@@ -1,3 +1,6 @@
+import { SERVER_MODE } from "$lib/app/deployment.ts";
+import { serverRequest } from "$lib/app/remote.ts";
+
 export interface AssistantSettings {
   readonly baseUrl: string;
   readonly model: string;
@@ -15,6 +18,8 @@ const STORE = "settings";
 const KEY = "provider";
 
 export async function loadAssistantSettings(): Promise<AssistantSettings> {
+  if (SERVER_MODE && typeof window !== "undefined")
+    return (await serverRequest("assistant.get")) as AssistantSettings;
   if (typeof indexedDB === "undefined") return { ...DEFAULT_ASSISTANT_SETTINGS };
   const database = await openSettingsDatabase();
   try {
@@ -27,6 +32,10 @@ export async function loadAssistantSettings(): Promise<AssistantSettings> {
 
 export async function saveAssistantSettings(input: AssistantSettings): Promise<void> {
   const settings = readAssistantSettings(input);
+  if (SERVER_MODE && typeof window !== "undefined") {
+    await serverRequest("assistant.put", { ...settings });
+    return;
+  }
   if (typeof indexedDB === "undefined") return;
   const database = await openSettingsDatabase();
   try {

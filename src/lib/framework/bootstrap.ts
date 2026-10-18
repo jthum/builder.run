@@ -7,6 +7,7 @@ import {
 import { createEmptySpec, type Spec } from "@jthum/framework/spec";
 import { createWorkspaceClient, type WorkspaceClient } from "@jthum/framework/client";
 import { createSpecId } from "$lib/runtime/ids.ts";
+import { runtimeInfo, type RuntimeInfo } from "./runtime-info.ts";
 
 export interface RuntimeSeed {
   readonly spaceName: string;
@@ -30,6 +31,7 @@ export interface OpenRuntimeInput {
   readonly preferredActorId?: string;
 }
 export interface AppContext {
+  readonly profiles: RuntimeInfo;
   readonly spaceClient: WorkspaceClient;
   readonly appClient: WorkspaceClient;
   readonly space: Workspace;
@@ -186,6 +188,7 @@ export async function resolveApp(
     throw new Error("Selection does not resolve to one Space and App for this Actor.");
   }
   return {
+    profiles: runtimeInfo(kernel),
     spaceClient: await createWorkspaceClient(kernel, spaceContext),
     appClient: await createWorkspaceClient(kernel, appContext),
     space,

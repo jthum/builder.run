@@ -395,9 +395,7 @@ describe("canonical WebMCP", () => {
       expect((await value.context.runtime().appClient.getSource("contact"))?.schema.key).toBe(
         "contact",
       );
-      expect(
-        await value.context.runtime().kernel.listAttachmentsTo(value.context.runtime().appContext),
-      ).toEqual([
+      expect(await value.context.runtime().appClient.listAttachmentsTo()).toEqual([
         expect.objectContaining({
           sourceId: "contact",
           collectionId: "contact",

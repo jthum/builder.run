@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { toolContext, session, wipeAllLocalData } from "$lib/app/session.svelte.ts";
+	import { SERVER_MODE } from "$lib/app/deployment.ts";
 	import { PageHeader } from "@jthum/framework/svelte/ui/page-header";
 	import * as AlertDialog from "@jthum/framework/svelte/ui/alert-dialog";
 	import { Badge } from "@jthum/framework/svelte/ui/badge";
@@ -56,7 +57,7 @@
 		<Card.Root>
 			<Card.Header>
 				<Card.Title>Storage</Card.Title>
-				<Card.Description>Records live in SQLite tables on this device.</Card.Description>
+				<Card.Description>{SERVER_MODE ? "Records live in persistent SQLite files on the server." : "Records live in SQLite tables on this device."}</Card.Description>
 			</Card.Header>
 			<Card.Content class="flex flex-col gap-2">
 				<Badge>{session.diagnostics?.engine} · {session.diagnostics?.backend}</Badge>
@@ -192,7 +193,7 @@
 			</Tabs.Root>
 		</Card.Content>
 	</Card.Root>
-	<div class="flex flex-col gap-3">
+	{#if !SERVER_MODE}<div class="flex flex-col gap-3">
 		<h2 class="text-sm font-medium text-muted-foreground">Danger zone</h2>
 		<Card.Root>
 			<Card.Header>
@@ -208,7 +209,7 @@
 				</Button>
 			</Card.Footer>
 		</Card.Root>
-	</div>
+	</div>{/if}
 </div>
 
 <AlertDialog.Root bind:open={wipeOpen}>

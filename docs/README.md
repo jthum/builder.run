@@ -18,6 +18,7 @@ Builder.run turns a portable application Spec into an app people and agents can 
 - [Architecture and code map](architecture.md)
 - [Canonical automation format](automations-spec.md)
 - [Testing](testing.md)
+- [Local and server deployment](deployment.md)
 
 These docs describe Builder.run's product and its integration with [Framework](https://github.com/jthum/framework). Framework owns the portable Spec and runtime contracts; its [docs](https://github.com/jthum/framework/tree/main/docs) and [source](https://github.com/jthum/framework/tree/main/src) are the reference for those APIs.
 
