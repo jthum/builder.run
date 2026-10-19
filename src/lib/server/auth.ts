@@ -5,7 +5,13 @@ import type { Kernel } from "@jthum/framework/kernel";
 import type { SecretCipher } from "@jthum/framework/kernel";
 import { DEFAULT_ASSISTANT_SETTINGS, type AssistantSettings } from "$lib/inference/settings.ts";
 import { FrameworkError, invalidInput, resourceConflict } from "@jthum/framework/errors";
-import { entityEqual, type ModuleStore } from "@jthum/framework/persistence";
+import {
+  entityAnd,
+  entityEqual,
+  type ModuleStore,
+  type ModuleTransaction,
+} from "@jthum/framework/persistence";
+import type { SecurityInfo } from "$lib/app/access.ts";
 
 const deriveKey = promisify(scrypt);
 export const SESSION_COOKIE = "builder_session";
@@ -17,6 +23,8 @@ interface Login {
   readonly username: string;
   readonly hash: string;
   readonly salt: string;
+  /** Issuance Actor for indexed realm-local administration; actors also binds independent Spaces. */
+  readonly actorId: string;
   /** Host login bindings, not a Kernel people directory or an authorization grant. */
   readonly actors: Record<string, string>;
   readonly assistant?: Record<string, unknown>;
@@ -29,6 +37,7 @@ interface LoginSession {
 export interface Identity {
   readonly realmId: string;
   readonly login: Login;
+  readonly sessionId: string;
 }
 
 /** Login credentials are host-owned and scoped to their issuance realm. */
@@ -50,17 +59,18 @@ export class ServerAuth {
             username: { type: "text" },
             hash: { type: "text" },
             salt: { type: "text" },
+            actorId: { type: "id" },
             actors: { type: "json" },
             assistant: { type: "json", optional: true },
           },
-          indexes: [{ fields: ["username"], unique: true }],
+          indexes: [{ fields: ["username"], unique: true }, { fields: ["actorId"] }],
         },
         sessions: {
           fields: {
             loginId: { type: "id", references: { entity: "logins", onDelete: "cascade" } },
             expiresAt: { type: "number" },
           },
-          indexes: [{ fields: ["expiresAt"] }],
+          indexes: [{ fields: ["expiresAt"] }, { fields: ["loginId", "expiresAt"] }],
         },
       },
     });
@@ -85,12 +95,11 @@ export class ServerAuth {
     // creation so concurrent requests cannot both provision people for the same credential.
     const pending = this.loginQueue.then(async () => {
       username = username.trim().toLowerCase();
-      if (
-        !/^[a-z0-9][a-z0-9._@+-]{0,127}$/.test(username) ||
-        password.length < 12 ||
-        password.length > 1024
-      )
-        throw invalidInput("Use a valid username and a password of at least 12 characters.");
+      if (!/^[a-z0-9][a-z0-9._@+-]{0,127}$/.test(username))
+        throw invalidInput(
+          "Use a username containing letters, numbers, dots, dashes or underscores.",
+        );
+      validatePassword(password);
       const store = this.storage.workspace(realmId);
       if (
         (await store.query({ from: "logins", where: entityEqual("username", username), limit: 1 }))
@@ -100,7 +109,17 @@ export class ServerAuth {
       const salt = randomBytes(16).toString("hex");
       const hash = ((await deriveKey(password, salt, 64)) as Buffer).toString("hex");
       const bindings = typeof actors === "function" ? await actors() : actors;
-      await store.insert("logins", { id: nanoid(), username, salt, hash, actors: bindings });
+      const actorId = bindings[realmId];
+      if (!actorId)
+        throw invalidInput("The login must be bound to an Actor in its issuance Space.");
+      await store.insert("logins", {
+        id: nanoid(),
+        username,
+        salt,
+        hash,
+        actorId,
+        actors: bindings,
+      });
     });
     this.loginQueue = pending.catch(() => {});
     return pending;
@@ -121,6 +140,9 @@ export class ServerAuth {
     const secret = randomBytes(32).toString("base64url");
     const expiresAt = this.now() + SESSION_MS;
     await store.transaction(async (tx) => {
+      // A password change may have completed while scrypt was running.
+      if ((await tx.get<Login>("logins", login.id))?.hash !== login.hash)
+        throw authenticationRequired();
       const expired = await tx.query<LoginSession>({
         from: "sessions",
         where: { op: "lte", left: { field: "expiresAt" }, right: { value: this.now() } },
@@ -140,7 +162,121 @@ export class ServerAuth {
     if (!session || session.expiresAt <= this.now()) throw authenticationRequired();
     const login = await store.get<Login>("logins", session.loginId);
     if (!login) throw authenticationRequired();
-    return { realmId: parsed.realmId, login };
+    return { realmId: parsed.realmId, login, sessionId: session.id };
+  }
+
+  async assertActive(identity: Identity): Promise<void> {
+    const session = await this.storage
+      .workspace(identity.realmId)
+      .get<LoginSession>("sessions", identity.sessionId);
+    if (!session || session.loginId !== identity.login.id || session.expiresAt <= this.now())
+      throw authenticationRequired();
+  }
+
+  async security(identity: Identity): Promise<SecurityInfo> {
+    await this.assertActive(identity);
+    const sessions = await this.storage.workspace(identity.realmId).query<LoginSession>({
+      from: "sessions",
+      where: entityAnd(entityEqual("loginId", identity.login.id), {
+        op: "gt",
+        left: { field: "expiresAt" },
+        right: { value: this.now() },
+      }),
+      orderBy: [{ expression: { field: "expiresAt" }, direction: "desc" }],
+    });
+    return {
+      username: identity.login.username,
+      sessions: sessions.map((session) => ({
+        id: session.id,
+        current: session.id === identity.sessionId,
+        createdAt: new Date(session.expiresAt - SESSION_MS).toISOString(),
+        expiresAt: new Date(session.expiresAt).toISOString(),
+      })),
+    };
+  }
+
+  async changePassword(
+    identity: Identity,
+    currentPassword: string,
+    password: string,
+  ): Promise<void> {
+    validatePassword(password);
+    if (currentPassword.length > 1024) throw invalidInput("The current password is incorrect.");
+    const store = this.storage.workspace(identity.realmId);
+    const current = await store.get<Login>("logins", identity.login.id);
+    if (!current) throw authenticationRequired();
+    const key = (await deriveKey(currentPassword, current.salt, 64)) as Buffer;
+    if (!timingSafeEqual(key, Buffer.from(current.hash, "hex")))
+      throw invalidInput("The current password is incorrect.");
+    const salt = randomBytes(16).toString("hex");
+    const hash = ((await deriveKey(password, salt, 64)) as Buffer).toString("hex");
+    await store.transaction(async (tx) => {
+      const session = await tx.get<LoginSession>("sessions", identity.sessionId);
+      if (!session || session.loginId !== current.id || session.expiresAt <= this.now())
+        throw authenticationRequired();
+      if ((await tx.get<Login>("logins", current.id))?.hash !== current.hash)
+        throw resourceConflict("Your password changed. Please try again.");
+      await tx.update("logins", current.id, { salt, hash });
+      await this.deleteSessions(tx, current.id, identity.sessionId);
+    });
+  }
+
+  async revokeSession(identity: Identity, id?: string): Promise<void> {
+    await this.assertActive(identity);
+    const store = this.storage.workspace(identity.realmId);
+    await store.transaction(async (tx) => {
+      if (id !== undefined) {
+        const session = await tx.get<LoginSession>("sessions", id);
+        if (!session || session.loginId !== identity.login.id || id === identity.sessionId)
+          throw invalidInput("Choose another session belonging to your login.");
+        await tx.delete("sessions", id);
+      } else await this.deleteSessions(tx, identity.login.id, identity.sessionId);
+    });
+  }
+
+  /** Only realm-local logins are exposed to that Space's managers. */
+  async localLogins(spaceId: string): Promise<readonly { actorId: string; username: string }[]> {
+    const logins = await this.storage
+      .workspace(spaceId)
+      .query<{ username: string; actorId: string }>({
+        from: "logins",
+        select: { username: { field: "username" }, actorId: { field: "actorId" } },
+      });
+    return logins;
+  }
+
+  async revokeActorSessions(spaceId: string, actorId: string): Promise<void> {
+    const store = this.storage.workspace(spaceId);
+    await store.transaction(async (tx) => {
+      const logins = await tx.query<{ id: string }>({
+        from: "logins",
+        where: entityEqual("actorId", actorId),
+        select: { id: { field: "id" } },
+      });
+      for (const login of logins) await this.deleteSessions(tx, login.id);
+    });
+  }
+
+  private async deleteSessions(
+    tx: ModuleTransaction,
+    loginId: string,
+    except?: string,
+  ): Promise<void> {
+    // Bounded batches avoid loading every session into memory during revocation.
+    const where = entityAnd(
+      entityEqual("loginId", loginId),
+      ...(except ? [{ op: "ne" as const, left: { field: "id" }, right: { value: except } }] : []),
+    );
+    for (;;) {
+      const rows = await tx.query<{ id: string }>({
+        from: "sessions",
+        where,
+        select: { id: { field: "id" } },
+        limit: 100,
+      });
+      if (!rows.length) break;
+      for (const row of rows) await tx.delete("sessions", row.id);
+    }
   }
 
   async linkActor(identity: Identity, spaceId: string, actorId: string): Promise<void> {
@@ -157,7 +293,7 @@ export class ServerAuth {
       .workspace(identity.realmId)
       .get<Login>("logins", identity.login.id);
     if (!login) throw authenticationRequired();
-    return { realmId: identity.realmId, login };
+    return { ...identity, login };
   }
 
   async getAssistantSettings(
@@ -224,6 +360,11 @@ export class ServerAuth {
     if (parsed)
       await this.storage.workspace(parsed.realmId).delete("sessions", digest(parsed.secret));
   }
+}
+
+function validatePassword(password: string): void {
+  if (password.length < 12 || password.length > 1024)
+    throw invalidInput("Use a password of 12 to 1024 characters.");
 }
 
 function digest(secret: string): string {

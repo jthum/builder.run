@@ -21,6 +21,7 @@ import type { RemoteSnapshot } from "$lib/app/remote-contract.ts";
 import { ServerAuth, authenticationRequired, type Identity } from "./auth.ts";
 import { openServerStorage } from "./storage.ts";
 import { workspaceDatabaseName } from "$lib/framework/sqlite.ts";
+import { PeopleService } from "./people.ts";
 
 interface AssistantRun {
   identity: Identity;
@@ -37,22 +38,36 @@ export interface ServerOptions {
 /** One Kernel/storage lifetime per server process; request identity and assistant state stay isolated. */
 export class ServerRuntime {
   private readonly revisions = new Map<string, number>();
+  private readonly people: PeopleService;
   private closed = false;
   private constructor(
     readonly kernel: Kernel,
     readonly auth: ServerAuth,
     private readonly storage: Awaited<ReturnType<typeof openServerStorage>>,
     private readonly inferenceRuns: AsyncLocalStorage<AssistantRun>,
-  ) {}
+  ) {
+    this.people = new PeopleService(kernel, auth, storage.catalog());
+  }
 
   static async open(options: ServerOptions): Promise<ServerRuntime> {
     const storage = await openServerStorage(options.directory);
     const runs = new AsyncLocalStorage<AssistantRun>();
     let runtime: ServerRuntime | undefined;
     const assistantTools = {
-      resolve: (caller: Parameters<ReturnType<typeof createAssistantTools>["resolve"]>[0]) => {
+      resolve: async (
+        caller: Parameters<ReturnType<typeof createAssistantTools>["resolve"]>[0],
+      ) => {
         const run = runs.getStore();
-        return run ? createAssistantTools(run.tools).resolve(caller) : [];
+        if (!run || !runtime) return [];
+        await runtime.assertAssistantAccess(run);
+        const tools = await createAssistantTools(run.tools).resolve(caller);
+        return tools.map((tool) => ({
+          ...tool,
+          execute: async (...args: Parameters<typeof tool.execute>) => {
+            await runtime!.assertAssistantAccess(run);
+            return tool.execute(...args);
+          },
+        }));
       },
     };
     const inference =
@@ -137,7 +152,18 @@ export class ServerRuntime {
     const actor = await context.spaceClient.getActor(context.actorId);
     if (!actor) throw authenticationRequired();
     const membership = await this.storage.catalog().getMembership(actor.id, context.space.id);
-    const roles = membership?.permissions.includes("manage") ? ["admin"] : ["member"];
+    const appMembership = await this.storage.catalog().getMembership(actor.id, context.app.id);
+    const permissions = {
+      space:
+        membership?.permissions.filter((permission) =>
+          context.space.access.members.includes(permission),
+        ) ?? [],
+      app:
+        appMembership?.permissions.filter((permission) =>
+          context.app.access.members.includes(permission),
+        ) ?? [],
+    };
+    const roles = permissions.space.includes("manage") ? ["admin"] : ["member"];
     const spaces = [];
     for (const [spaceId, actorId] of Object.entries(identity.login.actors)) {
       try {
@@ -157,13 +183,14 @@ export class ServerRuntime {
       if (member?.permissions.includes("read") && child.access.members.includes("read"))
         apps.push(child);
     }
-    const actors = membership?.permissions.includes("manage")
+    const actors = permissions.space.includes("manage")
       ? (await context.spaceClient.listActorsByOrigin()).map((person) => ({
           ...person,
           roles: person.id === actor.id ? roles : ["member"],
         }))
       : [{ ...actor, roles }];
     return {
+      realmId: identity.realmId,
       selection: context.selection,
       actorId: context.actorId,
       space: context.space,
@@ -173,8 +200,9 @@ export class ServerRuntime {
       actor: { ...actor, roles },
       actors,
       profiles: encodeRuntimeInfo(context.profiles),
+      permissions,
       revision: this.revisions.get(context.space.id) ?? 0,
-      databases: membership?.permissions.includes("manage")
+      databases: permissions.space.includes("manage")
         ? (await this.storage.inspect()).filter(
             ({ name }) =>
               name === "catalog.db" ||
@@ -193,6 +221,12 @@ export class ServerRuntime {
     appId?: string,
   ): Promise<WorkspaceClient> {
     if (!Object.hasOwn(identity.login.actors, spaceId)) throw authenticationRequired();
+    // A login's Space access is a host entry condition, not inherited Kernel ACL.
+    const root = await createWorkspaceClient(this.kernel, {
+      workspaceId: spaceId,
+      actorId: identity.login.actors[spaceId]!,
+    });
+    await root.getWorkspace();
     const client = await createWorkspaceClient(this.kernel, {
       workspaceId,
       actorId: identity.login.actors[spaceId]!,
@@ -207,6 +241,12 @@ export class ServerRuntime {
       return this.withInferenceContext(stream, run);
     };
     return wrapped;
+  }
+
+  private async assertAssistantAccess(run: AssistantRun): Promise<void> {
+    await this.auth.assertActive(run.identity);
+    await run.runtime.spaceClient.getWorkspace();
+    await run.runtime.appClient.getWorkspace();
   }
 
   private async *withInferenceContext(
@@ -291,7 +331,25 @@ export class ServerRuntime {
       const spaceId = selection?.spaceId ?? Object.keys(identity.login.actors)[0];
       if (!spaceId || !Object.hasOwn(identity.login.actors, spaceId))
         throw authenticationRequired();
+      const root = await createWorkspaceClient(this.kernel, {
+        workspaceId: spaceId,
+        actorId: identity.login.actors[spaceId]!,
+      });
+      await root.getWorkspace();
       return this.revisions.get(spaceId) ?? 0;
+    }
+    if (command === "security.get") return this.auth.security(identity);
+    if (command === "security.password") {
+      if (typeof input.currentPassword !== "string" || typeof input.password !== "string")
+        throw invalidInput("Current and new passwords required.");
+      await this.auth.changePassword(identity, input.currentPassword, input.password);
+      return this.auth.security(identity);
+    }
+    if (command === "security.revoke") {
+      if (input.sessionId !== undefined && typeof input.sessionId !== "string")
+        throw invalidInput("Invalid session.");
+      await this.auth.revokeSession(identity, input.sessionId);
+      return this.auth.security(identity);
     }
     if (command === "snapshot") return this.snapshot(identity, selection);
     if (command === "assistant.get")
@@ -305,6 +363,15 @@ export class ServerRuntime {
       return null;
     }
     const context = await this.context(identity, selection);
+    if (command === "people.list") return this.people.list(context);
+    if (command.startsWith("people.")) {
+      try {
+        await this.people.mutate(identity, context, command.slice("people.".length), input);
+        return await this.people.list(context);
+      } finally {
+        this.changed(context.space.id);
+      }
+    }
     let next = context;
     const name = () => {
       if (typeof input.name !== "string" || !input.name.trim())
@@ -337,22 +404,7 @@ export class ServerRuntime {
         name: name(),
         ...(typeof input.email === "string" ? { email: input.email } : {}),
       });
-    else if (command === "createLogin") {
-      if (typeof input.username !== "string" || typeof input.password !== "string")
-        throw invalidInput("Username and password required.");
-      await this.auth.createLogin(context.space.id, input.username, input.password, async () => {
-        const member = await context.spaceClient.createMember({
-          name: name(),
-          permissions: ["read", "create", "update", "delete", "manage"],
-        });
-        await context.appClient.addMembership({
-          actorId: member.actor.id,
-          workspaceId: context.app.id,
-          permissions: ["read", "create", "update", "delete", "manage"],
-        });
-        return { [context.space.id]: member.actor.id };
-      });
-    } else throw invalidInput("Unknown app operation.");
+    else throw invalidInput("Unknown app operation.");
     this.changed(context.space.id);
     const refreshed = await this.auth.refreshIdentity(identity);
     return this.snapshot(refreshed, next.selection);

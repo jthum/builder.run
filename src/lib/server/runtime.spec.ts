@@ -1,8 +1,7 @@
 import { afterEach, describe, expect, it } from "vite-plus/test";
-import { mkdtemp, rm, readdir, cp, readFile } from "node:fs/promises";
-import { tmpdir } from "node:os";
+import { readdir, cp, readFile } from "node:fs/promises";
 import { join } from "node:path";
-import { createHttpWorkspaceClient, readJsonResponse } from "@jthum/framework-http";
+import { createHttpWorkspaceClient } from "@jthum/framework-http";
 import { createWorkspaceClient } from "@jthum/framework/client";
 import { createEmptySpec } from "@jthum/framework/spec";
 import { ServerRuntime } from "./runtime.ts";
@@ -10,71 +9,9 @@ import { createServerHandler } from "./http.ts";
 import { ServerAuth } from "./auth.ts";
 import type { RemoteSnapshot } from "$lib/app/remote-contract.ts";
 
-const directories: string[] = [];
-const runtimes: ServerRuntime[] = [];
-afterEach(async () => {
-  await Promise.all(runtimes.splice(0).map((runtime) => runtime.close()));
-  await Promise.all(
-    directories.splice(0).map((path) => rm(path, { recursive: true, force: true })),
-  );
-});
-async function directory() {
-  const path = await mkdtemp(join(tmpdir(), "app-server-"));
-  directories.push(path);
-  return path;
-}
-async function fixture(
-  path?: string,
-  inference?: Parameters<typeof ServerRuntime.open>[0]["inference"],
-) {
-  const runtime = await ServerRuntime.open({
-    directory: path ?? (await directory()),
-    adminPassword: "correct-password-for-test",
-    ...(inference ? { inference } : {}),
-  });
-  runtimes.push(runtime);
-  const handle = createServerHandler(runtime);
-  let token = "";
-  const fetch: typeof globalThis.fetch = async (input, init) => {
-    const request = new Request(input, init);
-    request.headers.set("origin", new URL(request.url).origin);
-    if (token) request.headers.set("cookie", token);
-    const response = await handle(request);
-    if (response.headers.has("set-cookie"))
-      token = response.headers.get("set-cookie")!.split(";", 1)[0]!;
-    return response;
-  };
-  const command = async (
-    command: string,
-    input: Record<string, unknown> = {},
-    selection?: RemoteSnapshot["selection"],
-  ): Promise<unknown> => {
-    const response = await fetch("https://example.test/api/app", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ command, input, ...(selection ? { selection } : {}) }),
-    });
-    const body = (await readJsonResponse(response)) as { result: unknown };
-    return body.result;
-  };
-  const login = async (username = "admin", password = "correct-password-for-test") => {
-    const response = await fetch("https://example.test/api/login", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ username, password }),
-    });
-    await readJsonResponse(response);
-    return response;
-  };
-  await login();
-  const snapshot = (await command("snapshot")) as RemoteSnapshot;
-  const client = (snapshot: RemoteSnapshot) =>
-    createHttpWorkspaceClient({
-      url: `https://example.test/api/workspaces/${snapshot.app.id}?${new URLSearchParams({ spaceId: snapshot.space.id, appId: snapshot.app.id })}`,
-      fetch,
-    });
-  return { runtime, handle, fetch, command, login, snapshot, client, getToken: () => token };
-}
+import { fixture, directory, cleanupServerFixtures } from "./testing.ts";
+
+afterEach(cleanupServerFixtures);
 
 describe("server deployment", () => {
   it("rejects invalid and duplicate credentials before provisioning Actors", async () => {
@@ -86,7 +23,7 @@ describe("server deployment", () => {
     const before = await owner.listMembers();
     await expect(
       f.command(
-        "createLogin",
+        "people.create",
         {
           name: "Invalid",
           username: "invalid",
@@ -99,7 +36,7 @@ describe("server deployment", () => {
     const results = await Promise.allSettled(
       [1, 2].map(() =>
         f.command(
-          "createLogin",
+          "people.create",
           {
             name: "Colleague",
             username: "colleague",

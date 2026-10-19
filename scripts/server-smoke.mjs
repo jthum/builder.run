@@ -136,9 +136,78 @@ try {
   await cp(directory, restored, { recursive: true });
   await start(restored);
   assert.equal((await request(endpoint, { method: "listRecords", args: ["note"] })).length, 9);
+
+  const people = await request("/api/app", {
+    command: "people.create",
+    selection: snapshot.selection,
+    input: { name: "Colleague", username: "colleague", password: `${password}-initial` },
+  });
+  const colleague = people.people.find((person) => person.username === "colleague");
+  assert.deepEqual(colleague.permissions, ["read"]);
+  let memberCookie = "";
+  const asMember = async (path, body) => {
+    const response = await fetch(`${origin}${path}`, {
+      method: "POST",
+      headers: {
+        origin,
+        "content-type": "application/json",
+        ...(memberCookie ? { cookie: memberCookie } : {}),
+      },
+      body: JSON.stringify(body),
+    });
+    if (response.headers.has("set-cookie"))
+      memberCookie = response.headers.get("set-cookie").split(";", 1)[0];
+    return response;
+  };
+  assert.equal(
+    (await asMember("/api/login", { username: "colleague", password: `${password}-initial` }))
+      .status,
+    200,
+  );
+  assert.equal(
+    (await asMember(endpoint, { method: "getRecord", args: ["note", record.id] })).status,
+    200,
+  );
+  assert.equal(
+    (await asMember(endpoint, { method: "createRecord", args: ["note", { title: "Denied" }] }))
+      .status,
+    403,
+  );
+  assert.equal(
+    (
+      await asMember("/api/app", {
+        command: "security.password",
+        input: { currentPassword: `${password}-initial`, password: `${password}-changed` },
+      })
+    ).status,
+    200,
+  );
+  await request("/api/app", {
+    command: "people.revokeSessions",
+    selection: snapshot.selection,
+    input: { actorId: colleague.actor.id },
+  });
+  assert.equal(
+    (await asMember(endpoint, { method: "getRecord", args: ["note", record.id] })).status,
+    401,
+  );
+  assert.equal(
+    (await asMember("/api/login", { username: "colleague", password: `${password}-changed` }))
+      .status,
+    200,
+  );
+  await request("/api/app", {
+    command: "people.remove",
+    selection: snapshot.selection,
+    input: { actorId: colleague.actor.id },
+  });
+  assert.equal(
+    (await asMember(endpoint, { method: "getRecord", args: ["note", record.id] })).status,
+    401,
+  );
   await request("/api/logout", {});
   console.log(
-    "Server smoke passed: login, concurrent HTTP writes, forced process restart, persistent session, backup/restore and logout.",
+    "Server smoke passed: login, concurrent writes, process restart, backup/restore, user access, password changes, session revocation and logout.",
   );
 } finally {
   await stop();
