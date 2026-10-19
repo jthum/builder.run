@@ -77,6 +77,7 @@ class SessionState {
   ready = $state(false);
   framework = $state.raw<AppContext | null>(null);
   loginRequired = $state(false);
+  setupRequired = $state(false);
   permissions = $state.raw<{
     readonly space: readonly Permission[];
     readonly app: readonly Permission[];
@@ -483,6 +484,7 @@ function applyRemoteSnapshot(snapshot: RemoteSnapshot): void {
   session.webmcpToolMode = getWebMcpAppToolMode();
   session.ready = true;
   session.loginRequired = false;
+  session.setupRequired = false;
   session.error = null;
   session.revision += 1;
   listeners.forEach((listener) => listener());
@@ -576,7 +578,11 @@ function remoteFailure(error: unknown): void {
   session.ready = false;
   session.framework = null;
   session.permissions = { space: [], app: [] };
-  if (error instanceof FrameworkError && error.code.startsWith("AUTH.")) {
+  if (error instanceof FrameworkError && error.code === "AUTH.SETUP_REQUIRED") {
+    session.setupRequired = true;
+    session.loginRequired = false;
+    session.error = null;
+  } else if (error instanceof FrameworkError && error.code.startsWith("AUTH.")) {
     session.loginRequired = true;
     session.error = null;
   } else
@@ -595,6 +601,25 @@ export async function login(username: string, password: string): Promise<void> {
     }),
   });
   await readJsonResponse(response);
+  booting = null;
+  await boot();
+}
+
+export async function setup(input: {
+  name: string;
+  username: string;
+  password: string;
+  spaceName?: string;
+}): Promise<void> {
+  await readJsonResponse(
+    await fetch("/api/setup", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(input),
+    }),
+  );
+  session.setupRequired = false;
+  session.error = null;
   booting = null;
   await boot();
 }

@@ -8,6 +8,7 @@ import { FrameworkError, invalidInput } from "@jthum/framework/errors";
 import { ServerRuntime } from "./runtime.ts";
 import { SESSION_COOKIE } from "./auth.ts";
 import type { AppSelection } from "$lib/framework/bootstrap.ts";
+import type { SetupInput } from "./setup.ts";
 
 /** All cookie-authenticated mutations require a same-origin request, including login/logout. */
 export function createServerHandler(
@@ -28,6 +29,27 @@ export function createServerHandler(
           message: "A same-origin request is required.",
         });
       const token = cookie(request.headers.get("cookie"), SESSION_COOKIE);
+      if (url.pathname === "/api/setup/status")
+        return jsonResponse({ result: { required: runtime.setupRequired } });
+      if (url.pathname === "/api/setup") {
+        if (!runtime.setupRequired)
+          throw new FrameworkError({
+            code: "RESOURCE.CONFLICT",
+            message: "Setup is complete. Sign in to continue.",
+          });
+        const body = object(await readJsonRequest(request, 8192));
+        if (
+          Object.keys(body).some(
+            (key) => !["name", "username", "password", "spaceName"].includes(key),
+          )
+        )
+          throw invalidInput("Invalid setup request.");
+        await runtime.setup(body as unknown as SetupInput);
+        const session = await runtime.auth.login(text(body.username), text(body.password));
+        const response = jsonResponse({ result: null });
+        response.headers.set("set-cookie", sessionCookie(session, origin.startsWith("https:")));
+        return response;
+      }
       if (url.pathname === "/api/login") {
         const body = object(await readJsonRequest(request, 8192));
         const username = text(body.username);

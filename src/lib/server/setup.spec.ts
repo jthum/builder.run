@@ -52,9 +52,11 @@ function terminal(answers: readonly string[]) {
 }
 
 describe("native server setup", () => {
-  it("refuses uninitialized startup and creates only the explicitly chosen owner during setup", async () => {
+  it("opens fresh storage for onboarding and creates only the explicitly chosen owner during setup", async () => {
     const path = await directory();
-    await expect(ServerRuntime.open({ directory: path })).rejects.toThrow("build/setup.mjs");
+    const fresh = await ServerRuntime.open({ directory: path });
+    expect(fresh.setupRequired).toBe(true);
+    await fresh.close();
     const created = await setupServer(path, owner);
     const runtime = await ServerRuntime.open({ directory: path });
     try {
@@ -114,7 +116,9 @@ describe("native server setup", () => {
       "code",
       "VALIDATION.INVALID_INPUT",
     );
-    await expect(ServerRuntime.open({ directory: path })).rejects.toThrow("not been initialized");
+    const fresh = await ServerRuntime.open({ directory: path });
+    expect(fresh.setupRequired).toBe(true);
+    await fresh.close();
     const created = await setupServer(path, owner);
     expect(created.spaceId).toBeTruthy();
   });
@@ -188,7 +192,9 @@ describe("native server setup", () => {
       expect(io.transcript()).not.toContain(owner.password);
       expect(io.transcript()).not.toContain("different-password");
       expect(io.input.isRaw).toBe(false);
-      await expect(ServerRuntime.open({ directory: path })).rejects.toThrow("not been initialized");
+      const fresh = await ServerRuntime.open({ directory: path });
+      expect(fresh.setupRequired).toBe(true);
+      await fresh.close();
       expect((await setupServer(path, owner)).actorId).toBeTruthy();
     }
   });

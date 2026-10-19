@@ -10,6 +10,7 @@
 	import { pageContext } from "$lib/app/pages.ts";
 	import AppSidebar from "$lib/components/app-sidebar.svelte";
 	import LoginForm from "$lib/components/login-form.svelte";
+	import SetupForm from "$lib/components/setup-form.svelte";
 	import * as Breadcrumb from "@jthum/framework/svelte/ui/breadcrumb";
 	import * as Sidebar from "@jthum/framework/svelte/ui/sidebar";
 	import { Separator } from "@jthum/framework/svelte/ui/separator";
@@ -61,7 +62,9 @@
 <ModeWatcher />
 <Toaster />
 
-{#if session.loginRequired}
+{#if session.setupRequired}
+	<SetupForm />
+{:else if session.loginRequired}
 	<LoginForm />
 {:else if (!session.ready || (session.framework && !canonicalStudio.context)) && !session.error && !canonicalStudio.error}
 	<div class="flex min-h-svh items-center justify-center gap-2 text-muted-foreground">

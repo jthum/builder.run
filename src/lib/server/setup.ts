@@ -25,38 +25,10 @@ export async function setupServer(
       persistence: storage.persistence,
       secretCipher: storage.secretCipher,
     });
-    if ((await storage.catalog().listRootWorkspaces()).length)
-      throw new Error(
-        "This directory already contains instance data. Setup will not overwrite it. Use a new data directory or restore a complete backup.",
-      );
+    await assertEmptySetup(storage);
     const value = typeof input === "function" ? await input() : input;
-    if (
-      !value ||
-      typeof value !== "object" ||
-      typeof value.name !== "string" ||
-      !value.name.trim() ||
-      typeof value.username !== "string" ||
-      typeof value.password !== "string" ||
-      (value.spaceName !== undefined &&
-        (typeof value.spaceName !== "string" || !value.spaceName.trim()))
-    )
-      throw invalidInput("Provide your name, username, password and an optional Space name.");
-    const username = validateCredentials(value.username, value.password);
-    const spaceName = value.spaceName?.trim() ?? "My Space";
-    const created = await createSpace(kernel, {
-      spaceName,
-      appName: "Home",
-      user: { name: value.name.trim() },
-      spaceSpec: emptySpec("space", spaceName),
-      appSpec: emptySpec("home", "Home"),
-    });
-    const auth = await ServerAuth.open(kernel, created.space.id);
-    await auth.createLogin(created.space.id, username, value.password, {
-      [created.space.id]: created.actorId,
-    });
-    // Completion marker comes last: a partial setup is never served as an initialized instance.
-    await storage.saveRealm(created.space.id);
-    return { spaceId: created.space.id, actorId: created.actorId };
+    const { spaceId, actorId } = await provisionServer(kernel, storage, value);
+    return { spaceId, actorId };
   } finally {
     try {
       await kernel?.close();
@@ -64,4 +36,45 @@ export async function setupServer(
       await storage.release();
     }
   }
+}
+
+type Storage = Awaited<ReturnType<typeof openServerStorage>>;
+
+export async function assertEmptySetup(storage: Storage): Promise<void> {
+  if ((await storage.catalog().listRootWorkspaces()).length)
+    throw new Error(
+      "This directory already contains instance data. Setup will not overwrite it. Use a new data directory or restore a complete backup.",
+    );
+}
+
+/** Shared by browser onboarding and the optional CLI; caller owns the storage lease. */
+export async function provisionServer(kernel: Kernel, storage: Storage, value: SetupInput) {
+  await assertEmptySetup(storage);
+  if (
+    !value ||
+    typeof value !== "object" ||
+    typeof value.name !== "string" ||
+    !value.name.trim() ||
+    typeof value.username !== "string" ||
+    typeof value.password !== "string" ||
+    (value.spaceName !== undefined &&
+      (typeof value.spaceName !== "string" || !value.spaceName.trim()))
+  )
+    throw invalidInput("Provide your name, username, password and an optional Space name.");
+  const username = validateCredentials(value.username, value.password);
+  const spaceName = value.spaceName?.trim() ?? "My Space";
+  const created = await createSpace(kernel, {
+    spaceName,
+    appName: "Home",
+    user: { name: value.name.trim() },
+    spaceSpec: emptySpec("space", spaceName),
+    appSpec: emptySpec("home", "Home"),
+  });
+  const auth = await ServerAuth.open(kernel, created.space.id);
+  await auth.createLogin(created.space.id, username, value.password, {
+    [created.space.id]: created.actorId,
+  });
+  // Completion marker comes last: a partial setup is never served as an initialized instance.
+  await storage.saveRealm(created.space.id);
+  return { spaceId: created.space.id, actorId: created.actorId, auth };
 }

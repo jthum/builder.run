@@ -31,9 +31,10 @@ Shared Collections live in the Space. Apps declare Sources and receive instance 
 [bootstrap.ts](../src/lib/framework/bootstrap.ts) contains local bootstrap and selection. Its local Actor discovery is not server authentication. In server mode, the [server composition](../src/lib/server) binds an Actor from an authenticated session and the [remote session client](../src/lib/app/remote.ts) supplies the same Workspace clients to the UI. See [deployment](deployment.md) for both builds.
 
 Native server initialization is explicit: [setup.ts](../src/lib/server/setup.ts) creates the first
-Space/App, User and login under an exclusive storage lease. The separate terminal command collects
-credentials; deployment ENV contains infrastructure settings only. Server startup opens the Kernel
-for a completed instance without seeding users or selecting an Actor from a local roster.
+Space/App, User and login under an exclusive storage lease. Fresh installations open browser
+onboarding; the optional terminal command uses the same provisioning code before startup.
+Deployment ENV contains infrastructure settings only. Existing installations open the persisted
+login realm without seeding users or selecting an Actor from a local roster.
 
 ## Definition and identity
 

@@ -22,25 +22,27 @@ The server build produces `build/index.js` and a separate `build/setup.mjs` comm
 Framework packages and the linked `node_modules` layout available when running the app. Copying
 only `build` is not a complete deployment with these local package links.
 
-Choose a persistent data directory and initialize it once:
+Choose a persistent data directory and start the application:
 
 ```bash
 export DATA_DIR=/absolute/path/to/builder-data
-node build/setup.mjs
+HOST=127.0.0.1 ORIGIN=http://localhost:3000 node build/index.js
 ```
 
-Setup asks for the Space name, your name, username and password, with password confirmation and
-hidden password input. There is no default administrator username and no credential ENV setting.
-The chosen user receives ordinary management Memberships in the new Space/App. The command stores
-a salted scrypt password hash and closes the databases. `vp run setup:server` runs the same command.
+Open `http://localhost:3000`. A fresh installation shows a one-time form for your name, username,
+password and Space name. Submitting it creates the first Space/App and signs you in immediately;
+there is no setup command or restart required. The chosen user receives ordinary management
+Memberships. There is no default administrator username and no credential ENV setting. Passwords
+are stored as salted scrypt hashes.
 
-Then start the application with the same directory:
+**Complete setup before exposing a fresh installation publicly.** The first successful submission
+claims the installation; same-origin checks prevent cross-site submissions, not another visitor
+opening the public setup page. Bind to `HOST=127.0.0.1` and use a local browser or SSH tunnel, or
+keep access restricted at the proxy until setup is complete. For unattended provisioning, the
+optional CLI below can complete setup before the server starts. Once complete, the browser setup
+endpoint refuses further claims; additional users are managed by signed-in Space managers.
 
-```bash
-DATA_DIR=/absolute/path/to/builder-data ORIGIN=http://localhost:3000 node build/index.js
-```
-
-Open `http://localhost:3000` and sign in with the username you chose. For a public deployment, set
+For a public deployment, set
 `ORIGIN=https://your-domain.com` and put an HTTPS reverse proxy in front of the Node service. The
 proxy must support streaming responses. Run Node under systemd or your preferred process manager,
 as a dedicated non-root user with read/write access to `DATA_DIR`. `HOST` and `PORT` configure the
@@ -50,16 +52,23 @@ Keep only infrastructure settings in deployment configuration: `DATA_DIR`, `ORIG
 `PORT`. You can use Node's `--env-file` flag for these; the built server does not automatically load
 `.env`. Do not put passwords in environment variables, process arguments or build arguments.
 
-Setup refuses an initialized directory before prompting and never resets an existing user's
-password. Startup requires a completed setup and does not create people or guess an Actor from a
-roster. Cancelled prompts or invalid input create no Workspaces or users and can be retried. If
-initialization is interrupted after creating instance data, setup refuses to overwrite it; use a
-fresh directory or restore a complete backup. There is no anonymous browser setup endpoint.
+Starting an existing installation opens its persisted login realm and never resets users or
+guesses an Actor from a roster. Invalid setup input creates no Workspaces or users and can be
+corrected. Concurrent claims are serialized: only one can succeed. If initialization is interrupted
+after creating instance data, setup/startup refuses to overwrite it; use a fresh directory or restore
+a complete backup. A server holds the storage lease throughout onboarding as well as normal use.
+
+### Optional terminal setup
+
+Before starting the server, `node build/setup.mjs` (or `vp run setup:server`) asks for credentials
+with password confirmation and hidden input. It uses the same provisioning code as browser setup.
+Run it with the same `DATA_DIR`; it refuses an initialized directory before prompting and never
+resets an existing password. Cancelled prompts leave no Workspaces or users and can be retried.
 
 For trusted automation, `node build/setup.mjs --stdin` accepts a bounded JSON object with `name`,
 `username`, `password` and optional `spaceName` through a private input pipe. Passwords are not
 echoed. Obtain this input from your automation/secret manager, not a password embedded in shell
-history. Interactive setup remains the default.
+history. Without `--stdin`, the optional CLI prompts interactively.
 
 Sessions use opaque random tokens in HttpOnly, SameSite cookies; tokens are hashed in storage.
 Serve over HTTPS in production so cookies also receive `Secure`.
@@ -77,12 +86,14 @@ Compose version supporting `additional_contexts` are required.
 
 ```bash
 docker compose build
-docker compose run --rm --no-deps app node build/setup.mjs
 docker compose up -d
 ```
 
-The one-off setup command asks for credentials in the terminal and uses the same `app-data` volume
-as the service. Run it before starting the server; it does not open a public setup endpoint.
+Open the app and complete browser setup while access is private, as for native Node. Alternatively,
+before starting the service, run `docker compose run --rm --no-deps app node build/setup.mjs` for
+optional terminal provisioning into the same `app-data` volume.
+Compose publishes the port on loopback by default. Keep that private for setup; then serve it
+through your HTTPS reverse proxy (or deliberately change the published binding).
 
 The named `app-data` volume persists across container recreation. Set `ORIGIN` to the public URL
 when serving through a reverse proxy; the proxy must support streaming responses. Do not scale
@@ -164,8 +175,8 @@ vp run build:server
 vp run test:server
 ```
 
-The process smoke runs setup through a private stdin pipe, verifies refusal of uninitialized startup
-and repeat setup, then starts the production build with isolated temporary storage, tests login
+The process smoke verifies both optional private-stdin setup and browser setup over HTTP, including
+immediate sign-in and refusal of repeat setup. It starts the production build with isolated temporary storage, tests login
 and concurrent HTTP writes, kills/restarts the process, verifies persisted sessions/records, then
 tests backup/restore, read-only user access, password changes and session revocation. It makes no browser or external provider calls and removes only its own
 temporary test directories.

@@ -9,6 +9,7 @@ import { randomBytes } from "node:crypto";
 // Deterministic HTTP/process proof; no browser, provider calls, or user data are involved.
 const directory = await mkdtemp(join(tmpdir(), "app-server-smoke-"));
 const restored = await mkdtemp(join(tmpdir(), "app-server-restore-"));
+const cliDirectory = await mkdtemp(join(tmpdir(), "app-server-cli-"));
 const password = randomBytes(24).toString("base64url");
 let processHandle;
 let cookie = "";
@@ -122,10 +123,16 @@ async function initialize(dataDir, expectedCode = 0) {
 }
 
 try {
-  await assert.rejects(start(directory), /not been initialized/);
-  await initialize(directory);
-  await start(directory);
+  await initialize(cliDirectory); // Optional private-stdin setup remains supported.
+  await start(cliDirectory);
   await request("/api/login", { username: "admin", password });
+  await stop();
+  cookie = "";
+  await start(directory);
+  assert.equal((await fetch(origin)).status, 200);
+  assert.deepEqual(await request("/api/setup/status", {}), { required: true });
+  await request("/api/setup", { name: "Test owner", username: "admin", password });
+  assert.deepEqual(await request("/api/setup/status", {}), { required: false });
   const snapshot = await request("/api/app", { command: "snapshot" });
   const endpoint = `/api/workspaces/${snapshot.app.id}?${new URLSearchParams({ spaceId: snapshot.space.id, appId: snapshot.app.id })}`;
   const spec = {
@@ -237,11 +244,11 @@ try {
   );
   await request("/api/logout", {});
   console.log(
-    "Server smoke passed: explicit setup, uninitialized-start refusal, login, concurrent writes, process restart, backup/restore, user access, password changes, session revocation and logout.",
+    "Server smoke passed: browser onboarding, optional CLI setup, login, concurrent writes, process restart, backup/restore, user access, password changes, session revocation and logout.",
   );
 } finally {
   await stop();
   await Promise.all(
-    [directory, restored].map((path) => rm(path, { recursive: true, force: true })),
+    [directory, restored, cliDirectory].map((path) => rm(path, { recursive: true, force: true })),
   );
 }

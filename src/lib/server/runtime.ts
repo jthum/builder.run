@@ -26,6 +26,7 @@ import { ServerAuth, authenticationRequired, type Identity } from "./auth.ts";
 import { openServerStorage } from "./storage.ts";
 import { workspaceDatabaseName } from "$lib/framework/sqlite.ts";
 import { PeopleService } from "./people.ts";
+import { assertEmptySetup, provisionServer, type SetupInput } from "./setup.ts";
 
 interface AssistantRun {
   identity: Identity;
@@ -40,15 +41,50 @@ export interface ServerOptions {
 /** One Kernel/storage lifetime per server process; request identity and assistant state stay isolated. */
 export class ServerRuntime {
   private readonly revisions = new Map<string, number>();
-  private readonly people: PeopleService;
+  private settingUp = false;
+  private peopleService?: PeopleService;
   private closed = false;
   private constructor(
     readonly kernel: Kernel,
-    readonly auth: ServerAuth,
+    private loginAuth: ServerAuth | undefined,
     private readonly storage: Awaited<ReturnType<typeof openServerStorage>>,
     private readonly inferenceRuns: AsyncLocalStorage<AssistantRun>,
-  ) {
-    this.people = new PeopleService(kernel, auth, storage.catalog());
+  ) {}
+
+  get setupRequired(): boolean {
+    return !this.loginAuth;
+  }
+
+  get auth(): ServerAuth {
+    if (!this.loginAuth)
+      throw new FrameworkError({
+        code: "AUTH.SETUP_REQUIRED",
+        message: "Create your first login to get started.",
+      });
+    return this.loginAuth;
+  }
+
+  private get people(): PeopleService {
+    return (this.peopleService ??= new PeopleService(
+      this.kernel,
+      this.auth,
+      this.storage.catalog(),
+    ));
+  }
+
+  async setup(input: SetupInput): Promise<void> {
+    if (this.loginAuth || this.settingUp)
+      throw new FrameworkError({
+        code: "RESOURCE.CONFLICT",
+        message: "Setup is already complete or in progress. Sign in to continue.",
+      });
+    this.settingUp = true;
+    try {
+      const created = await provisionServer(this.kernel, this.storage, input);
+      this.loginAuth = created.auth;
+    } finally {
+      this.settingUp = false;
+    }
   }
 
   static async open(options: ServerOptions): Promise<ServerRuntime> {
@@ -86,10 +122,6 @@ export class ServerRuntime {
     let kernel: Kernel | undefined;
     try {
       const realm = await storage.readRealm();
-      if (!realm)
-        throw new Error(
-          "Server data has not been initialized. Run node build/setup.mjs with the same DATA_DIR first.",
-        );
       kernel = await Kernel.open({
         persistence: storage.persistence,
         secretCipher: storage.secretCipher,
@@ -103,6 +135,11 @@ export class ServerRuntime {
           webhooks: false,
         },
       });
+      if (!realm) {
+        await assertEmptySetup(storage);
+        runtime = new ServerRuntime(kernel, undefined, storage, runs);
+        return runtime;
+      }
       const root = await storage.catalog().getWorkspace(realm);
       if (!root?.isRoot)
         throw new Error(

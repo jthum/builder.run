@@ -1,7 +1,7 @@
 import { SERVER_MODE } from "$lib/app/deployment.ts";
 import { building } from "$app/env";
 
-/** Fail startup on uninitialized/invalid storage, but never open instance data during a build. */
+/** Open storage (including first-run onboarding), but never instance data during a build. */
 export async function init(): Promise<void> {
   if (SERVER_MODE && !building) {
     const { server } = await import("$lib/server/index.ts");

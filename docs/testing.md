@@ -55,6 +55,9 @@ live authorization changes, password/session lifecycle, and direct-versus-HTTP e
 The [setup tests](../src/lib/server/setup.spec.ts) verify explicit owner provisioning, refusal of
 repeat/partial setup, hidden password input, confirmation and cancellation, terminal restoration,
 and private stdin automation. No credential environment variables are needed for these tests.
+The [browser setup contract tests](../src/lib/server/browser-setup.spec.ts) exercise first-run
+HTTP onboarding without a browser: ordinary API gates, same-origin checks, invalid input retries,
+concurrent claims, immediate sign-in, repeat-setup refusal and persistence across restart.
 After `vp run build:server`, run `vp run test:server` for the real HTTP/process restart and
 backup/restore proof. See [deployment](deployment.md). It uses only temporary test directories.
 

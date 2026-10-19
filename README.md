@@ -60,12 +60,12 @@ built, use Node 24+ and run:
 ```bash
 vp run build:server
 export DATA_DIR=/absolute/path/to/builder-data
-node build/setup.mjs
-ORIGIN=http://localhost:3000 node build/index.js
+HOST=127.0.0.1 ORIGIN=http://localhost:3000 node build/index.js
 ```
 
-Setup prompts once for the first user's name, username and password. Credentials belong in the
-database, not deployment ENV settings. Startup requires a completed setup and never resets users.
+Open the app and create your first login. Credentials belong in the database, not deployment ENV
+settings. Complete this one-time setup before exposing a new installation publicly. Setup never
+resets existing users. An optional `node build/setup.mjs` command can provision it before startup.
 Use an HTTPS reverse proxy and a process manager for a public deployment. Docker remains optional;
 see [deployment](docs/deployment.md) for linked package builds, persistent storage and backups.
 
