@@ -123,6 +123,25 @@ describe("native server setup", () => {
     expect(created.spaceId).toBeTruthy();
   });
 
+  it("validates untrusted setup data without accepting arrays, wrong types or unknown keys", async () => {
+    const path = await directory();
+    for (const value of [
+      null,
+      [],
+      "not an object",
+      { ...owner, name: 7 },
+      { ...owner, username: null },
+      { ...owner, password: { value: owner.password } },
+      { ...owner, spaceName: false },
+      { ...owner, actorId: "not-authority" },
+    ])
+      await expect(setupServer(path, async () => value)).rejects.toHaveProperty(
+        "code",
+        "VALIDATION.INVALID_INPUT",
+      );
+    expect((await setupServer(path, owner)).actorId).toBeTruthy();
+  });
+
   it("refuses to overwrite partial instance data even without a completion marker", async () => {
     const path = await directory();
     const storage = await openServerStorage(path);

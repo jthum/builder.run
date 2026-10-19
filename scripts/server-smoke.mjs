@@ -130,9 +130,7 @@ try {
   cookie = "";
   await start(directory);
   assert.equal((await fetch(origin)).status, 200);
-  assert.deepEqual(await request("/api/setup/status", {}), { required: true });
   await request("/api/setup", { name: "Test owner", username: "admin", password });
-  assert.deepEqual(await request("/api/setup/status", {}), { required: false });
   const snapshot = await request("/api/app", { command: "snapshot" });
   const endpoint = `/api/workspaces/${snapshot.app.id}?${new URLSearchParams({ spaceId: snapshot.space.id, appId: snapshot.app.id })}`;
   const spec = {

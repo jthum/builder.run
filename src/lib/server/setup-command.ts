@@ -35,7 +35,7 @@ export async function runSetupCommand(
   );
 }
 
-async function readSetupJson(input: Readable): Promise<SetupInput> {
+async function readSetupJson(input: Readable): Promise<unknown> {
   const chunks: Buffer[] = [];
   let bytes = 0;
   for await (const chunk of input) {
@@ -45,7 +45,7 @@ async function readSetupJson(input: Readable): Promise<SetupInput> {
     chunks.push(buffer);
   }
   try {
-    return JSON.parse(Buffer.concat(chunks).toString("utf8")) as SetupInput;
+    return JSON.parse(Buffer.concat(chunks).toString("utf8")) as unknown;
   } catch {
     throw new Error("Setup input must be valid JSON.");
   }

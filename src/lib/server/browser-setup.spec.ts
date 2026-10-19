@@ -33,7 +33,7 @@ async function fresh() {
 describe("browser first-run setup", () => {
   it("blocks normal APIs until setup, creates an owner and signs them in without restarting", async () => {
     const { path, runtime, browser, post } = await fresh();
-    expect(await (await post("/api/setup/status")).json()).toEqual({ result: { required: true } });
+    expect(runtime.setupRequired).toBe(true);
     for (const route of ["/api/login", "/api/app", "/api/workspaces/anything"]) {
       const response = await post(route, { username: owner.username, password: owner.password });
       expect(response.status).toBe(401);
@@ -50,8 +50,8 @@ describe("browser first-run setup", () => {
     expect(snapshot.permissions.space).toContain("manage");
     expect(snapshot.permissions.app).toContain("manage");
     expect((await readFile(join(path, "login.realm"), "utf8")).trim()).toBe(snapshot.realmId);
-    expect(await (await post("/api/setup/status")).json()).toEqual({ result: { required: false } });
     await expect(browser.command("snapshot")).resolves.toMatchObject({ actor: { name: "Ada" } });
+    expect((await post("/api/setup/status")).status).toBe(404);
   });
 
   it("validates before writes, keeps the lease, and allows a corrected submission", async () => {

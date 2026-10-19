@@ -12,10 +12,7 @@ export interface SetupInput {
 }
 
 /** Trusted, one-time provisioning. The input callback runs only after an empty-instance check. */
-export async function setupServer(
-  directory: string,
-  input: SetupInput | (() => Promise<SetupInput>),
-) {
+export async function setupServer(directory: string, input: SetupInput | (() => Promise<unknown>)) {
   const storage = await openServerStorage(directory);
   let kernel: Kernel | undefined;
   try {
@@ -48,33 +45,52 @@ export async function assertEmptySetup(storage: Storage): Promise<void> {
 }
 
 /** Shared by browser onboarding and the optional CLI; caller owns the storage lease. */
-export async function provisionServer(kernel: Kernel, storage: Storage, value: SetupInput) {
+export async function provisionServer(kernel: Kernel, storage: Storage, value: unknown) {
   await assertEmptySetup(storage);
-  if (
-    !value ||
-    typeof value !== "object" ||
-    typeof value.name !== "string" ||
-    !value.name.trim() ||
-    typeof value.username !== "string" ||
-    typeof value.password !== "string" ||
-    (value.spaceName !== undefined &&
-      (typeof value.spaceName !== "string" || !value.spaceName.trim()))
-  )
-    throw invalidInput("Provide your name, username, password and an optional Space name.");
-  const username = validateCredentials(value.username, value.password);
-  const spaceName = value.spaceName?.trim() ?? "My Space";
+  const input = readSetupInput(value);
+  const spaceName = input.spaceName ?? "My Space";
   const created = await createSpace(kernel, {
     spaceName,
     appName: "Home",
-    user: { name: value.name.trim() },
+    user: { name: input.name },
     spaceSpec: emptySpec("space", spaceName),
     appSpec: emptySpec("home", "Home"),
   });
   const auth = await ServerAuth.open(kernel, created.space.id);
-  await auth.createLogin(created.space.id, username, value.password, {
+  await auth.createLogin(created.space.id, input.username, input.password, {
     [created.space.id]: created.actorId,
   });
   // Completion marker comes last: a partial setup is never served as an initialized instance.
   await storage.saveRealm(created.space.id);
   return { spaceId: created.space.id, actorId: created.actorId, auth };
+}
+
+function readSetupInput(value: unknown): SetupInput {
+  if (
+    !value ||
+    typeof value !== "object" ||
+    Array.isArray(value) ||
+    Object.keys(value).some(
+      (key) => !["name", "username", "password", "spaceName"].includes(key),
+    ) ||
+    !("name" in value) ||
+    typeof value.name !== "string" ||
+    !value.name.trim() ||
+    !("username" in value) ||
+    typeof value.username !== "string" ||
+    !("password" in value) ||
+    typeof value.password !== "string" ||
+    ("spaceName" in value &&
+      value.spaceName !== undefined &&
+      (typeof value.spaceName !== "string" || !value.spaceName.trim()))
+  )
+    throw invalidInput("Provide your name, username, password and an optional Space name.");
+  return {
+    name: value.name.trim(),
+    username: validateCredentials(value.username, value.password),
+    password: value.password,
+    ...("spaceName" in value && typeof value.spaceName === "string"
+      ? { spaceName: value.spaceName.trim() }
+      : {}),
+  };
 }

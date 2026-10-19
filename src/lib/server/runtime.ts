@@ -26,7 +26,7 @@ import { ServerAuth, authenticationRequired, type Identity } from "./auth.ts";
 import { openServerStorage } from "./storage.ts";
 import { workspaceDatabaseName } from "$lib/framework/sqlite.ts";
 import { PeopleService } from "./people.ts";
-import { assertEmptySetup, provisionServer, type SetupInput } from "./setup.ts";
+import { assertEmptySetup, provisionServer } from "./setup.ts";
 
 interface AssistantRun {
   identity: Identity;
@@ -72,7 +72,7 @@ export class ServerRuntime {
     ));
   }
 
-  async setup(input: SetupInput): Promise<void> {
+  async setup(input: unknown): Promise<void> {
     if (this.loginAuth || this.settingUp)
       throw new FrameworkError({
         code: "RESOURCE.CONFLICT",
