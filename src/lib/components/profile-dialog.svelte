@@ -2,6 +2,8 @@
 	import { initialsFromName, toneFromName } from "$lib/app/color.ts";
 	import { assistant } from "$lib/app/assistant.svelte.ts";
 	import { session, updateProfile } from "$lib/app/session.svelte.ts";
+	import { SERVER_MODE } from "$lib/app/deployment.ts";
+	import SecuritySettings from "$lib/components/security-settings.svelte";
 	import {
 		DEFAULT_ASSISTANT_SETTINGS,
 		loadAssistantSettings,
@@ -22,6 +24,7 @@
 	import SunIcon from "@lucide/svelte/icons/sun";
 	import UserIcon from "@lucide/svelte/icons/user";
 	import BotIcon from "@lucide/svelte/icons/bot";
+	import ShieldIcon from "@lucide/svelte/icons/shield";
 	import { setMode, userPrefersMode } from "mode-watcher";
 	import { toast } from "svelte-sonner";
 
@@ -42,10 +45,13 @@
 	let assistantModel = $state("");
 	let assistantApiKey = $state("");
 	let assistantLoaded = $state(false);
+	let securityForm = $state<{ changePassword(): Promise<void> }>();
+	let securityPending = $state(false);
 	const sections = [
 		{ value: "general", label: "General", icon: UserIcon },
 		{ value: "assistant", label: "Assistant", icon: BotIcon },
 		{ value: "appearance", label: "Appearance", icon: PaletteIcon },
+		...(SERVER_MODE ? [{ value: "security", label: "Security", icon: ShieldIcon }] : []),
 	];
 
 	const initials = $derived(initialsFromName(name.trim() || "You"));
@@ -77,6 +83,7 @@
 	});
 
 	function setOpen(value: boolean) {
+		if (securityPending) return;
 		if (!value && !committed) setMode(initialAppearance);
 		open = value;
 	}
@@ -89,6 +96,7 @@
 
 	async function submit(event: Event) {
 		event.preventDefault();
+		if (section === "security") { await securityForm?.changePassword(); return; }
 		if (!name.trim()) return;
 		pending = true;
 		try {
@@ -147,7 +155,7 @@
 								<Field.Field>
 									<Field.Label for="profile-email">Email</Field.Label>
 									<Input id="profile-email" bind:value={email} type="email" placeholder="ada@example.com" autocomplete="email" />
-									<Field.Description>Used in this space only. Sign-in comes later.</Field.Description>
+									<Field.Description>{SERVER_MODE ? "Contact information for this Space. Your sign-in username is separate." : "Used in this space only."}</Field.Description>
 								</Field.Field>
 							</Field.Group>
 						</Field.Set>
@@ -204,11 +212,16 @@
 							</Field.Group>
 						</Field.Set>
 					</Tabs.Content>
+	{#if SERVER_MODE}
+		<Tabs.Content value="security" class="min-w-0 overflow-y-auto p-6">
+			<SecuritySettings bind:this={securityForm} bind:pending={securityPending} />
+		</Tabs.Content>
+	{/if}
 	{#snippet actions()}
-		<Button type="button" variant="outline" onclick={() => setOpen(false)}>Cancel</Button>
-		<Button type="submit" disabled={pending || !name.trim()}>
-			{#if pending}<Spinner data-icon="inline-start" />{/if}
-			Save
+		<Button type="button" variant="outline" disabled={securityPending} onclick={() => setOpen(false)}>Cancel</Button>
+		<Button type="submit" disabled={pending || securityPending || (section !== "security" && !name.trim())}>
+			{#if pending || securityPending}<Spinner data-icon="inline-start" />{/if}
+			{section === "security" ? "Change password" : "Save"}
 		</Button>
 	{/snippet}
 </SettingsDialogShell>

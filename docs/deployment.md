@@ -62,29 +62,40 @@ issued in their Workspaces and are authorized through Memberships and Attachment
 independent Space explicitly links that newly issued Actor to the signed-in login; it does not grant
 permissions to unrelated Workspaces. An Actor ID in a browser request is never trusted.
 
-An administrator can provision another login through the app-control endpoint; a roster/invite UI
-is not part of this deployment pass. From an authenticated same-origin browser console:
+Space managers can open **People and access** from the user menu, add a user, and assign Space
+and App permissions separately. New users default to Viewer access in the Space and current App.
+Editor grants record creation, updates and deletion; Manager also grants definition and access
+management. Custom permissions use the same five Kernel permissions, not another role system.
+Only Apps the acting manager can manage appear; managing a Space never implies managing its Apps.
+The host screen prevents changing your own access to avoid accidental lockout.
 
-```js
-await fetch("/api/app", {
-  method: "POST",
-  headers: { "content-type": "application/json" },
-  body: JSON.stringify({
-    command: "createLogin",
-    input: { name: "Colleague", username: "colleague", password: "<a strong password>" },
-  }),
-});
-```
+Copy the Space sign-in link and share it and the initial password privately. Logins are issued in
+the selected Space, with usernames unique only within that realm. The link includes
+`?realm=<workspace-id>` so users enter the correct login realm. Email delivery, invitations and
+forgot-password recovery are not implemented. The bootstrap environment password is not a reset
+mechanism.
+The browser remembers the authenticated login realm for the current tab after navigation and
+sign-out. A different Space link overrides that hint; the login screen also offers the server's
+default sign-in. These hints never grant authority.
 
-This initial provisioning command grants management access to the current Space/App. It is for
-trusted collaborators. Fine-grained Membership APIs remain available through Framework. Logins
-created in a different realm use `/?realm=<workspace-id>` when signing in.
+Removing Space access blocks this login's direct App requests as well as navigation; it also signs
+out realm-local login sessions. Actor identity, memberships and historical records are retained, so
+access can be restored explicitly. This Space-entry check is host policy, not recursive Kernel ACL.
+An administrator can also sign out a user's sessions without changing their memberships.
+
+In **Profile → Security**, users can change their password, inspect active sessions, sign out one
+other session, or sign out all other sessions. Password changes require the current password and
+invalidate other sessions atomically. The current session stays signed in. Session lists contain
+timestamps, not inferred device identities or authentication tokens.
 
 ## Refresh, inference and boundaries
 
 The browser polls a lightweight, Space-scoped revision every three seconds while visible, then refreshes its
 authorized context when something changes. This is invalidation, not a durable change feed or a
 collaborative editor merge protocol. Concurrent whole-Spec edits remain last-writer-wins.
+Server requests always check current authorization; permission revocation does not wait for polling.
+Already-offered assistant tools also recheck the login session and selected Space/App access before
+execution. Revocation does not undo effects that have already committed.
 
 Inference streams through the optional `@jthum/framework-http` package. The server keeps each
 conversation's selected App and tools isolated from other requests. Provider settings live on the
@@ -106,16 +117,25 @@ consistent backup. Online multi-file backups are outside this first deployment i
 
 Existing browser data is not automatically uploaded to a server. That is an explicit data transfer,
 not a migration reader or storage-mode switch over the same database.
+Server login storage is still greenfield: use a fresh data directory when testing against an older
+experimental login schema. There are no legacy readers or automatic data resets. Browser-local
+storage is unaffected.
 
 ## Deterministic verification
 
 ```bash
-vp test src/lib/server/runtime.spec.ts --run
+vp test src/lib/server --run
 VITE_DEPLOYMENT=server vp build
 vp run test:server
 ```
 
 The process smoke starts the actual production build with isolated temporary storage, tests login
 and concurrent HTTP writes, kills/restarts the process, verifies persisted sessions/records, then
-tests backup/restore. It makes no browser or external provider calls and removes only its own
+tests backup/restore, read-only user access, password changes and session revocation. It makes no browser or external provider calls and removes only its own
 temporary test directories.
+
+The server contract tests additionally cover isolated login realms, live permission changes,
+session revocation, password changes across restart, and an offered assistant tool paused across
+revocation. The client parity test runs the same definition/field-rename, Form, View, Page and Rule
+workflow through direct and HTTP clients. These are deterministic contract tests, not browser UI
+or external provider tests.

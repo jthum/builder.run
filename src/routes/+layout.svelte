@@ -4,7 +4,8 @@
 	import { ModeWatcher } from "mode-watcher";
 	import { applySpaceAccent } from "$lib/app/color.ts";
 	import { breadcrumbFor } from "$lib/app/labels.ts";
-	import { boot, session } from "$lib/app/session.svelte.ts";
+	import { boot, session, logout } from "$lib/app/session.svelte.ts";
+	import { SERVER_MODE } from "$lib/app/deployment.ts";
 	import { canonicalStudio } from "$lib/app/canonical-studio.svelte.ts";
 	import { pageContext } from "$lib/app/pages.ts";
 	import AppSidebar from "$lib/components/app-sidebar.svelte";
@@ -79,6 +80,7 @@
 					<RefreshCwIcon data-icon="inline-start" />
 					Reload
 				</Button>
+				{#if SERVER_MODE}<Button variant="outline" onclick={() => logout()}>Sign out</Button>{/if}
 			</Empty.Content>
 		</Empty.Root>
 	</div>

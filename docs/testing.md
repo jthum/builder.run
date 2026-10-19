@@ -48,7 +48,10 @@ Analytics tests render the real block components and SVG markup with a fixed-siz
 
 ## Manual browser checks
 
-Server deployment has deterministic tests in [runtime.spec.ts](../src/lib/server/runtime.spec.ts).
+Server deployment has deterministic tests in [runtime.spec.ts](../src/lib/server/runtime.spec.ts),
+[access.spec.ts](../src/lib/server/access.spec.ts), and
+[client-parity.spec.ts](../src/lib/server/client-parity.spec.ts). These cover realm isolation,
+live authorization changes, password/session lifecycle, and direct-versus-HTTP editor contracts.
 After `vp run build:server`, run `vp run test:server` for the real HTTP/process restart and
 backup/restore proof. See [deployment](deployment.md). It uses only temporary test directories.
 

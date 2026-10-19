@@ -1,9 +1,10 @@
-import type { Actor } from "@jthum/framework/kernel";
-import { LOCAL_BROWSER_ENVIRONMENT } from "@jthum/framework/kernel";
+import type { Actor, Permission } from "@jthum/framework/kernel";
+import { LOCAL_BROWSER_ENVIRONMENT, PERMISSIONS } from "@jthum/framework/kernel";
 import type { Spec } from "@jthum/framework/spec";
 import { SPACE_ACCENT_KEYS, type SpaceAccent } from "$lib/app/appearance.ts";
 import { seedApp } from "./app-templates.ts";
 import { readSelection, writeSelection } from "./selection.ts";
+import { readLoginRealm, rememberLoginRealm } from "./login-realm.ts";
 import {
   createSpace as seedSpace,
   deleteApp as removeApp,
@@ -76,6 +77,10 @@ class SessionState {
   ready = $state(false);
   framework = $state.raw<AppContext | null>(null);
   loginRequired = $state(false);
+  permissions = $state.raw<{
+    readonly space: readonly Permission[];
+    readonly app: readonly Permission[];
+  }>({ space: PERMISSIONS, app: PERMISSIONS });
   diagnostics = $state.raw<RuntimeDiagnostics | null>(null);
   app = $state.raw<AppSummary | null>(null);
   apps = $state.raw<readonly AppSummary[]>([]);
@@ -447,7 +452,9 @@ export function openNewApp(preset = "") {
 }
 
 function applyRemoteSnapshot(snapshot: RemoteSnapshot): void {
+  rememberLoginRealm(sessionStorage, snapshot.realmId);
   session.framework = remoteContext(snapshot);
+  session.permissions = snapshot.permissions;
   session.actor = snapshot.actor;
   session.actors = snapshot.actors;
   session.app = { id: snapshot.app.id, name: snapshot.app.name };
@@ -561,10 +568,14 @@ async function pollRemote(): Promise<void> {
 }
 
 function remoteFailure(error: unknown): void {
+  remoteEpoch += 1;
+  remoteSpec = null;
+  remoteRevision = undefined;
   remoteBridge?.stop();
   if (remotePoll) clearInterval(remotePoll);
   session.ready = false;
   session.framework = null;
+  session.permissions = { space: [], app: [] };
   if (error instanceof FrameworkError && error.code.startsWith("AUTH.")) {
     session.loginRequired = true;
     session.error = null;
@@ -573,15 +584,14 @@ function remoteFailure(error: unknown): void {
 }
 
 export async function login(username: string, password: string): Promise<void> {
+  const realmId = readLoginRealm(sessionStorage, location.search);
   const response = await fetch("/api/login", {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify({
       username,
       password,
-      ...(new URLSearchParams(location.search).get("realm")
-        ? { realmId: new URLSearchParams(location.search).get("realm") }
-        : {}),
+      ...(realmId ? { realmId } : {}),
     }),
   });
   await readJsonResponse(response);
@@ -590,13 +600,20 @@ export async function login(username: string, password: string): Promise<void> {
 }
 
 export async function logout(): Promise<void> {
-  await readJsonResponse(await fetch("/api/logout", { method: "POST" }));
+  try {
+    await readJsonResponse(await fetch("/api/logout", { method: "POST" }));
+  } catch (error) {
+    if (!(error instanceof FrameworkError) || error.code !== "AUTH.REQUIRED") throw error;
+  }
   if (remotePoll) clearInterval(remotePoll);
   remoteBridge?.stop();
   remoteEpoch += 1;
   booting = null;
   session.ready = false;
   session.framework = null;
+  remoteSpec = null;
+  remoteRevision = undefined;
+  session.permissions = { space: [], app: [] };
   session.loginRequired = true;
 }
 

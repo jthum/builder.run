@@ -86,6 +86,9 @@
 	let appSettingsOpen = $state(false);
 	let appMenuOpen = $state(false);
 	let appSearch = $state("");
+	let peopleOpen = $state(false);
+	const canManageSpace = $derived(!SERVER_MODE || session.permissions.space.includes("manage"));
+	const canManageApp = $derived(!SERVER_MODE || session.permissions.app.includes("manage"));
 
 
 	const studioIcons: Record<string, Component> = {
@@ -213,8 +216,8 @@
 							</Command.List>
 							<Command.Separator />
 							<div class="grid gap-0.5 p-1">
-								<Button type="button" variant="ghost" class="justify-start" onclick={createApp}><PlusIcon data-icon="inline-start" />New app</Button>
-								<Button type="button" variant="ghost" class="justify-start" onclick={editAppSettings}><SettingsIcon data-icon="inline-start" />App settings</Button>
+								{#if canManageSpace}<Button type="button" variant="ghost" class="justify-start" onclick={createApp}><PlusIcon data-icon="inline-start" />New app</Button>{/if}
+								{#if canManageApp}<Button type="button" variant="ghost" class="justify-start" onclick={editAppSettings}><SettingsIcon data-icon="inline-start" />App settings</Button>{/if}
 							</div>
 						</Command.Root>
 					</DropdownMenu.Content>
@@ -326,7 +329,7 @@
 	</Sidebar.Content>
 	<Sidebar.Footer class="gap-3">
 		<Sidebar.Menu aria-label="App tools" class="grid grid-cols-2 gap-2 group-data-[collapsible=icon]:grid-cols-1">
-			<Sidebar.MenuItem>
+			{#if studio || canManageApp}<Sidebar.MenuItem>
 				<Sidebar.MenuButton
 					variant="outline"
 					size="sm"
@@ -339,7 +342,7 @@
 						</a>
 					{/snippet}
 				</Sidebar.MenuButton>
-			</Sidebar.MenuItem>
+			</Sidebar.MenuItem>{/if}
 			<Sidebar.MenuItem>
 				<Sidebar.MenuButton
 					variant="outline"
@@ -402,21 +405,28 @@
 							</DropdownMenu.Label>
 						</DropdownMenu.Group>
 						<DropdownMenu.Separator />
+						<DropdownMenu.Group>
 						<DropdownMenu.Item onSelect={() => openProfile()}>
 							<UserIcon />
 							Profile
 						</DropdownMenu.Item>
-						<DropdownMenu.Item onSelect={() => (settingsOpen = true)}>
+						{#if SERVER_MODE && canManageSpace}
+							<DropdownMenu.Item onSelect={() => (peopleOpen = true)}><UsersIcon />People and access</DropdownMenu.Item>
+						{/if}
+						{#if canManageSpace}<DropdownMenu.Item onSelect={() => (settingsOpen = true)}>
 							<SettingsIcon />
 							Space settings
-						</DropdownMenu.Item>
+						</DropdownMenu.Item>{/if}
+						</DropdownMenu.Group>
 						<DropdownMenu.Separator />
+						<DropdownMenu.Group>
 						<DropdownMenu.Sub>
 							<DropdownMenu.SubTrigger>
 								<Building2Icon />
 								Spaces
 							</DropdownMenu.SubTrigger>
 							<DropdownMenu.SubContent class="min-w-48">
+								<DropdownMenu.Group>
 								{#each session.spaces as item (item.id)}
 									<DropdownMenu.Item onSelect={() => selectSpace(item.id)}>
 										<span class="truncate">{spaceLabel(item.name)}</span>
@@ -430,11 +440,13 @@
 									<PlusIcon />
 									New space
 								</DropdownMenu.Item>
+								</DropdownMenu.Group>
 							</DropdownMenu.SubContent>
 						</DropdownMenu.Sub>
+						</DropdownMenu.Group>
 						<DropdownMenu.Separator />
-						{#if SERVER_MODE}<DropdownMenu.Item onSelect={() => logout()}>Sign out</DropdownMenu.Item><DropdownMenu.Separator />{/if}
-						<DropdownMenu.Label class="text-xs font-normal text-muted-foreground">builder.run</DropdownMenu.Label>
+						{#if SERVER_MODE}<DropdownMenu.Group><DropdownMenu.Item onSelect={() => logout()}>Sign out</DropdownMenu.Item></DropdownMenu.Group><DropdownMenu.Separator />{/if}
+						<DropdownMenu.Group><DropdownMenu.Label class="text-xs font-normal text-muted-foreground">builder.run</DropdownMenu.Label></DropdownMenu.Group>
 					</DropdownMenu.Content>
 				</DropdownMenu.Root>
 			</Sidebar.MenuItem>
@@ -446,6 +458,11 @@
 <AppSettingsDialog bind:open={appSettingsOpen} />
 <ProfileDialog bind:open={profileOpen} initialSection={profileSection} />
 <SpaceSettingsDialog bind:open={settingsOpen} />
+{#if SERVER_MODE && peopleOpen && canManageSpace}
+	{#await import("$lib/components/people-dialog.svelte") then people}
+		<people.default bind:open={peopleOpen} />
+	{/await}
+{/if}
 <AssistantSheet />
 <NameDialog
 	bind:open={spaceOpen}

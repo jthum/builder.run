@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { tick } from "svelte";
+	import { tick, onDestroy } from "svelte";
 	import { assistant } from "$lib/app/assistant.svelte.ts";
 	import { session } from "$lib/app/session.svelte.ts";
 	import { DEFAULT_ASSISTANT_SETTINGS, saveAssistantSettings, assistantConfigured } from "$lib/inference/settings.ts";
@@ -34,6 +34,7 @@
 		void session.revision;
 		return session.framework ? buildTools(toolContext, { appTools: getWebMcpAppToolMode() }) : [];
 	});
+	onDestroy(() => assistant.cancel());
 
 	$effect(() => {
 		assistant.selectApp(session.app?.id ?? "", session.space?.id ?? "", session.actor?.id ?? "");

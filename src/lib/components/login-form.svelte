@@ -1,5 +1,7 @@
 <script lang="ts">
   import { login } from "$lib/app/session.svelte.ts";
+  import { onMount } from "svelte";
+  import { readLoginRealm } from "$lib/app/login-realm.ts";
   import * as Card from "@jthum/framework/svelte/ui/card";
   import * as Field from "@jthum/framework/svelte/ui/field";
   import * as Alert from "@jthum/framework/svelte/ui/alert";
@@ -11,6 +13,8 @@
   let password = $state("");
   let pending = $state(false);
   let error = $state<string | null>(null);
+  let scoped = $state(false);
+  onMount(() => { scoped = Boolean(readLoginRealm(sessionStorage, location.search)); });
   async function submit(event: SubmitEvent) {
     event.preventDefault();
     if (pending) return;
@@ -41,6 +45,7 @@
           </Field.Field>
           {#if error}<Alert.Root variant="destructive"><Alert.Description>{error}</Alert.Description></Alert.Root>{/if}
           <Button type="submit" disabled={pending}>{#if pending}<Spinner data-icon="inline-start" />{/if}Sign in</Button>
+          {#if scoped}<Button variant="link" href="/?realm=">Use the server's default sign-in</Button>{/if}
         </Field.FieldGroup>
       </form>
     </Card.Content>
