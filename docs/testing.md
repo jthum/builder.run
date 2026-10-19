@@ -52,6 +52,9 @@ Server deployment has deterministic tests in [runtime.spec.ts](../src/lib/server
 [access.spec.ts](../src/lib/server/access.spec.ts), and
 [client-parity.spec.ts](../src/lib/server/client-parity.spec.ts). These cover realm isolation,
 live authorization changes, password/session lifecycle, and direct-versus-HTTP editor contracts.
+The [setup tests](../src/lib/server/setup.spec.ts) verify explicit owner provisioning, refusal of
+repeat/partial setup, hidden password input, confirmation and cancellation, terminal restoration,
+and private stdin automation. No credential environment variables are needed for these tests.
 After `vp run build:server`, run `vp run test:server` for the real HTTP/process restart and
 backup/restore proof. See [deployment](deployment.md). It uses only temporary test directories.
 

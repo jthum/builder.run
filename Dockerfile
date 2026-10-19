@@ -35,7 +35,7 @@ COPY src ./src
 COPY static ./static
 RUN vp install --frozen-lockfile
 ENV VITE_DEPLOYMENT=server
-RUN vp build
+RUN vp run build:server
 
 FROM node:24-slim
 ENV NODE_ENV=production HOST=0.0.0.0 PORT=3000 DATA_DIR=/data

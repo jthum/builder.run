@@ -10,7 +10,8 @@
   "scripts": {
     "dev": "vp dev",
     "build": "vp build",
-    "build:server": "VITE_DEPLOYMENT=server vp build",
+    "build:server": "VITE_DEPLOYMENT=server vp build && vp pack",
+    "setup:server": "node build/setup.mjs",
     "start": "node build/index.js",
     "preview": "vp preview",
     "prepare": "vp config && svelte-kit sync || echo ''",

@@ -3,35 +3,65 @@
 Builder.run has two build modes. Both use the same Specs, editors, Views, Forms, Pages and Rules.
 `VITE_DEPLOYMENT` is a build-time choice, not an automatic storage fallback.
 
-## Browser-local
+## Native Node server
+
+Native Node is the primary server deployment path. Docker is optional. Use Node 24 or later with
+`node:sqlite` available. With the current linked checkout layout, build Framework and its optional
+packages first:
 
 ```bash
+cd ../framework
 vp install
-VITE_DEPLOYMENT=local vp build
+vp run -r build
+cd ../builder.run
+vp install
+vp run build:server
 ```
 
-Serve `build` as a static SPA with `index.html` as the navigation fallback. The browser opens its
-own OPFS/IndexedDB SQLite storage. There is no server login or shared server data in this mode.
+The server build produces `build/index.js` and a separate `build/setup.mjs` command. Keep the built
+Framework packages and the linked `node_modules` layout available when running the app. Copying
+only `build` is not a complete deployment with these local package links.
 
-## Node server
-
-Use Node 24 or later with `node:sqlite` available. Build Framework and its optional HTTP, browser
-SQLite and YAIR packages first when using the active linked checkout.
+Choose a persistent data directory and initialize it once:
 
 ```bash
-vp install
-VITE_DEPLOYMENT=server vp build
-DATA_DIR=./data SERVER_ADMIN_USERNAME=admin SERVER_ADMIN_PASSWORD='<a strong password>' \
-  ORIGIN=http://localhost:3000 node build/index.js
+export DATA_DIR=/absolute/path/to/builder-data
+node build/setup.mjs
 ```
 
-Alternatively load server-only configuration using Node's `--env-file` flag. The built server does
-not automatically load `.env`. Do not put secrets in `VITE_` variables or build arguments.
+Setup asks for the Space name, your name, username and password, with password confirmation and
+hidden password input. There is no default administrator username and no credential ENV setting.
+The chosen user receives ordinary management Memberships in the new Space/App. The command stores
+a salted scrypt password hash and closes the databases. `vp run setup:server` runs the same command.
 
-The first successful initialization creates the initial Space/App, issues its owner Actor, and
-stores a salted scrypt password hash. The bootstrap password is required only for that first login;
-changing the environment variable later does not reset an existing password. Sign in through the
-app. Sessions use opaque random tokens in HttpOnly, SameSite cookies; tokens are hashed in storage.
+Then start the application with the same directory:
+
+```bash
+DATA_DIR=/absolute/path/to/builder-data ORIGIN=http://localhost:3000 node build/index.js
+```
+
+Open `http://localhost:3000` and sign in with the username you chose. For a public deployment, set
+`ORIGIN=https://your-domain.com` and put an HTTPS reverse proxy in front of the Node service. The
+proxy must support streaming responses. Run Node under systemd or your preferred process manager,
+as a dedicated non-root user with read/write access to `DATA_DIR`. `HOST` and `PORT` configure the
+Node listener when needed.
+
+Keep only infrastructure settings in deployment configuration: `DATA_DIR`, `ORIGIN`, `HOST` and
+`PORT`. You can use Node's `--env-file` flag for these; the built server does not automatically load
+`.env`. Do not put passwords in environment variables, process arguments or build arguments.
+
+Setup refuses an initialized directory before prompting and never resets an existing user's
+password. Startup requires a completed setup and does not create people or guess an Actor from a
+roster. Cancelled prompts or invalid input create no Workspaces or users and can be retried. If
+initialization is interrupted after creating instance data, setup refuses to overwrite it; use a
+fresh directory or restore a complete backup. There is no anonymous browser setup endpoint.
+
+For trusted automation, `node build/setup.mjs --stdin` accepts a bounded JSON object with `name`,
+`username`, `password` and optional `spaceName` through a private input pipe. Passwords are not
+echoed. Obtain this input from your automation/secret manager, not a password embedded in shell
+history. Interactive setup remains the default.
+
+Sessions use opaque random tokens in HttpOnly, SameSite cookies; tokens are hashed in storage.
 Serve over HTTPS in production so cookies also receive `Secure`.
 
 Mount `DATA_DIR` on persistent local storage. It contains `catalog.db`, routed record databases,
@@ -40,14 +70,19 @@ SQLite's process lease excludes a second server using the same directory and rel
 normal shutdown closes the Kernel and all databases. Run one Node process/replica per data directory.
 The UI can remain client-rendered: data, permissions, Rules and inference execute on the server.
 
-## Container
+## Optional Docker deployment
 
 The build uses the sibling Framework checkout as a named build context. Docker BuildKit and a
 Compose version supporting `additional_contexts` are required.
 
 ```bash
-SERVER_ADMIN_PASSWORD='<a strong password>' docker compose up --build -d
+docker compose build
+docker compose run --rm --no-deps app node build/setup.mjs
+docker compose up -d
 ```
+
+The one-off setup command asks for credentials in the terminal and uses the same `app-data` volume
+as the service. Run it before starting the server; it does not open a public setup endpoint.
 
 The named `app-data` volume persists across container recreation. Set `ORIGIN` to the public URL
 when serving through a reverse proxy; the proxy must support streaming responses. Do not scale
@@ -72,7 +107,7 @@ The host screen prevents changing your own access to avoid accidental lockout.
 Copy the Space sign-in link and share it and the initial password privately. Logins are issued in
 the selected Space, with usernames unique only within that realm. The link includes
 `?realm=<workspace-id>` so users enter the correct login realm. Email delivery, invitations and
-forgot-password recovery are not implemented. The bootstrap environment password is not a reset
+forgot-password recovery are not implemented. There is no deployment-configuration password reset
 mechanism.
 The browser remembers the authenticated login realm for the current tab after navigation and
 sign-out. A different Space link overrides that hint; the login screen also offers the server's
@@ -125,11 +160,12 @@ storage is unaffected.
 
 ```bash
 vp test src/lib/server --run
-VITE_DEPLOYMENT=server vp build
+vp run build:server
 vp run test:server
 ```
 
-The process smoke starts the actual production build with isolated temporary storage, tests login
+The process smoke runs setup through a private stdin pipe, verifies refusal of uninitialized startup
+and repeat setup, then starts the production build with isolated temporary storage, tests login
 and concurrent HTTP writes, kills/restarts the process, verifies persisted sessions/records, then
 tests backup/restore, read-only user access, password changes and session revocation. It makes no browser or external provider calls and removes only its own
 temporary test directories.
@@ -139,3 +175,13 @@ session revocation, password changes across restart, and an offered assistant to
 revocation. The client parity test runs the same definition/field-rename, Form, View, Page and Rule
 workflow through direct and HTTP clients. These are deterministic contract tests, not browser UI
 or external provider tests.
+
+## Browser-local deployment
+
+```bash
+vp install
+VITE_DEPLOYMENT=local vp build
+```
+
+Serve `build` as a static SPA with `index.html` as the navigation fallback. The browser opens its
+own OPFS/IndexedDB SQLite storage. There is no server setup, login or shared server data in this mode.

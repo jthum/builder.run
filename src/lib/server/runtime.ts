@@ -1,9 +1,13 @@
 import { AsyncLocalStorage } from "node:async_hooks";
 import { createWorkspaceClient, type WorkspaceClient } from "@jthum/framework/client";
 import { FrameworkError, invalidInput, resourceNotFound } from "@jthum/framework/errors";
-import type { InferenceEvent, InferenceRuntime, Kernel, Workspace } from "@jthum/framework/kernel";
 import {
-  openRuntime,
+  Kernel,
+  type InferenceEvent,
+  type InferenceRuntime,
+  type Workspace,
+} from "@jthum/framework/kernel";
+import {
   resolveApp,
   createSpace,
   deleteApp,
@@ -30,8 +34,6 @@ interface AssistantRun {
 }
 export interface ServerOptions {
   readonly directory: string;
-  readonly adminUsername?: string;
-  readonly adminPassword?: string;
   readonly inference?: InferenceRuntime;
 }
 
@@ -84,38 +86,41 @@ export class ServerRuntime {
     let kernel: Kernel | undefined;
     try {
       const realm = await storage.readRealm();
-      const opened = await openRuntime({
-        ...(realm ? { preferredSelection: { spaceId: realm } } : {}),
-        kernel: {
-          persistence: storage.persistence,
-          secretCipher: storage.secretCipher,
-          inference,
-          inferenceTools: [assistantTools],
-          environment: {
-            durableRuleExecution: true,
-            multiplayer: true,
-            inference: true,
-            schedules: false,
-            webhooks: false,
-          },
-        },
-        seed: {
-          spaceName: "My Space",
-          appName: "Home",
-          user: { name: options.adminUsername ?? "Admin" },
-          spaceSpec: emptySpec("space", "My Space"),
-          appSpec: emptySpec("home", "Home"),
+      if (!realm)
+        throw new Error(
+          "Server data has not been initialized. Run node build/setup.mjs with the same DATA_DIR first.",
+        );
+      kernel = await Kernel.open({
+        persistence: storage.persistence,
+        secretCipher: storage.secretCipher,
+        inference,
+        inferenceTools: [assistantTools],
+        environment: {
+          durableRuleExecution: true,
+          multiplayer: true,
+          inference: true,
+          schedules: false,
+          webhooks: false,
         },
       });
-      kernel = opened.kernel;
-      if (!realm) await storage.saveRealm(opened.space.id);
-      const auth = await ServerAuth.open(kernel, realm ?? opened.space.id);
-      await auth.bootstrap(options.adminUsername ?? "admin", options.adminPassword, opened.actorId);
+      const root = await storage.catalog().getWorkspace(realm);
+      if (!root?.isRoot)
+        throw new Error(
+          "The login realm does not identify a root Workspace. Restore a complete data-directory backup.",
+        );
+      const auth = await ServerAuth.open(kernel, realm);
+      if (!(await auth.hasLogins()))
+        throw new Error(
+          "This instance has no login. Setup did not complete; use a new data directory or restore a complete backup.",
+        );
       runtime = new ServerRuntime(kernel, auth, storage, runs);
       return runtime;
     } catch (error) {
-      await kernel?.close();
-      await storage.release();
+      try {
+        await kernel?.close();
+      } finally {
+        await storage.release();
+      }
       throw error;
     }
   }

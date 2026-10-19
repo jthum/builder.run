@@ -45,6 +45,17 @@ export default defineConfig(({ mode }) => {
       exclude: ["wa-sqlite"],
     },
     assetsInclude: ["**/*.wasm"],
+    // Ship setup beside the Node server without clearing the adapter's build output.
+    pack: {
+      entry: { setup: "src/lib/server/setup-cli.ts" },
+      outDir: "build",
+      clean: false,
+      format: ["esm"],
+      target: "node24",
+      dts: false,
+      define: { "import.meta.env.VITE_DEPLOYMENT": JSON.stringify("server") },
+      deps: { neverBundle: [/^@jthum\//] },
+    },
     worker: {
       format: "es",
     },

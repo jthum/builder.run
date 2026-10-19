@@ -1,6 +1,6 @@
 import { ServerRuntime } from "./runtime.ts";
 import { createServerHandler } from "./http.ts";
-import { DATA_DIR, SERVER_ADMIN_USERNAME, SERVER_ADMIN_PASSWORD, ORIGIN } from "$app/env/private";
+import { DATA_DIR, ORIGIN } from "$app/env/private";
 
 type ServerHandle = {
   runtime: ServerRuntime;
@@ -12,8 +12,6 @@ const processState = globalThis as typeof globalThis & { appServer?: Promise<Ser
 export function server() {
   processState.appServer ??= ServerRuntime.open({
     directory: DATA_DIR,
-    adminUsername: SERVER_ADMIN_USERNAME,
-    ...(SERVER_ADMIN_PASSWORD ? { adminPassword: SERVER_ADMIN_PASSWORD } : {}),
   })
     .then((runtime) => ({
       runtime,

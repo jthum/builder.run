@@ -1,9 +1,10 @@
-import { mkdtemp, rm } from "node:fs/promises";
+import { access, mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createHttpWorkspaceClient, readJsonResponse } from "@jthum/framework-http";
 import { ServerRuntime } from "./runtime.ts";
 import { createServerHandler } from "./http.ts";
+import { setupServer } from "./setup.ts";
 import type { RemoteSnapshot } from "$lib/app/remote-contract.ts";
 
 const directories: string[] = [];
@@ -68,9 +69,20 @@ export async function fixture(
   path?: string,
   inference?: Parameters<typeof ServerRuntime.open>[0]["inference"],
 ) {
+  const target = path ?? (await directory());
+  try {
+    await access(join(target, "login.realm"));
+  } catch (error) {
+    if (!(error && typeof error === "object" && "code" in error && error.code === "ENOENT"))
+      throw error;
+    await setupServer(target, {
+      name: "Test owner",
+      username: "admin",
+      password: "correct-password-for-test",
+    });
+  }
   const runtime = await ServerRuntime.open({
-    directory: path ?? (await directory()),
-    adminPassword: "correct-password-for-test",
+    directory: target,
     ...(inference ? { inference } : {}),
   });
   runtimes.push(runtime);

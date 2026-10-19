@@ -77,12 +77,16 @@ export class ServerAuth {
     return new ServerAuth(storage, realmId, now);
   }
 
-  async bootstrap(username: string, password: string | undefined, actorId: string): Promise<void> {
-    if ((await this.storage.workspace(this.realmId).query({ from: "logins", limit: 1 })).length)
-      return;
-    if (!password)
-      throw new Error("Set SERVER_ADMIN_PASSWORD (at least 12 characters) for first-run setup.");
-    await this.createLogin(this.realmId, username, password, { [this.realmId]: actorId });
+  async hasLogins(): Promise<boolean> {
+    return (
+      (
+        await this.storage.workspace(this.realmId).query({
+          from: "logins",
+          select: { id: { field: "id" } },
+          limit: 1,
+        })
+      ).length > 0
+    );
   }
 
   createLogin(
@@ -94,12 +98,7 @@ export class ServerAuth {
     // Validate and check the username before provisioning its Actor. Serialize rare login
     // creation so concurrent requests cannot both provision people for the same credential.
     const pending = this.loginQueue.then(async () => {
-      username = username.trim().toLowerCase();
-      if (!/^[a-z0-9][a-z0-9._@+-]{0,127}$/.test(username))
-        throw invalidInput(
-          "Use a username containing letters, numbers, dots, dashes or underscores.",
-        );
-      validatePassword(password);
+      username = validateCredentials(username, password);
       const store = this.storage.workspace(realmId);
       if (
         (await store.query({ from: "logins", where: entityEqual("username", username), limit: 1 }))
@@ -360,6 +359,14 @@ export class ServerAuth {
     if (parsed)
       await this.storage.workspace(parsed.realmId).delete("sessions", digest(parsed.secret));
   }
+}
+
+export function validateCredentials(username: string, password: string): string {
+  const normalized = username.trim().toLowerCase();
+  if (!/^[a-z0-9][a-z0-9._@+-]{0,127}$/.test(normalized))
+    throw invalidInput("Use a username containing letters, numbers, dots, dashes or underscores.");
+  validatePassword(password);
+  return normalized;
 }
 
 function validatePassword(password: string): void {

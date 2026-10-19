@@ -52,6 +52,23 @@ vp build
 
 `vp check` runs formatting and linting; `vp run check` runs the project's Svelte/TypeScript diagnostics. The stack is SvelteKit, Svelte 5, TypeScript, Vite+, Tailwind CSS, shadcn-svelte/Bits UI, and browser SQLite.
 
+## Deploy a Node server
+
+Native Node deployment uses persistent SQLite and built-in login. With the linked Framework packages
+built, use Node 24+ and run:
+
+```bash
+vp run build:server
+export DATA_DIR=/absolute/path/to/builder-data
+node build/setup.mjs
+ORIGIN=http://localhost:3000 node build/index.js
+```
+
+Setup prompts once for the first user's name, username and password. Credentials belong in the
+database, not deployment ENV settings. Startup requires a completed setup and never resets users.
+Use an HTTPS reverse proxy and a process manager for a public deployment. Docker remains optional;
+see [deployment](docs/deployment.md) for linked package builds, persistent storage and backups.
+
 ## Documentation
 
 Start with the [documentation index](docs/README.md), or go directly to:

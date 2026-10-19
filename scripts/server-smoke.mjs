@@ -27,8 +27,6 @@ async function start(dataDir) {
     env: {
       ...process.env,
       DATA_DIR: dataDir,
-      SERVER_ADMIN_USERNAME: "admin",
-      SERVER_ADMIN_PASSWORD: password,
       ORIGIN: origin,
       HOST: "127.0.0.1",
       PORT: String(port),
@@ -94,7 +92,38 @@ async function request(path, body) {
   return result.result;
 }
 
+async function initialize(dataDir, expectedCode = 0) {
+  const child = spawn(process.execPath, ["build/setup.mjs", "--stdin"], {
+    env: { ...process.env, DATA_DIR: dataDir },
+    stdio: ["pipe", "pipe", "pipe"],
+  });
+  let output = "";
+  child.stdout.on("data", (chunk) => {
+    output += chunk;
+  });
+  child.stderr.on("data", (chunk) => {
+    output += chunk;
+  });
+  const exited = new Promise((resolve, reject) => {
+    child.on("error", reject);
+    child.on("exit", resolve);
+  });
+  child.stdin.on("error", () => {}); // A repeat setup may reject before reading stdin.
+  child.stdin.end(JSON.stringify({ name: "Test owner", username: "admin", password }));
+  const timeout = setTimeout(() => child.kill("SIGKILL"), 20_000);
+  try {
+    const code = await exited;
+    assert.equal(code, expectedCode, output);
+    assert.equal(output.includes(password), false, "Setup must not echo passwords");
+    if (expectedCode !== 0) assert.match(output, /already set up/);
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
 try {
+  await assert.rejects(start(directory), /not been initialized/);
+  await initialize(directory);
   await start(directory);
   await request("/api/login", { username: "admin", password });
   const snapshot = await request("/api/app", { command: "snapshot" });
@@ -133,6 +162,7 @@ try {
     "Survives a process restart",
   );
   await stop();
+  await initialize(directory, 1); // Setup cannot reset the persisted owner or records.
   await cp(directory, restored, { recursive: true });
   await start(restored);
   assert.equal((await request(endpoint, { method: "listRecords", args: ["note"] })).length, 9);
@@ -207,7 +237,7 @@ try {
   );
   await request("/api/logout", {});
   console.log(
-    "Server smoke passed: login, concurrent writes, process restart, backup/restore, user access, password changes, session revocation and logout.",
+    "Server smoke passed: explicit setup, uninitialized-start refusal, login, concurrent writes, process restart, backup/restore, user access, password changes, session revocation and logout.",
   );
 } finally {
   await stop();
