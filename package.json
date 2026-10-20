@@ -20,7 +20,8 @@
     "test:unit": "vp test",
     "test": "npm run test:unit -- --run",
     "test:browser": "node scripts/browser-smoke.mjs",
-    "test:server": "node scripts/server-smoke.mjs"
+    "test:server": "node scripts/server-smoke.mjs && node scripts/server-workflow.mjs",
+    "test:server:workflow": "node scripts/server-workflow.mjs"
   },
   "dependencies": {
     "@jthum/framework": "link:../framework",

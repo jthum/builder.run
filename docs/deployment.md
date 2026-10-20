@@ -181,6 +181,15 @@ and concurrent HTTP writes, kills/restarts the process, verifies persisted sessi
 tests backup/restore, read-only user access, password changes and session revocation. It makes no browser or external provider calls and removes only its own
 temporary test directories.
 
+The same command also runs the [multiplayer workflow script](../scripts/server-workflow.mjs):
+Form submission, assigned approval, acknowledged waiting checkpoint, process kill/restart,
+completion as the initiating Actor, and refusal of unauthorized or duplicate responses. A second
+run revokes the initiator's update permission while waiting and verifies that the reviewer's own
+write permission cannot elevate the resumed Rule. Receipt assertions detect replay of pre-wait
+effects. Run it independently with `vp run test:server:workflow`; it starts/stops its own server
+and uses only temporary storage. This covers restart at a durable wait, not every possible
+effect/checkpoint crash window.
+
 The server contract tests additionally cover isolated login realms, live permission changes,
 session revocation, password changes across restart, and an offered assistant tool paused across
 revocation. The client parity test runs the same definition/field-rename, Form, View, Page and Rule

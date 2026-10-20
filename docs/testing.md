@@ -46,7 +46,7 @@ Analytics tests render the real block components and SVG markup with a fixed-siz
 
 [Chart accessibility markup](../src/lib/components/chart-accessibility.spec.ts) and [interaction](../src/lib/runtime/chart-interaction.spec.ts) tests cover unique pattern references, matching legend states, one tab stop per plot, arrow/Home/End navigation, Escape, pointer/focus precedence and stale-state cleanup. They use server-rendered SVG and deterministic event targets, not browser screenshots. Screen-reader behaviour, forced-colour appearance and pointer hit areas still benefit from manual checks.
 
-## Manual browser checks
+## Automated server checks
 
 Server deployment has deterministic tests in [runtime.spec.ts](../src/lib/server/runtime.spec.ts),
 [access.spec.ts](../src/lib/server/access.spec.ts), and
@@ -59,7 +59,29 @@ The [browser setup contract tests](../src/lib/server/browser-setup.spec.ts) exer
 HTTP onboarding without a browser: ordinary API gates, same-origin checks, invalid input retries,
 concurrent claims, immediate sign-in, repeat-setup refusal and persistence across restart.
 After `vp run build:server`, run `vp run test:server` for the real HTTP/process restart and
-backup/restore proof. See [deployment](deployment.md). It uses only temporary test directories.
+backup/restore proof plus the multiplayer approval workflow. See [deployment](deployment.md).
+
+To run just the workflow:
+
+```bash
+vp run build:server
+vp run test:server:workflow
+```
+
+The [workflow script](../scripts/server-workflow.mjs) starts its own production server on an
+ephemeral loopback port with temporary SQLite databases. It provisions a setup administrator,
+requester and reviewer and uses independent HTTP cookies, without mocking authentication or the
+Kernel. A Form triggers a Rule that writes a receipt and waits for the reviewer. The script kills
+and restarts the process, answers the persisted request and checks record attribution and receipt
+counts. It also checks wrong-user and duplicate responses, response isolation, and revocation of
+the original Actor's update permission even when the reviewer has update permission.
+
+Both scripts use the [shared process/session fixture](../scripts/server-test.mjs), remove only
+their own temporary directories, and need no manual interaction, browser or provider access.
+Restart coverage starts at an acknowledged waiting checkpoint; arbitrary crash windows around
+external effects still require idempotency.
+
+## Record presentation checks
 
 Record presentation tests are in [record-details.spec.ts](../src/lib/app/record-details.spec.ts),
 [record-preview.spec.ts](../src/lib/app/record-preview.spec.ts) and
@@ -69,6 +91,8 @@ preserved scalar values, record links/selection across list, card, Kanban and ca
 aggregate/missing-identity guards and query-side related-record filters. Framework separately tests the
 host-neutral details and non-modal panel. These deterministic checks do not verify actual browser
 focus movement or responsive appearance.
+
+## Manual browser checks
 
 Use a disposable browser profile when exercising deletion or storage cleanup.
 
