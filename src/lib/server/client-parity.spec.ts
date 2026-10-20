@@ -104,6 +104,15 @@ async function editorWorkflow(client: WorkspaceClient) {
   const custom = await client.submitForm("feedback", { values: { feedback: "Works" } });
   const rule = await client.runRule("summarize", { input: { message: "Ready" } });
   const execution = await client.startRule("summarize", { input: { message: "Durable" } });
+  const history = await client.listRuleExecutions();
+  expect(history.find((item) => item.id === execution.id)).toEqual({
+    id: execution.id,
+    actorId: execution.actorId,
+    rule: execution.rule,
+    status: execution.status,
+    createdAt: execution.createdAt,
+    updatedAt: execution.updatedAt,
+  });
   // Definition identity remains stable; the record and Form survive a semantic field-key rename.
   const renamed: Spec = {
     ...spec,
