@@ -24,6 +24,15 @@ vp test src/lib/framework
 
 Framework has its own tests and package checks in its repository. Run the relevant Framework checks when modifying shared contracts or implementations; passing Builder.run's suite does not replace adapter or Kernel conformance tests.
 
+### Standalone installation
+
+After changing dependencies, run `vp run test:install`. This opt-in network/build check copies the
+Git-tracked working files (including non-ignored new files) into a temporary directory without
+`node_modules` or a sibling Framework checkout. It installs the frozen lockfile, checks installed
+Framework packages stay inside that directory, runs diagnostics and unit tests, builds both modes,
+and runs the production server smoke/workflow scripts. It removes only its own temporary directory.
+The ordinary unit suite also checks immutable Git pins and shared Framework/YAIR module identities.
+
 ## Useful test entry points
 
 | Area                                             | Tests                                                                                                                                                                                                                                                     |

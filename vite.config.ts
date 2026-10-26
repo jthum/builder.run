@@ -37,12 +37,13 @@ export default defineConfig(({ mode }) => {
         "@jthum/framework/blocks",
         "@jthum/framework/catalog",
         "@jthum/framework-http",
-        "@jthum/yair",
-        "@jthum/yair-openai",
       ],
+      // YAIR is demand-loaded TypeScript in development, including when installed in node_modules.
+      noExternal: ["@jthum/yair", "@jthum/yair-openai"],
     },
     optimizeDeps: {
-      exclude: ["wa-sqlite"],
+      // Framework ships Svelte/runes source; compile it on demand, not in the dependency optimizer.
+      exclude: ["wa-sqlite", "@jthum/framework", "@jthum/yair", "@jthum/yair-openai"],
     },
     assetsInclude: ["**/*.wasm"],
     // Ship setup beside the Node server without clearing the adapter's build output.

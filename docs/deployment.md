@@ -6,21 +6,46 @@ Builder.run has two build modes. Both use the same Specs, editors, Views, Forms,
 ## Native Node server
 
 Native Node is the primary server deployment path. Docker is optional. Use Node 24 or later with
-`node:sqlite` available. With the current linked checkout layout, build Framework and its optional
-packages first:
+`node:sqlite` available. Install dependencies and build from this repository:
 
 ```bash
-cd ../framework
-vp install
-vp run -r build
-cd ../builder.run
 vp install
 vp run build:server
 ```
 
-The server build produces `build/index.js` and a separate `build/setup.mjs` command. Keep the built
-Framework packages and the linked `node_modules` layout available when running the app. Copying
-only `build` is not a complete deployment with these local package links.
+Framework and its optional packages are pinned Git dependencies. Installation downloads and builds
+them automatically; no sibling checkout, registry publication, or manual Framework build is needed.
+The server build produces `build/index.js` and a separate `build/setup.mjs` command. Keep this
+repository's installed `node_modules` alongside the build when running the app; copying only `build`
+is not a complete deployment.
+
+### Development
+
+```bash
+# Browser-local SQLite (default).
+vp run dev
+
+# Persistent server SQLite, with built-in login.
+VITE_DEPLOYMENT=server DATA_DIR=./data vp run dev
+```
+
+Use the URL Vite prints and leave `ORIGIN` unset during local development. Production builds select
+their mode at build time; `vp run start` runs a previously built Node server, not a static build.
+
+### Optional Framework co-development
+
+Only contributors changing Framework need a separate checkout. Build its packages there with
+`vp install` and `vp run -r build`, then explicitly link the five packages from this repository:
+
+```bash
+vp link ../framework ../framework/packages/http ../framework/packages/sqlite/browser \
+  ../framework/packages/inference/yair/core ../framework/packages/inference/yair/providers/openai
+```
+
+This writes local overrides into `pnpm-workspace.yaml` and updates the lockfile. Ordinary installs
+never detect or use a sibling directory implicitly. To remove the local overrides and restore the
+pinned dependencies, run `vp unlink`, then `vp install`. Keep local overrides out of commits.
+Framework package builds should not run concurrently with this application's builds or tests.
 
 Choose a persistent data directory and start the application:
 
@@ -81,8 +106,8 @@ The UI can remain client-rendered: data, permissions, Rules and inference execut
 
 ## Optional Docker deployment
 
-The build uses the sibling Framework checkout as a named build context. Docker BuildKit and a
-Compose version supporting `additional_contexts` are required.
+The optional Docker build installs the same pinned dependencies from this repository. No extra
+Framework build context is required.
 
 ```bash
 docker compose build

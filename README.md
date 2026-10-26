@@ -34,12 +34,26 @@ See [Data and persistence](docs/data-and-persistence.md).
 
 ## Run locally
 
-This checkout uses local package links to Framework and its optional packages. Clone [jthum/framework](https://github.com/jthum/framework) alongside this repository as `framework`, matching the links in [package.json](package.json).
+Install Node 24+ and Vite+, then clone this repository. Framework and its optional packages install
+automatically from pinned Git commits; no separate Framework checkout is required. The initial
+installation builds those dependencies, so it can take longer than subsequent installs.
 
 ```bash
+git clone https://github.com/jthum/builder.run.git
+cd builder.run
 vp install
-vp dev
+vp run dev
 ```
+
+The default is browser-local SQLite. For development with persistent server-side SQLite instead:
+
+```bash
+VITE_DEPLOYMENT=server DATA_DIR=./data vp run dev
+```
+
+Open the URL printed by Vite and complete the first-run login setup. For local development, leave
+`ORIGIN` unset so same-origin checks use the actual dev-server URL. See
+[deployment](docs/deployment.md) for production and optional Framework co-development.
 
 Quality checks:
 
@@ -54,8 +68,7 @@ vp build
 
 ## Deploy a Node server
 
-Native Node deployment uses persistent SQLite and built-in login. With the linked Framework packages
-built, use Node 24+ and run:
+Native Node deployment uses persistent SQLite and built-in login. After `vp install`, run:
 
 ```bash
 vp run build:server
@@ -67,7 +80,7 @@ Open the app and create your first login. Credentials belong in the database, no
 settings. Complete this one-time setup before exposing a new installation publicly. Setup never
 resets existing users. An optional `node build/setup.mjs` command can provision it before startup.
 Use an HTTPS reverse proxy and a process manager for a public deployment. Docker remains optional;
-see [deployment](docs/deployment.md) for linked package builds, persistent storage and backups.
+see [deployment](docs/deployment.md) for configuration, persistent storage and backups.
 
 ## Documentation
 

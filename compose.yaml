@@ -2,8 +2,6 @@ services:
   app:
     build:
       context: .
-      additional_contexts:
-        framework: ../framework
     ports:
       - "127.0.0.1:3000:3000"
     environment:

@@ -94,6 +94,8 @@ The Assistant and WebMCP share tool names and implementations. The inference pro
 
 Builder.run controls its product shell, templates, and host integration. Reusable Spec, Kernel, adapter, or editor changes belong in Framework when they apply across consumers.
 
-This repository currently links Framework packages locally for active development. Public Framework references use its GitHub repository; consult the checked-out package version for exact APIs.
+Framework packages install from pinned Git commits. Contributors may explicitly link local checkouts
+for co-development; ordinary installs do not require one. Public Framework references use its GitHub
+repository; consult the installed package version for exact APIs.
 
 The project remains pre-user. Format changes should update the current model, editors, tools, templates, tests, and docs together. There is no requirement to preserve old shapes through compatibility readers.

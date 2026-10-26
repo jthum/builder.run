@@ -1,5 +1,10 @@
 allowBuilds:
   esbuild: true
+  "@jthum/framework@git+https://github.com/jthum/framework.git": true
+  "@jthum/framework-http@git+https://github.com/jthum/framework.git": true
+  "@jthum/framework-sqlite-browser@git+https://github.com/jthum/framework.git": true
+  "@jthum/yair@git+https://github.com/jthum/framework.git": true
+  "@jthum/yair-openai@git+https://github.com/jthum/framework.git": true
 catalog:
   vite: npm:@voidzero-dev/vite-plus-core@0.3.0
   vite-plus: 0.3.0

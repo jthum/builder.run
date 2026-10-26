@@ -20,15 +20,16 @@
     "test:unit": "vp test",
     "test": "npm run test:unit -- --run",
     "test:browser": "node scripts/browser-smoke.mjs",
+    "test:install": "node scripts/install-smoke.mjs",
     "test:server": "node scripts/server-smoke.mjs && node scripts/server-workflow.mjs",
     "test:server:workflow": "node scripts/server-workflow.mjs"
   },
   "dependencies": {
-    "@jthum/framework": "link:../framework",
-    "@jthum/framework-http": "link:../framework/packages/http",
-    "@jthum/framework-sqlite-browser": "link:../framework/packages/sqlite/browser",
-    "@jthum/yair": "link:../framework/packages/inference/yair/core",
-    "@jthum/yair-openai": "link:../framework/packages/inference/yair/providers/openai",
+    "@jthum/framework": "github:jthum/framework#a70e5acbf309aeaa9fbb8b59d4373d73077cea95",
+    "@jthum/framework-http": "github:jthum/framework#a70e5acbf309aeaa9fbb8b59d4373d73077cea95&path:packages/http",
+    "@jthum/framework-sqlite-browser": "github:jthum/framework#a70e5acbf309aeaa9fbb8b59d4373d73077cea95&path:packages/sqlite/browser",
+    "@jthum/yair": "github:jthum/framework#a70e5acbf309aeaa9fbb8b59d4373d73077cea95&path:packages/inference/yair/core",
+    "@jthum/yair-openai": "github:jthum/framework#a70e5acbf309aeaa9fbb8b59d4373d73077cea95&path:packages/inference/yair/providers/openai",
     "nanoid": "^6.0.1",
     "pluralize": "^8.0.0",
     "yaml": "^2.9.0"
