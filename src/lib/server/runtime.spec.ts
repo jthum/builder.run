@@ -273,7 +273,11 @@ describe("server deployment", () => {
   it("excludes a second writer process/instance without leaving stale lock files after close", async () => {
     const path = await directory();
     const f = await fixture(path);
-    await expect(ServerRuntime.open({ directory: path })).rejects.toThrow("already in use");
+    await expect(ServerRuntime.open({ directory: path })).rejects.toMatchObject({
+      code: "PERSISTENCE.LOCKED",
+      message: expect.stringContaining("already in use"),
+      cause: expect.objectContaining({ errcode: 5 }),
+    });
     await f.runtime.close();
     const reopened = await fixture(path);
     expect(reopened.snapshot.app.id).toBe(f.snapshot.app.id);

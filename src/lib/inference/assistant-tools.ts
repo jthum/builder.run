@@ -401,12 +401,13 @@ function normalizeNodeIds(values: readonly unknown[]): readonly unknown[] {
     for (const key of nestedKeys) {
       if (Array.isArray(node[key])) normalized[key] = normalizeNodeIds(node[key]);
     }
-    if (record(node.gate)) normalized.gate = normalizeNestedStepContainer(record(node.gate)!);
-    if (record(node.foreach))
-      normalized.foreach = normalizeNestedStepContainer(record(node.foreach)!);
-    if (record(node.repeat)) normalized.repeat = normalizeNestedStepContainer(record(node.repeat)!);
-    if (record(node.wait)) {
-      const wait = normalizeNestedStepContainer(record(node.wait)!);
+    for (const key of ["gate", "foreach", "repeat"]) {
+      const container = record(node[key]);
+      if (container) normalized[key] = normalizeNestedStepContainer(container);
+    }
+    const waitInput = record(node.wait);
+    if (waitInput) {
+      const wait = normalizeNestedStepContainer(waitInput);
       const request = record(wait.request);
       normalized.wait = {
         ...wait,
@@ -415,10 +416,11 @@ function normalizeNodeIds(values: readonly unknown[]): readonly unknown[] {
           : {}),
       };
     }
-    if (record(node.parallel) && Array.isArray(record(node.parallel)!.branches)) {
+    const parallel = record(node.parallel);
+    if (parallel && Array.isArray(parallel.branches)) {
       normalized.parallel = {
-        ...record(node.parallel),
-        branches: (record(node.parallel)!.branches as readonly unknown[]).map((branch) => {
+        ...parallel,
+        branches: parallel.branches.map((branch) => {
           const item = record(branch) ?? {};
           return {
             ...item,

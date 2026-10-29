@@ -7,11 +7,11 @@ import {
 } from "./settings.ts";
 
 describe("browser assistant settings", () => {
-  it("stays optional outside a browser", async () => {
+  it("keeps reads optional but does not report an unavailable settings write as successful", async () => {
     await expect(loadAssistantSettings()).resolves.toEqual(DEFAULT_ASSISTANT_SETTINGS);
     await expect(
       saveAssistantSettings({ baseUrl: "https://example.test/v1", model: "model", apiKey: "key" }),
-    ).resolves.toBeUndefined();
+    ).rejects.toMatchObject({ code: "ENVIRONMENT.CAPABILITY_UNAVAILABLE" });
     expect(assistantConfigured(DEFAULT_ASSISTANT_SETTINGS)).toBe(false);
     expect(
       assistantConfigured({

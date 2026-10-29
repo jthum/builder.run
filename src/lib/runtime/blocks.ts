@@ -17,6 +17,7 @@ import type {
   CollectionDraft,
 } from "$lib/blocks/presentation.ts";
 import { createSpecId, labelFromKey } from "./ids.ts";
+import { ERROR_CODES, FrameworkError } from "@jthum/framework/errors";
 
 export const HOME_PAGE_KEY = "home";
 export { blockCategories, blocks };
@@ -285,7 +286,14 @@ export function asBlockList(value: unknown): PageNode[] {
     if (!text) return [];
     try {
       return asBlockList(JSON.parse(text) as unknown);
-    } catch {
+    } catch (cause) {
+      console.warn(
+        "Page layout could not be read.",
+        new FrameworkError(
+          { code: ERROR_CODES.specInvalid, message: "Page layout is not valid JSON." },
+          { cause },
+        ),
+      );
       return [];
     }
   }
@@ -302,9 +310,18 @@ export function asBlockList(value: unknown): PageNode[] {
 }
 
 export function normalizeBlockList(blocks: unknown): PageNode[] {
-  return asBlockList(blocks)
-    .filter((block) => block?.kind === "block" || block?.kind === "group")
-    .map(normalizeBlock);
+  const values = asBlockList(blocks);
+  const usable = values.filter(isPageLayoutNode);
+  if (usable.length !== values.length)
+    console.warn(
+      "Some page blocks could not be displayed.",
+      new FrameworkError({
+        code: ERROR_CODES.specInvalid,
+        message: "Unrecognized page blocks were skipped while rendering.",
+        details: { skipped: values.length - usable.length },
+      }),
+    );
+  return usable.map(normalizeBlock);
 }
 
 export function implicitHomePage(spec: PageContext): PagePresentation {

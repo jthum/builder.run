@@ -1,5 +1,6 @@
 import { SERVER_MODE } from "$lib/app/deployment.ts";
 import { serverRequest } from "$lib/app/remote.ts";
+import { ERROR_CODES, FrameworkError } from "@jthum/framework/errors";
 
 export interface AssistantSettings {
   readonly baseUrl: string;
@@ -36,7 +37,11 @@ export async function saveAssistantSettings(input: AssistantSettings): Promise<v
     await serverRequest("assistant.put", { ...settings });
     return;
   }
-  if (typeof indexedDB === "undefined") return;
+  if (typeof indexedDB === "undefined")
+    throw new FrameworkError({
+      code: ERROR_CODES.environmentCapabilityUnavailable,
+      message: "Browser storage is unavailable. Assistant settings could not be saved.",
+    });
   const database = await openSettingsDatabase();
   try {
     const transaction = database.transaction(STORE, "readwrite");

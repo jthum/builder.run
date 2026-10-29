@@ -2,6 +2,7 @@ import type { CollectionDraft } from "@jthum/framework/svelte/authoring/data";
 import type { RecordProperty } from "@jthum/framework/svelte/records/data";
 import { recordTitle } from "./labels.ts";
 import type { SourceFilter, SourceQueryDefinition, ViewDefinition } from "@jthum/framework/spec";
+import { asFrameworkError, ERROR_CODES } from "@jthum/framework/errors";
 
 export interface RecordReference {
   label: string;
@@ -119,7 +120,13 @@ export async function loadRecordDetails(
                 }
               : { label: "Unavailable" },
           ];
-        } catch {
+        } catch (error) {
+          const failure = asFrameworkError(error);
+          if (
+            failure.code !== ERROR_CODES.permissionDenied &&
+            failure.code !== ERROR_CODES.resourceNotFound
+          )
+            console.warn("Linked record could not be loaded.", failure);
           // Unreadable references do not prevent opening an otherwise accessible record.
           return [field.key, { label: "Unavailable" }];
         }

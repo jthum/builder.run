@@ -47,21 +47,11 @@ export function createNodeGateway(): SqlGateway {
     async remove(name: string) {
       const db = dbs.get(name);
       if (!db) return;
-      try {
-        db.close();
-      } catch {
-        // already closed
-      }
+      db.close();
       dbs.delete(name);
     },
     async wipe() {
-      for (const db of dbs.values()) {
-        try {
-          db.close();
-        } catch {
-          // already closed
-        }
-      }
+      for (const db of dbs.values()) db.close();
       dbs.clear();
     },
   };

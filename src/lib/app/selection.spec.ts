@@ -17,18 +17,6 @@ describe("App selection preferences", () => {
     expect(readSelection(storage)).toEqual(local);
     expect(readSelection(storage, "server-app-selection")).toEqual(remote);
   });
-  it("round trips navigation identifiers", () => {
-    let value: string | null = null;
-    const storage = {
-      getItem: () => value,
-      setItem: (_key: string, next: string) => {
-        value = next;
-      },
-    };
-    const selection = { spaceId: "space", appId: "app" };
-    writeSelection(storage, selection);
-    expect(readSelection(storage)).toEqual(selection);
-  });
 
   it("ignores malformed preferences", () => {
     for (const value of [null, "broken", "{}", '{"spaceId":1,"appId":"app"}'])

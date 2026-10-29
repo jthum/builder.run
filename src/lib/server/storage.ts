@@ -5,6 +5,7 @@ import { SqlitePersistenceAdapter } from "@jthum/framework/sqlite";
 import { openNodeSqlite } from "@jthum/framework/sqlite/node";
 import { createAesGcmSecretCipher } from "@jthum/framework/kernel";
 import type { CatalogRepository } from "@jthum/framework/persistence";
+import { FrameworkError } from "@jthum/framework/errors";
 import {
   CATALOG_DATABASE,
   workspaceDatabaseName,
@@ -18,9 +19,24 @@ export async function openServerStorage(directory: string) {
   const lease = openNodeSqlite(join(root, ".server-lock.db"));
   try {
     await lease.execute("BEGIN EXCLUSIVE");
-  } catch {
+  } catch (cause) {
     await lease.close();
-    throw new Error("The data directory is already in use by another server.");
+    // SQLite's low byte identifies the primary result code, including extended BUSY/LOCKED codes.
+    if (
+      cause instanceof Error &&
+      "errcode" in cause &&
+      typeof cause.errcode === "number" &&
+      [5, 6].includes(cause.errcode & 0xff)
+    )
+      throw new FrameworkError(
+        {
+          code: "PERSISTENCE.LOCKED",
+          message: "The data directory is already in use by another server.",
+          retryable: true,
+        },
+        { cause },
+      );
+    throw cause;
   }
   try {
     const keyPath = join(root, "secret.key");
