@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { page } from "$app/state";
+	import { goto } from "$app/navigation";
 	import { initialsFromName, toneFromAccent, toneFromName } from "$lib/app/color.ts";
 	import { collectionLabel, spaceLabel } from "$lib/app/labels.ts";
 	import { canonicalStudio } from "$lib/app/canonical-studio.svelte.ts";
@@ -86,7 +87,6 @@
 	let appSettingsOpen = $state(false);
 	let appMenuOpen = $state(false);
 	let appSearch = $state("");
-	let peopleOpen = $state(false);
 	const canManageSpace = $derived(!SERVER_MODE || session.permissions.space.includes("manage"));
 	const canManageApp = $derived(!SERVER_MODE || session.permissions.app.includes("manage"));
 
@@ -97,7 +97,7 @@
 		"/build/forms": FormInputIcon,
 		"/build/automations": WorkflowIcon,
 		"/build/pages": LayersIcon,
-		"/build/actors": UsersIcon,
+		"/people": UsersIcon,
 		"/build/settings": SettingsIcon,
 		"/build/spec": FileTextIcon,
 		"/library/blocks": LibraryIcon,
@@ -411,7 +411,7 @@
 							Profile
 						</DropdownMenu.Item>
 						{#if SERVER_MODE && canManageSpace}
-							<DropdownMenu.Item onSelect={() => (peopleOpen = true)}><UsersIcon />People and access</DropdownMenu.Item>
+							<DropdownMenu.Item onSelect={() => { sidebar.setOpenMobile(false); void goto("/people"); }}><UsersIcon />People and access</DropdownMenu.Item>
 						{/if}
 						{#if canManageSpace}<DropdownMenu.Item onSelect={() => (settingsOpen = true)}>
 							<SettingsIcon />
@@ -458,11 +458,6 @@
 <AppSettingsDialog bind:open={appSettingsOpen} />
 <ProfileDialog bind:open={profileOpen} initialSection={profileSection} />
 <SpaceSettingsDialog bind:open={settingsOpen} />
-{#if SERVER_MODE && peopleOpen && canManageSpace}
-	{#await import("$lib/components/people-dialog.svelte") then people}
-		<people.default bind:open={peopleOpen} />
-	{/await}
-{/if}
 <AssistantSheet />
 <NameDialog
 	bind:open={spaceOpen}

@@ -228,6 +228,7 @@ export type Crumb = { label: string; href?: string };
 export function breadcrumbFor(path: string, spec?: PageContext): Crumb[] {
   const parts = path.split("/").filter(Boolean);
   if (!parts.length) return [{ label: "Home" }];
+  if (parts[0] === "people") return [{ label: "People and access" }];
   if (parts[0] === "build") {
     const map: Record<string, string> = {
       types: "Data",
@@ -236,7 +237,6 @@ export function breadcrumbFor(path: string, spec?: PageContext): Crumb[] {
       automations: "Automations",
       pages: "Pages",
       spec: "Export",
-      actors: "People",
     };
     const crumbs: Crumb[] = [{ label: "Edit app", href: "/build" }];
     const section = parts[1];

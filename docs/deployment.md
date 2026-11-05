@@ -133,12 +133,17 @@ issued in their Workspaces and are authorized through Memberships and Attachment
 independent Space explicitly links that newly issued Actor to the signed-in login; it does not grant
 permissions to unrelated Workspaces. An Actor ID in a browser request is never trusted.
 
-Space managers can open **People and access** from the user menu, add a user, and assign Space
+Space managers can open the **People and access** page from the user menu, add a user, and assign Space
 and App permissions separately. New users default to Viewer access in the Space and current App.
 Editor grants record creation, updates and deletion; Manager also grants definition and access
 management. Custom permissions use the same five Kernel permissions, not another role system.
 Only Apps the acting manager can manage appear; managing a Space never implies managing its Apps.
 The host screen prevents changing your own access to avoid accidental lockout.
+
+The roster supports server-side name/email search, permission and App-access filters, sorting,
+and pages of 25, 50 or 100 people. Login usernames and App grants are loaded only for the displayed
+page. Framework supplies optional roster/filter/permission components; login provisioning and
+the Space/App access model remain app-owned. The local deployment has a read-only directory.
 
 Copy the Space sign-in link and share it and the initial password privately. Logins are issued in
 the selected Space, with usernames unique only within that realm. The link includes

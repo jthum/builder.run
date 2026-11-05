@@ -10,7 +10,6 @@ export interface RemoteSnapshot {
   readonly app: Workspace;
   readonly apps: readonly Workspace[];
   readonly spaces: readonly Workspace[];
-  readonly actors: readonly (Actor & { readonly roles: readonly string[] })[];
   readonly actor: Actor & { readonly roles: readonly string[] };
   readonly profiles: ReturnType<typeof encodeRuntimeInfo>;
   readonly permissions: {

@@ -88,7 +88,6 @@ class SessionState {
   space = $state.raw<SpaceSummary | null>(null);
   spaces = $state.raw<readonly SpaceSummary[]>([]);
   actor = $state.raw<ProfileActor | null>(null);
-  actors = $state.raw<readonly ProfileActor[]>([]);
   accent = $state<SpaceAccent>("blue");
   error = $state<string | null>(null);
   revision = $state(0);
@@ -183,27 +182,24 @@ async function refreshContext(): Promise<void> {
 }
 async function publishContext(runtime: LiveRuntime): Promise<void> {
   const framework = runtime.framework;
-  const [actor, apps, spaces, actors, memberships, workspaces, storage] = await Promise.all([
+  const [actor, apps, spaces, membership, workspaces, storage] = await Promise.all([
     framework.spaceClient.getActor(framework.actorId),
     listApps(framework.kernel, framework.spaceContext),
     framework.kernel.listRootWorkspaces(framework.spaceContext),
-    framework.kernel.listActorsByOrigin(framework.spaceContext, framework.space.id),
-    framework.kernel.listMembershipsForWorkspace(framework.spaceContext, framework.space.id),
+    framework.spaceClient.getMembership(framework.actorId),
     framework.kernel.listWorkspacesByRoot(framework.spaceContext),
     runtime.gateway.inspect(),
   ]);
   if (runtime !== live || runtime.framework !== framework || !actor) return;
-  const role = (id: string): readonly string[] =>
-    memberships.find((member) => member.actorId === id)?.permissions.includes("manage")
-      ? ["admin"]
-      : ["member"];
+  const roles: readonly string[] = membership?.permissions.includes("manage")
+    ? ["admin"]
+    : ["member"];
   session.framework = framework;
   session.app = { id: framework.app.id, name: framework.app.name };
   session.apps = apps.map(({ id, name }) => ({ id, name }));
   session.space = { id: framework.space.id, name: framework.space.name };
   session.spaces = spaces.map(({ id, name }) => ({ id, name }));
-  session.actor = { ...actor, roles: role(actor.id) };
-  session.actors = actors.map((actor) => ({ ...actor, roles: role(actor.id) }));
+  session.actor = { ...actor, roles };
   const appearance = framework.space.spec.meta?.appearance;
   session.accent = "blue";
   if (
@@ -457,7 +453,6 @@ function applyRemoteSnapshot(snapshot: RemoteSnapshot): void {
   session.framework = remoteContext(snapshot);
   session.permissions = snapshot.permissions;
   session.actor = snapshot.actor;
-  session.actors = snapshot.actors;
   session.app = { id: snapshot.app.id, name: snapshot.app.name };
   session.space = { id: snapshot.space.id, name: snapshot.space.name };
   session.apps = snapshot.apps.map(({ id, name }) => ({ id, name }));

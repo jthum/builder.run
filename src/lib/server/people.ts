@@ -5,6 +5,7 @@ import type { CatalogRepository } from "@jthum/framework/persistence";
 import type { AppContext } from "$lib/framework/bootstrap.ts";
 import type { PeopleInfo } from "$lib/app/access.ts";
 import { ServerAuth, type Identity } from "./auth.ts";
+import type { MemberQuery } from "@jthum/framework/client";
 
 /** Host login administration composed from ordinary Workspace memberships. */
 export class PeopleService {
@@ -16,42 +17,54 @@ export class PeopleService {
     private readonly catalog: CatalogRepository,
   ) {}
 
-  async list(context: AppContext): Promise<PeopleInfo> {
-    const memberships = await context.spaceClient.listMembershipsForWorkspace();
-    const [actors, logins, children] = await Promise.all([
-      context.spaceClient.listMembers(),
-      this.auth.localLogins(context.space.id),
+  async list(context: AppContext, query: MemberQuery = {}): Promise<PeopleInfo> {
+    // Authorize before discovering any host-owned App or login metadata.
+    const page = await context.spaceClient.queryMembers({ ...query, kind: "user" });
+    const [logins, children] = await Promise.all([
+      this.auth.localLogins(
+        context.space.id,
+        page.members.map(({ actor }) => actor.id),
+      ),
       this.catalog.listChildWorkspaces(context.space.id),
     ]);
     const apps: { id: string; name: string }[] = [];
-    const appMemberships = new Map<
-      string,
-      Awaited<ReturnType<WorkspaceClient["listMembershipsForWorkspace"]>>
-    >();
+    const appMemberships = new Map<string, Map<string, readonly Permission[]>>();
     for (const child of children) {
       const membership = await this.catalog.getMembership(context.actorId, child.id);
       // Parent management does not grant access to a child Workspace's membership roster.
       if (!membership?.permissions.includes("manage") || !child.access.members.includes("manage"))
         continue;
       const client = await this.appClient(context, child.id);
-      appMemberships.set(child.id, await client.listMembershipsForWorkspace());
+      await client.getMembership(context.actorId); // Target authorization, without loading its roster.
+      appMemberships.set(
+        child.id,
+        new Map(
+          await Promise.all(
+            page.members.map(
+              async ({ actor }) =>
+                [
+                  actor.id,
+                  (await this.catalog.getMembership(actor.id, child.id))?.permissions ?? [],
+                ] as const,
+            ),
+          ),
+        ),
+      );
       apps.push({ id: child.id, name: child.name });
     }
     return {
-      people: actors
-        .filter((actor) => actor.kind === "user")
-        .map((actor) => ({
-          actor,
-          username: logins.find((login) => login.actorId === actor.id)?.username,
-          permissions: memberships.find((member) => member.actorId === actor.id)?.permissions ?? [],
-          apps: apps.map((app) => ({
-            appId: app.id,
-            permissions:
-              appMemberships.get(app.id)?.find((member) => member.actorId === actor.id)
-                ?.permissions ?? [],
-          })),
-        }))
-        .sort((left, right) => left.actor.name.localeCompare(right.actor.name)),
+      total: page.total,
+      limit: page.limit,
+      offset: page.offset,
+      people: page.members.map(({ actor, membership }) => ({
+        actor,
+        username: logins.find((login) => login.actorId === actor.id)?.username,
+        permissions: membership.permissions,
+        apps: apps.map((app) => ({
+          appId: app.id,
+          permissions: appMemberships.get(app.id)?.get(actor.id) ?? [],
+        })),
+      })),
       apps,
       signInUrl: `/?realm=${encodeURIComponent(context.space.id)}`,
     };
@@ -77,7 +90,7 @@ export class PeopleService {
     operation: string,
     input: Record<string, unknown>,
   ): Promise<void> {
-    await context.spaceClient.listMembershipsForWorkspace(); // Kernel manage check, never a role-name check.
+    await context.spaceClient.getMembership(context.actorId); // Kernel manage check, never a role-name check.
     if (operation === "create") {
       const name = requiredText(input.name, "Name");
       const username = requiredText(input.username, "Username");
@@ -107,10 +120,13 @@ export class PeopleService {
       throw invalidInput(
         "Use Profile settings for your own login. You cannot change your own access here.",
       );
-    const actor = (await context.spaceClient.listMembers()).find(
-      (person) => person.id === actorId && person.kind === "user",
-    );
-    if (!actor) throw resourceNotFound("User", actorId);
+    const actor = await this.catalog.getActor(actorId);
+    if (
+      !actor ||
+      actor.kind !== "user" ||
+      !(await this.catalog.getMembership(actorId, context.space.id))
+    )
+      throw resourceNotFound("User", actorId);
     if (operation === "revokeSessions") {
       await this.auth.revokeActorSessions(context.space.id, actor.id);
       return;
@@ -129,9 +145,7 @@ export class PeopleService {
     const permissions = readPermissions(input.permissions);
     const apps = await this.appGrants(context, input.apps ?? []);
     for (const app of apps) {
-      const membership = (await app.client.listMembershipsForWorkspace()).find(
-        (member) => member.actorId === actorId,
-      );
+      const membership = await this.catalog.getMembership(actorId, app.appId);
       if (membership)
         await app.client.updateMembership({
           actorId,
@@ -164,7 +178,7 @@ export class PeopleService {
       ids.add(appId);
       const permissions = readPermissions(entry.permissions);
       const client = await this.appClient(context, appId);
-      await client.listMembershipsForWorkspace(); // Explicit target-App manage check before any writes.
+      await client.getMembership(context.actorId); // Explicit target-App manage check before any writes.
       grants.push({ appId, client, permissions });
     }
     return grants;

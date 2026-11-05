@@ -234,11 +234,16 @@ export class ServerAuth {
   }
 
   /** Only realm-local logins are exposed to that Space's managers. */
-  async localLogins(spaceId: string): Promise<readonly { actorId: string; username: string }[]> {
+  async localLogins(
+    spaceId: string,
+    actorIds: readonly string[],
+  ): Promise<readonly { actorId: string; username: string }[]> {
+    if (!actorIds.length) return [];
     const logins = await this.storage
       .workspace(spaceId)
       .query<{ username: string; actorId: string }>({
         from: "logins",
+        where: { op: "in", expression: { field: "actorId" }, values: actorIds },
         select: { username: { field: "username" }, actorId: { field: "actorId" } },
       });
     return logins;

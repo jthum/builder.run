@@ -7,6 +7,33 @@ import { cleanupServerFixtures, directory, fixture, testBrowser } from "./testin
 afterEach(cleanupServerFixtures);
 const password = "colleague-password-for-test";
 
+it("paginates and filters the server roster before adding page-local login and App metadata", async () => {
+  const f = await fixture();
+  await addUser(f, "directory-anna");
+  await addUser(f, "directory-beth", ["read", "manage"]);
+  await addUser(f, "directory-cara");
+  const page = (await f.command(
+    "people.list",
+    { search: "DIRECTORY-", limit: 1, offset: 1, sort: "name_asc" },
+    f.snapshot.selection,
+  )) as PeopleInfo;
+  expect(page).toMatchObject({ total: 3, limit: 1, offset: 1 });
+  expect(page.people.map((person) => person.username)).toEqual(["directory-beth"]);
+  expect(page.people[0]?.apps).toEqual([{ appId: f.snapshot.app.id, permissions: ["read"] }]);
+  const filtered = (await f.command(
+    "people.list",
+    { search: "directory-", permission: "manage", memberOf: f.snapshot.app.id },
+    f.snapshot.selection,
+  )) as PeopleInfo;
+  expect(filtered.total).toBe(1);
+  expect(filtered.people[0]?.username).toBe("directory-beth");
+  const client = f.client(f.snapshot);
+  expect((await client.queryMembers({ search: "directory-", limit: 1 })).total).toBe(3);
+  await expect(
+    f.command("people.list", { limit: 10000 }, f.snapshot.selection),
+  ).rejects.toMatchObject({ code: "VALIDATION.INVALID_INPUT" });
+});
+
 async function addUser(
   f: Awaited<ReturnType<typeof fixture>>,
   username = "colleague",
@@ -50,7 +77,8 @@ describe("People and access", () => {
     const snapshot = (await f.command("snapshot", {}, f.snapshot.selection)) as RemoteSnapshot;
     expect(snapshot.permissions.space).toEqual(["read"]);
     expect(snapshot.actor.roles).toEqual(["member"]);
-    expect(snapshot.actors.map((actor) => actor.id)).toEqual([snapshot.actorId]);
+    expect(snapshot.actor.id).toBe(snapshot.actorId);
+    expect(snapshot).not.toHaveProperty("actors");
     expect(snapshot.databases).toEqual([]);
     await expect(f.command("people.list", {}, snapshot.selection)).rejects.toMatchObject({
       code: "PERMISSION.DENIED",

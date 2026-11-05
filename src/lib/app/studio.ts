@@ -37,7 +37,7 @@ export const studioItems = [
     group: "Library",
   },
   {
-    href: "/build/actors",
+    href: "/people",
     label: "People",
     description: "Who can use this space.",
     group: "Space",

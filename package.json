@@ -25,11 +25,11 @@
     "test:server:workflow": "node scripts/server-workflow.mjs"
   },
   "dependencies": {
-    "@jthum/framework": "github:jthum/framework#a70e5acbf309aeaa9fbb8b59d4373d73077cea95",
-    "@jthum/framework-http": "github:jthum/framework#a70e5acbf309aeaa9fbb8b59d4373d73077cea95&path:packages/http",
-    "@jthum/framework-sqlite-browser": "github:jthum/framework#a70e5acbf309aeaa9fbb8b59d4373d73077cea95&path:packages/sqlite/browser",
-    "@jthum/yair": "github:jthum/framework#a70e5acbf309aeaa9fbb8b59d4373d73077cea95&path:packages/inference/yair/core",
-    "@jthum/yair-openai": "github:jthum/framework#a70e5acbf309aeaa9fbb8b59d4373d73077cea95&path:packages/inference/yair/providers/openai",
+    "@jthum/framework": "github:jthum/framework#35fe8d76aff662aae93da929018ff90e97ad3b8c",
+    "@jthum/framework-http": "github:jthum/framework#35fe8d76aff662aae93da929018ff90e97ad3b8c&path:packages/http",
+    "@jthum/framework-sqlite-browser": "github:jthum/framework#35fe8d76aff662aae93da929018ff90e97ad3b8c&path:packages/sqlite/browser",
+    "@jthum/yair": "github:jthum/framework#35fe8d76aff662aae93da929018ff90e97ad3b8c&path:packages/inference/yair/core",
+    "@jthum/yair-openai": "github:jthum/framework#35fe8d76aff662aae93da929018ff90e97ad3b8c&path:packages/inference/yair/providers/openai",
     "nanoid": "^6.0.1",
     "pluralize": "^8.0.0",
     "yaml": "^2.9.0"

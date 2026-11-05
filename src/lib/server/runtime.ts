@@ -225,12 +225,6 @@ export class ServerRuntime {
       if (member?.permissions.includes("read") && child.access.members.includes("read"))
         apps.push(child);
     }
-    const actors = permissions.space.includes("manage")
-      ? (await context.spaceClient.listActorsByOrigin()).map((person) => ({
-          ...person,
-          roles: person.id === actor.id ? roles : ["member"],
-        }))
-      : [{ ...actor, roles }];
     return {
       realmId: identity.realmId,
       selection: context.selection,
@@ -240,7 +234,6 @@ export class ServerRuntime {
       apps,
       spaces,
       actor: { ...actor, roles },
-      actors,
       profiles: encodeRuntimeInfo(context.profiles),
       permissions,
       revision: this.revisions.get(context.space.id) ?? 0,
@@ -405,7 +398,7 @@ export class ServerRuntime {
       return null;
     }
     const context = await this.context(identity, selection);
-    if (command === "people.list") return this.people.list(context);
+    if (command === "people.list") return this.people.list(context, input);
     if (command.startsWith("people.")) {
       try {
         await this.people.mutate(identity, context, command.slice("people.".length), input);
