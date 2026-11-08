@@ -220,20 +220,20 @@ importers:
   .:
     dependencies:
       '@jthum/framework':
-        specifier: github:jthum/framework#35fe8d76aff662aae93da929018ff90e97ad3b8c
-        version: https://codeload.github.com/jthum/framework/tar.gz/35fe8d76aff662aae93da929018ff90e97ad3b8c(@internationalized/date@3.12.3)(@sveltejs/kit@3.0.0-next.30(@sveltejs/vite-plugin-svelte@7.3.0(@voidzero-dev/vite-plus-core@0.3.0(@types/node@26.4.0)(jiti@2.7.0)(typescript@6.0.3)(yaml@2.9.0))(svelte@5.57.0))(@voidzero-dev/vite-plus-core@0.3.0(@types/node@26.4.0)(jiti@2.7.0)(typescript@6.0.3)(yaml@2.9.0))(svelte@5.57.0)(typescript@6.0.3))(svelte@5.57.0)(tailwindcss@4.3.3)
+        specifier: github:jthum/framework#86a6430606a248333459c29662bf86a8d2a65d14
+        version: https://codeload.github.com/jthum/framework/tar.gz/86a6430606a248333459c29662bf86a8d2a65d14(@internationalized/date@3.12.3)(@sveltejs/kit@3.0.0-next.30(@sveltejs/vite-plugin-svelte@7.3.0(@voidzero-dev/vite-plus-core@0.3.0(@types/node@26.4.0)(jiti@2.7.0)(typescript@6.0.3)(yaml@2.9.0))(svelte@5.57.0))(@voidzero-dev/vite-plus-core@0.3.0(@types/node@26.4.0)(jiti@2.7.0)(typescript@6.0.3)(yaml@2.9.0))(svelte@5.57.0)(typescript@6.0.3))(svelte@5.57.0)(tailwindcss@4.3.3)
       '@jthum/framework-http':
-        specifier: github:jthum/framework#35fe8d76aff662aae93da929018ff90e97ad3b8c&path:packages/http
-        version: https://codeload.github.com/jthum/framework/tar.gz/35fe8d76aff662aae93da929018ff90e97ad3b8c#path:packages/http(@jthum/framework@https://codeload.github.com/jthum/framework/tar.gz/35fe8d76aff662aae93da929018ff90e97ad3b8c(@internationalized/date@3.12.3)(@sveltejs/kit@3.0.0-next.30(@sveltejs/vite-plugin-svelte@7.3.0(@voidzero-dev/vite-plus-core@0.3.0(@types/node@26.4.0)(jiti@2.7.0)(typescript@6.0.3)(yaml@2.9.0))(svelte@5.57.0))(@voidzero-dev/vite-plus-core@0.3.0(@types/node@26.4.0)(jiti@2.7.0)(typescript@6.0.3)(yaml@2.9.0))(svelte@5.57.0)(typescript@6.0.3))(svelte@5.57.0)(tailwindcss@4.3.3))
+        specifier: github:jthum/framework#86a6430606a248333459c29662bf86a8d2a65d14&path:packages/http
+        version: https://codeload.github.com/jthum/framework/tar.gz/86a6430606a248333459c29662bf86a8d2a65d14#path:packages/http(@jthum/framework@https://codeload.github.com/jthum/framework/tar.gz/86a6430606a248333459c29662bf86a8d2a65d14(@internationalized/date@3.12.3)(@sveltejs/kit@3.0.0-next.30(@sveltejs/vite-plugin-svelte@7.3.0(@voidzero-dev/vite-plus-core@0.3.0(@types/node@26.4.0)(jiti@2.7.0)(typescript@6.0.3)(yaml@2.9.0))(svelte@5.57.0))(@voidzero-dev/vite-plus-core@0.3.0(@types/node@26.4.0)(jiti@2.7.0)(typescript@6.0.3)(yaml@2.9.0))(svelte@5.57.0)(typescript@6.0.3))(svelte@5.57.0)(tailwindcss@4.3.3))
       '@jthum/framework-sqlite-browser':
-        specifier: github:jthum/framework#35fe8d76aff662aae93da929018ff90e97ad3b8c&path:packages/sqlite/browser
-        version: https://codeload.github.com/jthum/framework/tar.gz/35fe8d76aff662aae93da929018ff90e97ad3b8c#path:packages/sqlite/browser(@jthum/framework@https://codeload.github.com/jthum/framework/tar.gz/35fe8d76aff662aae93da929018ff90e97ad3b8c(@internationalized/date@3.12.3)(@sveltejs/kit@3.0.0-next.30(@sveltejs/vite-plugin-svelte@7.3.0(@voidzero-dev/vite-plus-core@0.3.0(@types/node@26.4.0)(jiti@2.7.0)(typescript@6.0.3)(yaml@2.9.0))(svelte@5.57.0))(@voidzero-dev/vite-plus-core@0.3.0(@types/node@26.4.0)(jiti@2.7.0)(typescript@6.0.3)(yaml@2.9.0))(svelte@5.57.0)(typescript@6.0.3))(svelte@5.57.0)(tailwindcss@4.3.3))
+        specifier: github:jthum/framework#86a6430606a248333459c29662bf86a8d2a65d14&path:packages/sqlite/browser
+        version: https://codeload.github.com/jthum/framework/tar.gz/86a6430606a248333459c29662bf86a8d2a65d14#path:packages/sqlite/browser(@jthum/framework@https://codeload.github.com/jthum/framework/tar.gz/86a6430606a248333459c29662bf86a8d2a65d14(@internationalized/date@3.12.3)(@sveltejs/kit@3.0.0-next.30(@sveltejs/vite-plugin-svelte@7.3.0(@voidzero-dev/vite-plus-core@0.3.0(@types/node@26.4.0)(jiti@2.7.0)(typescript@6.0.3)(yaml@2.9.0))(svelte@5.57.0))(@voidzero-dev/vite-plus-core@0.3.0(@types/node@26.4.0)(jiti@2.7.0)(typescript@6.0.3)(yaml@2.9.0))(svelte@5.57.0)(typescript@6.0.3))(svelte@5.57.0)(tailwindcss@4.3.3))
       '@jthum/yair':
-        specifier: github:jthum/framework#35fe8d76aff662aae93da929018ff90e97ad3b8c&path:packages/inference/yair/core
-        version: https://codeload.github.com/jthum/framework/tar.gz/35fe8d76aff662aae93da929018ff90e97ad3b8c#path:packages/inference/yair/core(@jthum/framework@https://codeload.github.com/jthum/framework/tar.gz/35fe8d76aff662aae93da929018ff90e97ad3b8c(@internationalized/date@3.12.3)(@sveltejs/kit@3.0.0-next.30(@sveltejs/vite-plugin-svelte@7.3.0(@voidzero-dev/vite-plus-core@0.3.0(@types/node@26.4.0)(jiti@2.7.0)(typescript@6.0.3)(yaml@2.9.0))(svelte@5.57.0))(@voidzero-dev/vite-plus-core@0.3.0(@types/node@26.4.0)(jiti@2.7.0)(typescript@6.0.3)(yaml@2.9.0))(svelte@5.57.0)(typescript@6.0.3))(svelte@5.57.0)(tailwindcss@4.3.3))
+        specifier: github:jthum/framework#86a6430606a248333459c29662bf86a8d2a65d14&path:packages/inference/yair/core
+        version: https://codeload.github.com/jthum/framework/tar.gz/86a6430606a248333459c29662bf86a8d2a65d14#path:packages/inference/yair/core(@jthum/framework@https://codeload.github.com/jthum/framework/tar.gz/86a6430606a248333459c29662bf86a8d2a65d14(@internationalized/date@3.12.3)(@sveltejs/kit@3.0.0-next.30(@sveltejs/vite-plugin-svelte@7.3.0(@voidzero-dev/vite-plus-core@0.3.0(@types/node@26.4.0)(jiti@2.7.0)(typescript@6.0.3)(yaml@2.9.0))(svelte@5.57.0))(@voidzero-dev/vite-plus-core@0.3.0(@types/node@26.4.0)(jiti@2.7.0)(typescript@6.0.3)(yaml@2.9.0))(svelte@5.57.0)(typescript@6.0.3))(svelte@5.57.0)(tailwindcss@4.3.3))
       '@jthum/yair-openai':
-        specifier: github:jthum/framework#35fe8d76aff662aae93da929018ff90e97ad3b8c&path:packages/inference/yair/providers/openai
-        version: https://codeload.github.com/jthum/framework/tar.gz/35fe8d76aff662aae93da929018ff90e97ad3b8c#path:packages/inference/yair/providers/openai(4940e99702f8f46a4341f2c08ff5f3d5)
+        specifier: github:jthum/framework#86a6430606a248333459c29662bf86a8d2a65d14&path:packages/inference/yair/providers/openai
+        version: https://codeload.github.com/jthum/framework/tar.gz/86a6430606a248333459c29662bf86a8d2a65d14#path:packages/inference/yair/providers/openai(6808364f69e729e397114fb9d927fe4a)
       nanoid:
         specifier: ^6.0.1
         version: 6.0.1
@@ -253,6 +253,9 @@ importers:
       '@lucide/svelte':
         specifier: ^1.46.0
         version: 1.51.0(svelte@5.57.0)
+      '@spacefast/zero':
+        specifier: 0.8.0
+        version: 0.8.0
       '@sveltejs/adapter-node':
         specifier: 6.0.0-next.15
         version: 6.0.0-next.15(@sveltejs/kit@3.0.0-next.30(@sveltejs/vite-plugin-svelte@7.3.0(@voidzero-dev/vite-plus-core@0.3.0(@types/node@26.4.0)(jiti@2.7.0)(typescript@6.0.3)(yaml@2.9.0))(svelte@5.57.0))(@voidzero-dev/vite-plus-core@0.3.0(@types/node@26.4.0)(jiti@2.7.0)(typescript@6.0.3)(yaml@2.9.0))(svelte@5.57.0)(typescript@6.0.3))
@@ -274,6 +277,12 @@ importers:
       '@types/pluralize':
         specifier: ^0.0.33
         version: 0.0.33
+      '@types/ungap__structured-clone':
+        specifier: ^1.2.0
+        version: 1.2.0
+      '@ungap/structured-clone':
+        specifier: ^1.4.0
+        version: 1.4.0
       bits-ui:
         specifier: ^2.19.0
         version: 2.19.0(@internationalized/date@3.12.3)(@sveltejs/kit@3.0.0-next.30(@sveltejs/vite-plugin-svelte@7.3.0(@voidzero-dev/vite-plus-core@0.3.0(@types/node@26.4.0)(jiti@2.7.0)(typescript@6.0.3)(yaml@2.9.0))(svelte@5.57.0))(@voidzero-dev/vite-plus-core@0.3.0(@types/node@26.4.0)(jiti@2.7.0)(typescript@6.0.3)(yaml@2.9.0))(svelte@5.57.0)(typescript@6.0.3))(svelte@5.57.0)
@@ -371,33 +380,33 @@ packages:
   '@jridgewell/trace-mapping@0.3.31':
     resolution: {integrity: sha512-zzNR+SdQSDJzc8joaeP8QQoCQr8NuYx2dIIytl1QeBEZHJ9uW6hebsrYgbz8hJwUQao3TWCMtmfV8Nu1twOLAw==}
 
-  '@jthum/framework-http@https://codeload.github.com/jthum/framework/tar.gz/35fe8d76aff662aae93da929018ff90e97ad3b8c#path:packages/http':
-    resolution: {gitHosted: true, integrity: sha512-uPB/M+X/cZMGIoTfA9EQOPBA+seJ+1KYIJYGnho0MEqUl5qeg7Q3L70pi+a6har4p9YHqLVr335ASHNtOqARpw==, path: packages/http, tarball: https://codeload.github.com/jthum/framework/tar.gz/35fe8d76aff662aae93da929018ff90e97ad3b8c}
+  '@jthum/framework-http@https://codeload.github.com/jthum/framework/tar.gz/86a6430606a248333459c29662bf86a8d2a65d14#path:packages/http':
+    resolution: {gitHosted: true, integrity: sha512-FTAoGiAsyMGqVPw7IpRp9xfY0ZKICHoczBjSqYtbRe/UsRdxHvmSggMT099Kcrp08sQP0xRiKjOO2rwIutr0dg==, path: packages/http, tarball: https://codeload.github.com/jthum/framework/tar.gz/86a6430606a248333459c29662bf86a8d2a65d14}
     version: 0.0.0
     peerDependencies:
       '@jthum/framework': 0.0.0
 
-  '@jthum/framework-sqlite-browser@https://codeload.github.com/jthum/framework/tar.gz/35fe8d76aff662aae93da929018ff90e97ad3b8c#path:packages/sqlite/browser':
-    resolution: {gitHosted: true, integrity: sha512-uPB/M+X/cZMGIoTfA9EQOPBA+seJ+1KYIJYGnho0MEqUl5qeg7Q3L70pi+a6har4p9YHqLVr335ASHNtOqARpw==, path: packages/sqlite/browser, tarball: https://codeload.github.com/jthum/framework/tar.gz/35fe8d76aff662aae93da929018ff90e97ad3b8c}
+  '@jthum/framework-sqlite-browser@https://codeload.github.com/jthum/framework/tar.gz/86a6430606a248333459c29662bf86a8d2a65d14#path:packages/sqlite/browser':
+    resolution: {gitHosted: true, integrity: sha512-FTAoGiAsyMGqVPw7IpRp9xfY0ZKICHoczBjSqYtbRe/UsRdxHvmSggMT099Kcrp08sQP0xRiKjOO2rwIutr0dg==, path: packages/sqlite/browser, tarball: https://codeload.github.com/jthum/framework/tar.gz/86a6430606a248333459c29662bf86a8d2a65d14}
     version: 0.0.0
     peerDependencies:
       '@jthum/framework': 0.0.0
 
-  '@jthum/framework@https://codeload.github.com/jthum/framework/tar.gz/35fe8d76aff662aae93da929018ff90e97ad3b8c':
-    resolution: {gitHosted: true, integrity: sha512-uPB/M+X/cZMGIoTfA9EQOPBA+seJ+1KYIJYGnho0MEqUl5qeg7Q3L70pi+a6har4p9YHqLVr335ASHNtOqARpw==, tarball: https://codeload.github.com/jthum/framework/tar.gz/35fe8d76aff662aae93da929018ff90e97ad3b8c}
+  '@jthum/framework@https://codeload.github.com/jthum/framework/tar.gz/86a6430606a248333459c29662bf86a8d2a65d14':
+    resolution: {gitHosted: true, integrity: sha512-FTAoGiAsyMGqVPw7IpRp9xfY0ZKICHoczBjSqYtbRe/UsRdxHvmSggMT099Kcrp08sQP0xRiKjOO2rwIutr0dg==, tarball: https://codeload.github.com/jthum/framework/tar.gz/86a6430606a248333459c29662bf86a8d2a65d14}
     version: 0.0.0
     peerDependencies:
       svelte: ^5.0.0
 
-  '@jthum/yair-openai@https://codeload.github.com/jthum/framework/tar.gz/35fe8d76aff662aae93da929018ff90e97ad3b8c#path:packages/inference/yair/providers/openai':
-    resolution: {gitHosted: true, integrity: sha512-uPB/M+X/cZMGIoTfA9EQOPBA+seJ+1KYIJYGnho0MEqUl5qeg7Q3L70pi+a6har4p9YHqLVr335ASHNtOqARpw==, path: packages/inference/yair/providers/openai, tarball: https://codeload.github.com/jthum/framework/tar.gz/35fe8d76aff662aae93da929018ff90e97ad3b8c}
+  '@jthum/yair-openai@https://codeload.github.com/jthum/framework/tar.gz/86a6430606a248333459c29662bf86a8d2a65d14#path:packages/inference/yair/providers/openai':
+    resolution: {gitHosted: true, integrity: sha512-FTAoGiAsyMGqVPw7IpRp9xfY0ZKICHoczBjSqYtbRe/UsRdxHvmSggMT099Kcrp08sQP0xRiKjOO2rwIutr0dg==, path: packages/inference/yair/providers/openai, tarball: https://codeload.github.com/jthum/framework/tar.gz/86a6430606a248333459c29662bf86a8d2a65d14}
     version: 0.0.0
     peerDependencies:
       '@jthum/framework': 0.0.0
       '@jthum/yair': 0.0.0
 
-  '@jthum/yair@https://codeload.github.com/jthum/framework/tar.gz/35fe8d76aff662aae93da929018ff90e97ad3b8c#path:packages/inference/yair/core':
-    resolution: {gitHosted: true, integrity: sha512-uPB/M+X/cZMGIoTfA9EQOPBA+seJ+1KYIJYGnho0MEqUl5qeg7Q3L70pi+a6har4p9YHqLVr335ASHNtOqARpw==, path: packages/inference/yair/core, tarball: https://codeload.github.com/jthum/framework/tar.gz/35fe8d76aff662aae93da929018ff90e97ad3b8c}
+  '@jthum/yair@https://codeload.github.com/jthum/framework/tar.gz/86a6430606a248333459c29662bf86a8d2a65d14#path:packages/inference/yair/core':
+    resolution: {gitHosted: true, integrity: sha512-FTAoGiAsyMGqVPw7IpRp9xfY0ZKICHoczBjSqYtbRe/UsRdxHvmSggMT099Kcrp08sQP0xRiKjOO2rwIutr0dg==, path: packages/inference/yair/core, tarball: https://codeload.github.com/jthum/framework/tar.gz/86a6430606a248333459c29662bf86a8d2a65d14}
     version: 0.0.0
     peerDependencies:
       '@jthum/framework': 0.0.0
@@ -711,6 +720,24 @@ packages:
   '@rolldown/pluginutils@1.0.1':
     resolution: {integrity: sha512-2j9bGt5Jh8hj+vPtgzPtl72j0yRxHAyumoo6TNfAjsLB04UtpSvPbPcDcBMxz7n+9CYB0c1GxQFxYRg2jimqGw==}
 
+  '@spacefast/common@0.8.0':
+    resolution: {integrity: sha512-Zxz69l8USfmr/tZt3fo/1eySKcek8JKRCZ6OeB+1ri6dQ3nx5JQoyPGq+5HeR9g5/xeRmwNTIWOfSvsyFTI7lQ==}
+    engines: {bun: ^1.3.11, node: '>=20'}
+    peerDependencies:
+      '@tanstack/react-query': ^5.102.8
+    peerDependenciesMeta:
+      '@tanstack/react-query':
+        optional: true
+
+  '@spacefast/zero@0.8.0':
+    resolution: {integrity: sha512-/qYdPWP1Ucjyb/2/hCxAE9H5t249uhGeweMzn09xbB/aXZsaPK+E8abUXJUQTMJlSKQDGv9aqTKVBxLkllVcyQ==}
+    engines: {bun: ^1.3.11, node: '>=20'}
+    peerDependencies:
+      react: ^18.0.0 || ^19.0.0
+    peerDependenciesMeta:
+      react:
+        optional: true
+
   '@standard-schema/spec@1.1.0':
     resolution: {integrity: sha512-l2aFy5jALhniG5HgqrD6jXLi/rUWrKvqN/qJx6yoJsgKhblVd+iqqU4RCXavm/jPityDo5TCvKMnpjKnOriy0w==}
 
@@ -880,6 +907,12 @@ packages:
 
   '@types/pluralize@0.0.33':
     resolution: {integrity: sha512-JOqsl+ZoCpP4e8TDke9W79FDcSgPAR0l6pixx2JHkhnRjvShyYiAYw2LVsnA7K08Y6DeOnaU6ujmENO4os/cYg==}
+
+  '@types/ungap__structured-clone@1.2.0':
+    resolution: {integrity: sha512-ZoaihZNLeZSxESbk9PUAPZOlSpcKx81I1+4emtULDVmBLkYutTcMlCj2K9VNlf9EWODxdO6gkAqEaLorXwZQVA==}
+
+  '@ungap/structured-clone@1.4.0':
+    resolution: {integrity: sha512-1mEZtMKPM09vDmQt5y7YvmN2+DFTP7Tg0EWXdic8/C6VRnpb33e4ghisCIE3WZjsE2N8mf+QV1Zqh7ZFYLWInQ==}
 
   '@vitest/browser-preview@4.1.11':
     resolution: {integrity: sha512-iPKSE6Ibayey6HFgK1V1/aHgyhx7HSRk1YMi+lnBZGmlIiNV5Uc7xRkD9Su8RDylTxDECK23t7kTHdRKoqSYDQ==}
@@ -1197,8 +1230,8 @@ packages:
       '@internationalized/date': ^3.8.1
       svelte: ^5.33.0
 
-  bits-ui@2.20.4:
-    resolution: {integrity: sha512-2J8uDaEigS/Z2yiyRDzciOt9PnmWNFGSg6Rh1xu5fi6rw9GmCZl33RZU0PSbbwGhcxKPp77A33q1n0hVQlbl9A==}
+  bits-ui@2.20.6:
+    resolution: {integrity: sha512-V4fgaFAtw+d8xS+3SBuLqouDsAo06991oJnW3hdEx0O1O/sl+BGLKKdZ0i4ZI1mgqT0JXJJ+6avI750OkvgZrA==}
     engines: {node: '>=20'}
     peerDependencies:
       '@internationalized/date': ^3.8.1
@@ -1237,6 +1270,10 @@ packages:
     resolution: {integrity: sha512-yuToqVvRrj6pfDXREyQAAv8SkAEk/8GS3jQRTiUMm66TVtBYmqQeoEjL2Lmq8Rpo6271vH76InTChTitEAm65w==}
     engines: {node: '>=22'}
 
+  culori@4.0.2:
+    resolution: {integrity: sha512-1+BhOB8ahCn4O0cep0Sh2l9KCOfOdY+BXJnKMHFFzDEouSr/el18QwXEMRlOj9UY5nCeA8UN3a/82rUWRBeyBw==}
+    engines: {node: ^12.20.0 || ^14.13.1 || >=16.0.0}
+
   deepmerge@4.3.1:
     resolution: {integrity: sha512-3sUqbMEc77XqpdNO7FRyRog+eW3ph+GYCbj+rK+uYyRMuwsVy0rMiVtPn+QJlKFvWP/1PYpapqYn0Me2knFn+A==}
     engines: {node: '>=0.10.0'}
@@ -1267,6 +1304,10 @@ packages:
   enhanced-resolve@5.24.5:
     resolution: {integrity: sha512-L1l8TNvomm6UVW5B253AGxQagSQr+vGwhMlrrfRS2qmhx46AMpMVJKQYLvWYbysTMY8VoicOvzHzoHMbyzB+4A==}
     engines: {node: '>=10.13.0'}
+
+  entities@6.0.1:
+    resolution: {integrity: sha512-aN97NXWF6AWBTahfVOIrB/NShkzi5H7F9r1s9mD3cDj4Ko5f2qhhVoYMibXF7GlLveb/D2ioWay8lxI97Ven3g==}
+    engines: {node: '>=0.12'}
 
   es-module-lexer@2.3.2:
     resolution: {integrity: sha512-poHGpORABojJJucnV9KbOavETW8lBVnphkW77ER5/BQ5Fz7oXSoCNek7IH3vR5nRjdsEz926ibFYX8KtLQmdyw==}
@@ -1482,6 +1523,11 @@ packages:
   locate-character@3.0.0:
     resolution: {integrity: sha512-SW13ws7BjaeJ6p7Q6CO2nchbYEc3X3J6WrmTTDto7yMPqVSZTUyY5Tjbid+Ab8gLnATtygYtiDIJGQRRn2ZOiA==}
 
+  lucide-preact@0.575.0:
+    resolution: {integrity: sha512-W8JZyQEkYv6DlbRrEgmZxVWFKL3zjoyEkFOOSxiX2VEU6Gou8cOqXZ5IAGmqAL4KiPx1tWgGT9awNjAH7MFknw==}
+    peerDependencies:
+      preact: ^10.27.2
+
   lz-string@1.5.0:
     resolution: {integrity: sha512-h5bgJWpxJNswbU7qCrV0tIKQCaS3blPDrqKWx+QxzuzL1zGUzij9XCWLrSLsJPu5t+eWA/ycetzYAO5IOMcWAQ==}
     hasBin: true
@@ -1491,6 +1537,11 @@ packages:
 
   magic-string@1.2.3:
     resolution: {integrity: sha512-Bpb0W2TbLKOZ7vJnOUnVRGq3WL2p+ISV29M6hYPL1AFCpyKZpdr5ytiXoTSSxRVhg8YW7f65+6gbG8WG6PCa/g==}
+
+  mime@4.1.2:
+    resolution: {integrity: sha512-ikRzZ2RwbUVDyL9SsU0f2Phcmav4yq5r8faH5ZZKHtOZrMBLnrQOrj0uvqZ5R1uQnj+RO7Wcklw/lAf81mP9LQ==}
+    engines: {node: '>=16'}
+    hasBin: true
 
   mitt@3.0.1:
     resolution: {integrity: sha512-vKivATfr97l2/QBCYAkXYDbrIWPM2IIKEl7YPhjCvKlG3kE2gm+uBo6nEXK3M5/Ffh/FLpKExzOQ3JJoJGFKBw==}
@@ -1524,6 +1575,9 @@ packages:
 
   node-fetch-native@1.6.7:
     resolution: {integrity: sha512-g9yhqoedzIUm0nTnTqAQvueMPVOuIY16bqgAJJC8XOOubYFNwz6IER9qs0Gq2Xd0+CecCKFjtdDTMA4u4xG06Q==}
+
+  oauth4webapi@3.8.7:
+    resolution: {integrity: sha512-4RxcKxXjuItDFZ20RRPf4YTw3kpeXJyCgJFxVzJ068A7PNJ18st2Dg90tlC1LkSDS0GecroagCLHYEIVUhCAkw==}
 
   obug@2.1.4:
     resolution: {integrity: sha512-4a+OsYv9UktOJKE+l1A4OufDgdRF9PifWj+tJnHURo/P+WOxpG4GzUFL9qCalmWauao6ogiG+QvnCovwPoyAWA==}
@@ -1559,6 +1613,9 @@ packages:
       vite-plus:
         optional: true
 
+  parse5@7.3.0:
+    resolution: {integrity: sha512-IInvU7fabl34qmi9gY8XOVxhYyMyuH2xUNpb2q8/Y+7552KlejkRvqvD19nMoUW/uQGGbqNpA6Tufu5FL5BZgw==}
+
   pathe@2.0.3:
     resolution: {integrity: sha512-WUjGcAqP1gQacoQe+OBJsFA7Ld4DyXuUIjZ5cc75cLHvJ7dtNsTugphxIADwspS+AraAUePCKrSVtPLFj/F88w==}
 
@@ -1580,6 +1637,14 @@ packages:
   postcss@8.5.26:
     resolution: {integrity: sha512-u82N74LFzG8ca+dD8puPnplTXoGH4fTPpVGuIbt36G3qvNlkvfD0lEAZSxaly3KX8TS/L1A1gsCEmvKmBcVbkQ==}
     engines: {node: ^10 || ^12 || >=14}
+
+  preact@10.29.8:
+    resolution: {integrity: sha512-ej2aVZ+vZ8WO7tvlQWRM9N63A0KzF9q4mWJfDUHgYaIofWY9hu74QdnQrjoPMmZi2/nZ5gN0bJCQF49xQqx09Q==}
+    peerDependencies:
+      preact-render-to-string: '>=5'
+    peerDependenciesMeta:
+      preact-render-to-string:
+        optional: true
 
   pretty-format@27.5.1:
     resolution: {integrity: sha512-Qb1gy5OrP5+zDf2Bvnzdl3jsTf1qXVMazbvCoKhtKqVs4/YK4ozX4gKQJJVyNe+cajNPn0KoC0MC3FUmaHWEmQ==}
@@ -1681,6 +1746,12 @@ packages:
     peerDependencies:
       svelte: ^5.30.2
 
+  svelte-toolbelt@0.10.7:
+    resolution: {integrity: sha512-gjuUVEEpo38UJCeI1ssE3NxG31tYENczPTcTGTXf4338qAQNdR9I1oAEbQY0KQFmbdUojNIhHuRNix7ThwFNxQ==}
+    engines: {node: '>=18', pnpm: '>=8.7.0'}
+    peerDependencies:
+      svelte: ^5.30.2
+
   svelte-toolbelt@0.7.1:
     resolution: {integrity: sha512-HcBOcR17Vx9bjaOceUvxkY3nGmbBmCBBbuWLLEWO6jtmWH8f/QoWmbyUfQZrpDINH39en1b8mptfPQT9VKQ1xQ==}
     engines: {node: '>=18', pnpm: '>=8.7.0'}
@@ -1693,6 +1764,9 @@ packages:
 
   tabbable@6.5.0:
     resolution: {integrity: sha512-wieBHXygIm7OyQOu5hQlkk62/WyCFYGlWg7L6/ZCUZwx0o398Zkn4pVmMyfYhfMG8kGrj/Krt8eIk6UKC6VzwA==}
+
+  tabbable@6.5.1:
+    resolution: {integrity: sha512-dMCuwDUY6Noz3zVKLefBC4wq+aJV20yc7vWmM7uTNGwtQSFF5kX7OUIUsxuVajz/bdt5Xqdah3/0NLjth+cM5A==}
 
   tailwind-merge@3.6.0:
     resolution: {integrity: sha512-uxL7qAVQriqRQPAyK3pj66VqskWqoZ37PW94jwOTwNfq/z9oyu1V+eqrZqtR2+fCiXdYOZe/Modt8GtvqNzu+w==}
@@ -1737,6 +1811,13 @@ packages:
   tinyrainbow@3.1.1:
     resolution: {integrity: sha512-yau8yJdTt989Mm0Bd/236QnzEiPf2xLLTqUZRUJOo/3CB078LSwzei343DgtJVmfJKJE3TMINY1u42SQsP6mXw==}
     engines: {node: '>=14.0.0'}
+
+  tldts-core@7.4.20:
+    resolution: {integrity: sha512-C630TWXZCZmLq0F2bW4QqwnaaxCQ/svpAqvJwnC4JvgEM5ohhBnGsEzTLSOXcN+xjz+kEaHS5uoWIw2klnqd0A==}
+
+  tldts@7.4.19:
+    resolution: {integrity: sha512-48dH6aSpQnpbzDUc4vIQZ1VjB8tkK+e8c1yx05/SZK+rkssgjEOlxDd/yU8/a4vGYQ9vRgJr9dwMq9TJ0b3X2Q==}
+    hasBin: true
 
   totalist@3.0.1:
     resolution: {integrity: sha512-sf4i37nQ2LBx4m3wB74y+ubopq6W/dIzXg0FDGjsYnZHVa1Da8FH853wlL2gtUhg+xJXjfk3kUZS3BRoQeoQBQ==}
@@ -1880,6 +1961,12 @@ packages:
   zod@3.25.76:
     resolution: {integrity: sha512-gzUt/qt81nXsFGKIFcC3YnfEAx5NkunCfnDlvuBSSFS02bcXu4Lmea0AFIUwbLWxWPx3d9p8S5QoaujKcNQxcQ==}
 
+  zod@4.3.6:
+    resolution: {integrity: sha512-rftlrkhHZOcjDwkGlnUtZZkvaPHCsDATp4pGpuOOMDaTdDDXF91wuVDJoWoPsKX/3YPQ5fHuF3STjcYyKr+Qhg==}
+
+  zod@4.6.7:
+    resolution: {integrity: sha512-g8W2D2kU6a8untc053fX1uVBKzM7yqAxW/3zwk83+6RyF2+SKOuV+c0wBDhUwzV1PaGapmZH+rmcUzPf+3CGwg==}
+
 snapshots:
 
   '@babel/code-frame@7.29.7':
@@ -1930,19 +2017,19 @@ snapshots:
       '@jridgewell/resolve-uri': 3.1.2
       '@jridgewell/sourcemap-codec': 1.6.0
 
-  '@jthum/framework-http@https://codeload.github.com/jthum/framework/tar.gz/35fe8d76aff662aae93da929018ff90e97ad3b8c#path:packages/http(@jthum/framework@https://codeload.github.com/jthum/framework/tar.gz/35fe8d76aff662aae93da929018ff90e97ad3b8c(@internationalized/date@3.12.3)(@sveltejs/kit@3.0.0-next.30(@sveltejs/vite-plugin-svelte@7.3.0(@voidzero-dev/vite-plus-core@0.3.0(@types/node@26.4.0)(jiti@2.7.0)(typescript@6.0.3)(yaml@2.9.0))(svelte@5.57.0))(@voidzero-dev/vite-plus-core@0.3.0(@types/node@26.4.0)(jiti@2.7.0)(typescript@6.0.3)(yaml@2.9.0))(svelte@5.57.0)(typescript@6.0.3))(svelte@5.57.0)(tailwindcss@4.3.3))':
+  '@jthum/framework-http@https://codeload.github.com/jthum/framework/tar.gz/86a6430606a248333459c29662bf86a8d2a65d14#path:packages/http(@jthum/framework@https://codeload.github.com/jthum/framework/tar.gz/86a6430606a248333459c29662bf86a8d2a65d14(@internationalized/date@3.12.3)(@sveltejs/kit@3.0.0-next.30(@sveltejs/vite-plugin-svelte@7.3.0(@voidzero-dev/vite-plus-core@0.3.0(@types/node@26.4.0)(jiti@2.7.0)(typescript@6.0.3)(yaml@2.9.0))(svelte@5.57.0))(@voidzero-dev/vite-plus-core@0.3.0(@types/node@26.4.0)(jiti@2.7.0)(typescript@6.0.3)(yaml@2.9.0))(svelte@5.57.0)(typescript@6.0.3))(svelte@5.57.0)(tailwindcss@4.3.3))':
     dependencies:
-      '@jthum/framework': https://codeload.github.com/jthum/framework/tar.gz/35fe8d76aff662aae93da929018ff90e97ad3b8c(@internationalized/date@3.12.3)(@sveltejs/kit@3.0.0-next.30(@sveltejs/vite-plugin-svelte@7.3.0(@voidzero-dev/vite-plus-core@0.3.0(@types/node@26.4.0)(jiti@2.7.0)(typescript@6.0.3)(yaml@2.9.0))(svelte@5.57.0))(@voidzero-dev/vite-plus-core@0.3.0(@types/node@26.4.0)(jiti@2.7.0)(typescript@6.0.3)(yaml@2.9.0))(svelte@5.57.0)(typescript@6.0.3))(svelte@5.57.0)(tailwindcss@4.3.3)
+      '@jthum/framework': https://codeload.github.com/jthum/framework/tar.gz/86a6430606a248333459c29662bf86a8d2a65d14(@internationalized/date@3.12.3)(@sveltejs/kit@3.0.0-next.30(@sveltejs/vite-plugin-svelte@7.3.0(@voidzero-dev/vite-plus-core@0.3.0(@types/node@26.4.0)(jiti@2.7.0)(typescript@6.0.3)(yaml@2.9.0))(svelte@5.57.0))(@voidzero-dev/vite-plus-core@0.3.0(@types/node@26.4.0)(jiti@2.7.0)(typescript@6.0.3)(yaml@2.9.0))(svelte@5.57.0)(typescript@6.0.3))(svelte@5.57.0)(tailwindcss@4.3.3)
 
-  '@jthum/framework-sqlite-browser@https://codeload.github.com/jthum/framework/tar.gz/35fe8d76aff662aae93da929018ff90e97ad3b8c#path:packages/sqlite/browser(@jthum/framework@https://codeload.github.com/jthum/framework/tar.gz/35fe8d76aff662aae93da929018ff90e97ad3b8c(@internationalized/date@3.12.3)(@sveltejs/kit@3.0.0-next.30(@sveltejs/vite-plugin-svelte@7.3.0(@voidzero-dev/vite-plus-core@0.3.0(@types/node@26.4.0)(jiti@2.7.0)(typescript@6.0.3)(yaml@2.9.0))(svelte@5.57.0))(@voidzero-dev/vite-plus-core@0.3.0(@types/node@26.4.0)(jiti@2.7.0)(typescript@6.0.3)(yaml@2.9.0))(svelte@5.57.0)(typescript@6.0.3))(svelte@5.57.0)(tailwindcss@4.3.3))':
+  '@jthum/framework-sqlite-browser@https://codeload.github.com/jthum/framework/tar.gz/86a6430606a248333459c29662bf86a8d2a65d14#path:packages/sqlite/browser(@jthum/framework@https://codeload.github.com/jthum/framework/tar.gz/86a6430606a248333459c29662bf86a8d2a65d14(@internationalized/date@3.12.3)(@sveltejs/kit@3.0.0-next.30(@sveltejs/vite-plugin-svelte@7.3.0(@voidzero-dev/vite-plus-core@0.3.0(@types/node@26.4.0)(jiti@2.7.0)(typescript@6.0.3)(yaml@2.9.0))(svelte@5.57.0))(@voidzero-dev/vite-plus-core@0.3.0(@types/node@26.4.0)(jiti@2.7.0)(typescript@6.0.3)(yaml@2.9.0))(svelte@5.57.0)(typescript@6.0.3))(svelte@5.57.0)(tailwindcss@4.3.3))':
     dependencies:
-      '@jthum/framework': https://codeload.github.com/jthum/framework/tar.gz/35fe8d76aff662aae93da929018ff90e97ad3b8c(@internationalized/date@3.12.3)(@sveltejs/kit@3.0.0-next.30(@sveltejs/vite-plugin-svelte@7.3.0(@voidzero-dev/vite-plus-core@0.3.0(@types/node@26.4.0)(jiti@2.7.0)(typescript@6.0.3)(yaml@2.9.0))(svelte@5.57.0))(@voidzero-dev/vite-plus-core@0.3.0(@types/node@26.4.0)(jiti@2.7.0)(typescript@6.0.3)(yaml@2.9.0))(svelte@5.57.0)(typescript@6.0.3))(svelte@5.57.0)(tailwindcss@4.3.3)
+      '@jthum/framework': https://codeload.github.com/jthum/framework/tar.gz/86a6430606a248333459c29662bf86a8d2a65d14(@internationalized/date@3.12.3)(@sveltejs/kit@3.0.0-next.30(@sveltejs/vite-plugin-svelte@7.3.0(@voidzero-dev/vite-plus-core@0.3.0(@types/node@26.4.0)(jiti@2.7.0)(typescript@6.0.3)(yaml@2.9.0))(svelte@5.57.0))(@voidzero-dev/vite-plus-core@0.3.0(@types/node@26.4.0)(jiti@2.7.0)(typescript@6.0.3)(yaml@2.9.0))(svelte@5.57.0)(typescript@6.0.3))(svelte@5.57.0)(tailwindcss@4.3.3)
       wa-sqlite: 1.0.0
 
-  '@jthum/framework@https://codeload.github.com/jthum/framework/tar.gz/35fe8d76aff662aae93da929018ff90e97ad3b8c(@internationalized/date@3.12.3)(@sveltejs/kit@3.0.0-next.30(@sveltejs/vite-plugin-svelte@7.3.0(@voidzero-dev/vite-plus-core@0.3.0(@types/node@26.4.0)(jiti@2.7.0)(typescript@6.0.3)(yaml@2.9.0))(svelte@5.57.0))(@voidzero-dev/vite-plus-core@0.3.0(@types/node@26.4.0)(jiti@2.7.0)(typescript@6.0.3)(yaml@2.9.0))(svelte@5.57.0)(typescript@6.0.3))(svelte@5.57.0)(tailwindcss@4.3.3)':
+  '@jthum/framework@https://codeload.github.com/jthum/framework/tar.gz/86a6430606a248333459c29662bf86a8d2a65d14(@internationalized/date@3.12.3)(@sveltejs/kit@3.0.0-next.30(@sveltejs/vite-plugin-svelte@7.3.0(@voidzero-dev/vite-plus-core@0.3.0(@types/node@26.4.0)(jiti@2.7.0)(typescript@6.0.3)(yaml@2.9.0))(svelte@5.57.0))(@voidzero-dev/vite-plus-core@0.3.0(@types/node@26.4.0)(jiti@2.7.0)(typescript@6.0.3)(yaml@2.9.0))(svelte@5.57.0)(typescript@6.0.3))(svelte@5.57.0)(tailwindcss@4.3.3)':
     dependencies:
       '@lucide/svelte': 1.51.0(svelte@5.57.0)
-      bits-ui: 2.20.4(@internationalized/date@3.12.3)(@sveltejs/kit@3.0.0-next.30(@sveltejs/vite-plugin-svelte@7.3.0(@voidzero-dev/vite-plus-core@0.3.0(@types/node@26.4.0)(jiti@2.7.0)(typescript@6.0.3)(yaml@2.9.0))(svelte@5.57.0))(@voidzero-dev/vite-plus-core@0.3.0(@types/node@26.4.0)(jiti@2.7.0)(typescript@6.0.3)(yaml@2.9.0))(svelte@5.57.0)(typescript@6.0.3))(svelte@5.57.0)
+      bits-ui: 2.20.6(@internationalized/date@3.12.3)(@sveltejs/kit@3.0.0-next.30(@sveltejs/vite-plugin-svelte@7.3.0(@voidzero-dev/vite-plus-core@0.3.0(@types/node@26.4.0)(jiti@2.7.0)(typescript@6.0.3)(yaml@2.9.0))(svelte@5.57.0))(@voidzero-dev/vite-plus-core@0.3.0(@types/node@26.4.0)(jiti@2.7.0)(typescript@6.0.3)(yaml@2.9.0))(svelte@5.57.0)(typescript@6.0.3))(svelte@5.57.0)
       clsx: 2.1.1
       mode-watcher: 1.1.0(svelte@5.57.0)
       nanoid: 6.0.1
@@ -1955,14 +2042,14 @@ snapshots:
       - '@sveltejs/kit'
       - tailwindcss
 
-  '@jthum/yair-openai@https://codeload.github.com/jthum/framework/tar.gz/35fe8d76aff662aae93da929018ff90e97ad3b8c#path:packages/inference/yair/providers/openai(4940e99702f8f46a4341f2c08ff5f3d5)':
+  '@jthum/yair-openai@https://codeload.github.com/jthum/framework/tar.gz/86a6430606a248333459c29662bf86a8d2a65d14#path:packages/inference/yair/providers/openai(6808364f69e729e397114fb9d927fe4a)':
     dependencies:
-      '@jthum/framework': https://codeload.github.com/jthum/framework/tar.gz/35fe8d76aff662aae93da929018ff90e97ad3b8c(@internationalized/date@3.12.3)(@sveltejs/kit@3.0.0-next.30(@sveltejs/vite-plugin-svelte@7.3.0(@voidzero-dev/vite-plus-core@0.3.0(@types/node@26.4.0)(jiti@2.7.0)(typescript@6.0.3)(yaml@2.9.0))(svelte@5.57.0))(@voidzero-dev/vite-plus-core@0.3.0(@types/node@26.4.0)(jiti@2.7.0)(typescript@6.0.3)(yaml@2.9.0))(svelte@5.57.0)(typescript@6.0.3))(svelte@5.57.0)(tailwindcss@4.3.3)
-      '@jthum/yair': https://codeload.github.com/jthum/framework/tar.gz/35fe8d76aff662aae93da929018ff90e97ad3b8c#path:packages/inference/yair/core(@jthum/framework@https://codeload.github.com/jthum/framework/tar.gz/35fe8d76aff662aae93da929018ff90e97ad3b8c(@internationalized/date@3.12.3)(@sveltejs/kit@3.0.0-next.30(@sveltejs/vite-plugin-svelte@7.3.0(@voidzero-dev/vite-plus-core@0.3.0(@types/node@26.4.0)(jiti@2.7.0)(typescript@6.0.3)(yaml@2.9.0))(svelte@5.57.0))(@voidzero-dev/vite-plus-core@0.3.0(@types/node@26.4.0)(jiti@2.7.0)(typescript@6.0.3)(yaml@2.9.0))(svelte@5.57.0)(typescript@6.0.3))(svelte@5.57.0)(tailwindcss@4.3.3))
+      '@jthum/framework': https://codeload.github.com/jthum/framework/tar.gz/86a6430606a248333459c29662bf86a8d2a65d14(@internationalized/date@3.12.3)(@sveltejs/kit@3.0.0-next.30(@sveltejs/vite-plugin-svelte@7.3.0(@voidzero-dev/vite-plus-core@0.3.0(@types/node@26.4.0)(jiti@2.7.0)(typescript@6.0.3)(yaml@2.9.0))(svelte@5.57.0))(@voidzero-dev/vite-plus-core@0.3.0(@types/node@26.4.0)(jiti@2.7.0)(typescript@6.0.3)(yaml@2.9.0))(svelte@5.57.0)(typescript@6.0.3))(svelte@5.57.0)(tailwindcss@4.3.3)
+      '@jthum/yair': https://codeload.github.com/jthum/framework/tar.gz/86a6430606a248333459c29662bf86a8d2a65d14#path:packages/inference/yair/core(@jthum/framework@https://codeload.github.com/jthum/framework/tar.gz/86a6430606a248333459c29662bf86a8d2a65d14(@internationalized/date@3.12.3)(@sveltejs/kit@3.0.0-next.30(@sveltejs/vite-plugin-svelte@7.3.0(@voidzero-dev/vite-plus-core@0.3.0(@types/node@26.4.0)(jiti@2.7.0)(typescript@6.0.3)(yaml@2.9.0))(svelte@5.57.0))(@voidzero-dev/vite-plus-core@0.3.0(@types/node@26.4.0)(jiti@2.7.0)(typescript@6.0.3)(yaml@2.9.0))(svelte@5.57.0)(typescript@6.0.3))(svelte@5.57.0)(tailwindcss@4.3.3))
 
-  '@jthum/yair@https://codeload.github.com/jthum/framework/tar.gz/35fe8d76aff662aae93da929018ff90e97ad3b8c#path:packages/inference/yair/core(@jthum/framework@https://codeload.github.com/jthum/framework/tar.gz/35fe8d76aff662aae93da929018ff90e97ad3b8c(@internationalized/date@3.12.3)(@sveltejs/kit@3.0.0-next.30(@sveltejs/vite-plugin-svelte@7.3.0(@voidzero-dev/vite-plus-core@0.3.0(@types/node@26.4.0)(jiti@2.7.0)(typescript@6.0.3)(yaml@2.9.0))(svelte@5.57.0))(@voidzero-dev/vite-plus-core@0.3.0(@types/node@26.4.0)(jiti@2.7.0)(typescript@6.0.3)(yaml@2.9.0))(svelte@5.57.0)(typescript@6.0.3))(svelte@5.57.0)(tailwindcss@4.3.3))':
+  '@jthum/yair@https://codeload.github.com/jthum/framework/tar.gz/86a6430606a248333459c29662bf86a8d2a65d14#path:packages/inference/yair/core(@jthum/framework@https://codeload.github.com/jthum/framework/tar.gz/86a6430606a248333459c29662bf86a8d2a65d14(@internationalized/date@3.12.3)(@sveltejs/kit@3.0.0-next.30(@sveltejs/vite-plugin-svelte@7.3.0(@voidzero-dev/vite-plus-core@0.3.0(@types/node@26.4.0)(jiti@2.7.0)(typescript@6.0.3)(yaml@2.9.0))(svelte@5.57.0))(@voidzero-dev/vite-plus-core@0.3.0(@types/node@26.4.0)(jiti@2.7.0)(typescript@6.0.3)(yaml@2.9.0))(svelte@5.57.0)(typescript@6.0.3))(svelte@5.57.0)(tailwindcss@4.3.3))':
     dependencies:
-      '@jthum/framework': https://codeload.github.com/jthum/framework/tar.gz/35fe8d76aff662aae93da929018ff90e97ad3b8c(@internationalized/date@3.12.3)(@sveltejs/kit@3.0.0-next.30(@sveltejs/vite-plugin-svelte@7.3.0(@voidzero-dev/vite-plus-core@0.3.0(@types/node@26.4.0)(jiti@2.7.0)(typescript@6.0.3)(yaml@2.9.0))(svelte@5.57.0))(@voidzero-dev/vite-plus-core@0.3.0(@types/node@26.4.0)(jiti@2.7.0)(typescript@6.0.3)(yaml@2.9.0))(svelte@5.57.0)(typescript@6.0.3))(svelte@5.57.0)(tailwindcss@4.3.3)
+      '@jthum/framework': https://codeload.github.com/jthum/framework/tar.gz/86a6430606a248333459c29662bf86a8d2a65d14(@internationalized/date@3.12.3)(@sveltejs/kit@3.0.0-next.30(@sveltejs/vite-plugin-svelte@7.3.0(@voidzero-dev/vite-plus-core@0.3.0(@types/node@26.4.0)(jiti@2.7.0)(typescript@6.0.3)(yaml@2.9.0))(svelte@5.57.0))(@voidzero-dev/vite-plus-core@0.3.0(@types/node@26.4.0)(jiti@2.7.0)(typescript@6.0.3)(yaml@2.9.0))(svelte@5.57.0)(typescript@6.0.3))(svelte@5.57.0)(tailwindcss@4.3.3)
 
   '@lucide/svelte@1.51.0(svelte@5.57.0)':
     dependencies:
@@ -2115,6 +2202,25 @@ snapshots:
 
   '@rolldown/pluginutils@1.0.1': {}
 
+  '@spacefast/common@0.8.0':
+    dependencies:
+      culori: 4.0.2
+      mime: 4.1.2
+      oauth4webapi: 3.8.7
+      parse5: 7.3.0
+      tldts: 7.4.19
+      zod: 4.6.7
+
+  '@spacefast/zero@0.8.0':
+    dependencies:
+      '@spacefast/common': 0.8.0
+      lucide-preact: 0.575.0(preact@10.29.8)
+      preact: 10.29.8
+      zod: 4.3.6
+    transitivePeerDependencies:
+      - '@tanstack/react-query'
+      - preact-render-to-string
+
   '@standard-schema/spec@1.1.0': {}
 
   '@sveltejs/acorn-typescript@1.0.13(acorn@8.18.0)':
@@ -2259,6 +2365,10 @@ snapshots:
       undici-types: 8.3.0
 
   '@types/pluralize@0.0.33': {}
+
+  '@types/ungap__structured-clone@1.2.0': {}
+
+  '@ungap/structured-clone@1.4.0': {}
 
   '@vitest/browser-preview@4.1.11(@voidzero-dev/vite-plus-core@0.3.0(@types/node@26.4.0)(jiti@2.7.0)(typescript@6.0.3)(yaml@2.9.0))(vitest@4.1.11)':
     dependencies:
@@ -2478,7 +2588,7 @@ snapshots:
     transitivePeerDependencies:
       - '@sveltejs/kit'
 
-  bits-ui@2.20.4(@internationalized/date@3.12.3)(@sveltejs/kit@3.0.0-next.30(@sveltejs/vite-plugin-svelte@7.3.0(@voidzero-dev/vite-plus-core@0.3.0(@types/node@26.4.0)(jiti@2.7.0)(typescript@6.0.3)(yaml@2.9.0))(svelte@5.57.0))(@voidzero-dev/vite-plus-core@0.3.0(@types/node@26.4.0)(jiti@2.7.0)(typescript@6.0.3)(yaml@2.9.0))(svelte@5.57.0)(typescript@6.0.3))(svelte@5.57.0):
+  bits-ui@2.20.6(@internationalized/date@3.12.3)(@sveltejs/kit@3.0.0-next.30(@sveltejs/vite-plugin-svelte@7.3.0(@voidzero-dev/vite-plus-core@0.3.0(@types/node@26.4.0)(jiti@2.7.0)(typescript@6.0.3)(yaml@2.9.0))(svelte@5.57.0))(@voidzero-dev/vite-plus-core@0.3.0(@types/node@26.4.0)(jiti@2.7.0)(typescript@6.0.3)(yaml@2.9.0))(svelte@5.57.0)(typescript@6.0.3))(svelte@5.57.0):
     dependencies:
       '@floating-ui/core': 1.8.0
       '@floating-ui/dom': 1.8.0
@@ -2486,8 +2596,8 @@ snapshots:
       esm-env: 1.2.2
       runed: 0.35.1(@sveltejs/kit@3.0.0-next.30(@sveltejs/vite-plugin-svelte@7.3.0(@voidzero-dev/vite-plus-core@0.3.0(@types/node@26.4.0)(jiti@2.7.0)(typescript@6.0.3)(yaml@2.9.0))(svelte@5.57.0))(@voidzero-dev/vite-plus-core@0.3.0(@types/node@26.4.0)(jiti@2.7.0)(typescript@6.0.3)(yaml@2.9.0))(svelte@5.57.0)(typescript@6.0.3))(svelte@5.57.0)
       svelte: 5.57.0
-      svelte-toolbelt: 0.10.6(@sveltejs/kit@3.0.0-next.30(@sveltejs/vite-plugin-svelte@7.3.0(@voidzero-dev/vite-plus-core@0.3.0(@types/node@26.4.0)(jiti@2.7.0)(typescript@6.0.3)(yaml@2.9.0))(svelte@5.57.0))(@voidzero-dev/vite-plus-core@0.3.0(@types/node@26.4.0)(jiti@2.7.0)(typescript@6.0.3)(yaml@2.9.0))(svelte@5.57.0)(typescript@6.0.3))(svelte@5.57.0)
-      tabbable: 6.5.0
+      svelte-toolbelt: 0.10.7(@sveltejs/kit@3.0.0-next.30(@sveltejs/vite-plugin-svelte@7.3.0(@voidzero-dev/vite-plus-core@0.3.0(@types/node@26.4.0)(jiti@2.7.0)(typescript@6.0.3)(yaml@2.9.0))(svelte@5.57.0))(@voidzero-dev/vite-plus-core@0.3.0(@types/node@26.4.0)(jiti@2.7.0)(typescript@6.0.3)(yaml@2.9.0))(svelte@5.57.0)(typescript@6.0.3))(svelte@5.57.0)
+      tabbable: 6.5.1
     transitivePeerDependencies:
       - '@sveltejs/kit'
 
@@ -2517,6 +2627,8 @@ snapshots:
 
   cookie@2.0.1: {}
 
+  culori@4.0.2: {}
+
   deepmerge@4.3.1: {}
 
   dequal@2.0.3: {}
@@ -2537,6 +2649,8 @@ snapshots:
     dependencies:
       graceful-fs: 4.2.11
       tapable: 2.3.3
+
+  entities@6.0.1: {}
 
   es-module-lexer@2.3.2: {}
 
@@ -2677,6 +2791,10 @@ snapshots:
 
   locate-character@3.0.0: {}
 
+  lucide-preact@0.575.0(preact@10.29.8):
+    dependencies:
+      preact: 10.29.8
+
   lz-string@1.5.0: {}
 
   magic-string@0.30.21:
@@ -2686,6 +2804,8 @@ snapshots:
   magic-string@1.2.3:
     dependencies:
       '@jridgewell/sourcemap-codec': 1.6.0
+
+  mime@4.1.2: {}
 
   mitt@3.0.1: {}
 
@@ -2706,6 +2826,8 @@ snapshots:
   nanoid@6.0.1: {}
 
   node-fetch-native@1.6.7: {}
+
+  oauth4webapi@3.8.7: {}
 
   obug@2.1.4: {}
 
@@ -2768,6 +2890,10 @@ snapshots:
       oxlint-tsgolint: 7.0.2001
       vite-plus: 0.3.0(@types/node@26.4.0)(@voidzero-dev/vite-plus-core@0.3.0(@types/node@26.4.0)(jiti@2.7.0)(typescript@6.0.3)(yaml@2.9.0))(jiti@2.7.0)(svelte@5.57.0)(typescript@6.0.3)(yaml@2.9.0)
 
+  parse5@7.3.0:
+    dependencies:
+      entities: 6.0.1
+
   pathe@2.0.3: {}
 
   picocolors@1.1.1: {}
@@ -2783,6 +2909,8 @@ snapshots:
       nanoid: 3.3.18
       picocolors: 1.1.1
       source-map-js: 1.2.1
+
+  preact@10.29.8: {}
 
   pretty-format@27.5.1:
     dependencies:
@@ -2904,6 +3032,15 @@ snapshots:
     transitivePeerDependencies:
       - '@sveltejs/kit'
 
+  svelte-toolbelt@0.10.7(@sveltejs/kit@3.0.0-next.30(@sveltejs/vite-plugin-svelte@7.3.0(@voidzero-dev/vite-plus-core@0.3.0(@types/node@26.4.0)(jiti@2.7.0)(typescript@6.0.3)(yaml@2.9.0))(svelte@5.57.0))(@voidzero-dev/vite-plus-core@0.3.0(@types/node@26.4.0)(jiti@2.7.0)(typescript@6.0.3)(yaml@2.9.0))(svelte@5.57.0)(typescript@6.0.3))(svelte@5.57.0):
+    dependencies:
+      clsx: 2.1.1
+      runed: 0.35.1(@sveltejs/kit@3.0.0-next.30(@sveltejs/vite-plugin-svelte@7.3.0(@voidzero-dev/vite-plus-core@0.3.0(@types/node@26.4.0)(jiti@2.7.0)(typescript@6.0.3)(yaml@2.9.0))(svelte@5.57.0))(@voidzero-dev/vite-plus-core@0.3.0(@types/node@26.4.0)(jiti@2.7.0)(typescript@6.0.3)(yaml@2.9.0))(svelte@5.57.0)(typescript@6.0.3))(svelte@5.57.0)
+      style-to-object: 1.0.14
+      svelte: 5.57.0
+    transitivePeerDependencies:
+      - '@sveltejs/kit'
+
   svelte-toolbelt@0.7.1(svelte@5.57.0):
     dependencies:
       clsx: 2.1.1
@@ -2932,6 +3069,8 @@ snapshots:
       - '@typescript-eslint/types'
 
   tabbable@6.5.0: {}
+
+  tabbable@6.5.1: {}
 
   tailwind-merge@3.6.0: {}
 
@@ -2963,6 +3102,12 @@ snapshots:
   tinypool@2.1.0: {}
 
   tinyrainbow@3.1.1: {}
+
+  tldts-core@7.4.20: {}
+
+  tldts@7.4.19:
+    dependencies:
+      tldts-core: 7.4.20
 
   totalist@3.0.1: {}
 
@@ -3135,3 +3280,7 @@ snapshots:
   zimmerframe@1.1.4: {}
 
   zod@3.25.76: {}
+
+  zod@4.3.6: {}
+
+  zod@4.6.7: {}

@@ -235,3 +235,18 @@ VITE_DEPLOYMENT=local vp build
 
 Serve `build` as a static SPA with `index.html` as the navigation fallback. The browser opens its
 own OPFS/IndexedDB SQLite storage. There is no server setup, login or shared server data in this mode.
+
+## Publish a generated app to Spacefast
+
+The optional [Spacefast Zero target](../examples/spacefast-zero/README.md) builds an exported Spec
+into a separate native Zero backend and Svelte app. Definitions change through redeployment;
+application data stays in the target. It does not switch Builder.run's browser or Node storage.
+
+```sh
+vp run deploy:spacefast -- --spec /path/to/app.json --space spc_... --team TEAM_ID --owner you@example.com
+```
+
+Authenticate with Spacefast first and use a dedicated existing Space. The linked target guide
+covers query budgets, supported model changes, native sign-in, and the current blocker to direct
+publishing from an external static browser origin. This is an optional command-line deployment
+path; the main app does not yet expose a one-click target picker.

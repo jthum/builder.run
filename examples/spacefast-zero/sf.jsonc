@@ -1,0 +1,11 @@
+{
+  "$schema": "https://spacefast.com/schemas/sf.json",
+  "name": "Deployment-generated app",
+  "rewrites": [
+    { "source": "/p/*", "destination": "/index.html" },
+    { "source": "/v/*", "destination": "/index.html" },
+    { "source": "/t/*", "destination": "/index.html" },
+    { "source": "/f/*", "destination": "/index.html" },
+  ],
+  "runtime": { "kind": "zero", "server": "server/index.ts", "client": "client/index.tsx" },
+}

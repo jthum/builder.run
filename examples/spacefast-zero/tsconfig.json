@@ -1,0 +1,20 @@
+{
+  "compilerOptions": {
+    "strict": true,
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "skipLibCheck": true,
+    "allowImportingTsExtensions": true,
+    "noEmit": true,
+    "lib": ["ES2022", "DOM"],
+    "types": ["node", "svelte", "vite-plus/client"],
+    "paths": {
+      "$lib/app/canonical-studio.svelte.ts": ["./frontend/data.svelte.ts"],
+      "$lib/app/session.svelte.ts": ["./frontend/data.svelte.ts"],
+      "$lib/app/workflow-launch.ts": ["./frontend/workflow.ts"],
+      "$lib/*": ["../../src/lib/*"]
+    }
+  },
+  "include": ["./**/*.ts", "./frontend/**/*.svelte"]
+}
