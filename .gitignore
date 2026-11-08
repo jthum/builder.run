@@ -29,3 +29,6 @@ vite.config.ts.timestamp-*
 
 # Agent / editor
 .grok
+
+# Generated optional deployment templates
+/static/deployment-assets

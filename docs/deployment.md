@@ -248,5 +248,6 @@ vp run deploy:spacefast -- --spec /path/to/app.json --space spc_... --team TEAM_
 
 Authenticate with Spacefast first and use a dedicated existing Space. The linked target guide
 covers query budgets, supported model changes, native sign-in, and the current blocker to direct
-publishing from an external static browser origin. This is an optional command-line deployment
-path; the main app does not yet expose a one-click target picker.
+publishing from an external static browser origin. The App switcher menu also offers **Deploy app** for direct browser
+publishing with a user-supplied Spacefast key. Local preparation works; Spacefast currently needs
+to enable cross-origin API access for the browser upload step. No publishing relay is required.

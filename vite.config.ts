@@ -1,3 +1,4 @@
+import { deploymentAssets } from "./scripts/deployment-assets.ts";
 import path from "node:path";
 import { realpathSync } from "node:fs";
 import { fileURLToPath } from "node:url";
@@ -76,6 +77,7 @@ export default defineConfig(({ mode }) => {
       options: { typeAware: true, typeCheck: false },
     },
     plugins: lazyPlugins(() => [
+      deploymentAssets(root),
       tailwindcss(),
       sveltekit({
         compilerOptions: {

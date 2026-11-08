@@ -23,6 +23,7 @@
 	import * as DropdownMenu from "@jthum/framework/svelte/ui/dropdown-menu";
 	import * as Sidebar from "@jthum/framework/svelte/ui/sidebar";
 	import ArrowLeftIcon from "@lucide/svelte/icons/arrow-left";
+	import CloudUploadIcon from "@lucide/svelte/icons/cloud-upload";
 	import BoxIcon from "@lucide/svelte/icons/box";
 	import Building2Icon from "@lucide/svelte/icons/building-2";
 	import CheckIcon from "@lucide/svelte/icons/check";
@@ -86,6 +87,7 @@
 	let settingsOpen = $state(false);
 	let appSettingsOpen = $state(false);
 	let appMenuOpen = $state(false);
+	let deployOpen = $state(false);
 	let appSearch = $state("");
 	const canManageSpace = $derived(!SERVER_MODE || session.permissions.space.includes("manage"));
 	const canManageApp = $derived(!SERVER_MODE || session.permissions.app.includes("manage"));
@@ -218,6 +220,7 @@
 							<div class="grid gap-0.5 p-1">
 								{#if canManageSpace}<Button type="button" variant="ghost" class="justify-start" onclick={createApp}><PlusIcon data-icon="inline-start" />New app</Button>{/if}
 								{#if canManageApp}<Button type="button" variant="ghost" class="justify-start" onclick={editAppSettings}><SettingsIcon data-icon="inline-start" />App settings</Button>{/if}
+								{#if canManageApp}<Button type="button" variant="ghost" class="justify-start" onclick={()=>{appMenuOpen=false;deployOpen=true;}}><CloudUploadIcon data-icon="inline-start" />Deploy app</Button>{/if}
 							</div>
 						</Command.Root>
 					</DropdownMenu.Content>
@@ -468,3 +471,11 @@
 		await createSpace(name);
 	}}
 />
+
+{#if deployOpen && canonicalStudio.spec}
+  {#key canonicalStudio.spec.id}
+    {#await import("./deploy-app-dialog.svelte") then module}
+      <module.default bind:open={deployOpen} spec={canonicalStudio.spec} />
+    {/await}
+  {/key}
+{/if}

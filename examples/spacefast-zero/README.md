@@ -67,13 +67,55 @@ Views, grouped queries, durable Rule execution/history, settings, and ActorReque
 invocations. Native OAuth login itself
 still needs a human check; the HTTP harness uses explicitly enabled test authentication.
 
-## Browser publishing status
+## Direct browser publishing
 
-Direct publishing from an external static origin is currently blocked: Spacefast's publish API
-preflight does not grant access to `https://builder.run` or localhost. The supported Zero compiler
-also runs through Node tooling. One-click browser publishing therefore needs a supported browser
-integration/remote compiler from Spacefast, or an optional authenticated publishing relay. The
-local command above is usable independently. No disabled Deploy button, relay requirement, or
-Spacefast-specific restriction has been imposed on the main app or Framework.
+Open the App switcher menu → **Deploy app**. The dialog and selected target load lazily.
+Paste a Spacefast API key, connect, select your team and a dedicated existing Space (or create
+one), enter the owner's verified email, and deploy. The key stays in memory for the dialog's
+lifetime. It is sent only to the official Spacefast API, never stored in localStorage, embedded
+in the generated app, or sent to a relay. Only destination preferences are remembered locally.
+
+**Prepare locally** works independently of the key/network connection to Spacefast. It generates
+the native deployment in the browser and offers a credential-free deployment JSON download.
+It contains app definitions/assets, so treat it like an app export. It is a diagnostic/interchange
+artifact, not a static site directory or a file the generic archive uploader can serve directly.
+
+Builder.run's normal build prepares a versioned runtime template using Spacefast's pinned SDK.
+The end-user browser generates the schema, substitutes model data into that compiled template,
+calculates native migrations/digests, and performs manifest publishing, signed file uploads,
+finalization and activation checks. End users need no Node, CLI, WASM compiler, OPFS staging or
+publishing service. The template is fetched compressed on demand and released when the dialog
+closes. New targets have metadata plus independent dynamic imports and assets.
+
+Retries within an open dialog retain the original publish intent/idempotency key and refresh
+upload instructions. **Stop waiting** interrupts local waiting; it does not undo accepted writes.
+Do not close/reload an uncertain deployment and blindly create another Space: inspect its current
+status first. Already-created destinations are remembered immediately. Browser records and
+stored credentials are not transferred by this flow.
+
+### Current platform blocker
+
+On November 8, Spacefast's API preflight still grants no `Access-Control-Allow-Origin` for
+`https://builder.run`, localhost or the tested Space-hosted origin. It does grant access to its
+own dashboard origin. A user-supplied key authorizes the API but cannot bypass this browser policy.
+The dialog therefore reports the connection failure on those origins today. No relay or CORS
+bypass has been added. Spacefast must enable token-authenticated access from the calling origin
+for the direct browser network step to succeed.
+
+The browser-generated artifact passed native schema, migration and digest equivalence checks and
+was installed/activated on the dedicated test Space through the browser publisher's exact manifest
+and signed-upload protocol. That live protocol test used a CLI-authenticated transport to avoid
+extracting credentials; it does **not** claim that browser CORS succeeded. The regular CLI publish
+command remains available independently.
+
+```sh
+vp run test:spacefast-browser
+vp test src/lib/deployments/spacefast --run
+```
+
+The first command builds the template and compares browser output against the official SDK.
+The second checks retry identity, scoped upload credentials, activation and destination protection.
+`scripts/spacefast-browser-publish-live.mjs` is an opt-in native API check requiring explicit
+`SPACEFAST_TEST_SPACE` and `SPACEFAST_TEST_TEAM`; it never creates a new Space.
 
 See [adapter architecture and target limits](deployment/README.md).

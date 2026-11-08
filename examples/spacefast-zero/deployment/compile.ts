@@ -1,4 +1,5 @@
-import { createHash } from "node:crypto";
+import { sha256 } from "@noble/hashes/sha2.js";
+import { bytesToHex } from "@noble/hashes/utils.js";
 import { assertValidSpec, type Spec } from "@jthum/framework/spec";
 import type { Deployment, QueryPlan } from "./model.ts";
 import { queryShape } from "./query-shape.ts";
@@ -32,7 +33,7 @@ scope_config: table({workspace: string(), scope_kind: string(), scope_id: string
 
 /** Physical names depend on stable identity, never the editable label/key. */
 const name = (prefix: string, id: string) =>
-  `${prefix}_${createHash("sha256").update(id).digest("hex").slice(0, 24)}`;
+  `${prefix}_${bytesToHex(sha256(new TextEncoder().encode(id))).slice(0, 24)}`;
 
 export function compileDeployment(
   spec: Spec,

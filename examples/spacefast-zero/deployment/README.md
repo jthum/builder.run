@@ -6,7 +6,9 @@ actual Kernel through Framework's allowlisted HTTP protocol; the frontend uses W
 
 ## Source map
 
-- `compile.ts`: canonical Spec validation, stable physical names and literal native schema/indexes.
+- `compile.ts`: portable Spec compilation, stable physical names and literal native schema/indexes.
+- `browser.ts`: template-based browser compilation, additive native migrations, safe data retention
+  and deployment digests. Its output is checked against the pinned official compiler.
 - `records.ts`: native scalar encoding, indexed reads and logical query evaluation.
 - `catalog.ts`: indexed catalog metadata, staged transaction callbacks and shared Core invariants.
 - `configuration.ts`: Workspace/Scope instance configuration, including already-sealed payloads.
@@ -21,8 +23,9 @@ actual Kernel through Framework's allowlisted HTTP protocol; the frontend uses W
 
 The small shared `WorkspaceData` host binding is also used by Builder.run. The generated frontend
 binds it to authenticated HTTP clients instead of the authoring session. It does not load browser
-SQLite or the editors. Block components load lazily; target imports never enter the ordinary app
-build. The optional SDK/build dependencies do not become Framework Core dependencies.
+SQLite or the editors. Block components load lazily. Builder.run loads its publisher UI/compiler
+in separate dynamic chunks; the SDK compiler runs only during builds. Optional SDK/build
+dependencies do not become Framework Core dependencies.
 
 ## Storage and queries
 
@@ -72,7 +75,9 @@ an optional diagnostic ID cannot be generated.
 
 - Runtime model edits are rejected with `PERSISTENCE.UNSUPPORTED`; redeploy definitions instead.
 - Zero 0.8 publishes additive schemas. Stable-ID key renames and optional additions are verified.
-  Removed tables/fields/indexes, storage-type changes and required-field backfills need explicit
+  The browser compiler retains physical tables/fields/indexes when their portable definitions
+  are removed, preserving data without legacy Spec readers. The CLI source compiler still requires
+  declarations to remain. Storage-type changes and required-field backfills need explicit
   deployment planning. Native preflight/publication rejects incompatible changes. CLI `db migrate`
   destructive flags preview intent; they do not apply source removals. Do not promise otherwise.
 - The generated host installs no module-owned persistence modules or custom host Actions/Blocks.

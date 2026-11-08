@@ -7,6 +7,7 @@ import { fileURLToPath } from "node:url";
 import { realpathSync } from "node:fs";
 import { randomUUID } from "node:crypto";
 import { compileDeployment } from "../examples/spacefast-zero/deployment/compile.ts";
+import { createEmptySpec } from "@jthum/framework/spec";
 import { fixture } from "../examples/spacefast-zero/deployment/fixture.ts";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
@@ -37,8 +38,12 @@ const runtimeCompatibility = {
 const options = process.argv.slice(2);
 const specFile = options.indexOf("--spec");
 const revision = options.includes("--revision=2") ? 2 : 1;
-const spec =
-  specFile >= 0 ? JSON.parse(await readFile(options[specFile + 1], "utf8")) : fixture(revision);
+const template = options.includes("--template");
+const spec = template
+  ? createEmptySpec({ id: "template", key: "app", label: "App" })
+  : specFile >= 0
+    ? JSON.parse(await readFile(options[specFile + 1], "utf8"))
+    : fixture(revision);
 const { deployment, schema } = compileDeployment(spec, "deployed-app");
 await rm(output, { recursive: true, force: true });
 await mkdir(join(output, "server"), { recursive: true });
@@ -57,7 +62,9 @@ await writeFile(
 );
 await writeFile(
   join(output, "server/model.ts"),
-  `export const deployment = ${JSON.stringify(deployment)};\nexport const releaseId = ${JSON.stringify(randomUUID().replaceAll("-", ""))};\nexport const testDeployment = ${options.includes("--test")};\n`,
+  template
+    ? `export const deployment = JSON.parse("__SF_DEPLOYMENT_JSON__");\nexport const releaseId = "__SF_RELEASE_ID__";\nexport const testDeployment = false;\n`
+    : `export const deployment = ${JSON.stringify(deployment)};\nexport const releaseId = ${JSON.stringify(randomUUID().replaceAll("-", ""))};\nexport const testDeployment = ${options.includes("--test")};\n`,
 );
 await cp(join(source, "sf.jsonc"), join(output, "sf.jsonc"));
 

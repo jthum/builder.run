@@ -25,7 +25,9 @@
     "test:server:workflow": "node scripts/server-workflow.mjs",
     "build:spacefast": "node scripts/build-spacefast-zero.mjs",
     "deploy:spacefast": "node scripts/deploy-spacefast.mjs",
-    "check:spacefast": "svelte-check --tsconfig examples/spacefast-zero/tsconfig.json"
+    "check:spacefast": "svelte-check --tsconfig examples/spacefast-zero/tsconfig.json",
+    "build:spacefast-browser": "node scripts/build-spacefast-browser.mjs",
+    "test:spacefast-browser": "node scripts/build-spacefast-browser.mjs && node scripts/spacefast-browser-smoke.mjs"
   },
   "dependencies": {
     "@jthum/framework": "github:jthum/framework#86a6430606a248333459c29662bf86a8d2a65d14",
@@ -41,7 +43,10 @@
     "@fontsource-variable/inter": "^5.3.0",
     "@internationalized/date": "^3.12.3",
     "@lucide/svelte": "^1.46.0",
+    "@noble/hashes": "^2.4.0",
+    "@spacefast/common": "0.8.0",
     "@spacefast/zero": "0.8.0",
+    "@spacefast/zero-compile": "0.8.0",
     "@sveltejs/adapter-node": "6.0.0-next.15",
     "@sveltejs/adapter-static": "^4.0.0-next.4",
     "@sveltejs/kit": "^3.0.0-next.30",
