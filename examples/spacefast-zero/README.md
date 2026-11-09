@@ -72,8 +72,9 @@ still needs a human check; the HTTP harness uses explicitly enabled test authent
 Open the App switcher menu → **Deploy app**. The dialog and selected target load lazily.
 Paste a Spacefast API key, connect, select your team and a dedicated existing Space (or create
 one), enter the owner's verified email, and deploy. The key stays in memory for the dialog's
-lifetime. It is sent only to the official Spacefast API, never stored in localStorage, embedded
-in the generated app, or sent to a relay. Only destination preferences are remembered locally.
+lifetime. It is never stored in localStorage or embedded in the generated app. With direct transport it
+goes to Spacefast; when a relay is configured it passes through that service to Spacefast. The
+dialog explains the configured connection. Only destination preferences are remembered locally.
 
 **Prepare locally** works independently of the key/network connection to Spacefast. It generates
 the native deployment in the browser and offers a credential-free deployment JSON download.
@@ -84,7 +85,7 @@ Builder.run's normal build prepares a versioned runtime template using Spacefast
 The end-user browser generates the schema, substitutes model data into that compiled template,
 calculates native migrations/digests, and performs manifest publishing, signed file uploads,
 finalization and activation checks. End users need no Node, CLI, WASM compiler, OPFS staging or
-publishing service. The template is fetched compressed on demand and released when the dialog
+compiler service. The template is fetched compressed on demand and released when the dialog
 closes. New targets have metadata plus independent dynamic imports and assets.
 
 Retries within an open dialog retain the original publish intent/idempotency key and refresh
@@ -98,9 +99,11 @@ stored credentials are not transferred by this flow.
 On November 8, Spacefast's API preflight still grants no `Access-Control-Allow-Origin` for
 `https://builder.run`, localhost or the tested Space-hosted origin. It does grant access to its
 own dashboard origin. A user-supplied key authorizes the API but cannot bypass this browser policy.
-The dialog therefore reports the connection failure on those origins today. No relay or CORS
-bypass has been added. Spacefast must enable token-authenticated access from the calling origin
-for the direct browser network step to succeed.
+The direct transport therefore reports a connection failure on those origins today. To publish
+from them now, deploy the [two standalone relay scripts](../../relay/README.md) and build with
+`VITE_SPACEFAST_RELAY_URL=/relay/spacefast`. The relay forwards restricted HTTP requests; all
+preparation, upload orchestration, retries and activation checks stay in the browser. Leaving
+that setting blank retains direct access, which requires Spacefast to allow the calling origin.
 
 The browser-generated artifact passed native schema, migration and digest equivalence checks and
 was installed/activated on the dedicated test Space through the browser publisher's exact manifest

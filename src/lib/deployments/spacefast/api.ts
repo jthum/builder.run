@@ -47,7 +47,7 @@ export interface Space {
   channels: { live: { versionId: string | null } };
 }
 
-/** The key stays in this ephemeral client. Only the official API receives it. */
+/** The key stays in this ephemeral client; the configured transport forwards requests to Spacefast. */
 export class SpacefastApi {
   private creating?: { teamId: string; title: string; key: string };
   constructor(
@@ -86,7 +86,7 @@ export class SpacefastApi {
       if (options.signal?.aborted) throw cause;
       throw new SpacefastError(
         "DEPLOYMENT.CONNECTION_FAILED",
-        "The browser could not reach Spacefast. Check your connection. Spacefast must also allow this site's origin through CORS; an API key does not bypass that browser policy.",
+        "Could not reach Spacefast through the configured publishing connection. Check your network and relay configuration, or Spacefast’s CORS policy when connecting directly.",
       );
     }
     const envelope = await response.json();

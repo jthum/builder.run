@@ -249,5 +249,7 @@ vp run deploy:spacefast -- --spec /path/to/app.json --space spc_... --team TEAM_
 Authenticate with Spacefast first and use a dedicated existing Space. The linked target guide
 covers query budgets, supported model changes, native sign-in, and the current blocker to direct
 publishing from an external static browser origin. The App switcher menu also offers **Deploy app** for direct browser
-publishing with a user-supplied Spacefast key. Local preparation works; Spacefast currently needs
-to enable cross-origin API access for the browser upload step. No publishing relay is required.
+publishing with a user-supplied Spacefast key. For browser origins Spacefast does not allow,
+[deploy the standalone relay](../relay/README.md) and build with
+`VITE_SPACEFAST_RELAY_URL=/relay/spacefast`. Local preparation and deployment orchestration stay
+in the browser. Direct access remains available when the relay setting is blank.

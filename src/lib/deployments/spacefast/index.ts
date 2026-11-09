@@ -4,6 +4,8 @@ import {
   prepareBrowserDeployment,
   type BrowserTemplate,
 } from "../../../../examples/spacefast-zero/deployment/browser.ts";
+import { SpacefastApi } from "./api.ts";
+import { spacefastRelayFetch } from "./transport.ts";
 export { SpacefastApi, SpacefastError } from "./api.ts";
 export type { Space, Team, SpacefastPublish } from "./api.ts";
 let template: Promise<BrowserTemplate> | undefined;
@@ -35,4 +37,10 @@ export function prepare(spec: Spec, previous: Parameters<typeof prepareBrowserDe
 
 export function release() {
   template = undefined;
+}
+
+const relay = import.meta.env.VITE_SPACEFAST_RELAY_URL?.trim();
+export const usesRelay = Boolean(relay);
+export function connect(key: string) {
+  return new SpacefastApi(key, relay ? spacefastRelayFetch(relay) : fetch);
 }

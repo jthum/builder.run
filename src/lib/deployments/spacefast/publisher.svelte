@@ -37,7 +37,7 @@
   async function work(task:()=>Promise<void>){controller=new AbortController();pending=true;onBusyChange(true);error="";try{await task();}catch(cause){error=cause instanceof Error?cause.message:String(cause);}finally{pending=false;onBusyChange(false);progress="";}}
   function saveDestination(){try{localStorage.setItem(storageKey,JSON.stringify({teamId,spaceId,owner}));}catch(cause){console.warn("Could not remember deployment destination",cause);}}
   async function connect(){await work(async()=>{
-        const next=new target.SpacefastApi(key.trim());
+        const next=target.connect(key.trim());
     const context=await next.bootstrap(controller.signal);
     teams=context.teams;api=next;
     if(!teams.some(team=>team.id===teamId))teamId=teams[0]?.id??"";
@@ -79,7 +79,7 @@
       <Field.Group>
 
         {#if !api}
-          <Field.Field><Field.Label for={`${id}-key`}>Spacefast API key</Field.Label><Input id={`${id}-key`} type="password" bind:value={key} autocomplete="off" spellcheck={false} disabled={pending} /><Field.Description>Paste a key from your Spacefast account. It stays in memory and goes directly to Spacefast.</Field.Description></Field.Field>
+          <Field.Field><Field.Label for={`${id}-key`}>Spacefast API key</Field.Label><Input id={`${id}-key`} type="password" bind:value={key} autocomplete="off" spellcheck={false} disabled={pending} /><Field.Description>Paste a key from your Spacefast account. It stays in memory. {target.usesRelay?"Requests pass through this site’s configured publishing relay to Spacefast.":"Requests go directly to Spacefast."}</Field.Description></Field.Field>
           <div><Button onclick={connect} disabled={!key.trim()||pending}>Connect to Spacefast</Button></div>
         {:else}
           <Field.Field><Field.Label for={`${id}-team`}>Team</Field.Label><OptionSelect id={`${id}-team`} value={teamId} options={teams.map(team=>({value:team.id,label:team.name}))} disabled={pending||Boolean(publish)} onValueChange={value=>{teamId=value;spaceId="";void work(()=>loadSpaces());}} /></Field.Field>
